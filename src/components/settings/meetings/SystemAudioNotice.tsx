@@ -30,24 +30,27 @@ export const SystemAudioNotice: React.FC<SystemAudioNoticeProps> = ({
   const { t } = useTranslation();
 
   return (
-    <div className="w-full rounded-2xl border border-error/40 bg-error/10 p-4">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-error/15 text-error">
-          <MicOff size={17} />
+    <div
+      className="w-full rounded-2xl border border-error/30 bg-error/[0.06] px-5 py-4"
+      role="alert"
+    >
+      <div className="flex items-start gap-3.5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-error/12 text-error">
+          <MicOff className="h-[18px] w-[18px]" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-semibold text-red-700 dark:text-red-300">
+          <p className="text-[0.9375rem] font-semibold text-ink">
             {live
               ? t("meetings.systemAudio.liveTitle")
               : t("meetings.systemAudio.unavailableTitle")}
           </p>
-          <p className="mt-1 text-[13px] leading-relaxed text-red-700/90 dark:text-red-300/90">
+          <p className="mt-1 max-w-[68ch] text-sm leading-relaxed text-body">
             {live
               ? t("meetings.systemAudio.liveBody")
               : t("meetings.systemAudio.unavailableBody")}
           </p>
           {detail && (
-            <p className="mt-2 rounded-lg bg-error/10 px-2.5 py-1.5 font-mono text-[11.5px] leading-relaxed break-words text-red-700 dark:text-red-300">
+            <p className="mt-2.5 rounded-lg border border-hairline bg-surface px-3 py-2 font-mono text-xs leading-relaxed break-words text-muted">
               {detail}
             </p>
           )}

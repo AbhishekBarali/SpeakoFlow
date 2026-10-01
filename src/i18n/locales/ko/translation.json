@@ -147,8 +147,7 @@
       "progress": "{{total}}단계 중 {{current}}단계",
       "steps": {
         "setup": "설정",
-        "tour": "둘러보기",
-        "finish": "시작"
+        "tour": "둘러보기"
       }
     },
     "setup": {
@@ -161,7 +160,7 @@
       "count": "{{total}}개 중 {{current}}번째",
       "skip": "둘러보기 건너뛰기",
       "next": "다음",
-      "done": "계속",
+      "finish": "SpeakoFlow 열기",
       "tabs": {
         "dictate": "받아쓰기",
         "ask": "어시스턴트",
@@ -171,6 +170,15 @@
         "hold": "누른 채 말하기",
         "tap": "눌러서 시작, 다시 눌러서 멈춤",
         "call": "눌러서 시작, 다시 눌러서 끊기"
+      },
+      "steps": {
+        "label": "사용 방법",
+        "speak": "입력할 내용을 말하기",
+        "typed": "커서가 있는 곳에 입력됩니다",
+        "select": "텍스트 선택 (선택 사항)",
+        "use": "답변을 삽입하거나 읽기만 하기",
+        "talk": "그냥 말하기",
+        "answer": "소리 내어 대답합니다"
       },
       "mail": {
         "window": "새 메시지",
@@ -219,15 +227,6 @@
         "assistant": "어시스턴트",
         "said": "금요일 팀 회의에서 할 짧은 발표를 같이 준비해 줘.",
         "reply": "좋아요. 가장 자랑스러운 성과 하나로 시작하고, 잘된 이유 두 가지를 말한 다음, 앞으로의 계획으로 마무리하세요."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "준비됨",
-        "installing": "설치 중…",
-        "percent": "{{percent}}%",
-        "retry": "다시 시도",
-        "waiting": "대기 중"
       }
     },
     "subtitle": "시작하려면 음성 인식 모델을 선택하세요",
@@ -460,8 +459,7 @@
     },
     "frame": {
       "setup": "설정",
-      "tour": "둘러보기",
-      "finish": "시작"
+      "tour": "둘러보기"
     },
     "welcome": {
       "line": "말하면 입력되고, 물으면 답합니다.",
@@ -486,33 +484,6 @@
       "continue": "계속",
       "later": "나중에 설정",
       "loading": "음성 모델을 찾는 중"
-    },
-    "start": {
-      "ready": {
-        "title": "지금 써 보세요"
-      },
-      "downloading": {
-        "title": "거의 준비됐습니다"
-      },
-      "failed": {
-        "title": "다운로드가 중단되었습니다"
-      },
-      "none": {
-        "title": "시작하려면 음성 모델을 고르세요"
-      },
-      "progress": {
-        "of": "{{total}} 중 {{done}}",
-        "failed": "끝나지 않았습니다. 다시 시도할까요?",
-        "underMinute": "1분도 안 남았습니다",
-        "minutes_other": "약 {{count}}분 남음"
-      },
-      "try": {
-        "label": "받아쓰기 해 보기",
-        "placeholder": "말한 내용이 여기에 나타납니다…",
-        "success": "바로 이겁니다. 모든 앱에서 이렇게 작동합니다."
-      },
-      "open": "SpeakoFlow 열기",
-      "choose": "음성 모델 선택"
     }
   },
   "modelSelector": {
@@ -1846,14 +1817,6 @@
           "large": "크게",
           "extraLarge": "아주 크게"
         },
-        "panelSizeLabel": "패널 크기",
-        "panelSizeDescription": "플로팅 어시스턴트 패널의 전체 크기입니다.",
-        "panelSizes": {
-          "mini": "작게",
-          "compact": "컴팩트",
-          "standard": "표준",
-          "large": "크게"
-        },
         "askDisplayLabel": "표시할 화면",
         "askDisplayDescription": "어시스턴트가 열리는 화면입니다. 기본값은 마우스가 있는 화면입니다.",
         "askDisplays": {
@@ -1976,7 +1939,9 @@
     },
     "delete": {
       "action": "회의 삭제",
-      "whileRecording": "이 회의를 삭제하려면 먼저 녹음을 중지하세요."
+      "whileRecording": "이 회의를 삭제하려면 먼저 녹음을 중지하세요.",
+      "confirmTitle": "이 회의를 삭제할까요?",
+      "confirmBody": "회의의 기록, 메모, 오디오가 이 컴퓨터에서 삭제됩니다. 되돌릴 수 없습니다."
     },
     "detail": {
       "title": "회의",
@@ -2220,6 +2185,7 @@
       "details": "자세히",
       "startHint": "말을 시작하거나 메시지를 입력하세요.",
       "mutedHint": "마이크가 꺼져 있습니다. 입력은 계속할 수 있습니다.",
+      "heldHint": "받아쓰기하는 동안 일시 중지됩니다.",
       "preparingVoice": "음성을 준비하는 중… {{progress}}%",
       "history": {
         "title": "지난 대화",
@@ -2256,6 +2222,7 @@
         "responding": "생각하는 중…",
         "speaking": "말하는 중",
         "muted": "마이크 꺼짐",
+        "held": "받아쓰기로 일시 중지됨",
         "error": "통화 중단됨"
       },
       "errors": {
@@ -2904,7 +2871,6 @@
       "replyLength": "평소 답변의 길이입니다.",
       "history": "최근 메시지를 몇 개까지 기억할지 정합니다.",
       "summarize": "긴 대화를 요약해 앞부분을 잊지 않도록 합니다.",
-      "panelSize": "화면에서 차지하는 크기입니다.",
       "opacity": "낮출수록 바탕 화면이 비쳐 보입니다.",
       "position": "화면에서 위치를 클릭하세요.",
       "display": "패널이 열릴 화면입니다."
@@ -2977,7 +2943,6 @@
     "panel": {
       "where": "열리는 위치",
       "text": "글자 크기",
-      "size": "패널 크기",
       "opacity": "불투명도",
       "screen": "표시할 화면"
     }

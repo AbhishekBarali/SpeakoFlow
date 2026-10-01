@@ -150,8 +150,7 @@
       "progress": "Krok {{current}} z {{total}}",
       "steps": {
         "setup": "Konfiguracja",
-        "tour": "Prezentacja",
-        "finish": "Start"
+        "tour": "Prezentacja"
       }
     },
     "setup": {
@@ -164,7 +163,7 @@
       "count": "{{current}} z {{total}}",
       "skip": "Pomiń prezentację",
       "next": "Dalej",
-      "done": "Kontynuuj",
+      "finish": "Otwórz SpeakoFlow",
       "tabs": {
         "dictate": "Dyktowanie",
         "ask": "Asystent",
@@ -174,6 +173,15 @@
         "hold": "Przytrzymaj, aby mówić",
         "tap": "Stuknij, aby zacząć, stuknij, aby zakończyć",
         "call": "Naciśnij, aby zacząć, i ponownie, aby się rozłączyć"
+      },
+      "steps": {
+        "label": "Jak to działa",
+        "speak": "Powiedz, co chcesz napisać",
+        "typed": "Tekst pojawi się tam, gdzie jest kursor",
+        "select": "Zaznacz tekst (opcjonalnie)",
+        "use": "Wstaw odpowiedź albo po prostu ją przeczytaj",
+        "talk": "Po prostu mów",
+        "answer": "Odpowiada na głos"
       },
       "mail": {
         "window": "Nowa wiadomość",
@@ -222,15 +230,6 @@
         "assistant": "Asystent",
         "said": "Pomóż mi zaplanować krótkie wystąpienie na piątkowe spotkanie zespołu.",
         "reply": "Jasne. Zacznij od wyniku, z którego jesteś najbardziej dumny, podaj dwa powody, dla których się udało, i zakończ tym, co dalej."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Gotowe",
-        "installing": "Instalowanie…",
-        "percent": "{{percent}}%",
-        "retry": "Ponów",
-        "waiting": "Oczekiwanie"
       }
     },
     "subtitle": "Aby rozpocząć, wybierz model transkrypcji",
@@ -463,8 +462,7 @@
     },
     "frame": {
       "setup": "Konfiguracja",
-      "tour": "Prezentacja",
-      "finish": "Start"
+      "tour": "Prezentacja"
     },
     "welcome": {
       "line": "Mówisz, a tekst sam się pisze. Pytasz, a dostajesz odpowiedź.",
@@ -495,36 +493,6 @@
       "continue": "Kontynuuj",
       "later": "Skonfiguruj później",
       "loading": "Szukanie modelu mowy"
-    },
-    "start": {
-      "ready": {
-        "title": "Wypróbuj teraz"
-      },
-      "downloading": {
-        "title": "Prawie gotowe"
-      },
-      "failed": {
-        "title": "Pobieranie zostało przerwane"
-      },
-      "none": {
-        "title": "Wybierz model mowy, aby zacząć"
-      },
-      "progress": {
-        "of": "{{done}} z {{total}}",
-        "failed": "Nie udało się dokończyć. Spróbować ponownie?",
-        "underMinute": "Zostało mniej niż minutę",
-        "minutes_one": "Zostało około {{count}} minuty",
-        "minutes_few": "Zostało około {{count}} minut",
-        "minutes_many": "Zostało około {{count}} minut",
-        "minutes_other": "Zostało około {{count}} minuty"
-      },
-      "try": {
-        "label": "Wypróbuj dyktowanie",
-        "placeholder": "Tu pojawią się Twoje słowa…",
-        "success": "To wszystko. Działa w każdej aplikacji."
-      },
-      "open": "Otwórz SpeakoFlow",
-      "choose": "Wybierz model mowy"
     }
   },
   "modelSelector": {
@@ -1879,14 +1847,6 @@
           "large": "Duży",
           "extraLarge": "Bardzo duży"
         },
-        "panelSizeLabel": "Rozmiar panelu",
-        "panelSizeDescription": "Ogólny rozmiar pływającego panelu asystenta.",
-        "panelSizes": {
-          "mini": "Mały",
-          "compact": "Kompaktowy",
-          "standard": "Standardowy",
-          "large": "Duży"
-        },
         "askDisplayLabel": "Który ekran",
         "askDisplayDescription": "Ekran, na którym otwiera się asystent. Domyślnie ten, na którym jest kursor myszy.",
         "askDisplays": {
@@ -2012,7 +1972,9 @@
     },
     "delete": {
       "action": "Usuń spotkanie",
-      "whileRecording": "Zatrzymaj nagrywanie przed usunięciem tego spotkania."
+      "whileRecording": "Zatrzymaj nagrywanie przed usunięciem tego spotkania.",
+      "confirmTitle": "Usunąć to spotkanie?",
+      "confirmBody": "Jego transkrypcja, notatki i nagranie zostaną usunięte z tego komputera. Tej operacji nie można cofnąć."
     },
     "detail": {
       "title": "Spotkanie",
@@ -2265,6 +2227,7 @@
       "details": "Szczegóły",
       "startHint": "Zacznij mówić albo napisz wiadomość.",
       "mutedHint": "Mikrofon wyłączony. Nadal możesz pisać.",
+      "heldHint": "Wstrzymano na czas dyktowania.",
       "preparingVoice": "Przygotowywanie głosu… {{progress}}%",
       "history": {
         "title": "Poprzednie rozmowy",
@@ -2304,6 +2267,7 @@
         "responding": "Myślę…",
         "speaking": "Mówię",
         "muted": "Mikrofon wyłączony",
+        "held": "Wstrzymano na dyktowanie",
         "error": "Rozmowa przerwana"
       },
       "errors": {
@@ -2982,7 +2946,6 @@
       "replyLength": "Jak długie są zwykle odpowiedzi.",
       "history": "Ile ostatnich wiadomości asystent pamięta.",
       "summarize": "Streszcza długie rozmowy, aby nie zapominać ich początku.",
-      "panelSize": "Jaką część ekranu zajmuje.",
       "opacity": "Niższa wartość pozwala prześwitywać pulpitowi.",
       "position": "Kliknij miejsce na ekranie.",
       "display": "Ekran, na którym otwiera się panel."
@@ -3061,7 +3024,6 @@
     "panel": {
       "where": "Gdzie się otwiera",
       "text": "Rozmiar tekstu",
-      "size": "Rozmiar panelu",
       "opacity": "Nieprzezroczystość",
       "screen": "Który ekran"
     }

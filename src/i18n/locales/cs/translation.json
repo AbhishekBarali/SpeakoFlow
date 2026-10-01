@@ -150,8 +150,7 @@
       "progress": "Krok {{current}} z {{total}}",
       "steps": {
         "setup": "Nastavení",
-        "tour": "Prohlídka",
-        "finish": "Start"
+        "tour": "Prohlídka"
       }
     },
     "setup": {
@@ -164,7 +163,7 @@
       "count": "{{current}} z {{total}}",
       "skip": "Přeskočit prohlídku",
       "next": "Další",
-      "done": "Pokračovat",
+      "finish": "Otevřít SpeakoFlow",
       "tabs": {
         "dictate": "Diktování",
         "ask": "Asistent",
@@ -174,6 +173,15 @@
         "hold": "Podržte a mluvte",
         "tap": "Stiskněte pro start, znovu pro stop",
         "call": "Stiskněte pro zahájení, znovu pro zavěšení"
+      },
+      "steps": {
+        "label": "Jak to funguje",
+        "speak": "Řekněte, co chcete napsat",
+        "typed": "Napíše se to tam, kde je kurzor",
+        "select": "Označte text (volitelné)",
+        "use": "Vložte odpověď, nebo si ji jen přečtěte",
+        "talk": "Prostě mluvte",
+        "answer": "Odpovídá nahlas"
       },
       "mail": {
         "window": "Nová zpráva",
@@ -222,15 +230,6 @@
         "assistant": "Asistent",
         "said": "Pomoz mi připravit krátký proslov na páteční poradu týmu.",
         "reply": "Jasně. Začněte výsledkem, na který jste nejvíc hrdí, uveďte dva důvody, proč se povedl, a skončete tím, co přijde dál."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Připraveno",
-        "installing": "Instalace…",
-        "percent": "{{percent}}%",
-        "retry": "Zkusit znovu",
-        "waiting": "Čeká se"
       }
     },
     "subtitle": "Pro začátek vyberte model pro přepis",
@@ -463,8 +462,7 @@
     },
     "frame": {
       "setup": "Nastavení",
-      "tour": "Prohlídka",
-      "finish": "Start"
+      "tour": "Prohlídka"
     },
     "welcome": {
       "line": "Mluvte a píše se to samo. Zeptejte se a dostanete odpověď.",
@@ -495,36 +493,6 @@
       "continue": "Pokračovat",
       "later": "Nastavit později",
       "loading": "Hledám váš model pro přepis"
-    },
-    "start": {
-      "ready": {
-        "title": "Vyzkoušejte to hned"
-      },
-      "downloading": {
-        "title": "Skoro hotovo"
-      },
-      "failed": {
-        "title": "Stahování se zastavilo"
-      },
-      "none": {
-        "title": "Pro začátek vyberte hlasový model"
-      },
-      "progress": {
-        "of": "{{done}} z {{total}}",
-        "failed": "Nedokončilo se to. Zkusit znovu?",
-        "underMinute": "Zbývá méně než minuta",
-        "minutes_one": "Zbývá asi {{count}} minuta",
-        "minutes_few": "Zbývají asi {{count}} minuty",
-        "minutes_many": "Zbývá asi {{count}} minuty",
-        "minutes_other": "Zbývá asi {{count}} minut"
-      },
-      "try": {
-        "label": "Vyzkoušejte diktování",
-        "placeholder": "Tady se objeví vaše slova…",
-        "success": "A je to. Funguje to v každé aplikaci."
-      },
-      "open": "Otevřít SpeakoFlow",
-      "choose": "Vybrat hlasový model"
     }
   },
   "modelSelector": {
@@ -1879,14 +1847,6 @@
           "large": "Velká",
           "extraLarge": "Extra velká"
         },
-        "panelSizeLabel": "Velikost panelu",
-        "panelSizeDescription": "Celková velikost plovoucího panelu asistenta.",
-        "panelSizes": {
-          "mini": "Malý",
-          "compact": "Kompaktní",
-          "standard": "Standardní",
-          "large": "Velký"
-        },
         "askDisplayLabel": "Na které obrazovce",
         "askDisplayDescription": "Obrazovka, na které se asistent otevře. Ve výchozím nastavení ta, na které je myš.",
         "askDisplays": {
@@ -2012,7 +1972,9 @@
     },
     "delete": {
       "action": "Smazat schůzku",
-      "whileRecording": "Před smazáním této schůzky zastavte nahrávání."
+      "whileRecording": "Před smazáním této schůzky zastavte nahrávání.",
+      "confirmTitle": "Smazat tuto schůzku?",
+      "confirmBody": "Její přepis, poznámky a zvuk budou z tohoto počítače odstraněny. Tuto akci nelze vrátit."
     },
     "detail": {
       "title": "Schůzka",
@@ -2265,6 +2227,7 @@
       "details": "Podrobnosti",
       "startHint": "Začněte mluvit, nebo napište zprávu.",
       "mutedHint": "Mikrofon je vypnutý. Psát můžete dál.",
+      "heldHint": "Pozastaveno, dokud diktujete.",
       "preparingVoice": "Připravuji hlas… {{progress}} %",
       "history": {
         "title": "Předchozí konverzace",
@@ -2304,6 +2267,7 @@
         "responding": "Přemýšlím…",
         "speaking": "Mluvím",
         "muted": "Mikrofon vypnutý",
+        "held": "Pozastaveno kvůli diktování",
         "error": "Hovor přerušen"
       },
       "errors": {
@@ -2982,7 +2946,6 @@
       "replyLength": "Jak dlouhé obvykle odpovědi jsou.",
       "history": "Kolik nedávných zpráv si pamatuje.",
       "summarize": "Zhušťuje dlouhé chaty, aby nezapomněl jejich začátek.",
-      "panelSize": "Kolik místa na obrazovce zabírá.",
       "opacity": "Nižší hodnota nechá prosvítat plochu.",
       "position": "Klikněte na místo na obrazovce.",
       "display": "Obrazovka, na které se panel otevře."
@@ -3061,7 +3024,6 @@
     "panel": {
       "where": "Kde se otevírá",
       "text": "Velikost textu",
-      "size": "Velikost panelu",
       "opacity": "Průhlednost",
       "screen": "Obrazovka"
     }

@@ -149,8 +149,7 @@
       "progress": "Étape {{current}} sur {{total}}",
       "steps": {
         "setup": "Configuration",
-        "tour": "Visite",
-        "finish": "Démarrer"
+        "tour": "Visite"
       }
     },
     "setup": {
@@ -163,7 +162,7 @@
       "count": "{{current}} sur {{total}}",
       "skip": "Passer la visite",
       "next": "Suivant",
-      "done": "Continuer",
+      "finish": "Ouvrir SpeakoFlow",
       "tabs": {
         "dictate": "Dictée",
         "ask": "Assistant",
@@ -173,6 +172,15 @@
         "hold": "Maintenez pour parler",
         "tap": "Appuyez pour commencer, puis pour arrêter",
         "call": "Appuyez pour appeler, puis pour raccrocher"
+      },
+      "steps": {
+        "label": "Comment ça marche",
+        "speak": "Dites ce que vous voulez écrire",
+        "typed": "Le texte s'écrit là où se trouve votre curseur",
+        "select": "Sélectionnez du texte (facultatif)",
+        "use": "Insérez la réponse, ou lisez-la simplement",
+        "talk": "Parlez, tout simplement",
+        "answer": "Il répond à voix haute"
       },
       "mail": {
         "window": "Nouveau message",
@@ -221,15 +229,6 @@
         "assistant": "Assistant",
         "said": "Aide-moi à préparer une courte intervention pour la réunion d'équipe de vendredi.",
         "reply": "Bien sûr. Commencez par le résultat dont vous êtes le plus fier, donnez deux raisons de sa réussite, et terminez par la suite."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Prêt",
-        "installing": "Installation…",
-        "percent": "{{percent}}%",
-        "retry": "Réessayer",
-        "waiting": "En attente"
       }
     },
     "subtitle": "Pour commencer, choisissez un modèle de transcription",
@@ -462,8 +461,7 @@
     },
     "frame": {
       "setup": "Configuration",
-      "tour": "Visite",
-      "finish": "Démarrer"
+      "tour": "Visite"
     },
     "welcome": {
       "line": "Parlez, ça s'écrit. Demandez, il vous répond.",
@@ -492,35 +490,6 @@
       "continue": "Continuer",
       "later": "Configurer plus tard",
       "loading": "Recherche de votre modèle vocal"
-    },
-    "start": {
-      "ready": {
-        "title": "Essayez maintenant"
-      },
-      "downloading": {
-        "title": "Presque prêt"
-      },
-      "failed": {
-        "title": "Le téléchargement s'est arrêté"
-      },
-      "none": {
-        "title": "Choisissez un modèle vocal pour commencer"
-      },
-      "progress": {
-        "of": "{{done}} sur {{total}}",
-        "failed": "Le téléchargement n'a pas abouti. Réessayer ?",
-        "underMinute": "Moins d'une minute restante",
-        "minutes_one": "Environ {{count}} minute restante",
-        "minutes_many": "Environ {{count}} minutes restantes",
-        "minutes_other": "Environ {{count}} minutes restantes"
-      },
-      "try": {
-        "label": "Essayer la dictée",
-        "placeholder": "Vos mots s'affichent ici…",
-        "success": "Et voilà. Ça fonctionne dans toutes les applications."
-      },
-      "open": "Ouvrir SpeakoFlow",
-      "choose": "Choisir un modèle vocal"
     }
   },
   "modelSelector": {
@@ -1868,14 +1837,6 @@
           "large": "Grande",
           "extraLarge": "Très grande"
         },
-        "panelSizeLabel": "Taille du panneau",
-        "panelSizeDescription": "Taille globale du panneau flottant de l'assistant.",
-        "panelSizes": {
-          "mini": "Petit",
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Grand"
-        },
         "askDisplayLabel": "Sur quel écran",
         "askDisplayDescription": "L'écran sur lequel l'assistant s'ouvre. Par défaut, celui où se trouve votre souris.",
         "askDisplays": {
@@ -2000,7 +1961,9 @@
     },
     "delete": {
       "action": "Supprimer la réunion",
-      "whileRecording": "Arrêtez l'enregistrement avant de supprimer cette réunion."
+      "whileRecording": "Arrêtez l'enregistrement avant de supprimer cette réunion.",
+      "confirmTitle": "Supprimer cette réunion ?",
+      "confirmBody": "Sa transcription, ses notes et son audio sont supprimés de cet ordinateur. Cette action est irréversible."
     },
     "detail": {
       "title": "Réunion",
@@ -2250,6 +2213,7 @@
       "details": "Détails",
       "startHint": "Commencez à parler, ou écrivez un message.",
       "mutedHint": "Microphone coupé. Vous pouvez toujours écrire.",
+      "heldHint": "En pause pendant que vous dictez.",
       "preparingVoice": "Préparation de la voix… {{progress}} %",
       "history": {
         "title": "Conversations précédentes",
@@ -2288,6 +2252,7 @@
         "responding": "Réflexion…",
         "speaking": "Parle",
         "muted": "Microphone coupé",
+        "held": "En pause pour la dictée",
         "error": "Appel interrompu"
       },
       "errors": {
@@ -2956,7 +2921,6 @@
       "replyLength": "La longueur habituelle des réponses.",
       "history": "Le nombre de messages récents qu'il garde en tête.",
       "summarize": "Résume les longues conversations pour ne pas en oublier le début.",
-      "panelSize": "La place qu'il occupe sur votre écran.",
       "opacity": "Plus faible, elle laisse apparaître votre bureau.",
       "position": "Cliquez sur un emplacement de l'écran.",
       "display": "L'écran sur lequel le panneau s'ouvre."
@@ -3033,7 +2997,6 @@
     "panel": {
       "where": "Où il s'ouvre",
       "text": "Taille du texte",
-      "size": "Taille du panneau",
       "opacity": "Opacité",
       "screen": "Quel écran"
     }

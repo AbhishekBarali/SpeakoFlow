@@ -25,6 +25,7 @@ pub mod call_detect;
 pub mod chat;
 pub mod chunker;
 pub mod diarize;
+pub mod discuss;
 pub mod pill;
 pub mod retrieve;
 pub mod session;

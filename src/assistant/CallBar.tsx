@@ -20,14 +20,21 @@ import {
   Mic,
   MicOff,
   RotateCcw,
+  Search,
   SlidersHorizontal,
   Square,
   SquarePen,
+  Users,
   Volume2,
   VolumeX,
   X,
 } from "lucide-react";
-import { commands, type AssistantHistorySummary } from "@/bindings";
+import {
+  commands,
+  type AssistantHistoryFilter,
+  type AssistantHistorySummary,
+  type MeetingAttachment,
+} from "@/bindings";
 import {
   CONVERSATION_SENSITIVITIES,
   type ConversationSensitivity,
@@ -531,6 +538,8 @@ function useBubbleContent({
     return { kind: "status", text: t("assistant.conversation.phase.speaking") };
   if (phase === "muted")
     return { kind: "hint", text: t("assistant.conversation.mutedHint") };
+  if (phase === "held")
+    return { kind: "hint", text: t("assistant.conversation.heldHint") };
   if (phase === "listening" && !hasConversation)
     return { kind: "hint", text: t("assistant.conversation.startHint") };
   return null;
@@ -644,13 +653,68 @@ function CallBubble({
   );
 }
 
-/** Past conversations, openable inside the live call. */
+/** Which day bucket a conversation's last activity falls in. */
+export type HistoryGroup = "today" | "yesterday" | "week" | "earlier";
+
+/**
+ * The day bucket for `seconds`, against local calendar days (so "yesterday"
+ * is the day before today, not the 24 hours before now). Pure, for tests.
+ */
+export function historyGroup(
+  seconds: number,
+  now: Date = new Date(),
+): HistoryGroup {
+  const day = (offset: number) =>
+    new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - offset,
+    ).getTime();
+  const at = seconds * 1000;
+  if (at >= day(0)) return "today";
+  if (at >= day(1)) return "yesterday";
+  if (at >= day(6)) return "week";
+  return "earlier";
+}
+
+/** Consecutive runs of entries in the same bucket, in the list's own order. */
+export function groupConversations<
+  T extends { updated_at: number; timestamp: number },
+>(
+  entries: T[],
+  now: Date = new Date(),
+): { group: HistoryGroup; entries: T[] }[] {
+  const groups: { group: HistoryGroup; entries: T[] }[] = [];
+  for (const entry of entries) {
+    const group = historyGroup(entry.updated_at || entry.timestamp, now);
+    const last = groups[groups.length - 1];
+    if (last && last.group === group) last.entries.push(entry);
+    else groups.push({ group, entries: [entry] });
+  }
+  return groups;
+}
+
+type HistoryScope = "all" | "meetings";
+const HISTORY_SCOPES: HistoryScope[] = ["all", "meetings"];
+/** How long typing in the search box pauses before the list is asked again. */
+const SEARCH_DEBOUNCE_MS = 220;
+
+/**
+ * Past conversations, openable inside the live call.
+ *
+ * Searchable (titles, the meeting a conversation was about, and everything
+ * said), filterable to the ones about meetings, and grouped by when they were
+ * last active — a list ordered by when each started put a week-old
+ * conversation continued this morning at the bottom.
+ */
 function CallHistory({
   activeId,
   onOpen,
+  onClose,
 }: {
   activeId: number | null;
   onOpen: (id: number) => Promise<boolean>;
+  onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const [entries, setEntries] = useState<AssistantHistorySummary[]>([]);
@@ -659,7 +723,15 @@ function CallHistory({
     "loading",
   );
   const [opening, setOpening] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [scope, setScope] = useState<HistoryScope>("all");
   const entriesRef = useRef<AssistantHistorySummary[]>([]);
+  const filterRef = useRef<AssistantHistoryFilter>({
+    query: null,
+    meetings_only: false,
+    meeting_id: null,
+  });
   const busyRef = useRef(false);
   const generationRef = useRef(0);
 
@@ -667,25 +739,42 @@ function CallHistory({
     entriesRef.current = entries;
   }, [entries]);
 
-  const load = useCallback(async (cursor: number | null) => {
-    const isReload = cursor === null;
-    if (!isReload && busyRef.current) return;
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  /**
+   * `fresh` starts over (a new search or filter), `refresh` re-reads what is
+   * showing (a turn was saved), `more` appends the next page.
+   */
+  const load = useCallback(async (mode: "fresh" | "refresh" | "more") => {
+    if (mode === "more" && busyRef.current) return;
     // A reload supersedes a page still in flight, which would otherwise be
-    // appended after the fresh list (the same guard as History's `loadPage`).
-    if (isReload) generationRef.current += 1;
+    // appended after the fresh list.
+    if (mode !== "more") generationRef.current += 1;
     const generation = generationRef.current;
     busyRef.current = true;
-    // A reload asks for as many rows as are showing, so a turn saved while
-    // the user is back in older pages does not fold the list to its first.
-    const limit = isReload
-      ? Math.max(HISTORY_PAGE, entriesRef.current.length)
-      : HISTORY_PAGE;
+    if (mode === "fresh") setStatus("loading");
+    const offset = mode === "more" ? entriesRef.current.length : 0;
+    // A refresh asks for as many rows as are showing, so a turn saved while
+    // the user is further down does not fold the list back to its first page.
+    const limit =
+      mode === "refresh"
+        ? Math.max(HISTORY_PAGE, entriesRef.current.length)
+        : HISTORY_PAGE;
     try {
-      const result = await commands.getAssistantHistoryEntries(cursor, limit);
+      const result = await commands.listAssistantConversations(
+        filterRef.current,
+        offset,
+        limit,
+      );
       if (generation !== generationRef.current) return;
       if (result.status !== "ok") throw new Error(result.error);
       setEntries((previous) =>
-        isReload ? result.data.entries : [...previous, ...result.data.entries],
+        mode === "more"
+          ? [...previous, ...result.data.entries]
+          : result.data.entries,
       );
       setHasMore(result.data.has_more);
       setStatus("ready");
@@ -697,14 +786,19 @@ function CallHistory({
   }, []);
 
   useEffect(() => {
-    void load(null);
-  }, [load]);
+    filterRef.current = {
+      query: search || null,
+      meetings_only: scope === "meetings",
+      meeting_id: null,
+    };
+    void load("fresh");
+  }, [search, scope, load]);
 
   // Every turn saves the conversation it belongs to, so the list is kept
   // current while it is open rather than only when it is first shown.
   useEffect(() => {
     const unlisten = listen("assistant-history-updated", () => {
-      void load(null);
+      void load("refresh");
     });
     return () => {
       void unlisten.then((stop) => stop());
@@ -720,11 +814,68 @@ function CallHistory({
     }
   };
 
+  const groups = groupConversations(entries);
+  const narrowed = search !== "" || scope !== "all";
+  const emptyKey = search
+    ? "assistant.conversation.history.noMatches"
+    : scope === "meetings"
+      ? "assistant.conversation.history.noMeetings"
+      : "assistant.conversation.history.empty";
+
   return (
     <div className="call-history">
       <div className="call-history-head">
         <h2>{t("assistant.conversation.history.title")}</h2>
         <p>{t("assistant.conversation.history.hint")}</p>
+      </div>
+      <div className="call-history-tools">
+        <label className="call-history-search">
+          <Search size={13} aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              // Escape anywhere else on a call hangs up. Here it clears the
+              // search, then closes the list.
+              if (event.key !== "Escape") return;
+              event.preventDefault();
+              if (query) setQuery("");
+              else onClose();
+            }}
+            placeholder={t("assistant.conversation.history.search")}
+            aria-label={t("assistant.conversation.history.search")}
+            spellCheck={false}
+          />
+          {query && (
+            <button
+              type="button"
+              className="call-history-clear"
+              onClick={() => setQuery("")}
+              aria-label={t("assistant.conversation.history.clearSearch")}
+              title={t("assistant.conversation.history.clearSearch")}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </label>
+        <div
+          className="call-history-scope"
+          role="group"
+          aria-label={t("assistant.conversation.history.scopeLabel")}
+        >
+          {HISTORY_SCOPES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={scope === value}
+              onClick={() => setScope(value)}
+            >
+              {value === "meetings" && <Users size={11} aria-hidden="true" />}
+              {t(`assistant.conversation.history.scopes.${value}`)}
+            </button>
+          ))}
+        </div>
       </div>
       {status === "loading" && (
         <p className="call-history-note">
@@ -737,58 +888,129 @@ function CallHistory({
         </p>
       )}
       {status === "ready" && entries.length === 0 && (
-        <p className="call-history-note">
-          {t("assistant.conversation.history.empty")}
-        </p>
+        <p className="call-history-note">{t(emptyKey)}</p>
       )}
-      <ul className="call-history-list">
-        {entries.map((entry) => {
-          const current = entry.id === activeId;
-          const meta = [
-            relativeTime(entry.updated_at || entry.timestamp, i18n.language),
-            t("assistant.conversation.history.messages", {
-              count: entry.message_count,
-            }),
-          ].join(" · ");
-          return (
-            <li key={entry.id}>
-              <button
-                type="button"
-                className={`call-history-item${current ? " current" : ""}`}
-                aria-current={current || undefined}
-                disabled={opening !== null}
-                onClick={() => void open(entry.id)}
-              >
-                <span className="call-history-title">
-                  {entry.title.trim() ||
-                    t("assistant.conversation.history.untitled")}
-                </span>
-                <span className="call-history-meta">
-                  {current
-                    ? `${t("assistant.conversation.history.current")} · ${meta}`
-                    : meta}
-                </span>
-                {opening === entry.id && (
-                  <Loader2
-                    size={14}
-                    className="call-spin call-history-spin"
-                    aria-hidden="true"
-                  />
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {groups.map(({ group, entries: rows }) => (
+        <section className="call-history-group" key={`${group}-${rows[0].id}`}>
+          <h3>{t(`assistant.conversation.history.groups.${group}`)}</h3>
+          <ul className="call-history-list">
+            {rows.map((entry) => {
+              const current = entry.id === activeId;
+              const meta = [
+                relativeTime(
+                  entry.updated_at || entry.timestamp,
+                  i18n.language,
+                ),
+                t("assistant.conversation.history.messages", {
+                  count: entry.message_count,
+                }),
+              ].join(" · ");
+              return (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    className={`call-history-item${current ? " current" : ""}`}
+                    aria-current={current || undefined}
+                    disabled={opening !== null}
+                    onClick={() => void open(entry.id)}
+                  >
+                    <span className="call-history-title">
+                      {entry.title.trim() ||
+                        t("assistant.conversation.history.untitled")}
+                    </span>
+                    {entry.meeting_id !== null && (
+                      <span className="call-history-meeting">
+                        <Users size={11} aria-hidden="true" />
+                        <span>
+                          {entry.meeting_title?.trim() ||
+                            t("assistant.conversation.meeting.untitled")}
+                        </span>
+                      </span>
+                    )}
+                    <span className="call-history-meta">
+                      {current
+                        ? `${t("assistant.conversation.history.current")} · ${meta}`
+                        : meta}
+                    </span>
+                    {opening === entry.id && (
+                      <Loader2
+                        size={14}
+                        className="call-spin call-history-spin"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
       {hasMore && status === "ready" && (
         <button
           type="button"
           className="call-history-more"
-          onClick={() => void load(entries[entries.length - 1]?.id ?? null)}
+          onClick={() => void load("more")}
         >
           {t("assistant.conversation.history.more")}
         </button>
       )}
+      {narrowed && status === "ready" && entries.length > 0 && !hasMore && (
+        <p className="call-history-note end">
+          {t("assistant.conversation.history.matchCount", {
+            count: entries.length,
+          })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Things worth asking straight after a meeting, as chips on an empty call. */
+const MEETING_PROMPTS = ["recap", "next", "followUp", "missed"] as const;
+
+/**
+ * What an empty call about a meeting shows: which meeting, and a few ways in.
+ * A chip sends its question as a typed message, so it is answered (and spoken)
+ * exactly as if the user had said it.
+ */
+export function MeetingStarter({
+  meeting,
+  onAsk,
+  disabled,
+}: {
+  meeting: MeetingAttachment;
+  onAsk: (text: string) => void;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="call-meeting-start">
+      <p className="call-meeting-start-title">
+        {t("assistant.conversation.meeting.startTitle", {
+          title:
+            meeting.title.trim() ||
+            t("assistant.conversation.meeting.untitled"),
+        })}
+      </p>
+      <p className="call-meeting-start-hint">
+        {t("assistant.conversation.meeting.startHint")}
+      </p>
+      <div className="call-meeting-prompts">
+        {MEETING_PROMPTS.map((key) => {
+          const text = t(`assistant.conversation.meeting.prompts.${key}`);
+          return (
+            <button
+              key={key}
+              type="button"
+              disabled={disabled}
+              onClick={() => onAsk(text)}
+            >
+              {text}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -876,9 +1098,8 @@ function CallOptions({ voice }: { voice: Voice }) {
 export interface CallSurfaceProps {
   voice: Voice;
   /**
-   * Which form the call is in, including the beats in between (see
-   * `useCallForm`): the bar, the conversation open above it, and the moments
-   * when one is leaving and the window is changing shape.
+   * Which form the call is in (see `useCallForm`): the bar, the conversation
+   * open above it, or the conversation folding back down into the bar.
    */
   form: CallForm;
   /** Open the conversation (the bubble, the "Open conversation" chip). */
@@ -892,6 +1113,8 @@ export interface CallSurfaceProps {
   profilePicker: ReactNode;
   /** The rendered message list, shown when expanded. */
   transcript: ReactNode;
+  /** The meeting this conversation is about, if any. */
+  meeting?: MeetingAttachment | null;
   /** Edge grips for the expanded window. */
   resizeHandles: ReactNode;
   /** The conversation has at least one message. */
@@ -914,6 +1137,7 @@ export function CallSurface({
   name,
   profilePicker,
   transcript,
+  meeting = null,
   resizeHandles,
   hasConversation,
   activity,
@@ -928,6 +1152,18 @@ export function CallSurface({
   // list. The backend does not report it; only this view needs it.
   const [activeHistoryId, setActiveHistoryId] = useState<number | null>(null);
   const { newConversation, loadConversation } = voice;
+
+  // An empty conversation is not a saved one, whatever emptied it (New chat,
+  // a meeting opened for discussion, a call that started fresh).
+  useEffect(() => {
+    if (!hasConversation) setActiveHistoryId(null);
+  }, [hasConversation]);
+
+  // A meeting brought in for discussion is what the user wants to see.
+  const meetingId = meeting?.meetingId ?? null;
+  useEffect(() => {
+    if (meetingId !== null) setShowHistory(false);
+  }, [meetingId]);
 
   const newChat = useCallback(async () => {
     if (await newConversation()) {
@@ -967,21 +1203,15 @@ export function CallSurface({
     />
   );
 
-  if (form === "bar" || form === "leaving") {
+  if (form === "bar") {
     return (
-      <div className={`call-frame${form === "leaving" ? " leaving" : ""}`}>
+      <div className="call-frame">
         <div className={`call-stack${typing ? " typing" : ""}`}>
           <CallBubble {...bubble} onOpen={onExpand} />
           {bar}
         </div>
       </div>
     );
-  }
-
-  // The window is changing shape. Anything drawn now would be painted at the
-  // wrong place for a frame, so nothing is (see `useCallForm`).
-  if (form === "opening" || form === "shrinking") {
-    return <div className="call-frame" aria-hidden="true" />;
   }
 
   const status =
@@ -1042,13 +1272,32 @@ export function CallSurface({
           </IconButton>
         </header>
         <div className="call-panel-body">
+          {meeting && !showHistory && (
+            <div
+              className="call-meeting-chip"
+              title={t("assistant.conversation.meeting.chipHint")}
+            >
+              <Users size={12} aria-hidden="true" />
+              <span>
+                {t("assistant.conversation.meeting.about", {
+                  title:
+                    meeting.title.trim() ||
+                    t("assistant.conversation.meeting.untitled"),
+                })}
+              </span>
+            </div>
+          )}
           {/* Kept mounted behind the history list, so its scroll position and
               the panel's stick-to-bottom tracking survive a look at history. */}
           <div className="call-panel-transcript" hidden={showHistory}>
             {transcript}
           </div>
           {showHistory && (
-            <CallHistory activeId={activeHistoryId} onOpen={openSaved} />
+            <CallHistory
+              activeId={activeHistoryId}
+              onOpen={openSaved}
+              onClose={() => setShowHistory(false)}
+            />
           )}
         </div>
         <div className={`call-panel-foot call-stack${typing ? " typing" : ""}`}>

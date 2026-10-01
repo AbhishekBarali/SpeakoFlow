@@ -330,15 +330,3 @@ export const useSetupQueue = create<SetupQueueState>()((set, get) => ({
       ),
     })),
 }));
-
-/** 0–100 for a task that is downloading, from whichever source tracks it. */
-export const useTaskProgress = (task: SetupTask | undefined): number => {
-  const catalog = useModelStore((s) =>
-    task?.modelId ? s.downloadProgress[task.modelId]?.percentage : undefined,
-  );
-  const webview = useSetupQueue((s) => s.webviewVoiceProgress);
-  if (!task) return 0;
-  if (task.state === "ready") return 100;
-  const value = task.modelId === null ? webview : (catalog ?? 0);
-  return Math.max(0, Math.min(100, Math.round(value)));
-};

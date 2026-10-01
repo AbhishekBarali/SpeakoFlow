@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,7 +23,7 @@ import {
   Loader2,
   TextSelect,
 } from "lucide-react";
-import { commands, type AppSettings } from "@/bindings";
+import { commands, type AppSettings, type MeetingAttachment } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
 import { FONT_SIZES, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
@@ -30,7 +31,7 @@ import { localTtsActive } from "./localTts";
 import { parseKokoroDevice, useLocalVoiceStatus } from "./localVoice";
 import { usePanelHitRegion, useSuppressContextMenu } from "./hitRegion";
 import { useVoiceConversation } from "./useVoiceConversation";
-import { CallSurface } from "./CallBar";
+import { CallSurface, MeetingStarter } from "./CallBar";
 import { useCallForm } from "./useCallForm";
 import { AssistantProfilePicker } from "./AssistantProfilePicker";
 import QuickAsk from "./QuickAsk";
@@ -41,6 +42,7 @@ import {
   workingLabelKey,
   type AssistantState,
   type QuickAskLayout,
+  type QuickAskPhase,
 } from "./quickAskState";
 import { VOICE_INTERRUPTED_MARKER } from "./conversationPolicy";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
@@ -60,10 +62,12 @@ interface ToolActivity {
   startedAt: number;
 }
 
-/** A saved conversation for the call to pick up (History → Continue). */
+/** What the call picks up when it opens (History → Continue, a meeting's
+ *  "Discuss in a call"). Exactly one of `id` and `meetingId` is set. */
 interface CallContinuation {
-  id: number;
+  id: number | null;
   messageIndex: number | null;
+  meetingId: number | null;
 }
 
 interface DisplayMessage {
@@ -398,6 +402,10 @@ const AssistantPanel: React.FC = () => {
   // Whether this window is on screen because the user asked for it (tray,
   // History, the call key) rather than as a voice ask.
   const [userOpened, setUserOpened] = useState(false);
+  // A call just ended in this window and nothing has taken it over yet. The
+  // window goes away a moment later (hanging up closes the panel), and until
+  // then it must not fall back to drawing the idle quick ask's typing bar.
+  const [callEnded, setCallEnded] = useState(false);
   // Characters of selected text the current recording picked up, reported while
   // the user is still speaking. The message itself carries the count once sent.
   const [selectionCaptured, setSelectionCaptured] = useState(0);
@@ -411,6 +419,8 @@ const AssistantPanel: React.FC = () => {
     listeningRef.current = state === "listening";
   }, [state]);
   const [tool, setTool] = useState<ToolActivity | null>(null);
+  // The meeting the conversation is about ("Discuss in a call"), or null.
+  const [meeting, setMeeting] = useState<MeetingAttachment | null>(null);
   const [toolElapsed, setToolElapsed] = useState(0);
   const [layout, setLayout] = useState<QuickAskLayout>(DEFAULT_LAYOUT);
   // The pointer is on the quick-ask surface, which holds back the error timeout.
@@ -477,6 +487,19 @@ const AssistantPanel: React.FC = () => {
   // conversation — and the window size belongs to the form (see
   // `assistant::set_conversation_expanded`).
   const callForm = useCallForm(voice.open);
+  // Notice the call ending before the browser paints the frame without it. In
+  // a passive effect the first frame after hang-up was the idle quick ask — its
+  // typing bar — drawn in the call's place until the window went away.
+  const callWasOpenRef = useRef(false);
+  useLayoutEffect(() => {
+    if (voice.open) {
+      callWasOpenRef.current = true;
+      setCallEnded(false);
+    } else if (callWasOpenRef.current) {
+      callWasOpenRef.current = false;
+      setCallEnded(true);
+    }
+  }, [voice.open]);
   const callExpanded = callForm.expanded;
   const resetCallFormRef = useRef(callForm.reset);
   resetCallFormRef.current = callForm.reset;
@@ -814,6 +837,10 @@ const AssistantPanel: React.FC = () => {
           setSelectionCaptured(0);
           setInput("");
           setHovered(false);
+          // A voice ask, whatever opened the window before it (a call, the
+          // tray): it has no text field to show.
+          setUserOpened(false);
+          setCallEnded(false);
         }),
       );
 
@@ -827,6 +854,19 @@ const AssistantPanel: React.FC = () => {
 
       // The call key starts a call. History's Continue starts one with a saved
       // conversation in it, or loads that conversation into a call already live.
+      // A meeting's "Discuss in a call" starts one about that meeting.
+      track(
+        await listen<MeetingAttachment | null>(
+          "assistant-conversation-meeting",
+          (e) => setMeeting(e.payload ?? null),
+        ),
+      );
+      void commands
+        .assistantConversationMeeting()
+        .then((current) => {
+          if (!cancelled) setMeeting(current ?? null);
+        })
+        .catch(() => {});
       track(
         await listen<CallContinuation | null>(
           "assistant-start-conversation",
@@ -840,14 +880,25 @@ const AssistantPanel: React.FC = () => {
               }
               if (!continuation) return;
               const live = voiceRef.current;
-              const opened =
-                continuation.messageIndex === null ||
-                continuation.messageIndex === undefined
-                  ? await live.loadConversation(continuation.id)
-                  : await live.branchConversation(
-                      continuation.id,
-                      continuation.messageIndex,
-                    );
+              let opened = false;
+              if (
+                continuation.meetingId !== null &&
+                continuation.meetingId !== undefined
+              ) {
+                opened = await live.discussMeeting(continuation.meetingId);
+              } else if (
+                continuation.id !== null &&
+                continuation.id !== undefined
+              ) {
+                opened =
+                  continuation.messageIndex === null ||
+                  continuation.messageIndex === undefined
+                    ? await live.loadConversation(continuation.id)
+                    : await live.branchConversation(
+                        continuation.id,
+                        continuation.messageIndex,
+                      );
+              }
               if (opened) expandCallRef.current();
             })();
           },
@@ -858,6 +909,7 @@ const AssistantPanel: React.FC = () => {
         await listen<boolean>("assistant-panel-shown", (e) => {
           setPanelVisible(true);
           setUserOpened(e.payload === true);
+          setCallEnded(false);
         }),
       );
 
@@ -867,6 +919,7 @@ const AssistantPanel: React.FC = () => {
         await listen("assistant-panel-hidden", () => {
           setPanelVisible(false);
           setUserOpened(false);
+          setCallEnded(false);
           setError(null);
           setNotice(null);
           setInput("");
@@ -959,7 +1012,11 @@ const AssistantPanel: React.FC = () => {
         ? t("assistant.tool.search")
         : tool.name === "capture_screen"
           ? t("assistant.tool.screen")
-          : t("assistant.tool.working");
+          : tool.name === "search_meeting"
+            ? t("assistant.tool.meetingSearch")
+            : tool.name === "read_meeting"
+              ? t("assistant.tool.meetingRead")
+              : t("assistant.tool.working");
     return tool.detail ? `${action} · ${tool.detail}` : action;
   }, [tool, t]);
 
@@ -1015,6 +1072,9 @@ const AssistantPanel: React.FC = () => {
   }, [tts]);
 
   const hidePanel = useCallback(async () => {
+    // Stop drawing first, in the same render that drops the call: otherwise
+    // the frame between the two is the idle quick ask, typing bar and all.
+    setPanelVisible(false);
     // Closing the panel hangs up. The backend ends the session too, but doing it
     // here first releases the microphone on the click.
     if (voice.open) voice.end();
@@ -1090,6 +1150,14 @@ const AssistantPanel: React.FC = () => {
   });
   const selectionChars =
     lastUserMessage?.selectionChars ?? (question ? 0 : selectionCaptured);
+  // The typing bar ("prompt") belongs to a quick ask the user opened to type
+  // into (the tray). A voice ask passes through idle too — before "listening"
+  // lands, between two pipeline stages, and in the moment before an empty ask
+  // puts itself away — and drawing the bar there flashed a text field in the
+  // middle of a voice-only flow (and focused it, taking the keyboard). It keeps
+  // the waiting pill instead. `phase` itself is unchanged for the logic below.
+  const shownPhase: QuickAskPhase =
+    phase === "prompt" && !userOpened ? "transcribing" : phase;
   const status = engineSetupActive
     ? engineSetupLabel || t("assistant.engineSetup.short")
     : // No search query appended: the pill says what is happening in a few
@@ -1116,6 +1184,18 @@ const AssistantPanel: React.FC = () => {
     }, EMPTY_ASK_DISMISS_MS);
     return () => window.clearTimeout(timer);
   }, [phase, voice.open, userOpened, panelVisible]);
+
+  // A call that ended without the window being put away or taken over by a
+  // quick ask leaves nothing to show: the window is the call. Put it away
+  // rather than leave an invisible frame on screen.
+  useEffect(() => {
+    if (!callEnded || !panelVisible) return;
+    const timer = window.setTimeout(
+      () => void commands.hideAssistantPanel(),
+      EMPTY_ASK_DISMISS_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [callEnded, panelVisible]);
 
   // A failed voice ask stays long enough to read, then puts itself away unless the
   // pointer is on it: an always-on-top error nobody asked to keep must not sit
@@ -1155,7 +1235,7 @@ const AssistantPanel: React.FC = () => {
   useSuppressContextMenu();
 
   const shellClass = `assistant-scope assistant-shell${
-    panelVisible ? "" : " native-window-hidden"
+    panelVisible && !callEnded ? "" : " native-window-hidden"
   }`;
 
   // ---- The live call: a floating bar, or the bar under the conversation -----
@@ -1168,7 +1248,18 @@ const AssistantPanel: React.FC = () => {
         ref={listRef}
         onScroll={handleMessagesScroll}
       >
-        {history.length === 0 && stream === "" && (
+        {history.length === 0 && stream === "" && meeting && (
+          <MeetingStarter
+            meeting={meeting}
+            onAsk={(text) => void voice.sendText(text)}
+            disabled={
+              voice.phase === "off" ||
+              voice.phase === "starting" ||
+              voice.phase === "error"
+            }
+          />
+        )}
+        {history.length === 0 && stream === "" && !meeting && (
           <div className="assistant-empty">
             <p>
               {activeCharacter?.greeting?.trim()
@@ -1311,6 +1402,7 @@ const AssistantPanel: React.FC = () => {
             />
           }
           transcript={transcript}
+          meeting={meeting}
           resizeHandles={callExpanded ? <ResizeHandles /> : null}
           hasConversation={history.length > 0}
           activity={
@@ -1337,7 +1429,7 @@ const AssistantPanel: React.FC = () => {
         onPointerLeave={() => setHovered(false)}
       >
         <QuickAsk
-          phase={phase}
+          phase={shownPhase}
           status={status}
           levels={state === "listening" ? micLevels : undefined}
           question={question}
@@ -1368,6 +1460,13 @@ const AssistantPanel: React.FC = () => {
             void commands.assistantRegenerate();
           }}
           onInsert={async (text) => {
+            if (!text.trim()) return false;
+            // The window is hidden at once for the paste (no time for the
+            // usual clear-then-hide), so stop drawing first and let that empty
+            // frame reach the screen: the next show must not reveal this card
+            // as a stale frame.
+            setPanelVisible(false);
+            await new Promise((done) => window.setTimeout(done, 50));
             const result = await commands.assistantInsertText(text);
             return result.status === "ok";
           }}

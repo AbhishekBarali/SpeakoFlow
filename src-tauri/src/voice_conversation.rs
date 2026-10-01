@@ -13,7 +13,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// a short, useful sentence", "no stock acknowledgments or filler", "ask at most
 /// one follow-up question"), which overrode the user's own persona and made
 /// capable models talk like a support script.
-const VOICE_PROMPT: &str = "This conversation is spoken: your reply is read aloud, so write it as speech rather than as a document — no markdown, headings, code blocks, or bullet lists. The user hears you in real time and can start talking over you at any point; when they do, answer what they just said instead of restarting your previous answer. A previous reply of yours marked as interrupted may contain words they never heard.";
+const VOICE_PROMPT: &str = "This conversation is spoken: your reply is read aloud, so write it as speech rather than as a document, with no markdown, headings, code blocks, or bullet lists. The user hears you in real time and can start talking over you at any point; when they do, answer what they just said instead of restarting your previous answer. A previous reply of yours marked as interrupted may contain words they never heard.";
 
 /// Voice changes the delivery medium, not the user's length preference: the
 /// length dial (profile override, else the global setting) still decides how
@@ -21,7 +21,7 @@ const VOICE_PROMPT: &str = "This conversation is spoken: your reply is read alou
 /// essay is unusable when it arrives one sentence at a time through a speaker.
 pub fn voice_prompt(length: crate::settings::AssistantResponseLength) -> String {
     if length == crate::settings::AssistantResponseLength::Default {
-        format!("{VOICE_PROMPT} Spoken answers work best when they stay conversational in length — say what is needed and leave room for the user to reply, then go into as much detail as they ask for.")
+        format!("{VOICE_PROMPT} Spoken answers work best when they stay conversational in length: say what is needed and leave room for the user to reply, then go into as much detail as they ask for.")
     } else {
         VOICE_PROMPT.to_string()
     }
@@ -217,6 +217,205 @@ impl VoiceConversation {
     }
 }
 
+/// What a dictation is doing, as far as a call is concerned.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum DictationStage {
+    #[default]
+    Idle,
+    /// Recording. The call stops listening until this ends.
+    Recording,
+    /// Transcribing, cleaning up, pasting. The microphone is free again, but
+    /// Esc still belongs to this dictation rather than to the call.
+    Processing,
+}
+
+/// Tracks the dictation running alongside a call.
+///
+/// A dictation used to hang up the call, because both want the microphone, and
+/// hanging up threw the call's conversation away. Now dictation **holds** the
+/// call instead: the call stops listening while dictation records, then picks up
+/// where it was, the same way the mute button pauses it. Replies already on
+/// their way keep coming, just as they do when muted.
+///
+/// Generations stop a pipeline that outlived its stage (the coordinator's
+/// processing cap can release it early) from ending a later dictation.
+#[derive(Default)]
+struct DictationTracker {
+    stage: DictationStage,
+    generation: u64,
+}
+
+impl DictationTracker {
+    /// A dictation started recording. Returns its generation.
+    fn start(&mut self) -> u64 {
+        self.generation = self.generation.wrapping_add(1);
+        self.stage = DictationStage::Recording;
+        self.generation
+    }
+
+    /// A dictation with nothing to record (a recovery) started processing.
+    fn start_processing(&mut self) -> u64 {
+        self.generation = self.generation.wrapping_add(1);
+        self.stage = DictationStage::Processing;
+        self.generation
+    }
+
+    /// Recording ended and the pipeline carries on without the microphone.
+    fn recorded(&mut self, generation: u64) {
+        if self.generation == generation && self.stage == DictationStage::Recording {
+            self.stage = DictationStage::Processing;
+        }
+    }
+
+    fn finish(&mut self, generation: u64) {
+        if self.generation == generation {
+            self.stage = DictationStage::Idle;
+        }
+    }
+
+    /// The recording was cancelled, so no pipeline follows it.
+    fn cancel_recording(&mut self) {
+        if self.stage == DictationStage::Recording {
+            self.stage = DictationStage::Idle;
+        }
+    }
+
+    fn holds_mic(&self) -> bool {
+        self.stage == DictationStage::Recording
+    }
+
+    fn in_flight(&self) -> bool {
+        self.stage != DictationStage::Idle
+    }
+}
+
+static DICTATION: Mutex<DictationTracker> = Mutex::new(DictationTracker {
+    stage: DictationStage::Idle,
+    generation: 0,
+});
+
+/// Tells the panel whether a dictation holds the microphone. Sent on every
+/// change, call or not, so a call that starts mid-dictation knows it is held.
+pub const DICTATION_HOLD_EVENT: &str = "assistant-conversation-dictation";
+
+/// Apply `change` and tell the panel if the hold changed.
+fn update_dictation<T>(app: &AppHandle, change: impl FnOnce(&mut DictationTracker) -> T) -> T {
+    let (result, before, after) = {
+        let mut tracker = DICTATION.lock().unwrap_or_else(|e| e.into_inner());
+        let before = tracker.holds_mic();
+        let result = change(&mut tracker);
+        (result, before, tracker.holds_mic())
+    };
+    if before != after {
+        log::debug!(
+            "Dictation {} the microphone",
+            if after { "holds" } else { "released" }
+        );
+        let _ = app.emit(DICTATION_HOLD_EVENT, after);
+    }
+    result
+}
+
+/// A dictation started recording. Returns its generation for
+/// [`dictation_recorded`] and [`dictation_finished`].
+pub fn dictation_started(app: &AppHandle) -> u64 {
+    update_dictation(app, DictationTracker::start)
+}
+
+/// A dictation that does not record (a recovered one) started its pipeline.
+pub fn dictation_processing(app: &AppHandle) -> u64 {
+    update_dictation(app, DictationTracker::start_processing)
+}
+
+/// The current dictation's generation. Read by `TranscribeAction::stop`, which
+/// the coordinator runs straight after that recording's own start.
+pub fn dictation_generation() -> u64 {
+    DICTATION
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .generation
+}
+
+/// Recording stopped: the call can listen again while the dictation finishes.
+pub fn dictation_recorded(app: &AppHandle, generation: u64) {
+    update_dictation(app, |t| t.recorded(generation));
+}
+
+/// The dictation's pipeline is done.
+pub fn dictation_finished(app: &AppHandle, generation: u64) {
+    update_dictation(app, |t| t.finish(generation));
+}
+
+/// A recording was cancelled. Releases the hold if it was a dictation's.
+pub fn dictation_cancelled(app: &AppHandle) {
+    update_dictation(app, DictationTracker::cancel_recording);
+}
+
+/// Whether a dictation is recording, which holds the call.
+pub fn dictation_holds_mic() -> bool {
+    DICTATION
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .holds_mic()
+}
+
+/// Whether a dictation is recording or still finishing.
+pub fn dictation_in_flight() -> bool {
+    DICTATION
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .in_flight()
+}
+
+/// Ends a dictation's stage when its pipeline ends, on every exit path.
+pub struct DictationFlight {
+    app: AppHandle,
+    generation: u64,
+}
+
+impl DictationFlight {
+    pub fn new(app: AppHandle, generation: u64) -> Self {
+        Self { app, generation }
+    }
+}
+
+impl Drop for DictationFlight {
+    fn drop(&mut self) {
+        dictation_finished(&self.app, self.generation);
+    }
+}
+
+/// Whether a cancel (Esc, the pill's stop, the tray) should leave the call
+/// alone.
+///
+/// A cancel during a dictation is aimed at the dictation. Letting it also cancel
+/// the call's reply, stop its voice and reset its state would bring back the
+/// problem this hold fixes: one feature taking the other down with it.
+pub fn cancel_spares_call(call_active: bool, dictation_in_flight: bool) -> bool {
+    call_active && dictation_in_flight
+}
+
+/// Whether the call shortcut's Esc should hang up. Only when nothing else has a
+/// claim on Esc: a reply to stop comes first, and so does a dictation.
+pub fn esc_hangs_up(call_active: bool, assistant_busy: bool, dictation_in_flight: bool) -> bool {
+    call_active && !assistant_busy && !dictation_in_flight
+}
+
+/// Whether a call can start while the recorder is busy. A dictation holds the
+/// new call the same way it holds a running one. A quick ask is a different
+/// matter: it records for the assistant, and the call would take its window.
+pub fn call_may_start(recording: bool, dictation_holds_mic: bool) -> bool {
+    !recording || dictation_holds_mic
+}
+
+/// Whether a dictation holds the microphone. A call that starts after the
+/// hold began asks this, because it missed the event.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_conversation_dictation_active() -> bool {
+    dictation_holds_mic()
+}
+
 pub fn is_current(app: &AppHandle, ticket: VoiceTicket) -> bool {
     app.state::<VoiceConversation>().is_current(ticket)
 }
@@ -329,10 +528,15 @@ pub async fn assistant_conversation_start(app: AppHandle) -> Result<VoiceTicket,
     {
         return Err("Choose an assistant model in Settings".into());
     }
-    if app
-        .state::<Arc<crate::managers::audio::AudioRecordingManager>>()
-        .is_recording()
-    {
+    // A dictation in progress does not block a call: the call starts held and
+    // begins listening when the dictation is done. A quick ask still does,
+    // because it is recording for the assistant and the call would take over
+    // the window it answers in.
+    if !call_may_start(
+        app.state::<Arc<crate::managers::audio::AudioRecordingManager>>()
+            .is_recording(),
+        dictation_holds_mic(),
+    ) {
         return Err("Finish the current recording first".into());
     }
     if app.state::<AssistantConversation>().is_busy() {
@@ -651,8 +855,58 @@ pub async fn assistant_conversation_load(
         .get_assistant_session(id)
         .map_err(|e| format!("Couldn't load the conversation: {e}"))?
         .ok_or("That conversation no longer exists.")?;
+    let meeting = restore_meeting(&app, entry.meeting_id).await;
     settle_call_for_switch(&app, session).await?;
-    assistant::adopt_saved_conversation(&app, entry.id, entry.messages);
+    assistant::adopt_saved_conversation(&app, entry.id, entry.messages, meeting);
+    Ok(())
+}
+
+/// The meeting a saved conversation was about, if it still exists.
+async fn restore_meeting(
+    app: &AppHandle,
+    meeting_id: Option<i64>,
+) -> Option<crate::meetings::discuss::MeetingAttachment> {
+    let meeting_id = meeting_id?;
+    let store = app
+        .try_state::<Arc<crate::meetings::store::MeetingStore>>()?
+        .inner()
+        .clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::meetings::discuss::attachment(&store, meeting_id)
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+/// Start a new conversation about a meeting inside the live call ("Discuss in a
+/// call" while a call is already up, or the call that button just opened).
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_conversation_discuss(
+    app: AppHandle,
+    session: u32,
+    meeting_id: i64,
+) -> Result<(), String> {
+    let store = app
+        .try_state::<Arc<crate::meetings::store::MeetingStore>>()
+        .ok_or("Meetings storage is unavailable.")?
+        .inner()
+        .clone();
+    let meeting = tauri::async_runtime::spawn_blocking(move || store.get_meeting(meeting_id))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?
+        .ok_or("That meeting no longer exists.")?;
+    crate::meetings::discuss::discussable(&meeting)?;
+    settle_call_for_switch(&app, session).await?;
+    assistant::adopt_meeting(
+        &app,
+        crate::meetings::discuss::MeetingAttachment {
+            meeting_id,
+            title: meeting.title,
+        },
+    );
     Ok(())
 }
 
@@ -680,8 +934,9 @@ pub async fn assistant_conversation_branch(
     if branched.is_empty() {
         return Err("There's nothing to continue from there.".into());
     }
+    let meeting = restore_meeting(&app, entry.meeting_id).await;
     settle_call_for_switch(&app, session).await?;
-    assistant::adopt_branch(&app, branched);
+    assistant::adopt_branch(&app, branched, meeting);
     Ok(())
 }
 
@@ -907,5 +1162,92 @@ mod tests {
         voice.session.lock().unwrap().ticket = Some(next);
         assert!(!voice.claim(first));
         assert!(voice.claim(next));
+    }
+
+    /// Recording holds the call, and only recording: once the audio is in, the
+    /// call listens again while the dictation transcribes and pastes.
+    #[test]
+    fn a_dictation_holds_the_call_only_while_it_records() {
+        let mut tracker = DictationTracker::default();
+        assert!(!tracker.holds_mic());
+        assert!(!tracker.in_flight());
+        let generation = tracker.start();
+        assert!(tracker.holds_mic());
+        tracker.recorded(generation);
+        assert!(!tracker.holds_mic(), "the microphone is free again");
+        assert!(tracker.in_flight(), "Esc still belongs to the dictation");
+        tracker.finish(generation);
+        assert!(!tracker.in_flight());
+    }
+
+    #[test]
+    fn a_cancelled_recording_releases_the_call() {
+        let mut tracker = DictationTracker::default();
+        tracker.start();
+        tracker.cancel_recording();
+        assert!(!tracker.holds_mic());
+        assert!(!tracker.in_flight());
+        // Cancelling while processing is the pipeline's to finish, not this.
+        let generation = tracker.start();
+        tracker.recorded(generation);
+        tracker.cancel_recording();
+        assert!(tracker.in_flight());
+    }
+
+    /// The coordinator's processing cap can release a stuck pipeline and let
+    /// the next dictation start. The old pipeline finishing late must not
+    /// release the new dictation's hold on the call.
+    #[test]
+    fn a_late_pipeline_cannot_release_a_newer_dictation() {
+        let mut tracker = DictationTracker::default();
+        let old = tracker.start();
+        tracker.recorded(old);
+        let new = tracker.start();
+        tracker.recorded(old);
+        assert!(tracker.holds_mic(), "a stale `recorded` is ignored");
+        tracker.finish(old);
+        assert!(tracker.holds_mic(), "a stale `finish` is ignored");
+        tracker.recorded(new);
+        tracker.finish(new);
+        assert!(!tracker.in_flight());
+    }
+
+    #[test]
+    fn a_recovered_dictation_is_in_flight_without_holding_the_call() {
+        let mut tracker = DictationTracker::default();
+        let generation = tracker.start_processing();
+        assert!(!tracker.holds_mic());
+        assert!(tracker.in_flight());
+        tracker.finish(generation);
+        assert!(!tracker.in_flight());
+    }
+
+    /// Cancelling a dictation used to cancel the call's reply as well.
+    #[test]
+    fn a_cancel_during_a_dictation_leaves_the_call_alone() {
+        assert!(cancel_spares_call(true, true));
+        assert!(!cancel_spares_call(true, false), "nothing else to cancel");
+        assert!(!cancel_spares_call(false, true), "no call to spare");
+    }
+
+    /// Esc hangs up only when nothing else claims it.
+    #[test]
+    fn esc_during_a_dictation_does_not_hang_up() {
+        assert!(esc_hangs_up(true, false, false));
+        assert!(!esc_hangs_up(true, false, true), "it cancels the dictation");
+        assert!(!esc_hangs_up(true, true, false), "it stops the reply");
+        assert!(!esc_hangs_up(false, false, false), "there is no call");
+    }
+
+    /// Starting a call mid-dictation used to fail with "Finish the current
+    /// recording first".
+    #[test]
+    fn a_call_can_start_during_a_dictation_but_not_during_a_quick_ask() {
+        assert!(call_may_start(false, false));
+        assert!(
+            call_may_start(true, true),
+            "dictation: the call starts held"
+        );
+        assert!(!call_may_start(true, false), "a quick ask is recording");
     }
 }

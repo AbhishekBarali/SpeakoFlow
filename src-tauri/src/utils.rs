@@ -60,8 +60,19 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // Cancel any ongoing recording. What it captured comes back, so a
     // dictation cancelled by mistake can be offered back below instead of lost.
     let audio_manager = app.state::<Arc<AudioRecordingManager>>();
+    // Decided before anything is torn down. A cancel during a dictation that is
+    // running beside a call is aimed at the dictation: the call's reply, its
+    // voice and its state are left exactly as they are.
+    let spare_call = crate::voice_conversation::cancel_spares_call(
+        crate::voice_conversation::is_active(app),
+        crate::voice_conversation::dictation_in_flight(),
+    );
     let cancelled = audio_manager.cancel_recording();
     let recording_was_active = cancelled.is_some();
+    if recording_was_active {
+        // Hands the microphone back to a call this dictation was holding.
+        crate::voice_conversation::dictation_cancelled(app);
+    }
 
     // Cancel any in-flight Flow generation and ensure a cancelled recording's
     // live-transcript watcher cannot leak into the next recording mode.
@@ -81,31 +92,34 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // Whether this cancellation belongs to the assistant: either a turn is in
     // flight, or the recording being cancelled was routed to the assistant.
     // Read before `request_cancel()` below, while the turn still reports busy.
-    let assistant_owns_cancel = app
-        .try_state::<crate::assistant::AssistantConversation>()
-        .map(|conversation| conversation.is_busy())
-        .unwrap_or(false)
-        || crate::assistant::is_transcribe_redirected();
+    let assistant_owns_cancel = !spare_call
+        && (app
+            .try_state::<crate::assistant::AssistantConversation>()
+            .map(|conversation| conversation.is_busy())
+            .unwrap_or(false)
+            || crate::assistant::is_transcribe_redirected());
 
     // Abort any in-flight assistant turn (streaming LLM answer) and silence a
     // spoken reply that's playing or about to play, so cancel (Esc / the pill's
     // stop button) stops a reply mid-generation — not only a recording. All of
     // these are no-ops when the assistant is idle.
-    if let Some(conversation) = app.try_state::<crate::assistant::AssistantConversation>() {
-        conversation.request_cancel();
+    if !spare_call {
+        if let Some(conversation) = app.try_state::<crate::assistant::AssistantConversation>() {
+            conversation.request_cancel();
+        }
+        crate::tts::stop_remote();
+        {
+            use tauri::Emitter;
+            let _ = app.emit("assistant-tts-stop", ());
+        }
+        // Reset the assistant panel/pill to idle. The panel renders purely from
+        // `assistant-state` events, so without this an in-progress capture
+        // (listening / transcribing / thinking / speaking) stays visually stuck
+        // after a cancel even though the recording and turn have actually
+        // stopped — the "I pressed cancel and nothing happened" bug. Safe and
+        // idempotent when the panel is hidden or already idle.
+        crate::assistant::emit_state(app, "idle");
     }
-    crate::tts::stop_remote();
-    {
-        use tauri::Emitter;
-        let _ = app.emit("assistant-tts-stop", ());
-    }
-    // Reset the assistant panel/pill to idle. The panel renders purely from
-    // `assistant-state` events, so without this an in-progress capture
-    // (listening / transcribing / thinking / speaking) stays visually stuck
-    // after a cancel even though the recording and turn have actually stopped —
-    // the "I pressed cancel and nothing happened" bug. Safe/idempotent when the
-    // panel is hidden or already idle.
-    crate::assistant::emit_state(app, "idle");
     // The compact voice overlay is transient, so cancelling an assistant turn
     // dismisses it. Cancelling a plain dictation leaves it alone: `Esc` during
     // dictation shouldn't close the assistant, and `hide_assistant_panel` ends

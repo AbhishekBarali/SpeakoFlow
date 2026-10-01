@@ -3,8 +3,10 @@ import ReactDOM from "react-dom/client";
 import AssistantPanel from "./AssistantPanel";
 import "@/i18n";
 import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+import { suppressBrowserContextMenu } from "@/lib/contextMenu";
 
 suppressCaretBrowsing();
+suppressBrowserContextMenu();
 
 // Fonts — the panel is its own window, so it must load fonts independently of
 // the main app entry point. Inter (variable) carries it: body at 400,

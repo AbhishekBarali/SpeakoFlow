@@ -147,8 +147,7 @@
       "progress": "Bước {{current}}/{{total}}",
       "steps": {
         "setup": "Thiết lập",
-        "tour": "Giới thiệu",
-        "finish": "Bắt đầu"
+        "tour": "Giới thiệu"
       }
     },
     "setup": {
@@ -161,7 +160,7 @@
       "count": "{{current}}/{{total}}",
       "skip": "Bỏ qua phần giới thiệu",
       "next": "Tiếp",
-      "done": "Tiếp tục",
+      "finish": "Mở SpeakoFlow",
       "tabs": {
         "dictate": "Đọc chính tả",
         "ask": "Trợ lý",
@@ -171,6 +170,15 @@
         "hold": "Giữ để nói",
         "tap": "Nhấn để bắt đầu, nhấn để dừng",
         "call": "Nhấn để bắt đầu, nhấn lần nữa để gác máy"
+      },
+      "steps": {
+        "label": "Cách hoạt động",
+        "speak": "Nói điều bạn muốn gõ",
+        "typed": "Chữ được gõ ngay tại vị trí con trỏ",
+        "select": "Chọn văn bản (tùy chọn)",
+        "use": "Chèn câu trả lời, hoặc chỉ cần đọc",
+        "talk": "Cứ nói thôi",
+        "answer": "Trả lời thành tiếng"
       },
       "mail": {
         "window": "Thư mới",
@@ -219,15 +227,6 @@
         "assistant": "Trợ lý",
         "said": "Giúp tôi lên ý cho một bài nói ngắn trong buổi họp nhóm thứ Sáu.",
         "reply": "Được thôi. Hãy mở đầu bằng kết quả bạn tự hào nhất, nêu hai lý do nó thành công, rồi kết thúc bằng bước tiếp theo."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Sẵn sàng",
-        "installing": "Đang cài đặt…",
-        "percent": "{{percent}}%",
-        "retry": "Thử lại",
-        "waiting": "Đang chờ"
       }
     },
     "subtitle": "Để bắt đầu, hãy chọn một mô hình chuyển đổi giọng nói",
@@ -460,8 +459,7 @@
     },
     "frame": {
       "setup": "Thiết lập",
-      "tour": "Giới thiệu",
-      "finish": "Bắt đầu"
+      "tour": "Giới thiệu"
     },
     "welcome": {
       "line": "Bạn nói, nó gõ. Bạn hỏi, nó trả lời.",
@@ -486,33 +484,6 @@
       "continue": "Tiếp tục",
       "later": "Thiết lập sau",
       "loading": "Đang tìm mô hình giọng nói cho bạn"
-    },
-    "start": {
-      "ready": {
-        "title": "Thử ngay"
-      },
-      "downloading": {
-        "title": "Sắp xong rồi"
-      },
-      "failed": {
-        "title": "Quá trình tải xuống đã dừng"
-      },
-      "none": {
-        "title": "Chọn một mô hình giọng nói để bắt đầu"
-      },
-      "progress": {
-        "of": "{{done}}/{{total}}",
-        "failed": "Chưa tải xong. Thử lại nhé?",
-        "underMinute": "Còn chưa đến một phút",
-        "minutes_other": "Còn khoảng {{count}} phút"
-      },
-      "try": {
-        "label": "Thử đọc chính tả",
-        "placeholder": "Lời bạn nói sẽ hiện ở đây…",
-        "success": "Vậy đó. Nó hoạt động trong mọi ứng dụng."
-      },
-      "open": "Mở SpeakoFlow",
-      "choose": "Chọn mô hình giọng nói"
     }
   },
   "modelSelector": {
@@ -1846,14 +1817,6 @@
           "large": "Lớn",
           "extraLarge": "Rất lớn"
         },
-        "panelSizeLabel": "Kích thước bảng",
-        "panelSizeDescription": "Kích thước tổng thể của bảng trợ lý nổi.",
-        "panelSizes": {
-          "mini": "Nhỏ",
-          "compact": "Gọn",
-          "standard": "Chuẩn",
-          "large": "Lớn"
-        },
         "askDisplayLabel": "Màn hình nào",
         "askDisplayDescription": "Màn hình mà trợ lý mở ra. Mặc định là màn hình có con trỏ chuột.",
         "askDisplays": {
@@ -1976,7 +1939,9 @@
     },
     "delete": {
       "action": "Xóa cuộc họp",
-      "whileRecording": "Hãy dừng ghi âm trước khi xóa cuộc họp này."
+      "whileRecording": "Hãy dừng ghi âm trước khi xóa cuộc họp này.",
+      "confirmTitle": "Xóa cuộc họp này?",
+      "confirmBody": "Bản chép lời, ghi chú và âm thanh của cuộc họp sẽ bị xóa khỏi máy tính này. Không thể hoàn tác."
     },
     "detail": {
       "title": "Cuộc họp",
@@ -2220,6 +2185,7 @@
       "details": "Chi tiết",
       "startHint": "Hãy bắt đầu nói, hoặc nhập tin nhắn.",
       "mutedHint": "Micrô đang tắt. Bạn vẫn có thể nhập.",
+      "heldHint": "Tạm dừng trong khi bạn đọc chính tả.",
       "preparingVoice": "Đang chuẩn bị giọng nói… {{progress}}%",
       "history": {
         "title": "Các cuộc trò chuyện trước",
@@ -2256,6 +2222,7 @@
         "responding": "Đang suy nghĩ…",
         "speaking": "Đang nói",
         "muted": "Micrô đang tắt",
+        "held": "Tạm dừng để đọc chính tả",
         "error": "Cuộc gọi bị gián đoạn"
       },
       "errors": {
@@ -2904,7 +2871,6 @@
       "replyLength": "Độ dài thông thường của câu trả lời.",
       "history": "Số tin nhắn gần đây mà trợ lý ghi nhớ.",
       "summarize": "Rút gọn các cuộc trò chuyện dài để trợ lý không quên phần đầu.",
-      "panelSize": "Bảng chiếm bao nhiêu phần màn hình.",
       "opacity": "Giảm xuống để màn hình nền hiện ra phía sau.",
       "position": "Nhấp vào một vị trí trên màn hình.",
       "display": "Màn hình mà bảng sẽ mở ra."
@@ -2977,7 +2943,6 @@
     "panel": {
       "where": "Nơi mở ra",
       "text": "Cỡ chữ",
-      "size": "Kích thước bảng",
       "opacity": "Độ mờ",
       "screen": "Màn hình nào"
     }

@@ -20,7 +20,6 @@ import {
 } from "@/components/shell/navigation";
 import {
   AccessibilityOnboarding,
-  FinishStep,
   SetupStep,
   WelcomeStep,
   TourStep,
@@ -33,10 +32,12 @@ import { watchScreenScale } from "@/lib/screenScale";
 import { useModelStore } from "@/stores/modelStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+import { suppressBrowserContextMenu } from "@/lib/contextMenu";
 import { useUpdateStore } from "@/components/update-checker/updateStore";
 import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
 
 suppressCaretBrowsing();
+suppressBrowserContextMenu();
 
 // Screenshots should not wait out the real 8-second first check.
 if (previewParams.get("update") === "1") {
@@ -66,15 +67,9 @@ const initialNavigation: NavigationState = {
     : [],
 };
 
-type FlowStep =
-  | "welcome"
-  | "accessibility"
-  | "setup"
-  | "tour"
-  | "finish"
-  | "done";
+type FlowStep = "welcome" | "accessibility" | "setup" | "tour" | "done";
 
-/** `?onboarding=welcome|setup|tour|finish` walks first-run setup from that step,
+/** `?onboarding=welcome|setup|tour` walks first-run setup from that step,
  *  with `&scene=0…2` opening the tour on one scene. Without `?onboarding`, the
  *  shell's Settings → General → Show onboarding again starts the flow too. */
 const OnboardingPreview: React.FC<{ from: FlowStep }> = ({ from }) => {
@@ -95,23 +90,20 @@ const OnboardingPreview: React.FC<{ from: FlowStep }> = ({ from }) => {
     return <AccessibilityOnboarding onComplete={() => setStep("setup")} />;
   }
   if (step === "setup") {
-    return <SetupStep onContinue={() => setStep("tour")} />;
+    return (
+      <SetupStep
+        onContinue={({ skippedModels }) => {
+          setChooseModels(skippedModels);
+          setStep("tour");
+        }}
+      />
+    );
   }
   if (step === "tour") {
     return (
       <TourStep
         initialIndex={Number(previewParams.get("scene") ?? 0)}
-        onDone={() => setStep("finish")}
-      />
-    );
-  }
-  if (step === "finish") {
-    return (
-      <FinishStep
-        onDone={(choose) => {
-          setChooseModels(!!choose);
-          setStep("done");
-        }}
+        onDone={() => setStep("done")}
       />
     );
   }

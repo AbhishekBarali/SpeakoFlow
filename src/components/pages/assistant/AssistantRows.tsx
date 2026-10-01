@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Loader2, X } from "lucide-react";
 import {
   commands,
   type AssistantCharacter,
@@ -132,7 +132,14 @@ const KEY_SITES: Record<string, string> = {
   tinyfish: "tinyfish.ai",
 };
 
-/** Which search company, by its logo, and its key. Shown once search is on. */
+/**
+ * Which search company, by its logo, and its key. Shown once search is on.
+ *
+ * Folded to one line — the provider in use and whether its key is saved —
+ * once it works, because a six-tile picker and a key field open all the time
+ * made the longest list on the page longer for a choice made once. It opens by
+ * itself when it needs something: the selected provider has no key yet.
+ */
 const WebSearchSetup: React.FC = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
@@ -142,6 +149,9 @@ const WebSearchSetup: React.FC = () => {
   const storedKey = keys[provider] ?? "";
   const [draft, setDraft] = useState(storedKey);
   const [testing, setTesting] = useState(false);
+  // Decided once, on mount: open only if there is something to do. Picking a
+  // different provider while open must not snap it shut under the cursor.
+  const [expanded, setExpanded] = useState(() => !storedKey.trim());
 
   useEffect(() => setDraft(storedKey), [storedKey, provider]);
 
@@ -179,6 +189,40 @@ const WebSearchSetup: React.FC = () => {
       setTesting(false);
     }
   };
+
+  const keyStatus = storedKey ? (
+    <span className="inline-flex items-center gap-1 text-success">
+      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      {t("assistantPage.cards.keySaved")}
+    </span>
+  ) : (
+    t("assistantPage.cards.webSearch.getKey", {
+      site: KEY_SITES[provider] ?? "",
+    })
+  );
+
+  if (!expanded) {
+    return (
+      <div className="flex items-center gap-3">
+        <ProviderTile id={provider} kind="search" size="sm" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[0.8125rem] font-medium text-ink">
+            {providerLabel(provider)}
+          </div>
+          <div className="truncate text-xs text-muted">{keyStatus}</div>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setExpanded(true)}
+          aria-expanded={false}
+        >
+          {t("common.change")}
+          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -228,18 +272,19 @@ const WebSearchSetup: React.FC = () => {
           {t("settings.assistant.webSearch.testButton")}
         </Button>
       </div>
-      <p className="mt-1.5 text-xs text-muted">
-        {storedKey ? (
-          <span className="inline-flex items-center gap-1 text-success">
-            <Check className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("assistantPage.cards.keySaved")}
-          </span>
-        ) : (
-          t("assistantPage.cards.webSearch.getKey", {
-            site: KEY_SITES[provider] ?? "",
-          })
-        )}
-      </p>
+      <div className="mt-1.5 flex items-center justify-between gap-3">
+        <p className="text-xs text-muted">{keyStatus}</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setExpanded(false)}
+          aria-expanded={true}
+          className="-me-2"
+        >
+          {t("common.showLess")}
+          <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+        </Button>
+      </div>
     </div>
   );
 };

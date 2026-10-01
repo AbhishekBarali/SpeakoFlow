@@ -148,8 +148,7 @@
       "progress": "Schritt {{current}} von {{total}}",
       "steps": {
         "setup": "Einrichten",
-        "tour": "Tour",
-        "finish": "Start"
+        "tour": "Tour"
       }
     },
     "setup": {
@@ -162,7 +161,7 @@
       "count": "{{current}} von {{total}}",
       "skip": "Tour überspringen",
       "next": "Weiter",
-      "done": "Fortfahren",
+      "finish": "SpeakoFlow öffnen",
       "tabs": {
         "dictate": "Diktat",
         "ask": "Assistent",
@@ -172,6 +171,15 @@
         "hold": "Zum Sprechen halten",
         "tap": "Antippen zum Starten, antippen zum Stoppen",
         "call": "Drücken zum Starten, erneut zum Auflegen"
+      },
+      "steps": {
+        "label": "So funktioniert's",
+        "speak": "Sag, was du schreiben willst",
+        "typed": "Es wird dort getippt, wo dein Cursor ist",
+        "select": "Text markieren (optional)",
+        "use": "Antwort einfügen oder einfach lesen",
+        "talk": "Einfach sprechen",
+        "answer": "Es antwortet laut"
       },
       "mail": {
         "window": "Neue Nachricht",
@@ -220,15 +228,6 @@
         "assistant": "Assistent",
         "said": "Hilf mir, einen kurzen Vortrag für das Teammeeting am Freitag zu planen.",
         "reply": "Gern. Beginne mit dem Ergebnis, auf das du am stolzesten bist, nenne zwei Gründe, warum es funktioniert hat, und schließe mit dem nächsten Schritt."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Bereit",
-        "installing": "Wird installiert…",
-        "percent": "{{percent}}%",
-        "retry": "Erneut versuchen",
-        "waiting": "Wartet"
       }
     },
     "subtitle": "Wähle ein Transkriptionsmodell, um loszulegen",
@@ -461,8 +460,7 @@
     },
     "frame": {
       "setup": "Einrichten",
-      "tour": "Tour",
-      "finish": "Start"
+      "tour": "Tour"
     },
     "welcome": {
       "line": "Sprich, und es tippt. Frag, und es antwortet.",
@@ -489,34 +487,6 @@
       "continue": "Weiter",
       "later": "Später einrichten",
       "loading": "Dein Sprachmodell wird gesucht"
-    },
-    "start": {
-      "ready": {
-        "title": "Probier es jetzt aus"
-      },
-      "downloading": {
-        "title": "Fast fertig"
-      },
-      "failed": {
-        "title": "Der Download wurde unterbrochen"
-      },
-      "none": {
-        "title": "Wähle zum Start ein Sprachmodell"
-      },
-      "progress": {
-        "of": "{{done}} von {{total}}",
-        "failed": "Es wurde nicht abgeschlossen. Erneut versuchen?",
-        "underMinute": "Weniger als eine Minute übrig",
-        "minutes_one": "Noch etwa {{count}} Minute",
-        "minutes_other": "Noch etwa {{count}} Minuten"
-      },
-      "try": {
-        "label": "Diktat ausprobieren",
-        "placeholder": "Deine Worte erscheinen hier…",
-        "success": "Das war’s. Es funktioniert in jeder App."
-      },
-      "open": "SpeakoFlow öffnen",
-      "choose": "Sprachmodell wählen"
     }
   },
   "modelSelector": {
@@ -1857,14 +1827,6 @@
           "large": "Groß",
           "extraLarge": "Sehr groß"
         },
-        "panelSizeLabel": "Panel-Größe",
-        "panelSizeDescription": "Gesamtgröße des schwebenden Assistenten-Panels.",
-        "panelSizes": {
-          "mini": "Klein",
-          "compact": "Kompakt",
-          "standard": "Standard",
-          "large": "Groß"
-        },
         "askDisplayLabel": "Welcher Bildschirm",
         "askDisplayDescription": "Der Bildschirm, auf dem sich der Assistent öffnet. Standardmäßig der, auf dem deine Maus ist.",
         "askDisplays": {
@@ -1988,7 +1950,9 @@
     },
     "delete": {
       "action": "Meeting löschen",
-      "whileRecording": "Stoppe die Aufnahme, bevor du dieses Meeting löschst."
+      "whileRecording": "Stoppe die Aufnahme, bevor du dieses Meeting löschst.",
+      "confirmTitle": "Dieses Meeting löschen?",
+      "confirmBody": "Transkript, Notizen und Audio werden von diesem Computer entfernt. Das lässt sich nicht rückgängig machen."
     },
     "detail": {
       "title": "Meeting",
@@ -2235,6 +2199,7 @@
       "details": "Details",
       "startHint": "Fang an zu sprechen oder tippe eine Nachricht.",
       "mutedHint": "Mikrofon aus. Du kannst weiterhin tippen.",
+      "heldHint": "Pausiert, während du diktierst.",
       "preparingVoice": "Stimme wird vorbereitet… {{progress}} %",
       "history": {
         "title": "Frühere Gespräche",
@@ -2272,6 +2237,7 @@
         "responding": "Denkt nach…",
         "speaking": "Spricht",
         "muted": "Mikrofon aus",
+        "held": "Pausiert fürs Diktat",
         "error": "Anruf unterbrochen"
       },
       "errors": {
@@ -2930,7 +2896,6 @@
       "replyLength": "Wie lang Antworten normalerweise sind.",
       "history": "Wie viele der letzten Nachrichten er im Blick behält.",
       "summarize": "Fasst lange Chats zusammen, damit er den Anfang nicht vergisst.",
-      "panelSize": "Wie viel deines Bildschirms das Panel einnimmt.",
       "opacity": "Ein niedrigerer Wert lässt deinen Desktop durchscheinen.",
       "position": "Klicke auf eine Stelle des Bildschirms.",
       "display": "Der Bildschirm, auf dem sich das Panel öffnet."
@@ -3005,7 +2970,6 @@
     "panel": {
       "where": "Wo es sich öffnet",
       "text": "Textgröße",
-      "size": "Panelgröße",
       "opacity": "Deckkraft",
       "screen": "Welcher Bildschirm"
     }

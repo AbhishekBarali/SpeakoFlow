@@ -33,26 +33,43 @@ const BINDING: Record<SceneId, string> = {
 
 /** A small rounded label, the app's chip style. */
 const Chip: React.FC<{
-  active?: boolean;
   icon?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ active = false, icon, children }) => (
-  <span
-    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.8125rem] font-medium transition-colors duration-300 ${
-      active
-        ? "border-accent/40 bg-accent/10 text-accent"
-        : "border-hairline bg-surface text-muted"
-    }`}
-  >
+}> = ({ icon, children }) => (
+  <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-2.5 py-1 text-[0.8125rem] font-medium text-muted">
     {icon}
     {children}
   </span>
 );
 
 /**
+ * How it is done, in three numbered steps. They hold still: the preview beside
+ * them is the moving part. Lighting each step in turn as the preview acted it
+ * out put a second animation next to the first, and the eye kept jumping
+ * between the 1-2-3 loop and the preview instead of watching either.
+ */
+const Steps: React.FC<{
+  label: string;
+  steps: React.ReactNode[];
+}> = ({ label, steps }) => (
+  <ol className="ob-steps" aria-label={label}>
+    {steps.map((content, i) => (
+      <li key={i} className="ob-step">
+        <span className="ob-step-num" aria-hidden="true">
+          {i + 1}
+        </span>
+        <span className="ob-step-body">{content}</span>
+      </li>
+    ))}
+  </ol>
+);
+
+/**
  * Three things you can do, each shown with the surface you will actually see,
- * and a headline and the keys beside it — nothing to read. The preview is the
- * explanation. It only shows: nothing here downloads or switches anything on.
+ * and beside it the steps to do it. This is the last screen of first-run
+ * setup: Continue opens the app, while the speech model chosen in setup keeps
+ * downloading (the sidebar shows its progress).
+ * It only shows: nothing here downloads or switches anything on.
  */
 export const TourStep: React.FC<{
   onDone: () => void;
@@ -64,8 +81,6 @@ export const TourStep: React.FC<{
   const [index, setIndex] = useState(() =>
     Math.min(Math.max(0, initialIndex), ORDER.length - 1),
   );
-  const [pressed, setPressed] = useState(false);
-  const [example, setExample] = useState(0);
   const scene = ORDER[index];
   const holdToTalk = settings?.push_to_talk ?? true;
   const binding = settings?.bindings?.[BINDING[scene]]?.current_binding;
@@ -83,16 +98,46 @@ export const TourStep: React.FC<{
         onDone();
         return;
       }
-      setPressed(false);
-      setExample(0);
       setIndex(Math.max(0, next));
     },
     [onDone],
   );
-  const onPressed = useCallback((value: boolean) => setPressed(value), []);
-  const onExample = useCallback((value: number) => setExample(value), []);
 
-  const sceneProps = { still, onPressed, holdToTalk };
+  const sceneProps = { still, holdToTalk, binding };
+
+  // The keys are a step of their own, drawn as keys, with how to press them
+  // beside them.
+  const keys = (
+    <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+      <Keycaps
+        binding={binding}
+        size="md"
+        fallback={
+          <span className="text-muted">
+            {t("settings.general.shortcut.notSet")}
+          </span>
+        }
+      />
+      <span>{hint}</span>
+    </span>
+  );
+  const steps: Record<SceneId, React.ReactNode[]> = {
+    dictate: [
+      keys,
+      t("onboarding.tour.steps.speak"),
+      t("onboarding.tour.steps.typed"),
+    ],
+    ask: [
+      t("onboarding.tour.steps.select"),
+      keys,
+      t("onboarding.tour.steps.use"),
+    ],
+    call: [
+      keys,
+      t("onboarding.tour.steps.talk"),
+      t("onboarding.tour.steps.answer"),
+    ],
+  };
 
   return (
     <OnboardingFrame
@@ -120,7 +165,7 @@ export const TourStep: React.FC<{
             )}
             <Button size="lg" onClick={() => go(index + 1)}>
               {index === ORDER.length - 1
-                ? t("onboarding.tour.done")
+                ? t("onboarding.tour.finish")
                 : t("onboarding.tour.next")}
               <ArrowRight
                 className="h-4 w-4 rtl:rotate-180"
@@ -142,40 +187,30 @@ export const TourStep: React.FC<{
         }))}
       />
 
-      <div className="ob-tour mt-10 grid items-center gap-10">
+      <div className="ob-tour grid items-center">
         <div key={scene} className="ob-tour-copy min-w-0" aria-live="polite">
-          <h1 className="font-display text-[2.75rem] leading-[1.05] whitespace-pre-line text-ink">
+          <h1 className="ob-tour-title font-display leading-[1.05] whitespace-pre-line text-ink">
             {t(`onboarding.tour.${scene}.title`)}
           </h1>
 
-          <div className="mt-8 flex flex-col items-start gap-2.5">
-            <span className="ob-keys" data-pressed={pressed}>
-              <Keycaps
-                binding={binding}
-                size="lg"
-                fallback={
-                  <span className="text-sm text-muted">
-                    {t("settings.general.shortcut.notSet")}
-                  </span>
-                }
-              />
-            </span>
-            <span className="text-sm text-muted">{hint}</span>
+          <div className="ob-tour-step">
+            <Steps
+              label={t("onboarding.tour.steps.label")}
+              steps={steps[scene]}
+            />
           </div>
 
           {scene === "dictate" && (
-            <div className="mt-8">
+            <div className="ob-tour-step ob-tour-extra">
               <Chip icon={<Wand2 className="h-3.5 w-3.5" aria-hidden="true" />}>
                 {t("onboarding.tour.dictate.cleanup")}
               </Chip>
             </div>
           )}
           {scene === "ask" && (
-            <div className="mt-8 flex flex-wrap gap-1.5">
-              {ASK_EXAMPLE_IDS.map((id, i) => (
-                <Chip key={id} active={!still && i === example}>
-                  {t(`onboarding.tour.ask.chips.${id}`)}
-                </Chip>
+            <div className="ob-tour-step ob-tour-extra flex flex-wrap gap-1.5">
+              {ASK_EXAMPLE_IDS.map((id) => (
+                <Chip key={id}>{t(`onboarding.tour.ask.chips.${id}`)}</Chip>
               ))}
               <Chip>{t("onboarding.tour.ask.chips.anything")}</Chip>
             </div>
@@ -190,7 +225,7 @@ export const TourStep: React.FC<{
               compactOverlay={compactOverlay}
             />
           ) : scene === "ask" ? (
-            <AskScene key="ask" {...sceneProps} onExample={onExample} />
+            <AskScene key="ask" {...sceneProps} />
           ) : (
             <CallScene key="call" {...sceneProps} />
           )}

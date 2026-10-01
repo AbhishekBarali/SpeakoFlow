@@ -59,6 +59,13 @@
 
   --as-error: #fda4af;
   --as-error-bg: rgba(244, 63, 94, 0.12);
+  /* An error on its own surface (the call's bubble, the quick ask's card): the
+     faint red tint already laid over the graphite, and opaque. Mixing the two
+     translucent tokens with `color-mix()` mixed their alpha too and gave a
+     surface about 37% opaque, so over a white window the message came out pink
+     on pale grey — unreadable, and lighter than everything around it. */
+  --as-error-surface: #2a1d21;
+  --as-error-line: rgba(253, 164, 175, 0.28);
   --as-live: #e5484d;
 
   /* Fast off the mark, unhurried settle, no overshoot. */
@@ -130,6 +137,17 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+/* Off screen, nothing is drawn. The window is only ever hidden, and a hidden
+ * window keeps the last frame its webview painted: the next show put that frame
+ * up before React had drawn the new surface, which is how a call's typing bar
+ * ("Message …") flashed at the start of the next ask or call. Rust leaves the
+ * window up long enough for this empty frame to land before it hides it
+ * (`PANEL_CLEAR_BEFORE_HIDE`), and the surface returns on `assistant-panel-shown`
+ * with its own entrance. */
+.assistant-shell.native-window-hidden {
+  visibility: hidden;
 }
 
 /* ---------- Resize grips ----------
@@ -959,12 +977,8 @@
 
 /* A failure wears the call's error bubble: a faint red tint, not a badge. */
 .qa-surface[data-phase="error"] {
-  background: color-mix(
-    in srgb,
-    var(--as-error-bg) 70%,
-    var(--as-chip-surface)
-  );
-  border-color: color-mix(in srgb, var(--as-error) 25%, transparent);
+  background: var(--as-error-surface);
+  border-color: var(--as-error-line);
 }
 
 @keyframes qa-arrive {

@@ -24,16 +24,46 @@ const surface = (
 
 test("the pill's own box is the hit rect, not the window it floats in", () => {
   // The pill as it actually renders: centred in a 340x56 frame.
+  const pill = { x: 92, y: 11, width: 155, height: 34 };
   expect(unionHitRect([surface(92, 11, 247, 45)], 1)).toEqual({
     kind: "rect",
-    rect: { x: 92, y: 11, width: 155, height: 34 },
+    rect: pill,
+    rects: [pill],
   });
 });
 
-test("several drawn surfaces are covered by one rect", () => {
+test("several drawn surfaces are each reported, with the box around them", () => {
   expect(
     unionHitRect([surface(10, 10, 60, 40), surface(100, 30, 140, 90)], 1),
-  ).toEqual({ kind: "rect", rect: { x: 10, y: 10, width: 130, height: 80 } });
+  ).toEqual({
+    kind: "rect",
+    rect: { x: 10, y: 10, width: 130, height: 80 },
+    rects: [
+      { x: 10, y: 10, width: 50, height: 30 },
+      { x: 100, y: 30, width: 40, height: 60 },
+    ],
+  });
+});
+
+test("a wide call bubble does not make the corners beside the bar tangible", () => {
+  // A 440x200 call window: "Searching the web · …" at 400px wide above a 170px
+  // bar. The box around the two takes in the empty space either side of the bar,
+  // which is where the user's own app is — so each surface is reported on its
+  // own, and that space is in none of them.
+  const region = unionHitRect(
+    [surface(20, 100, 420, 136), surface(135, 146, 305, 184)],
+    1,
+  );
+  expect(region.kind).toBe("rect");
+  if (region.kind !== "rect") return;
+  const inAny = (x: number, y: number) =>
+    region.rects.some(
+      (r) => x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height,
+    );
+  expect(inAny(220, 165)).toBe(true); // on the bar
+  expect(inAny(220, 118)).toBe(true); // on the bubble
+  expect(inAny(40, 165)).toBe(false); // beside the bar, under the bubble
+  expect(inAny(400, 165)).toBe(false);
 });
 
 test("surfaces that are all faded out pass everything through", () => {
@@ -66,17 +96,21 @@ test("a zero-area surface counts as not drawn rather than as a point", () => {
 test("the rect is reported in physical pixels", () => {
   // The window origin Rust compares against is physical, so a scaled display has to
   // be converted here — this side is the only one that knows the ratio.
+  const scaled = { x: 138, y: 16.5, width: 232.5, height: 51 };
   expect(unionHitRect([surface(92, 11, 247, 45)], 1.5)).toEqual({
     kind: "rect",
-    rect: { x: 138, y: 16.5, width: 232.5, height: 51 },
+    rect: scaled,
+    rects: [scaled],
   });
 });
 
 test("a nonsense device pixel ratio does not collapse the rect", () => {
   // A zero or negative ratio would multiply the drawn area to nothing, which reads
   // as "pass everything through" — i.e. a visible panel nobody can click.
+  const pill = { x: 92, y: 11, width: 155, height: 34 };
   expect(unionHitRect([surface(92, 11, 247, 45)], 0)).toEqual({
     kind: "rect",
-    rect: { x: 92, y: 11, width: 155, height: 34 },
+    rect: pill,
+    rects: [pill],
   });
 });

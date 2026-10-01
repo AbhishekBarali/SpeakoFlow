@@ -156,7 +156,10 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-          key: ${{ inputs.platform }}-${{ inputs.target }}
+          # `-ggml-portable`: whisper-rs-sys does not rebuild when GGML_NATIVE
+          # changes, so caches from before the portable-CPU step must not be
+          # reused. Bump the suffix whenever native CMake flags change.
+          key: ${{ inputs.platform }}-${{ inputs.target }}-ggml-portable
 
       - name: install dependencies (ubuntu 24.04 x64)
         if: contains(inputs.platform, 'ubuntu-24.04') && !contains(inputs.platform, 'arm')
@@ -289,6 +292,40 @@ jobs:
             patched_platform="${{ inputs.asset-prefix }}_${patched_platform}"
           fi
           echo "platform=${patched_platform}" >> $GITHUB_OUTPUT
+
+      # Build the statically linked whisper.cpp for a fixed CPU baseline, not for
+      # whatever CPU this runner happens to have.
+      #
+      # whisper-rs-sys never sets GGML_NATIVE, so ggml's default GGML_NATIVE=ON
+      # applies (-march=native; under MSVC, FindSIMD *runs* AVX/AVX2/AVX-512
+      # probes on the runner and enables whatever passes). GitHub's x64 runners
+      # are server parts that often have AVX-512, which most consumer CPUs do not
+      # (Intel 12th-14th gen, Core Ultra, AMD Zen 1-3), and the ARM runners are
+      # Neoverse with SVE2/i8mm, which a Raspberry Pi does not have. The result
+      # transcribes in CI and dies with SIGILL on a user's machine, at launch if
+      # the device listing hits it. Intel macOS hit exactly this and is fixed by
+      # its own step below; this covers every other target.
+      #
+      # whisper-rs-sys forwards every GGML_* environment variable as a CMake
+      # define, so GGML_NATIVE=OFF reaches it directly. With GGML_NATIVE off and
+      # no SOURCE_DATE_EPOCH, ggml picks a fixed baseline: AVX2 + FMA + F16C +
+      # BMI2 on x86-64 (the app refuses Whisper on CPUs below it, see
+      # `whisper_cpu_supported`), plain armv8-a on Linux ARM, and the Apple
+      # Silicon default on macOS. transcribe-cpp is already portable on Linux and
+      # Windows x64 (dynamic-backends picks kernels at run time); its static
+      # macOS arm64 build gets the same override through TRANSCRIBE_CMAKE_ARGS.
+      #
+      # Must run before the first cargo build of the job (the Linux pre-build
+      # below): whisper-rs-sys does not rerun when this variable changes.
+      - name: Build portable whisper.cpp CPU code
+        if: inputs.target != 'x86_64-apple-darwin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "GGML_NATIVE=OFF" >> "$GITHUB_ENV"
+          if [ "${{ inputs.target }}" = "aarch64-apple-darwin" ]; then
+            echo "TRANSCRIBE_CMAKE_ARGS=-DGGML_NATIVE=OFF" >> "$GITHUB_ENV"
+          fi
 
       # transcribe-cpp-sys cmake builds create paths that exceed Windows MAX_PATH
       # (260 chars). Shorten the target dir to keep paths under the limit.
@@ -599,11 +636,12 @@ jobs:
       # Two levers, because the two engines expose different knobs:
       #   * transcribe-cpp reads TRANSCRIBE_CMAKE_ARGS (same mechanism the
       #     Windows job already uses), so pass -DGGML_NATIVE=OFF directly.
-      #   * whisper-rs-sys 0.15 has NO hook for arbitrary cmake defines and never
-      #     sets GGML_NATIVE itself. But ggml's own CMakeLists flips
-      #     GGML_NATIVE_DEFAULT to OFF when SOURCE_DATE_EPOCH is present in the
-      #     environment â€” an upstream affordance for exactly this
-      #     reproducible/distributable case. Setting it covers both engines.
+      #   * whisper-rs-sys 0.15 never sets GGML_NATIVE itself (it does forward
+      #     GGML_* environment variables as CMake defines; the step near the top
+      #     of this job uses that for every other target). Here, ggml's own
+      #     CMakeLists flips GGML_NATIVE_DEFAULT to OFF when SOURCE_DATE_EPOCH is
+      #     present in the environment, which also turns off its AVX/AVX2
+      #     defaults, so this build keeps the most conservative x86-64 baseline.
       # Never do this for a local dev build: -march=native is the right default
       # when the binary only has to run on the machine that compiled it.
       - name: Build portable CPU code for Intel macOS
@@ -1060,18 +1098,52 @@ jobs:
             # Detect architecture and get appropriate appimagetool
             if [[ "$(uname -m)" == "aarch64" ]]; then
               APPIMAGETOOL_ARCH="aarch64"
+              APPIMAGETOOL_SHA256="f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158"
+              RUNTIME_SHA256="00cbdfcf917cc6c0ff6d3347d59e0ca1f7f45a6df1a428a0d6d8a78664d87444"
             else
               APPIMAGETOOL_ARCH="x86_64"
+              APPIMAGETOOL_SHA256="ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+              RUNTIME_SHA256="2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
             fi
 
-            wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${APPIMAGETOOL_ARCH}.AppImage"
-            chmod +x "appimagetool-${APPIMAGETOOL_ARCH}.AppImage"
+            # The current appimagetool (AppImage/appimagetool) with the static
+            # type2 runtime, both pinned and checksummed. The AppImageKit
+            # "continuous" build this used to fetch is deprecated upstream and
+            # embeds the old runtime, which links libfuse.so.2: on Ubuntu 22.04+,
+            # Fedora and others, where libfuse2 is not installed by default, the
+            # repacked AppImage printed "AppImages require FUSE to run" and never
+            # started. The type2 runtime needs no libfuse at all.
+            APPIMAGETOOL="appimagetool-${APPIMAGETOOL_ARCH}.AppImage"
+            RUNTIME="runtime-${APPIMAGETOOL_ARCH}"
+            wget -q -O "$APPIMAGETOOL" "https://github.com/AppImage/appimagetool/releases/download/1.9.1/${APPIMAGETOOL}"
+            wget -q -O "$RUNTIME" "https://github.com/AppImage/type2-runtime/releases/download/20251108/${RUNTIME}"
+            echo "${APPIMAGETOOL_SHA256}  ${APPIMAGETOOL}" | sha256sum -c -
+            echo "${RUNTIME_SHA256}  ${RUNTIME}" | sha256sum -c -
+            chmod +x "$APPIMAGETOOL"
 
             # Repackage AppImage with no-appstream to avoid warnings
-            ARCH="${APPIMAGETOOL_ARCH}" "./appimagetool-${APPIMAGETOOL_ARCH}.AppImage" --no-appstream squashfs-root "$APPIMAGE_NAME"
+            ARCH="${APPIMAGETOOL_ARCH}" "./${APPIMAGETOOL}" --no-appstream \
+              --runtime-file "$RUNTIME" squashfs-root "$APPIMAGE_NAME"
+
+            # The repacked file must start with exactly the pinned static type2
+            # runtime, or it would still need libfuse2 on the user's machine. The
+            # old runtime dlopens libfuse.so.2 by name (not a NEEDED entry, so
+            # readelf cannot see it); the static one never mentions it. Only the
+            # runtime's own bytes are searched, so the squashfs payload cannot
+            # trip this.
+            RUNTIME_SIZE="$(stat -c%s "$RUNTIME")"
+            if ! cmp -s -n "$RUNTIME_SIZE" "$RUNTIME" "$APPIMAGE_NAME"; then
+              echo "ERROR: repacked AppImage does not start with the pinned type2 runtime" >&2
+              exit 1
+            fi
+            FUSE2_REFS="$(head -c "$RUNTIME_SIZE" "$APPIMAGE_NAME" | grep -c -a 'libfuse.so.2' || true)"
+            if [ "$FUSE2_REFS" != "0" ]; then
+              echo "ERROR: repacked AppImage runtime still loads libfuse.so.2" >&2
+              exit 1
+            fi
 
             # Clean up
-            rm -rf squashfs-root "appimagetool-${APPIMAGETOOL_ARCH}.AppImage"
+            rm -rf squashfs-root "$APPIMAGETOOL" "$RUNTIME"
 
             echo "AppImage post-processing complete"
           else

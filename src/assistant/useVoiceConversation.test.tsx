@@ -21,6 +21,8 @@ const tracks: { stopped: boolean; stop: () => void }[] = [];
 let microphone: Promise<MediaStream> | null = null;
 let sourceStarts = 0;
 let callbackBegins = 0;
+/** What `assistant_conversation_dictation_active` answers. */
+let dictationActive = false;
 
 mock.module("@tauri-apps/api/core", () => ({
   invoke: async (command: string, args: unknown) => {
@@ -30,6 +32,8 @@ mock.module("@tauri-apps/api/core", () => ({
     if (command === "assistant_conversation_interrupt")
       return { session: nextSession, turn: ++turn };
     if (command === "assistant_conversation_audio") return audioTurn;
+    if (command === "assistant_conversation_dictation_active")
+      return dictationActive;
   },
 }));
 mock.module("@tauri-apps/api/event", () => ({
@@ -109,6 +113,7 @@ beforeEach(async () => {
   nextSession = 0;
   sourceStarts = 0;
   callbackBegins = 0;
+  dictationActive = false;
   backendStart = null;
   audioTurn = null;
   microphone = null;
@@ -691,7 +696,7 @@ describe("hands-free session lifecycle", () => {
   test("an ended event releases a session whose ticket has not arrived yet", async () => {
     // Rust treats a call as active from the moment it issues the ticket, which is
     // before the id reaches this hook. Something that hangs up in that window —
-    // the call hotkey, a recording shortcut taking the microphone back — emits
+    // the call hotkey, the assistant shortcut taking the microphone back — emits
     // `ended` for a session this side cannot name yet. Ignoring it left the VAD
     // holding the microphone for a call that no longer existed.
     const pending = deferred<unknown>();
@@ -733,5 +738,96 @@ describe("hands-free session lifecycle", () => {
       epoch: 7,
     });
     expect(voice.phase).toBe("listening");
+  });
+});
+
+/**
+ * Dictating during a call used to hang it up, and hanging up threw the call's
+ * conversation away. Now dictation holds the call: it stops listening while
+ * the dictation records and carries on afterwards.
+ */
+describe("dictation beside a call", () => {
+  const hold = async (held: boolean) => {
+    await emit("assistant-conversation-dictation", held);
+    // Let the VAD's pause or start settle.
+    await act(async () => {});
+  };
+
+  test("a dictation pauses the call's microphone and the call carries on", async () => {
+    await act(async () => voice.start());
+    await hold(true);
+    expect(voice.open).toBe(true);
+    expect(voice.phase).toBe("held");
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    // What is dictated is not answered by the call.
+    await speak();
+    expect(commandCount("assistant_conversation_audio")).toBe(0);
+
+    await hold(false);
+    expect(voice.phase).toBe("listening");
+    expect(tracks.at(-1)?.stopped).toBe(false);
+    await speak();
+    expect(commandCount("assistant_conversation_audio")).toBe(1);
+    // Nothing hung the call up along the way.
+    expect(commandCount("assistant_conversation_end")).toBe(0);
+  });
+
+  test("a reply already playing keeps playing while dictation holds the call", async () => {
+    await replyPlaying();
+    await hold(true);
+    expect(voice.phase).toBe("speaking");
+    expect(commandCount("assistant_conversation_interrupt")).toBe(1);
+    expect(sourceStarts).toBe(1);
+  });
+
+  test("speech cut off by a dictation is not sent", async () => {
+    await act(async () => voice.start());
+    await act(async () => vadOptions.onSpeechRealStart());
+    expect(voice.phase).toBe("hearing");
+    await hold(true);
+    await act(async () => vadOptions.onSpeechEnd(new Float32Array(16_000)));
+    expect(commandCount("assistant_conversation_audio")).toBe(0);
+    await hold(false);
+    await speak();
+    expect(commandCount("assistant_conversation_audio")).toBe(1);
+  });
+
+  test("a call started during a dictation begins held", async () => {
+    dictationActive = true;
+    await act(async () => voice.start());
+    await act(async () => {});
+    expect(voice.open).toBe(true);
+    expect(voice.phase).toBe("held");
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    await hold(false);
+    expect(voice.phase).toBe("listening");
+    expect(tracks.at(-1)?.stopped).toBe(false);
+  });
+
+  test("the hold and mute are separate switches", async () => {
+    await act(async () => voice.start());
+    await act(async () => voice.toggleMute());
+    await hold(true);
+    await hold(false);
+    // Still muted: the dictation ending does not unmute the call.
+    expect(voice.muted).toBe(true);
+    expect(voice.phase).toBe("muted");
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    await act(async () => voice.toggleMute());
+    expect(voice.phase).toBe("listening");
+    expect(tracks.at(-1)?.stopped).toBe(false);
+  });
+
+  test("unmuting during a dictation keeps the microphone closed until it ends", async () => {
+    await act(async () => voice.start());
+    await act(async () => voice.toggleMute());
+    await hold(true);
+    await act(async () => voice.toggleMute());
+    expect(voice.muted).toBe(false);
+    expect(voice.phase).toBe("held");
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    await hold(false);
+    expect(voice.phase).toBe("listening");
+    expect(tracks.at(-1)?.stopped).toBe(false);
   });
 });

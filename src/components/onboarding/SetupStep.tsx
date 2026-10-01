@@ -23,10 +23,16 @@ import { useHardwareFacts } from "./useHardwareFacts";
 interface Option {
   model: ModelInfo;
   name: string;
+  /** Which model of the family ("Medium"), or null when `name` says it all. */
+  variant: string | null;
   /** `onboarding.speech.tags.*`, or null for a model setup has no word for. */
   tag: (typeof SETUP_SPEECH_OPTIONS)[number]["tag"] | null;
   primary: boolean;
 }
+
+/** The option's full name, for anything that shows it without the label. */
+const fullName = (option: Option) =>
+  option.variant ? `${option.name} ${option.variant}` : option.name;
 
 /** One model, as a choice: its mark, its name, a few words, its size. */
 const ModelOption: React.FC<{
@@ -52,7 +58,7 @@ const ModelOption: React.FC<{
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`group flex w-full cursor-pointer items-center gap-4 rounded-2xl border px-4 py-3.5 text-start transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+      className={`ob-option group flex w-full cursor-pointer items-center gap-4 rounded-2xl border px-4 py-3.5 text-start transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
         selected
           ? "border-accent/60 bg-accent/[0.05] shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-accent)_30%,transparent)]"
           : "border-hairline bg-surface elev-card hover:border-hairline-strong"
@@ -65,10 +71,15 @@ const ModelOption: React.FC<{
         {brand.icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2">
           <span className="truncate text-base font-semibold text-ink">
             {option.name}
           </span>
+          {option.variant && (
+            <span className="shrink-0 rounded-md border border-hairline-strong px-1.5 py-px text-[0.6875rem] font-medium tabular-nums text-muted">
+              {option.variant}
+            </span>
+          )}
           {recommended && (
             <Badge variant="active">{t("onboarding.recommended")}</Badge>
           )}
@@ -133,7 +144,15 @@ export function SetupStep({
     const listed = SETUP_SPEECH_OPTIONS.flatMap((entry) => {
       const model = models.find((m) => m.id === entry.id);
       return model
-        ? [{ model, name: entry.name, tag: entry.tag, primary: entry.primary }]
+        ? [
+            {
+              model,
+              name: entry.name,
+              variant: entry.variant,
+              tag: entry.tag,
+              primary: entry.primary,
+            },
+          ]
         : [];
     });
     // A speech model already on this machine that setup does not list (a
@@ -149,6 +168,7 @@ export function SetupStep({
       .map((model) => ({
         model,
         name: getTranslatedModelName(model, t),
+        variant: null,
         tag: null,
         primary: false,
       }));
@@ -190,7 +210,7 @@ export function SetupStep({
       {
         job: "stt",
         modelId: model.id,
-        label: selected.name,
+        label: fullName(selected),
         sizeMb: model.is_downloaded ? 0 : Number(model.size_mb),
         wiring: { kind: "stt" },
       },
@@ -242,7 +262,7 @@ export function SetupStep({
       {failed ? (
         <div
           role="alert"
-          className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-hairline bg-surface px-5 py-4 elev-card"
+          className="ob-gap flex flex-wrap items-center gap-3 rounded-2xl border border-hairline bg-surface px-5 py-4 elev-card"
         >
           <p className="min-w-0 flex-1 text-sm text-ink">
             {t("onboarding.setup.loadFailed")}
@@ -257,7 +277,7 @@ export function SetupStep({
         </div>
       ) : primary.length === 0 ? (
         <div
-          className="mt-8 space-y-2.5"
+          className="ob-gap space-y-2.5"
           role="status"
           aria-label={t("onboarding.speech.loading")}
         >
@@ -272,7 +292,7 @@ export function SetupStep({
         <div
           role="radiogroup"
           aria-label={t("onboarding.speech.title")}
-          className="mt-8 space-y-2.5"
+          className="ob-gap space-y-2.5"
         >
           {primary.map(renderOption)}
           {more.length > 0 &&

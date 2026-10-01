@@ -5,9 +5,13 @@ import App from "./App";
 import { applyCachedTheme } from "./lib/theme";
 import { watchScreenScale } from "./lib/screenScale";
 import { suppressCaretBrowsing } from "./lib/caretBrowsing";
+import { suppressBrowserContextMenu } from "./lib/contextMenu";
 
 // No text caret in text that cannot be edited (see lib/caretBrowsing.ts).
 suppressCaretBrowsing();
+// No browser menu (Back / Refresh / Save as / Print) on right-click, except in
+// text fields and on selected text (see lib/contextMenu.ts).
+suppressBrowserContextMenu();
 
 // Fonts — Inter (variable) carries every heading, label, control, and sentence;
 // Instrument Serif is only the feature banners' headline (ui/Hero.tsx).

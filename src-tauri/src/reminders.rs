@@ -63,7 +63,7 @@ const IDLE_POLL: Duration = Duration::from_secs(60);
 
 /// Popup geometry. The width is fixed — a notification is a column of text, and
 /// letting it track the screen would make a reminder on a 4K display a banner.
-/// 400 pt sits in the same range as the assistant panel's own size presets, which
+/// 400 pt sits in the same range as the assistant panel's own card width, which
 /// is what the card inside this window is.
 ///
 /// The height is only a first frame: the webview measures its content and calls

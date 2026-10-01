@@ -149,8 +149,7 @@
       "progress": "Etapa {{current}} de {{total}}",
       "steps": {
         "setup": "Configurar",
-        "tour": "Tour",
-        "finish": "Começar"
+        "tour": "Tour"
       }
     },
     "setup": {
@@ -163,7 +162,7 @@
       "count": "{{current}} de {{total}}",
       "skip": "Pular tour",
       "next": "Próximo",
-      "done": "Continuar",
+      "finish": "Abrir SpeakoFlow",
       "tabs": {
         "dictate": "Ditado",
         "ask": "Assistente",
@@ -173,6 +172,15 @@
         "hold": "Segure para falar",
         "tap": "Toque para começar, toque para parar",
         "call": "Pressione para começar e de novo para desligar"
+      },
+      "steps": {
+        "label": "Como funciona",
+        "speak": "Diga o que quer escrever",
+        "typed": "É digitado onde está o cursor",
+        "select": "Selecione um texto (opcional)",
+        "use": "Insira a resposta ou apenas leia",
+        "talk": "É só falar",
+        "answer": "Responde em voz alta"
       },
       "mail": {
         "window": "Nova mensagem",
@@ -221,15 +229,6 @@
         "assistant": "Assistente",
         "said": "Me ajude a planejar uma fala curta para a reunião da equipe de sexta.",
         "reply": "Claro. Abra com o resultado de que você mais se orgulha, dê dois motivos pelos quais ele deu certo e termine com os próximos passos."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Pronto",
-        "installing": "Instalando…",
-        "percent": "{{percent}}%",
-        "retry": "Tentar de novo",
-        "waiting": "Aguardando"
       }
     },
     "subtitle": "Para começar, escolha um modelo de transcrição",
@@ -462,8 +461,7 @@
     },
     "frame": {
       "setup": "Configurar",
-      "tour": "Tour",
-      "finish": "Começar"
+      "tour": "Tour"
     },
     "welcome": {
       "line": "Fale, e ele digita. Pergunte, e ele responde.",
@@ -492,35 +490,6 @@
       "continue": "Continuar",
       "later": "Configurar depois",
       "loading": "Procurando seu modelo de voz"
-    },
-    "start": {
-      "ready": {
-        "title": "Experimente agora"
-      },
-      "downloading": {
-        "title": "Quase pronto"
-      },
-      "failed": {
-        "title": "O download parou"
-      },
-      "none": {
-        "title": "Escolha um modelo de voz para começar"
-      },
-      "progress": {
-        "of": "{{done}} de {{total}}",
-        "failed": "Não terminou. Tentar de novo?",
-        "underMinute": "Falta menos de um minuto",
-        "minutes_one": "Falta cerca de {{count}} minuto",
-        "minutes_many": "Faltam cerca de {{count}} minutos",
-        "minutes_other": "Faltam cerca de {{count}} minutos"
-      },
-      "try": {
-        "label": "Experimente o ditado",
-        "placeholder": "Suas palavras aparecem aqui…",
-        "success": "É isso. Funciona em qualquer app."
-      },
-      "open": "Abrir SpeakoFlow",
-      "choose": "Escolher um modelo de voz"
     }
   },
   "modelSelector": {
@@ -1868,14 +1837,6 @@
           "large": "Grande",
           "extraLarge": "Extragrande"
         },
-        "panelSizeLabel": "Tamanho do painel",
-        "panelSizeDescription": "Tamanho geral do painel flutuante do assistente.",
-        "panelSizes": {
-          "mini": "Pequeno",
-          "compact": "Compacto",
-          "standard": "Padrão",
-          "large": "Grande"
-        },
         "askDisplayLabel": "Qual tela",
         "askDisplayDescription": "A tela em que o assistente abre. Por padrão, aquela em que está o mouse.",
         "askDisplays": {
@@ -2000,7 +1961,9 @@
     },
     "delete": {
       "action": "Excluir reunião",
-      "whileRecording": "Pare a gravação antes de excluir esta reunião."
+      "whileRecording": "Pare a gravação antes de excluir esta reunião.",
+      "confirmTitle": "Excluir esta reunião?",
+      "confirmBody": "A transcrição, as notas e o áudio dela são removidos deste computador. Não é possível desfazer."
     },
     "detail": {
       "title": "Reunião",
@@ -2250,6 +2213,7 @@
       "details": "Detalhes",
       "startHint": "Comece a falar ou digite uma mensagem.",
       "mutedHint": "Microfone desligado. Você ainda pode digitar.",
+      "heldHint": "Em pausa enquanto você dita.",
       "preparingVoice": "Preparando a voz… {{progress}}%",
       "history": {
         "title": "Conversas anteriores",
@@ -2288,6 +2252,7 @@
         "responding": "Pensando…",
         "speaking": "Falando",
         "muted": "Microfone desligado",
+        "held": "Em pausa para o ditado",
         "error": "Chamada interrompida"
       },
       "errors": {
@@ -2956,7 +2921,6 @@
       "replyLength": "O tamanho habitual das respostas.",
       "history": "Quantas mensagens recentes ele tem em mente.",
       "summarize": "Resume conversas longas para não esquecer o começo.",
-      "panelSize": "Quanto da tela ele ocupa.",
       "opacity": "Mais baixa deixa sua área de trabalho aparecer por trás.",
       "position": "Clique em um ponto da tela.",
       "display": "A tela em que o painel abre."
@@ -3033,7 +2997,6 @@
     "panel": {
       "where": "Onde ele abre",
       "text": "Tamanho do texto",
-      "size": "Tamanho do painel",
       "opacity": "Opacidade",
       "screen": "Qual tela"
     }

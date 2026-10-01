@@ -1,0 +1,113 @@
+/* The README demo's frame (readme.tsx). The stage and the scenes are the
+   tour's own (onboarding.css); this is only the strip and title above them.
+   The page itself is transparent and the demo has rounded corners, so the
+   recording sits cleanly on GitHub's light and dark themes alike. */
+
+html,
+body {
+  background: transparent !important;
+}
+
+.readme-demo {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 24px 24px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--color-canvas);
+  cursor: default;
+  user-select: none;
+}
+
+/* The tour sizes its stage from the window height; here it takes whatever
+   the strip and the title leave. */
+.readme-demo .ob-stage {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+/* Story-style progress: one segment per scene, the current one filling. */
+.readme-progress {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr));
+  gap: 14px;
+}
+.readme-seg-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 220ms ease;
+}
+.readme-seg-label svg {
+  color: var(--color-muted-soft);
+  transition: color 220ms ease;
+}
+.readme-seg[data-state="current"] .readme-seg-label {
+  color: var(--color-ink);
+}
+.readme-seg[data-state="current"] .readme-seg-label svg {
+  color: var(--color-accent);
+}
+.readme-seg-track {
+  display: block;
+  height: 2px;
+  margin-top: 9px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-hairline-strong);
+}
+.readme-seg-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+.readme-seg[data-state="done"] .readme-seg-fill {
+  transform: scaleX(1);
+}
+.readme-seg[data-state="current"] .readme-seg-fill {
+  animation: readme-fill linear forwards;
+}
+@keyframes readme-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.readme-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  animation: ob-page-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* Set like the feature banners' headlines (`.hero-title` in App.css), the
+   one editorial voice in the app. */
+.readme-title {
+  margin: 0;
+  font-family: var(--font-hero);
+  font-weight: 400;
+  font-size: 2.625rem;
+  line-height: 1;
+  letter-spacing: -0.012em;
+  font-synthesis: none;
+}
+.readme-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 2px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}

@@ -11,7 +11,6 @@ import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
 import {
   AccessibilityOnboarding,
-  FinishStep,
   SetupStep,
   WelcomeStep,
   TourStep,
@@ -38,13 +37,7 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 
-type OnboardingStep =
-  | "welcome"
-  | "accessibility"
-  | "setup"
-  | "tour"
-  | "finish"
-  | "done";
+type OnboardingStep = "welcome" | "accessibility" | "setup" | "tour" | "done";
 
 // Force the full onboarding flow on every launch so it can be tested
 // repeatedly. This is intentionally gated to dev builds only
@@ -321,10 +314,10 @@ function App() {
     setOnboardingStep("tour");
   };
 
-  const handleFinish = (chooseModels = skippedModels) => {
+  const handleFinish = () => {
     markOnboardingComplete();
     setShellNavigation(
-      chooseModels
+      skippedModels
         ? { ...INITIAL_NAVIGATION, page: "models", modelSlot: "stt" }
         : INITIAL_NAVIGATION,
     );
@@ -354,15 +347,13 @@ function App() {
       </div>
     );
   } else if (onboardingStep === "tour") {
+    // The tour is the last screen: it opens the app directly. The speech model
+    // chosen in setup keeps downloading behind it (`setupQueue` outlives the
+    // screens, and the sidebar shows its progress); a dictation pressed before
+    // it lands is refused with a "downloading" pill (`speech_readiness.rs`).
     body = (
       <div className="flex-1 min-h-0">
-        <TourStep onDone={() => setOnboardingStep("finish")} />
-      </div>
-    );
-  } else if (onboardingStep === "finish") {
-    body = (
-      <div className="flex-1 min-h-0">
-        <FinishStep onDone={handleFinish} />
+        <TourStep onDone={handleFinish} />
       </div>
     );
   } else if (onboardingStep === "done") {

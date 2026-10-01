@@ -797,10 +797,10 @@ impl AssistantResponseLength {
         match self {
             AssistantResponseLength::Default => None,
             AssistantResponseLength::Short => Some(
-                "Keep your reply very short — usually one or two sentences. Match the user's intent: a greeting or trivial message gets a brief, friendly reply, never a long one.",
+                "Keep your reply very short, usually one or two sentences. Match the user's intent: a greeting or trivial message gets a brief, friendly reply, never a long one.",
             ),
             AssistantResponseLength::Medium => Some(
-                "Keep replies fairly brief — a short paragraph at most. Don't pad simple messages with extra detail.",
+                "Keep replies fairly brief, a short paragraph at most. Don't pad simple messages with extra detail.",
             ),
             AssistantResponseLength::Long => Some(
                 "Give thorough, detailed replies when the question genuinely calls for it. Still match the user's intent: greetings or trivial messages get a short reply, not filler.",
@@ -1335,22 +1335,27 @@ pub struct AppSettings {
     pub custom_words: Vec<String>,
     /// Offer to record when a call appears to be in progress.
     ///
-    /// On by default. It is safe to default on because the detector's entire output
-    /// is a *question*: it has no route by which it could start recording, and
-    /// software that began recording a private conversation because it inferred one
-    /// was happening is software nobody should leave installed. If the inference is
-    /// wrong the cost is one dismissed card.
-    #[serde(default = "default_true")]
+    /// **Off by default; the user opts in.** The detector's only output is a
+    /// question, so it can never start a recording on its own — but "some other
+    /// process holds the microphone" is also true of plenty that is not a call,
+    /// and in practice the card kept appearing around ordinary dictation. A card
+    /// that interrupts more often than it helps is worse than no card.
+    #[serde(default)]
     pub meeting_auto_detect: bool,
     /// Show the small floating indicator while a meeting records.
     ///
-    /// On by default, because a recording nobody can see is indistinguishable
-    /// from one that silently stopped. Off is for people who find any floating
-    /// window during a call distracting — the recording then lives only in
-    /// Settings → Meetings, which is where it is stopped. Other note takers were
-    /// asked for exactly this switch.
-    #[serde(default = "default_true")]
+    /// **Off by default; the user opts in.** With it off the recording lives in
+    /// Meetings, where it is started and stopped, and the floating pill is there
+    /// for people who want it on screen during a call.
+    #[serde(default)]
     pub meeting_show_indicator: bool,
+    /// Whether the opt-in defaults for the two meeting switches above have been
+    /// applied to this store. Both used to default on and every store wrote
+    /// `true` for them, so changing the default alone would only reach fresh
+    /// installs; this one-time pass turns them off once for existing stores and
+    /// then never touches them again, so a later opt-in sticks.
+    #[serde(default)]
+    pub meeting_opt_in_defaults_applied: bool,
     /// Learn a spelling when the user corrects a dictated word.
     ///
     /// **Off by default, and it must stay that way.** Unlike every other setting
@@ -1665,15 +1670,11 @@ pub struct AppSettings {
     ///
     /// Note: the old `assistant_accent`, `assistant_panel_size`, and
     /// `assistant_panel_theme` customization fields were removed (the panel is
-    /// dark-only now) — serde silently ignores those keys in previously stored
-    /// settings.
+    /// dark-only now, and its size follows the display alone — a size preset
+    /// only moved the ceiling of an invisible frame) — serde silently ignores
+    /// those keys in previously stored settings.
     #[serde(default = "default_assistant_panel_opacity")]
     pub assistant_panel_opacity: f64,
-    /// Size preset of the floating assistant: "mini", "compact", "standard"
-    /// (default), or "large". A multiplier on the display-derived size of the
-    /// quick ask's frame and of the expanded call.
-    #[serde(default = "default_assistant_panel_size")]
-    pub assistant_panel_size: String,
     /// Where the quick ask opens. Centre by default. `Custom` is a legacy value
     /// from when dragging remembered a position; it reads as `Center`.
     #[serde(default = "default_ask_anchor")]
@@ -2940,8 +2941,64 @@ fn default_assistant_provider_id() -> String {
 
 /// Stable system prompt for the assistant. Keep this byte-identical across
 /// requests — provider-side prompt caching keys off the exact prefix.
+///
+/// This is the *persona*: who the assistant is and what it is for. It is user
+/// editable, so anything that must hold for every persona (formatting, the
+/// no-dash rule, paste-ready output) lives in the app-owned
+/// `assistant::RESPONSE_STYLE_SECTION` instead. Written without em dashes on
+/// purpose: models copy the punctuation of the prompt they are given.
 fn default_assistant_system_prompt() -> String {
-    "You are a helpful voice assistant. The user talks to you by speaking; their speech is transcribed and sent to you, so expect occasional transcription errors and infer the intended meaning. Be concise and direct. Use plain text formatting suitable for a small chat panel. When a screenshot of the user's screen is attached, describe or use what you actually see in it.".to_string()
+    "You are SpeakoFlow's assistant, a capable AI helper on the user's desktop. They open you with a hotkey while they are working in another app, and they usually speak their request. Their speech is transcribed before it reaches you, so expect the odd misheard word and go with the most sensible meaning.\n\nHandle whatever they ask: answer questions, explain things, write emails and replies, rewrite, shorten or proofread text, translate, summarize, brainstorm, do quick maths, help with code, and set reminders. Do the task right away instead of describing what you would do. Ask a clarifying question only when you truly cannot proceed without one.\n\nBe direct and useful. Lead with the answer, skip openers like \"Great question\" or \"Sure, here you go\", and fit the length to the request: a quick question gets a sentence or two, a real task gets what it needs. When a screenshot of the user's screen is attached, work from what you actually see in it.".to_string()
+}
+
+/// Shipped prompts from earlier versions, each paired with the profile id it
+/// belonged to (`"default"` also covers `assistant_system_prompt`). A store
+/// still holding one of these byte-for-byte never edited it, so it is moved to
+/// the current text on load; an edited prompt never matches and is left alone.
+const LEGACY_SHIPPED_PROMPTS: &[(&str, &str)] = &[
+    (
+        "default",
+        "You are a helpful voice assistant. The user talks to you by speaking; their speech is transcribed and sent to you, so expect occasional transcription errors and infer the intended meaning. Be concise and direct. Use plain text formatting suitable for a small chat panel. When a screenshot of the user's screen is attached, describe or use what you actually see in it.",
+    ),
+    (
+        "quick",
+        "You are a fast, friendly assistant that gives quick, clean answers. Reply in as few words as the question honestly allows — usually one or two sentences — with no preamble, no filler, and no restating the question. Stay warm and natural, just brief: get straight to the useful part and only expand if the user asks. The user is speaking to you, so expect transcription quirks and infer their intent.",
+    ),
+    (
+        "unfiltered",
+        "You are a blunt, brutally honest advisor. Prioritize truth and usefulness over politeness: don't flatter, don't hedge, and don't pad answers with disclaimers or pleasantries. If something is wrong, weak, or a bad idea, say so plainly and explain exactly why. Disagree openly, name the real risks and trade-offs, and give the hard feedback most people would soften. Be direct and concise, and skip the \"great question\" niceties. Critique the idea or the work, not the person — stay honest and constructive rather than insulting. The user is speaking to you, so expect transcription quirks and infer their intent.",
+    ),
+];
+
+/// Move untouched shipped prompts to their current text. See
+/// [`LEGACY_SHIPPED_PROMPTS`].
+fn upgrade_shipped_assistant_prompts(settings: &mut AppSettings) -> bool {
+    let current = default_assistant_characters("");
+    let current_prompt = |id: &str| {
+        current
+            .iter()
+            .find(|c| c.id == id)
+            .map(|c| c.prompt.clone())
+    };
+    let mut changed = false;
+    for (id, legacy) in LEGACY_SHIPPED_PROMPTS {
+        let Some(replacement) = current_prompt(id) else {
+            continue;
+        };
+        if *id == "default" && settings.assistant_system_prompt == *legacy {
+            settings.assistant_system_prompt = replacement.clone();
+            changed = true;
+        }
+        for character in settings
+            .assistant_characters
+            .iter_mut()
+            .filter(|c| c.id == *id && c.builtin && c.prompt == *legacy)
+        {
+            character.prompt = replacement.clone();
+            changed = true;
+        }
+    }
+    changed
 }
 
 fn default_active_character_id() -> String {
@@ -2992,7 +3049,7 @@ pub fn default_assistant_characters(system_prompt: &str) -> Vec<AssistantCharact
         AssistantCharacter {
             id: "quick".to_string(),
             name: "Quick".to_string(),
-            prompt: "You are a fast, friendly assistant that gives quick, clean answers. Reply in as few words as the question honestly allows — usually one or two sentences — with no preamble, no filler, and no restating the question. Stay warm and natural, just brief: get straight to the useful part and only expand if the user asks. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            prompt: "You are a fast, friendly assistant that gives quick, clean answers. Reply in as few words as the question honestly allows, usually one or two sentences, with no preamble, no filler, and no restating the question. Stay warm and natural, just brief: get straight to the useful part and only expand if the user asks. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
             greeting: String::new(),
             avatar: String::new(),
             kind: AssistantCharacterKind::Llm,
@@ -3003,7 +3060,7 @@ pub fn default_assistant_characters(system_prompt: &str) -> Vec<AssistantCharact
         AssistantCharacter {
             id: "unfiltered".to_string(),
             name: "Unfiltered".to_string(),
-            prompt: "You are a blunt, brutally honest advisor. Prioritize truth and usefulness over politeness: don't flatter, don't hedge, and don't pad answers with disclaimers or pleasantries. If something is wrong, weak, or a bad idea, say so plainly and explain exactly why. Disagree openly, name the real risks and trade-offs, and give the hard feedback most people would soften. Be direct and concise, and skip the \"great question\" niceties. Critique the idea or the work, not the person — stay honest and constructive rather than insulting. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            prompt: "You are a blunt, brutally honest advisor. Prioritize truth and usefulness over politeness: don't flatter, don't hedge, and don't pad answers with disclaimers or pleasantries. If something is wrong, weak, or a bad idea, say so plainly and explain exactly why. Disagree openly, name the real risks and trade-offs, and give the hard feedback most people would soften. Be direct and concise, and skip the \"great question\" niceties. Critique the idea or the work, not the person, and stay honest and constructive rather than insulting. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
             greeting: String::new(),
             avatar: String::new(),
             kind: AssistantCharacterKind::Llm,
@@ -3130,16 +3187,6 @@ fn default_assistant_panel_opacity() -> f64 {
     1.0
 }
 
-fn default_assistant_panel_size() -> String {
-    "standard".to_string()
-}
-
-/// The panel size presets Settings offers. "mini" was offered in the UI and
-/// rejected here, so picking it failed and a stored "mini" was reset on load.
-pub fn is_assistant_panel_size(size: &str) -> bool {
-    matches!(size, "mini" | "compact" | "standard" | "large")
-}
-
 fn default_tap_to_lock() -> bool {
     true
 }
@@ -3261,6 +3308,9 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
             0,
             default_assistant_character(&settings.assistant_system_prompt),
         );
+        changed = true;
+    }
+    if upgrade_shipped_assistant_prompts(settings) {
         changed = true;
     }
     // Keep the active-character id pointing at a character that still exists.
@@ -3396,10 +3446,6 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     }
     if !(0.0..=1.0).contains(&settings.assistant_tts_volume) {
         settings.assistant_tts_volume = default_assistant_tts_volume();
-        changed = true;
-    }
-    if !is_assistant_panel_size(&settings.assistant_panel_size) {
-        settings.assistant_panel_size = default_assistant_panel_size();
         changed = true;
     }
     // "last_used" meant "the display I last dragged it to", a remembered position
@@ -3824,8 +3870,9 @@ pub fn get_default_settings() -> AppSettings {
         debug_mode: false,
         log_level: default_log_level(),
         custom_words: Vec::new(),
-        meeting_auto_detect: true,
-        meeting_show_indicator: true,
+        meeting_auto_detect: false,
+        meeting_show_indicator: false,
+        meeting_opt_in_defaults_applied: true,
         auto_learn_corrections: false,
         learned_words: Vec::new(),
         model_folders: Vec::new(),
@@ -3921,7 +3968,6 @@ pub fn get_default_settings() -> AppSettings {
         assistant_memory_incognito: false,
         assistant_font_size: default_assistant_font_size(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
-        assistant_panel_size: default_assistant_panel_size(),
         assistant_ask_anchor: default_ask_anchor(),
         assistant_ask_display: default_ask_display(),
         assistant_tts_stop_on_dictation: false,
@@ -4797,6 +4843,20 @@ fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bo
     (raw, true)
 }
 
+/// One-time switch of the two meeting settings to their opt-in defaults.
+///
+/// Returns whether anything changed. Runs once per store: afterwards the
+/// marker is set and a user who turns either switch back on keeps it on.
+fn apply_meeting_opt_in_defaults(settings: &mut AppSettings) -> bool {
+    if settings.meeting_opt_in_defaults_applied {
+        return false;
+    }
+    settings.meeting_auto_detect = false;
+    settings.meeting_show_indicator = false;
+    settings.meeting_opt_in_defaults_applied = true;
+    true
+}
+
 fn deserialize_settings_value(raw: serde_json::Value) -> (AppSettings, bool) {
     let (normalized, changed) = normalize_settings_json(raw);
     match serde_json::from_value::<AppSettings>(normalized.clone()) {
@@ -4913,6 +4973,12 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
                 settings.assistant_tap_to_lock_key = "space".to_string();
                 updated = true;
             }
+        }
+
+        // "Offer to record calls" and the meeting indicator became opt-in.
+        // See `meeting_opt_in_defaults_applied`.
+        if apply_meeting_opt_in_defaults(&mut settings) {
+            updated = true;
         }
 
         // Merge default bindings into existing settings
@@ -5121,6 +5187,108 @@ mod tests {
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()
+    }
+
+    /// Both meeting switches are opt-in. A fresh install starts with them off
+    /// and needs no migration.
+    #[test]
+    fn meeting_switches_default_off() {
+        let mut settings = get_default_settings();
+        assert!(!settings.meeting_auto_detect);
+        assert!(!settings.meeting_show_indicator);
+        assert!(!apply_meeting_opt_in_defaults(&mut settings));
+    }
+
+    /// A store written while both defaulted on is turned off exactly once; a
+    /// user who then opts back in keeps their choice on every later launch.
+    #[test]
+    fn meeting_opt_in_migration_runs_once() {
+        let mut stored = default_settings_json();
+        let map = stored.as_object_mut().unwrap();
+        map.insert("meeting_auto_detect".into(), serde_json::Value::Bool(true));
+        map.insert(
+            "meeting_show_indicator".into(),
+            serde_json::Value::Bool(true),
+        );
+        map.remove("meeting_opt_in_defaults_applied");
+        let (mut settings, _) = deserialize_settings_value(stored);
+
+        assert!(apply_meeting_opt_in_defaults(&mut settings));
+        assert!(!settings.meeting_auto_detect);
+        assert!(!settings.meeting_show_indicator);
+
+        settings.meeting_auto_detect = true;
+        settings.meeting_show_indicator = true;
+        let (mut reloaded, _) =
+            deserialize_settings_value(serde_json::to_value(&settings).unwrap());
+        assert!(!apply_meeting_opt_in_defaults(&mut reloaded));
+        assert!(reloaded.meeting_auto_detect);
+        assert!(reloaded.meeting_show_indicator);
+    }
+
+    /// The shipped persona prompts and reply-length directives reach the model
+    /// verbatim, and a model copies the punctuation of its instructions, so
+    /// none of them may contain the em dash the assistant is told not to use.
+    #[test]
+    fn shipped_assistant_prompts_have_no_em_dashes() {
+        for character in default_assistant_characters("") {
+            assert!(
+                !character.prompt.contains('\u{2014}'),
+                "em dash in the shipped '{}' prompt",
+                character.id
+            );
+        }
+        for length in [
+            AssistantResponseLength::Short,
+            AssistantResponseLength::Medium,
+            AssistantResponseLength::Long,
+        ] {
+            let directive = length.directive().unwrap();
+            assert!(!directive.contains('\u{2014}'), "em dash in {:?}", length);
+        }
+    }
+
+    /// An untouched old shipped prompt moves to the current text; one the user
+    /// edited, even slightly, is theirs and stays exactly as it was.
+    #[test]
+    fn untouched_legacy_assistant_prompts_are_upgraded() {
+        let legacy_default = LEGACY_SHIPPED_PROMPTS[0].1;
+        let legacy_quick = LEGACY_SHIPPED_PROMPTS[1].1;
+        let mut settings = get_default_settings();
+        settings.assistant_system_prompt = legacy_default.to_string();
+        for c in settings.assistant_characters.iter_mut() {
+            match c.id.as_str() {
+                "default" => c.prompt = legacy_default.to_string(),
+                "quick" => c.prompt = legacy_quick.to_string(),
+                "unfiltered" => c.prompt = "My own edited prompt.".to_string(),
+                _ => {}
+            }
+        }
+
+        assert!(upgrade_shipped_assistant_prompts(&mut settings));
+
+        let shipped = default_assistant_characters("");
+        let prompt_of = |list: &[AssistantCharacter], id: &str| {
+            list.iter().find(|c| c.id == id).unwrap().prompt.clone()
+        };
+        assert_eq!(
+            settings.assistant_system_prompt,
+            default_assistant_system_prompt()
+        );
+        assert_eq!(
+            prompt_of(&settings.assistant_characters, "default"),
+            prompt_of(&shipped, "default")
+        );
+        assert_eq!(
+            prompt_of(&settings.assistant_characters, "quick"),
+            prompt_of(&shipped, "quick")
+        );
+        assert_eq!(
+            prompt_of(&settings.assistant_characters, "unfiltered"),
+            "My own edited prompt."
+        );
+        // Idempotent: a second load changes nothing.
+        assert!(!upgrade_shipped_assistant_prompts(&mut settings));
     }
 
     /// The exact strings the settings store and the frontend exchange. These are

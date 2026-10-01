@@ -3,8 +3,10 @@ import ReactDOM from "react-dom/client";
 import RecordingOverlay from "./RecordingOverlay";
 import "@/i18n";
 import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+import { suppressBrowserContextMenu } from "@/lib/contextMenu";
 
 suppressCaretBrowsing();
+suppressBrowserContextMenu();
 
 // Fonts — the overlay is its own window and loads Inter independently of the
 // main app entry point.

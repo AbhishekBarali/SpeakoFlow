@@ -187,19 +187,21 @@ info → Run anyway**.
   # or
   paru -S speakoflow-bin
   ```
-- **Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS.** Download the `.deb`
-  and install it. This registers the app icon and menu entry properly, which the
-  AppImage can't do on its own:
+- **Debian 13+, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS.** Download the
+  `.deb` and install it. This registers the app icon and menu entry properly,
+  which the AppImage can't do on its own:
   ```bash
   sudo apt install ./SpeakoFlow_*_amd64.deb
   ```
-  The `.deb` is built on Ubuntu 24.04, so it needs that era of glibc. On an
-  older release, use the AppImage instead.
 - **Any other distribution, including Fedora and openSUSE.** Download the
   AppImage, make it executable (`chmod +x`), and run it. Note that an AppImage
   doesn't integrate with your desktop by itself, so it won't show an icon in your
   file manager or app menu; tools like Gear Lever or AppImageLauncher add that if
   you want it.
+
+Both packages are built on Ubuntu 24.04, so both need glibc 2.39 or newer. That
+rules out Ubuntu 22.04, Debian 12, Mint 21 and RHEL/Alma/Rocky 9, which ship older
+glibc and can't start either package.
 
 The AppImage and `.deb` are both built for x86_64 and ARM64. There's no `.rpm`
 yet, because the packaging doesn't bundle the speech engine correctly, and
@@ -240,11 +242,16 @@ Install it in three steps:
    ```
 3. Open SpeakoFlow normally, from Launchpad, Spotlight, or Applications.
 
-**You only do this once per version you install.** The command removes the
+**You only do this once per version you download.** The command removes the
 "downloaded from the internet" tag that macOS puts on the file; after that the
-app opens like any other. Because SpeakoFlow can't auto-update while unsigned,
-you'll repeat the step the next time you download a new version. One command
-per update, never per launch.
+app opens like any other. Updates installed from inside the app (Settings →
+About) aren't tagged, so they don't need it. If you download a new `.dmg` by
+hand, run the command again for that copy. Never per launch.
+
+After an update, macOS can sometimes keep showing SpeakoFlow as allowed under
+Accessibility, Microphone or Screen Recording while no longer honouring it. If a
+permission screen keeps waiting, use its **Reset permission** button, then switch
+SpeakoFlow on again in System Settings.
 
 If you're wondering why there's no button to click instead: macOS 15 and later
 removed the old right-click → **Open** bypass, and the "damaged" message is the
@@ -254,9 +261,10 @@ notarization is on the [roadmap](#roadmap) and removes this step entirely.
 
 **Intel Macs, from 1.3.0 onward.** Download
 `SpeakoFlow_<version>_x64.dmg` for Intel and
-`SpeakoFlow_<version>_aarch64.dmg` for M1 and newer. The Intel build is CPU
-only, since the GPU backend targets Apple Silicon, so transcription is slower
-than on Apple Silicon but fully functional. Every Intel build is checked in CI
+`SpeakoFlow_<version>_aarch64.dmg` for M1 and newer. The Intel build needs
+**macOS 14 Sonoma or later**. It is CPU only, since the GPU backend targets
+Apple Silicon, so transcription is slower than on Apple Silicon but fully
+functional. Every Intel build is checked in CI
 on a real Intel machine: the app's own libraries are the only ones left in
 place, then the binary is launched, so a bundle that could not start on your Mac
 fails the build instead of reaching the release page. You can also

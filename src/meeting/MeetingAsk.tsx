@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowUp, Square } from "lucide-react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { AlertCircle, ArrowUp, Square } from "lucide-react";
 import { useMeetingChat } from "@/components/settings/meetings/useMeetingChat";
 
 interface MeetingAskProps {
@@ -11,6 +13,27 @@ interface MeetingAskProps {
   meetingId: number | null;
 }
 
+/** Answers are markdown. Without this the card showed the model's `**` and
+ *  `- ` literally; the styling itself lives on `.pill-answer-text`. */
+const ANSWER_MARKDOWN: Components = {
+  a: ({ children }) => <span>{children}</span>,
+  h1: ({ children }) => (
+    <p>
+      <strong>{children}</strong>
+    </p>
+  ),
+  h2: ({ children }) => (
+    <p>
+      <strong>{children}</strong>
+    </p>
+  ),
+  h3: ({ children }) => (
+    <p>
+      <strong>{children}</strong>
+    </p>
+  ),
+};
+
 /**
  * Ask a question about the call that is happening right now.
  *
@@ -18,7 +41,9 @@ interface MeetingAskProps {
  * accumulating a thread — the pill is a few hundred pixels tall and floating over
  * the user's work, so a scrolling chat log inside it would push the live
  * transcript off screen. The full thread is kept in Rust and shown in Settings →
- * Meetings, so nothing is lost by only displaying the latest exchange here.
+ * Meetings, so nothing is lost by only displaying the latest exchange here. The
+ * question it answers sits on one quiet line above it, so an answer read a
+ * minute later still says what it was about.
  */
 export const MeetingAsk: React.FC<MeetingAskProps> = ({
   inputRef,
@@ -28,18 +53,28 @@ export const MeetingAsk: React.FC<MeetingAskProps> = ({
   const { messages, streaming, busy, error, ask, cancel, dismissError } =
     useMeetingChat(meetingId);
   const [draft, setDraft] = useState("");
+  // The question just sent, until the thread snapshot that contains it lands.
+  const [asked, setAsked] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAsked(null);
+  }, [messages]);
 
   const submit = () => {
     const question = draft.trim();
     if (!question || busy) return;
+    setAsked(question);
     ask(question);
     setDraft("");
   };
 
-  // The newest answer, or whatever has streamed of it so far.
-  const lastAnswer = [...messages]
-    .reverse()
-    .find((message) => message.role === "assistant")?.content;
+  // The newest exchange, or whatever has streamed of its answer so far.
+  const reversed = [...messages].reverse();
+  const lastAnswer = reversed.find(
+    (message) => message.role === "assistant",
+  )?.content;
+  const lastQuestion =
+    asked ?? reversed.find((message) => message.role === "user")?.content;
   const shown = streaming || (busy ? "" : lastAnswer);
 
   const answerRef = useRef<HTMLDivElement>(null);
@@ -51,17 +86,41 @@ export const MeetingAsk: React.FC<MeetingAskProps> = ({
   return (
     <>
       {error && (
-        <p className="pill-notice" role="alert" onClick={dismissError}>
-          {error}
+        <p
+          className="pill-notice"
+          data-tone="error"
+          role="alert"
+          onClick={dismissError}
+          title={t("common.close")}
+        >
+          <AlertCircle size={13} aria-hidden="true" />
+          <span className="pill-notice-text">{error}</span>
         </p>
       )}
 
       {(shown || busy) && (
         <div className="pill-answer" ref={answerRef}>
+          {lastQuestion && (
+            <p className="pill-answer-question" title={lastQuestion}>
+              {lastQuestion}
+            </p>
+          )}
           {shown ? (
-            <p className="pill-answer-text">{shown}</p>
+            <div className="pill-answer-text">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={ANSWER_MARKDOWN}
+              >
+                {shown}
+              </ReactMarkdown>
+            </div>
           ) : (
-            <p className="pill-answer-text" data-thinking="true">
+            <p className="pill-answer-thinking" role="status">
+              <span className="pill-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
               {t("meetings.ask.thinking")}
             </p>
           )}
@@ -69,50 +128,53 @@ export const MeetingAsk: React.FC<MeetingAskProps> = ({
       )}
 
       <div className="pill-ask">
-        <input
-          ref={inputRef}
-          className="pill-ask-input"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              submit();
-            }
-            // Escape gives the field up without collapsing the window, so a
-            // mistyped question does not cost the transcript view.
-            if (event.key === "Escape") {
-              event.stopPropagation();
-              setDraft("");
-              inputRef.current?.blur();
-            }
-          }}
-          placeholder={t("meetings.ask.placeholder")}
-          aria-label={t("meetings.ask.placeholder")}
-          disabled={meetingId === null}
-        />
-        {busy ? (
-          <button
-            type="button"
-            className="pill-action"
-            onClick={cancel}
-            title={t("meetings.ask.stop")}
-            aria-label={t("meetings.ask.stop")}
-          >
-            <Square size={11} />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="pill-action"
-            onClick={submit}
-            disabled={!draft.trim()}
-            title={t("meetings.ask.send")}
-            aria-label={t("meetings.ask.send")}
-          >
-            <ArrowUp size={13} />
-          </button>
-        )}
+        <div className="pill-ask-field">
+          <input
+            ref={inputRef}
+            className="pill-ask-input"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+              // Escape gives the field up without collapsing the window, so a
+              // mistyped question does not cost the transcript view.
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setDraft("");
+                inputRef.current?.blur();
+              }
+            }}
+            placeholder={t("meetings.ask.placeholder")}
+            aria-label={t("meetings.ask.placeholder")}
+            disabled={meetingId === null}
+          />
+          {busy ? (
+            <button
+              type="button"
+              className="pill-send"
+              data-variant="stop"
+              onClick={cancel}
+              title={t("meetings.ask.stop")}
+              aria-label={t("meetings.ask.stop")}
+            >
+              <Square size={11} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="pill-send"
+              onClick={submit}
+              disabled={!draft.trim()}
+              title={t("meetings.ask.send")}
+              aria-label={t("meetings.ask.send")}
+            >
+              <ArrowUp size={15} />
+            </button>
+          )}
+        </div>
       </div>
     </>
   );

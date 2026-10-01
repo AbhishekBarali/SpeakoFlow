@@ -105,12 +105,12 @@ pub fn web_search_system_directive(tts_enabled: bool) -> String {
          built-in web tool for this turn. Treat them as your own current findings and as ground \
          truth, trusting them over your prior knowledge when they conflict. Never describe them as \
          something the user gave, sent, pasted, or provided, and never use phrases like \"your \
-         search results\" or \"the results you sent\" — to the user it must read as if you simply \
+         search results\" or \"the results you sent\". To the user it must read as if you simply \
          know the current answer. Open with the direct answer in the very first sentence (the name, \
          number, score, or date asked for), then add the key supporting specifics. When the results \
          contain several relevant items (scores, prices, options), give them all rather than \
          undercounting or claiming only one is available. If coverage is only partial, answer what \
-         the results do support and add at most one short line on what's missing — never refuse, \
+         the results do support and add at most one short line on what's missing. Never refuse, \
          stall, or ask the user to clarify when relevant results are present. Prefer the most recent \
          and most authoritative sources for time-sensitive facts and note any real disagreement in a \
          few words. Do not output citation markers like [1], footnotes, or raw URLs; you may name a \
@@ -138,7 +138,7 @@ pub fn web_search_system_directive(tts_enabled: bool) -> String {
 /// turns where the app chose not to auto-search, which is exactly the wrong
 /// thing to say when the app *can* search. Byte-stable text, so it's safe for
 /// provider-side prompt caching.
-pub const WEB_SEARCH_CAPABILITY_NOTE: &str = "You have a live web search tool available in this app, and the user's current local date is provided with each message. Your training data has a cutoff and may be out of date, but you are NOT stuck in your training year: trust the provided current date, and rely on web search for anything time-sensitive (recent events, news, sports results, prices, releases, schedules, who currently holds a role) rather than answering from stale memory or assuming an old year. Use the tool ONLY when a question genuinely needs current or external facts. For greetings, small talk, opinions, advice, explanations, definitions, writing, coding, math, or anything you already know well, just answer directly — do NOT search. When a search is warranted the app runs it automatically and adds the results to the user's message; on a turn that arrives without results, never claim you cannot access the internet — if you're unsure about something current, give your best answer and offer to look it up.";
+pub const WEB_SEARCH_CAPABILITY_NOTE: &str = "You have a live web search tool available in this app, and the user's current local date is provided with each message. Your training data has a cutoff and may be out of date, but you are NOT stuck in your training year: trust the provided current date, and rely on web search for anything time-sensitive (recent events, news, sports results, prices, releases, schedules, who currently holds a role) rather than answering from stale memory or assuming an old year. Use the tool ONLY when a question genuinely needs current or external facts. For greetings, small talk, opinions, advice, explanations, definitions, writing, coding, math, or anything you already know well, just answer directly and do NOT search. When a search is warranted the app runs it automatically and adds the results to the user's message; on a turn that arrives without results, never claim you cannot access the internet. If you're unsure about something current, give your best answer and offer to look it up.";
 
 // ---------------------------------------------------------------------------
 // Search plan (retrieval input)
@@ -484,7 +484,7 @@ async fn snippet_search(
 pub fn format_results_for_prompt(results: &[SearchResult], total_budget: usize) -> String {
     let mut out = String::with_capacity(1024);
     out.push_str(
-        "[Web search results you retrieved for this turn — your own findings, NOT provided by the user]\n",
+        "[Web search results you retrieved for this turn. These are your own findings, NOT provided by the user]\n",
     );
     let mut budget = total_budget;
     for r in results {
@@ -785,7 +785,7 @@ async fn search_serpapi(
                 let base = item.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
                 let date = item.get("date").and_then(|v| v.as_str()).unwrap_or("");
                 let snippet = match (date.is_empty(), base.is_empty()) {
-                    (false, false) => format!("{} — {}", date, base),
+                    (false, false) => format!("{}: {}", date, base),
                     (false, true) => date.to_string(),
                     _ => base.to_string(),
                 };
@@ -801,7 +801,7 @@ async fn search_serpapi(
             let url = item.get("link").and_then(|v| v.as_str()).unwrap_or("");
             let base = item.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
             let snippet = match item.get("date").and_then(|v| v.as_str()) {
-                Some(date) if !date.is_empty() => format!("{} — {}", date, base),
+                Some(date) if !date.is_empty() => format!("{}: {}", date, base),
                 _ => base.to_string(),
             };
             push_candidate(&mut candidates, title, url, &snippet, false);
@@ -1064,7 +1064,7 @@ async fn serper_query(
             // Some organic results carry a date; prepend it so recency is visible
             // to the rerank.
             let snippet = match item.get("date").and_then(|v| v.as_str()) {
-                Some(date) if !date.is_empty() => format!("{} — {}", date, base),
+                Some(date) if !date.is_empty() => format!("{}: {}", date, base),
                 _ => base.to_string(),
             };
             push_candidate(&mut candidates, title, url, &snippet, false);

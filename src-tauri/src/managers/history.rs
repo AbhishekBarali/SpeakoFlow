@@ -74,6 +74,15 @@ static MIGRATIONS: &[M] = &[
     // it as dismissed with a way back, and usage does not count it until it is
     // recovered.
     M::up("ALTER TABLE transcription_history ADD COLUMN dismissed BOOLEAN NOT NULL DEFAULT 0;"),
+    // A conversation started from a meeting ("Discuss in a call") remembers which
+    // one, so continuing it brings the meeting back and the meeting page can list
+    // its discussions. Meetings live in their own database, so this is a plain
+    // number rather than a foreign key, and the title is copied: a conversation
+    // about a meeting that was later deleted should still say what it was about.
+    M::up(
+        "ALTER TABLE assistant_history ADD COLUMN meeting_id INTEGER;
+         ALTER TABLE assistant_history ADD COLUMN meeting_title TEXT;",
+    ),
 ];
 
 /// Every `transcription_history` column [`HistoryManager::map_history_entry`]
@@ -105,6 +114,10 @@ pub struct AssistantHistoryEntry {
     /// Short label derived from the first user message.
     pub title: String,
     pub messages: Vec<ChatMessage>,
+    /// The meeting this conversation discusses, when it was started from one.
+    pub meeting_id: Option<i64>,
+    /// That meeting's title when the conversation last saved.
+    pub meeting_title: Option<String>,
 }
 
 /// One row of the conversation list: what a list row shows, without the
@@ -122,6 +135,28 @@ pub struct AssistantHistorySummary {
     /// Short label derived from the first user message.
     pub title: String,
     pub message_count: i64,
+    /// The meeting this conversation discusses, when it was started from one.
+    pub meeting_id: Option<i64>,
+    pub meeting_title: Option<String>,
+}
+
+/// Which conversations a list asks for. Every field narrows; the default is all.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Type)]
+pub struct AssistantHistoryFilter {
+    /// Words to find in the title, the meeting title, or anything said.
+    pub query: Option<String>,
+    /// Only conversations about meetings.
+    #[serde(default)]
+    pub meetings_only: bool,
+    /// Only conversations about this meeting.
+    pub meeting_id: Option<i64>,
+}
+
+/// The meeting a conversation is saved against.
+#[derive(Clone, Copy, Debug)]
+pub struct MeetingLink<'a> {
+    pub id: i64,
+    pub title: &'a str,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -1333,6 +1368,8 @@ impl HistoryManager {
             updated_at: row.get("updated_at")?,
             title: row.get("title")?,
             messages,
+            meeting_id: row.get("meeting_id")?,
+            meeting_title: row.get("meeting_title")?,
         })
     }
 
@@ -1361,16 +1398,20 @@ impl HistoryManager {
     pub fn create_assistant_session(
         &self,
         messages: &[ChatMessage],
+        meeting: Option<MeetingLink<'_>>,
     ) -> Result<AssistantHistoryEntry> {
         let now = Utc::now().timestamp();
         let title = Self::derive_assistant_title(messages);
         let messages_json = serde_json::to_string(messages)?;
+        let meeting_id = meeting.map(|m| m.id);
+        let meeting_title = meeting.map(|m| m.title.to_string());
 
         let conn = self.get_connection()?;
         conn.execute(
-            "INSERT INTO assistant_history (timestamp, updated_at, title, messages)
-             VALUES (?1, ?2, ?3, ?4)",
-            params![now, now, &title, &messages_json],
+            "INSERT INTO assistant_history
+                 (timestamp, updated_at, title, messages, meeting_id, meeting_title)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![now, now, &title, &messages_json, meeting_id, &meeting_title],
         )?;
         let id = conn.last_insert_rowid();
 
@@ -1384,16 +1425,23 @@ impl HistoryManager {
             updated_at: now,
             title,
             messages: messages.to_vec(),
+            meeting_id,
+            meeting_title,
         })
     }
 
     /// Update an existing assistant conversation in place. Returns `Ok(None)`
     /// when the row no longer exists (e.g. it was deleted from the History
     /// view), so the caller can decide to create a fresh session instead.
+    ///
+    /// `meeting` only ever sets the link. `None` leaves a stored one alone, so a
+    /// conversation whose meeting could not be restored (deleted since) still
+    /// says, in History, what it was about.
     pub fn update_assistant_session(
         &self,
         id: i64,
         messages: &[ChatMessage],
+        meeting: Option<MeetingLink<'_>>,
     ) -> Result<Option<AssistantHistoryEntry>> {
         let now = Utc::now().timestamp();
         let title = Self::derive_assistant_title(messages);
@@ -1402,20 +1450,30 @@ impl HistoryManager {
         let conn = self.get_connection()?;
         let updated = conn.execute(
             "UPDATE assistant_history
-             SET updated_at = ?1, title = ?2, messages = ?3
+             SET updated_at = ?1, title = ?2, messages = ?3,
+                 meeting_id = COALESCE(?5, meeting_id),
+                 meeting_title = COALESCE(?6, meeting_title)
              WHERE id = ?4",
-            params![now, &title, &messages_json, id],
+            params![
+                now,
+                &title,
+                &messages_json,
+                id,
+                meeting.map(|m| m.id),
+                meeting.map(|m| m.title)
+            ],
         )?;
 
         if updated == 0 {
             return Ok(None);
         }
 
-        let timestamp: i64 = conn.query_row(
-            "SELECT timestamp FROM assistant_history WHERE id = ?1",
-            params![id],
-            |row| row.get(0),
-        )?;
+        let (timestamp, meeting_id, meeting_title): (i64, Option<i64>, Option<String>) = conn
+            .query_row(
+                "SELECT timestamp, meeting_id, meeting_title FROM assistant_history WHERE id = ?1",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )?;
 
         Ok(Some(AssistantHistoryEntry {
             id,
@@ -1423,6 +1481,8 @@ impl HistoryManager {
             updated_at: now,
             title,
             messages: messages.to_vec(),
+            meeting_id,
+            meeting_title,
         }))
     }
 
@@ -1438,6 +1498,27 @@ impl HistoryManager {
         Self::assistant_summaries_with_conn(&conn, cursor, limit)
     }
 
+    /// The summary columns, in the order [`Self::map_summary`] reads them by name.
+    /// The count is taken in SQL so the messages never leave the database.
+    /// Malformed JSON counts as an empty conversation instead of failing the
+    /// whole list, the same leniency `map_assistant_entry` applies.
+    const SUMMARY_COLUMNS: &'static str =
+        "id, timestamp, updated_at, title, meeting_id, meeting_title,
+        CASE WHEN json_valid(messages) THEN json_array_length(messages) ELSE 0 END
+            AS message_count";
+
+    fn map_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<AssistantHistorySummary> {
+        Ok(AssistantHistorySummary {
+            id: row.get("id")?,
+            timestamp: row.get("timestamp")?,
+            updated_at: row.get("updated_at")?,
+            title: row.get("title")?,
+            message_count: row.get("message_count")?,
+            meeting_id: row.get("meeting_id")?,
+            meeting_title: row.get("meeting_title")?,
+        })
+    }
+
     fn assistant_summaries_with_conn(
         conn: &Connection,
         cursor: Option<i64>,
@@ -1447,28 +1528,16 @@ impl HistoryManager {
         // One extra row answers `has_more`. A negative LIMIT is SQLite's "no limit".
         let fetch_count = limit.map_or(-1, |lim| lim as i64 + 1);
 
-        // The count is taken in SQL so the messages never leave the database.
-        // Malformed JSON counts as an empty conversation instead of failing the
-        // whole list, the same leniency `map_assistant_entry` applies.
-        let mut stmt = conn.prepare(
-            "SELECT id, timestamp, updated_at, title,
-                    CASE WHEN json_valid(messages) THEN json_array_length(messages) ELSE 0 END
-                        AS message_count
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {}
              FROM assistant_history
              WHERE ?1 IS NULL OR id < ?1
              ORDER BY id DESC
              LIMIT ?2",
-        )?;
+            Self::SUMMARY_COLUMNS
+        ))?;
         let mut entries = stmt
-            .query_map(params![cursor, fetch_count], |row| {
-                Ok(AssistantHistorySummary {
-                    id: row.get("id")?,
-                    timestamp: row.get("timestamp")?,
-                    updated_at: row.get("updated_at")?,
-                    title: row.get("title")?,
-                    message_count: row.get("message_count")?,
-                })
-            })?
+            .query_map(params![cursor, fetch_count], Self::map_summary)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let has_more = limit.is_some_and(|lim| entries.len() > lim);
@@ -1476,6 +1545,88 @@ impl HistoryManager {
             entries.pop();
         }
 
+        Ok(PaginatedAssistantHistory { entries, has_more })
+    }
+
+    /// Search and filter conversations, most recently active first.
+    ///
+    /// Ordered by `updated_at` rather than `id`, because a list grouped by day
+    /// has to agree with its own order: a week-old conversation continued today
+    /// belongs under Today, at the top. Paged by offset for the same reason (the
+    /// keyset on `id` no longer matches the order); the caller reloads after each
+    /// turn anyway, which is when rows move.
+    pub fn list_assistant_conversations(
+        &self,
+        filter: &AssistantHistoryFilter,
+        offset: usize,
+        limit: usize,
+    ) -> Result<PaginatedAssistantHistory> {
+        let conn = self.get_connection()?;
+        Self::filtered_summaries_with_conn(&conn, filter, offset, limit)
+    }
+
+    fn filtered_summaries_with_conn(
+        conn: &Connection,
+        filter: &AssistantHistoryFilter,
+        offset: usize,
+        limit: usize,
+    ) -> Result<PaginatedAssistantHistory> {
+        let limit = limit.clamp(1, 200);
+        let mut clauses: Vec<String> = Vec::new();
+        let mut values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if filter.meetings_only {
+            clauses.push("meeting_id IS NOT NULL".to_string());
+        }
+        if let Some(meeting_id) = filter.meeting_id {
+            values.push(Box::new(meeting_id));
+            clauses.push(format!("meeting_id = ?{}", values.len()));
+        }
+        // Every word has to appear somewhere, in any order: "pricing friday"
+        // finds the conversation where both came up, not only the one where they
+        // were said together. Message text is read through `json_each` rather
+        // than LIKE over the raw column, which holds base64 thumbnails that a
+        // short query would match by accident.
+        for word in search_words(filter.query.as_deref().unwrap_or("")) {
+            values.push(Box::new(like_pattern(&word)));
+            let n = values.len();
+            clauses.push(format!(
+                "(title LIKE ?{n} ESCAPE '\\'
+                  OR meeting_title LIKE ?{n} ESCAPE '\\'
+                  OR EXISTS (
+                      SELECT 1 FROM json_each(
+                          CASE WHEN json_valid(messages) THEN messages ELSE '[]' END
+                      ) AS m
+                      WHERE json_extract(m.value, '$.content') LIKE ?{n} ESCAPE '\\'
+                  ))"
+            ));
+        }
+
+        let where_sql = if clauses.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", clauses.join(" AND "))
+        };
+        values.push(Box::new(limit as i64 + 1));
+        let limit_index = values.len();
+        values.push(Box::new(offset as i64));
+        let offset_index = values.len();
+
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {}
+             FROM assistant_history
+             {where_sql}
+             ORDER BY updated_at DESC, id DESC
+             LIMIT ?{limit_index} OFFSET ?{offset_index}",
+            Self::SUMMARY_COLUMNS
+        ))?;
+        let refs: Vec<&dyn rusqlite::ToSql> = values.iter().map(|v| v.as_ref()).collect();
+        let mut entries = stmt
+            .query_map(refs.as_slice(), Self::map_summary)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        let has_more = entries.len() > limit;
+        entries.truncate(limit);
         Ok(PaginatedAssistantHistory { entries, has_more })
     }
 
@@ -1491,7 +1642,7 @@ impl HistoryManager {
     pub fn get_assistant_session(&self, id: i64) -> Result<Option<AssistantHistoryEntry>> {
         let conn = self.get_connection()?;
         let mut stmt = conn.prepare(
-            "SELECT id, timestamp, updated_at, title, messages
+            "SELECT id, timestamp, updated_at, title, messages, meeting_id, meeting_title
              FROM assistant_history
              WHERE id = ?1",
         )?;
@@ -1514,6 +1665,40 @@ impl HistoryManager {
         )?;
         Ok(())
     }
+}
+
+/// Most words a conversation search uses. Beyond this a query is a sentence, and
+/// each word is another scan of every stored message.
+const MAX_SEARCH_WORDS: usize = 6;
+
+/// The distinct words of a conversation search, lowercased.
+fn search_words(query: &str) -> Vec<String> {
+    let mut words: Vec<String> = Vec::new();
+    for word in query.split_whitespace() {
+        let word = word.to_lowercase();
+        if !words.contains(&word) {
+            words.push(word);
+        }
+        if words.len() == MAX_SEARCH_WORDS {
+            break;
+        }
+    }
+    words
+}
+
+/// A `LIKE … ESCAPE '\'` pattern matching `word` anywhere, with LIKE's own
+/// wildcards escaped: searching for "50%" or "file_name" means those characters.
+fn like_pattern(word: &str) -> String {
+    let mut pattern = String::with_capacity(word.len() + 2);
+    pattern.push('%');
+    for c in word.chars() {
+        if matches!(c, '%' | '_' | '\\') {
+            pattern.push('\\');
+        }
+        pattern.push(c);
+    }
+    pattern.push('%');
+    pattern
 }
 
 #[cfg(test)]
@@ -2363,5 +2548,185 @@ mod tests {
         let all = HistoryManager::assistant_summaries_with_conn(&conn, None, None).expect("all");
         assert!(!all.has_more);
         assert_eq!(all.entries.len(), 5);
+    }
+
+    // ---- conversations about meetings, and searching them ----
+
+    fn insert_meeting_conversation(
+        conn: &Connection,
+        updated_at: i64,
+        title: &str,
+        messages: &[(&str, &str)],
+        meeting: Option<(i64, &str)>,
+    ) -> i64 {
+        let messages: Vec<ChatMessage> = messages
+            .iter()
+            .map(|(role, content)| ChatMessage {
+                role: role.to_string(),
+                content: content.to_string(),
+                images: vec!["data:image/jpeg;base64,cHJpY2luZw==".into()],
+            })
+            .collect();
+        conn.execute(
+            "INSERT INTO assistant_history
+                 (timestamp, updated_at, title, messages, meeting_id, meeting_title)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                updated_at - 60,
+                updated_at,
+                title,
+                serde_json::to_string(&messages).unwrap(),
+                meeting.map(|m| m.0),
+                meeting.map(|m| m.1),
+            ],
+        )
+        .expect("insert conversation");
+        conn.last_insert_rowid()
+    }
+
+    fn ids(page: &PaginatedAssistantHistory) -> Vec<i64> {
+        page.entries.iter().map(|e| e.id).collect()
+    }
+
+    #[test]
+    fn a_meeting_link_round_trips_through_the_list() {
+        let conn = migrated_conn();
+        let id = insert_meeting_conversation(
+            &conn,
+            1_000,
+            "hey",
+            &[("user", "hey")],
+            Some((7, "Pricing review")),
+        );
+        let page = HistoryManager::filtered_summaries_with_conn(
+            &conn,
+            &AssistantHistoryFilter::default(),
+            0,
+            10,
+        )
+        .unwrap();
+        assert_eq!(ids(&page), vec![id]);
+        assert_eq!(page.entries[0].meeting_id, Some(7));
+        assert_eq!(
+            page.entries[0].meeting_title.as_deref(),
+            Some("Pricing review")
+        );
+    }
+
+    #[test]
+    fn the_list_filters_by_meeting() {
+        let conn = migrated_conn();
+        let plain = insert_meeting_conversation(&conn, 1_000, "a", &[("user", "a")], None);
+        let seven =
+            insert_meeting_conversation(&conn, 2_000, "b", &[("user", "b")], Some((7, "M7")));
+        let eight =
+            insert_meeting_conversation(&conn, 3_000, "c", &[("user", "c")], Some((8, "M8")));
+
+        let all = HistoryManager::filtered_summaries_with_conn(
+            &conn,
+            &AssistantHistoryFilter::default(),
+            0,
+            10,
+        )
+        .unwrap();
+        assert_eq!(ids(&all), vec![eight, seven, plain]);
+
+        let meetings = AssistantHistoryFilter {
+            meetings_only: true,
+            ..Default::default()
+        };
+        let page = HistoryManager::filtered_summaries_with_conn(&conn, &meetings, 0, 10).unwrap();
+        assert_eq!(ids(&page), vec![eight, seven]);
+
+        let one = AssistantHistoryFilter {
+            meeting_id: Some(7),
+            ..Default::default()
+        };
+        let page = HistoryManager::filtered_summaries_with_conn(&conn, &one, 0, 10).unwrap();
+        assert_eq!(ids(&page), vec![seven]);
+    }
+
+    /// Every word must appear somewhere — the title, the meeting's title, or what
+    /// was said — and base64 thumbnails must not count as something said.
+    #[test]
+    fn search_matches_every_word_across_title_meeting_and_messages() {
+        let conn = migrated_conn();
+        let both = insert_meeting_conversation(
+            &conn,
+            1_000,
+            "hello there",
+            &[
+                ("user", "What about Friday?"),
+                ("assistant", "The PRICING is set."),
+            ],
+            None,
+        );
+        let meeting = insert_meeting_conversation(
+            &conn,
+            2_000,
+            "hi",
+            &[("user", "friday works")],
+            Some((3, "Pricing review")),
+        );
+        let neither = insert_meeting_conversation(&conn, 3_000, "x", &[("user", "nothing")], None);
+
+        let search = |q: &str| {
+            let filter = AssistantHistoryFilter {
+                query: Some(q.to_string()),
+                ..Default::default()
+            };
+            ids(&HistoryManager::filtered_summaries_with_conn(&conn, &filter, 0, 10).unwrap())
+        };
+        assert_eq!(search("pricing friday"), vec![meeting, both]);
+        assert_eq!(search("hello"), vec![both]);
+        assert_eq!(search("   "), vec![neither, meeting, both]);
+        // "cHJpY2luZw" is in every thumbnail's base64, and must match nothing.
+        assert!(search("cHJpY2luZw").is_empty());
+    }
+
+    #[test]
+    fn like_wildcards_in_a_search_are_literal() {
+        assert_eq!(like_pattern("50%"), "%50\\%%");
+        assert_eq!(like_pattern("file_name"), "%file\\_name%");
+        assert_eq!(like_pattern("a\\b"), "%a\\\\b%");
+
+        let conn = migrated_conn();
+        let literal =
+            insert_meeting_conversation(&conn, 1_000, "a", &[("user", "a 50% cut")], None);
+        insert_meeting_conversation(&conn, 2_000, "b", &[("user", "a 500 cut")], None);
+        let filter = AssistantHistoryFilter {
+            query: Some("50%".into()),
+            ..Default::default()
+        };
+        let page = HistoryManager::filtered_summaries_with_conn(&conn, &filter, 0, 10).unwrap();
+        assert_eq!(ids(&page), vec![literal]);
+    }
+
+    #[test]
+    fn search_words_are_distinct_lowercase_and_bounded() {
+        assert_eq!(
+            search_words("Pricing  pricing FRIDAY"),
+            vec!["pricing", "friday"]
+        );
+        assert_eq!(search_words("a b c d e f g h").len(), MAX_SEARCH_WORDS);
+        assert!(search_words("   ").is_empty());
+    }
+
+    /// A conversation continued today belongs at the top, even though its row is
+    /// older than everything below it.
+    #[test]
+    fn the_filtered_list_orders_by_activity_and_pages_by_offset() {
+        let conn = migrated_conn();
+        let old_but_active = insert_meeting_conversation(&conn, 9_000, "a", &[("user", "a")], None);
+        let middle = insert_meeting_conversation(&conn, 5_000, "b", &[("user", "b")], None);
+        let newest_row = insert_meeting_conversation(&conn, 1_000, "c", &[("user", "c")], None);
+
+        let filter = AssistantHistoryFilter::default();
+        let first = HistoryManager::filtered_summaries_with_conn(&conn, &filter, 0, 2).unwrap();
+        assert!(first.has_more);
+        assert_eq!(ids(&first), vec![old_but_active, middle]);
+        let rest = HistoryManager::filtered_summaries_with_conn(&conn, &filter, 2, 2).unwrap();
+        assert!(!rest.has_more);
+        assert_eq!(ids(&rest), vec![newest_row]);
     }
 }

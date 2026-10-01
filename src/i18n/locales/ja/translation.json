@@ -147,8 +147,7 @@
       "progress": "ステップ {{current}}/{{total}}",
       "steps": {
         "setup": "設定",
-        "tour": "ツアー",
-        "finish": "開始"
+        "tour": "ツアー"
       }
     },
     "setup": {
@@ -161,7 +160,7 @@
       "count": "{{current}}/{{total}}",
       "skip": "ツアーをスキップ",
       "next": "次へ",
-      "done": "続ける",
+      "finish": "SpeakoFlowを開く",
       "tabs": {
         "dictate": "音声入力",
         "ask": "アシスタント",
@@ -171,6 +170,15 @@
         "hold": "押している間だけ録音",
         "tap": "押して開始、もう一度押して停止",
         "call": "押して開始、もう一度押して終了"
+      },
+      "steps": {
+        "label": "使い方",
+        "speak": "入力したいことを話す",
+        "typed": "カーソルの位置に入力されます",
+        "select": "テキストを選択（任意）",
+        "use": "回答を挿入、または読むだけ",
+        "talk": "そのまま話す",
+        "answer": "声で答えます"
       },
       "mail": {
         "window": "新規メッセージ",
@@ -219,15 +227,6 @@
         "assistant": "アシスタント",
         "said": "金曜日のチームミーティングで話す短いスピーチの構成を一緒に考えて。",
         "reply": "もちろんです。一番の成果から始めて、うまくいった理由を2つ挙げ、最後に今後の予定で締めくくりましょう。"
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "準備完了",
-        "installing": "インストール中…",
-        "percent": "{{percent}}%",
-        "retry": "再試行",
-        "waiting": "待機中"
       }
     },
     "subtitle": "開始するには、文字起こしモデルを選択してください",
@@ -460,8 +459,7 @@
     },
     "frame": {
       "setup": "設定",
-      "tour": "ツアー",
-      "finish": "開始"
+      "tour": "ツアー"
     },
     "welcome": {
       "line": "話せば入力され、聞けば答えが返ってきます。",
@@ -486,33 +484,6 @@
       "continue": "続ける",
       "later": "後で設定する",
       "loading": "音声モデルを探しています"
-    },
-    "start": {
-      "ready": {
-        "title": "さっそく試してみましょう"
-      },
-      "downloading": {
-        "title": "もうすぐ準備完了"
-      },
-      "failed": {
-        "title": "ダウンロードが止まりました"
-      },
-      "none": {
-        "title": "音声モデルを選んで始めましょう"
-      },
-      "progress": {
-        "of": "{{done}} / {{total}}",
-        "failed": "完了しませんでした。もう一度試しますか？",
-        "underMinute": "残り1分未満",
-        "minutes_other": "残り約{{count}}分"
-      },
-      "try": {
-        "label": "音声入力を試す",
-        "placeholder": "話した言葉がここに表示されます…",
-        "success": "これで完了です。どのアプリでも使えます。"
-      },
-      "open": "SpeakoFlowを開く",
-      "choose": "音声モデルを選ぶ"
     }
   },
   "modelSelector": {
@@ -1846,14 +1817,6 @@
           "large": "大",
           "extraLarge": "特大"
         },
-        "panelSizeLabel": "パネルのサイズ",
-        "panelSizeDescription": "フローティングのアシスタントパネル全体の大きさ。",
-        "panelSizes": {
-          "mini": "小",
-          "compact": "コンパクト",
-          "standard": "標準",
-          "large": "大"
-        },
         "askDisplayLabel": "表示する画面",
         "askDisplayDescription": "アシスタントを開く画面です。既定では、マウスがある画面に開きます。",
         "askDisplays": {
@@ -1976,7 +1939,9 @@
     },
     "delete": {
       "action": "ミーティングを削除",
-      "whileRecording": "このミーティングを削除する前に、録音を停止してください。"
+      "whileRecording": "このミーティングを削除する前に、録音を停止してください。",
+      "confirmTitle": "このミーティングを削除しますか？",
+      "confirmBody": "文字起こし、メモ、音声がこのコンピューターから削除されます。この操作は元に戻せません。"
     },
     "detail": {
       "title": "ミーティング",
@@ -2220,6 +2185,7 @@
       "details": "詳細",
       "startHint": "話しかけるか、メッセージを入力してください。",
       "mutedHint": "マイクはオフです。文字の入力はできます。",
+      "heldHint": "音声入力の間は一時停止しています。",
       "preparingVoice": "音声を準備中… {{progress}}%",
       "history": {
         "title": "過去の会話",
@@ -2256,6 +2222,7 @@
         "responding": "考え中…",
         "speaking": "話しています",
         "muted": "マイクオフ",
+        "held": "音声入力のため一時停止中",
         "error": "通話が中断されました"
       },
       "errors": {
@@ -2904,7 +2871,6 @@
       "replyLength": "回答のおおよその長さ。",
       "history": "直近のメッセージをいくつ覚えておくか。",
       "summarize": "長いチャットを要約して、最初の内容を忘れないようにします。",
-      "panelSize": "画面をどれだけ使うか。",
       "opacity": "下げるとデスクトップが透けて見えます。",
       "position": "画面上の位置をクリックしてください。",
       "display": "パネルを開く画面。"
@@ -2977,7 +2943,6 @@
     "panel": {
       "where": "開く位置",
       "text": "文字サイズ",
-      "size": "パネルのサイズ",
       "opacity": "不透明度",
       "screen": "表示する画面"
     }

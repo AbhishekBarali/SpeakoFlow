@@ -154,6 +154,54 @@ struct CallbackCtx {
     tap: Cell<Option<NonNull<CFMachPort>>>,
 }
 
+/// Whether this event was posted by our own process.
+///
+/// The macOS counterpart of Windows' `LLKHF_INJECTED`, but narrower: it names
+/// *this* process rather than "anything synthetic", so a macro tool or an
+/// accessibility app that fires a registered hotkey is never mistaken for us.
+fn is_own_synthetic_event(event: &CGEvent) -> bool {
+    let source_pid =
+        CGEvent::integer_value_field(Some(event), CGEventField::EventSourceUnixProcessID);
+    source_pid == i64::from(std::process::id())
+}
+
+/// The `EventSourceUserData` value enigo stamps on every event it posts
+/// (`enigo::EVENT_MARKER`; the host creates enigo with default settings). This
+/// crate does not depend on enigo, hence the copy.
+const ENIGO_EVENT_MARKER: i64 = 100;
+
+/// Whether an event carries enigo's marker. Any process using enigo stamps the
+/// same value, so this is only trusted inside the host's own injection window.
+fn has_enigo_marker(event: &CGEvent) -> bool {
+    CGEvent::integer_value_field(Some(event), CGEventField::EventSourceUserData)
+        == ENIGO_EVENT_MARKER
+}
+
+/// Whether an event must bypass hotkey matching *and* modifier tracking.
+///
+/// The host synthesizes Cmd+C to harvest a selection the moment an assistant
+/// recording starts, while the user is still holding the hotkey. enigo stamps
+/// those events with only the modifiers *it* pressed, so the synthetic C key-down
+/// arrives with Cmd set and Option/Control clear. `reconcile_modifiers` trusted
+/// that and dropped the user's held Option+Control from the tracked state, and
+/// the manager then reported the held `option+ctrl+space` binding as released
+/// about 30 ms into the recording — the same failure `injected.rs` documents for
+/// the Windows hook.
+///
+/// Unlike Windows this does not wait for the host's `ignore_injected_input`
+/// window. `CGEventPost` is asynchronous, so the synthetic Cmd key-up can reach
+/// this tap after the host has already closed the window; it would then be read
+/// as a Cmd *press* (the down was skipped) and leave Cmd stuck in the tracked
+/// state. The window exists on Windows to keep other tools' injected hotkeys
+/// working, and a process-id match already excludes those, so nothing is lost.
+///
+/// enigo's marker is the fallback in case an event ever reaches the tap without
+/// our process id, and is honoured only inside that window, where the host is
+/// the one synthesizing.
+fn should_skip_own_event(event: &CGEvent) -> bool {
+    is_own_synthetic_event(event) || crate::injected::should_ignore_event(has_enigo_marker(event))
+}
+
 /// The callback function for the event tap
 ///
 /// Returns NULL to block the event, or the event pointer to pass it through.
@@ -191,6 +239,14 @@ unsafe extern "C-unwind" fn event_tap_callback(
     }
 
     let cg_event = event.as_ref();
+
+    // Our own synthetic keystrokes (the selection harvest's Cmd+C) pass through
+    // to the focused app untouched, but must not move the tracked modifiers or
+    // reach hotkey matching. See `should_skip_own_event`.
+    if should_skip_own_event(cg_event) {
+        return event.as_ptr();
+    }
+
     let flags = CGEvent::flags(Some(cg_event));
 
     let mut should_block = false;

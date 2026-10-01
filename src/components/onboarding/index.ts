@@ -2,7 +2,6 @@ export { default as AccessibilityOnboarding } from "./AccessibilityOnboarding";
 export { SetupStep } from "./SetupStep";
 export { WelcomeStep } from "./WelcomeStep";
 export { TourStep } from "./TourStep";
-export { FinishStep } from "./FinishStep";
 export { VoicePrefetch } from "./VoicePrefetch";
 export { hasCompletedOnboarding, markOnboardingComplete } from "./completion";
 export { useOnboardingReplay } from "./replay";

@@ -125,14 +125,16 @@ export const SpeakerIdentification: React.FC<SpeakerIdentificationProps> = ({
   if (diarized || isLive || !hasSystemAudio || installed === null) return null;
 
   return (
-    <div className="rounded-xl border border-hairline bg-surface-strong/60 px-3.5 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-ink">
-            <Users size={13} />
+    <div className="rounded-2xl border border-hairline bg-surface px-4 py-3.5 elev-card">
+      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-strong text-muted">
+          <Users className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-[14rem] flex-1">
+          <p className="text-sm font-medium text-ink">
             {t("meetings.diarize.title")}
           </p>
-          <p className="mt-0.5 text-[11.5px] text-muted">
+          <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
             {busy === "running" && progress && progress.total > 0
               ? t("meetings.diarize.progress", {
                   done: progress.done,
@@ -148,9 +150,12 @@ export const SpeakerIdentification: React.FC<SpeakerIdentificationProps> = ({
           size="sm"
           onClick={installed ? run : install}
           disabled={busy !== null}
-          className="gap-1.5"
         >
-          {installed ? <Users size={13} /> : <Download size={13} />}
+          {installed ? (
+            <Users className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
           {busy === "downloading"
             ? t("meetings.diarize.downloading")
             : busy === "running"
@@ -161,7 +166,9 @@ export const SpeakerIdentification: React.FC<SpeakerIdentificationProps> = ({
         </Button>
       </div>
       {message && (
-        <p className="mt-2 text-[11.5px] text-muted-soft">{message}</p>
+        <p className="mt-3 border-t border-hairline pt-3 text-[0.8125rem] text-muted">
+          {message}
+        </p>
       )}
     </div>
   );

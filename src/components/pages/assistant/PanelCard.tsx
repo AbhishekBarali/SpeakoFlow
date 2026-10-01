@@ -17,9 +17,11 @@ import {
 /**
  * "Floating panel", in two halves.
  *
- * How it looks: the real panel (drawn with its own stylesheet) beside the three
- * knobs that change it — text size, panel size, opacity — so every change is
- * visible the moment it is made. Where it opens: a map of a screen whose spots
+ * How it looks: the real panel (drawn with its own stylesheet) beside the two
+ * knobs that change it — text size and opacity — so every change is visible the
+ * moment it is made. There is no size preset: the quick ask's frame is the
+ * largest the card may grow to and is invisible, so a preset only moved a
+ * ceiling most answers never reach and read as a control that did nothing. Where it opens: a map of a screen whose spots
  * are the places it can open — the same size as the preview — beside the
  * position and screen pickers, so both halves share one pair of columns.
  *
@@ -120,7 +122,6 @@ const FONT_KEYS: Record<(typeof FONT_SIZE_IDS)[number], string> = {
   large: "large",
   extra_large: "extraLarge",
 };
-const PANEL_SIZES = ["mini", "compact", "standard", "large"] as const;
 
 /** A label (with its (i)) above a control, and an optional value on the right
  *  of the label line. Same type as a settings-row title, so the two halves of
@@ -153,7 +154,6 @@ export const PanelCard: React.FC = () => {
   const run = useSettingCommand();
   const [displays, setDisplays] = useState<DisplayChoice[]>([]);
   const fontSize = settings?.assistant_font_size ?? "medium";
-  const panelSize = settings?.assistant_panel_size ?? "standard";
   const stored = settings?.assistant_panel_opacity ?? 1;
   const [opacity, setOpacity] = useState(stored);
   const storedAnchor: AskAnchor = settings?.assistant_ask_anchor ?? "center";
@@ -229,24 +229,6 @@ export const PanelCard: React.FC = () => {
                     A
                   </span>
                 ),
-              }))}
-            />
-          </Field>
-          <Field
-            label={t("assistantPage.panel.size")}
-            info={t("assistantPage.tips.panelSize")}
-          >
-            <Segmented
-              size="sm"
-              fill
-              label={t("assistantPage.panel.size")}
-              value={panelSize as (typeof PANEL_SIZES)[number]}
-              onChange={(next) =>
-                void run(commands.setAssistantPanelSize(next))
-              }
-              options={PANEL_SIZES.map((id) => ({
-                value: id,
-                label: t(`settings.assistant.appearance.panelSizes.${id}`),
               }))}
             />
           </Field>

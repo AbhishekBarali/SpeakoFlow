@@ -51,6 +51,7 @@ import { PageHeader } from "../../ui/Page";
 import { Tabs } from "../../ui/Tabs";
 import { useNavigation } from "../../shell/navigation";
 import { VOICE_INTERRUPTED_MARKER } from "@/assistant/conversationPolicy";
+import { formatTimeOfDay, groupByDay } from "@/utils/dayGroups";
 
 /** Must match the marker constants in src-tauri/src/assistant.rs */
 const SCREENSHOT_MARKER = "[screenshot attached]";
@@ -284,58 +285,6 @@ type FeedItem =
   | { kind: "assistant"; sortTime: number; session: AssistantHistorySummary };
 
 type HistoryFilter = "all" | "recordings" | "flow" | "assistant";
-
-interface DayGroup {
-  key: string;
-  label: string;
-  items: FeedItem[];
-}
-
-const dayKey = (seconds: number): string => {
-  const date = new Date(seconds * 1000);
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-};
-
-/** "Today", "Yesterday", "Monday", or a date — newest group first. */
-const groupFeedByDay = (
-  items: FeedItem[],
-  locale: string,
-  labels: { today: string; yesterday: string },
-): DayGroup[] => {
-  const now = new Date();
-  const today = dayKey(now.getTime() / 1000);
-  const yesterday = dayKey(now.getTime() / 1000 - 86_400);
-  const weekAgo = now.getTime() - 6 * 86_400_000;
-  const groups: DayGroup[] = [];
-  for (const item of items) {
-    const key = dayKey(item.sortTime);
-    let group = groups[groups.length - 1];
-    if (!group || group.key !== key) {
-      const date = new Date(item.sortTime * 1000);
-      let label: string;
-      if (key === today) label = labels.today;
-      else if (key === yesterday) label = labels.yesterday;
-      else {
-        try {
-          label = new Intl.DateTimeFormat(
-            locale,
-            date.getTime() >= weekAgo
-              ? { weekday: "long" }
-              : date.getFullYear() === now.getFullYear()
-                ? { weekday: "short", month: "long", day: "numeric" }
-                : { year: "numeric", month: "long", day: "numeric" },
-          ).format(date);
-        } catch {
-          label = date.toDateString();
-        }
-      }
-      group = { key, label, items: [] };
-      groups.push(group);
-    }
-    group.items.push(item);
-  }
-  return groups;
-};
 
 export const HistorySettings: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -734,7 +683,7 @@ export const HistorySettings: React.FC = () => {
 
   const dayGroups = useMemo(
     () =>
-      groupFeedByDay(filteredFeed, i18n.language, {
+      groupByDay(filteredFeed, (item) => item.sortTime, i18n.language, {
         today: t("historyPage.today"),
         yesterday: t("historyPage.yesterday"),
       }),
@@ -881,18 +830,6 @@ interface HistoryEntryProps {
   /** Bring back a dismissed dictation (Esc, or the tray's Cancel). */
   recoverDismissed: (id: number) => Promise<void>;
 }
-
-/** "4:07 PM" — the day is already the group heading. */
-const formatTimeOfDay = (seconds: number, locale: string): string => {
-  try {
-    return new Intl.DateTimeFormat(locale, {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(seconds * 1000));
-  } catch {
-    return "";
-  }
-};
 
 /**
  * One dictation. The text that was actually pasted comes first, because that

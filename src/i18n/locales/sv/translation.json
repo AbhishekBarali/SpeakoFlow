@@ -148,8 +148,7 @@
       "progress": "Steg {{current}} av {{total}}",
       "steps": {
         "setup": "Konfigurera",
-        "tour": "Rundtur",
-        "finish": "Starta"
+        "tour": "Rundtur"
       }
     },
     "setup": {
@@ -162,7 +161,7 @@
       "count": "{{current}} av {{total}}",
       "skip": "Hoppa över rundturen",
       "next": "Nästa",
-      "done": "Fortsätt",
+      "finish": "Öppna SpeakoFlow",
       "tabs": {
         "dictate": "Diktering",
         "ask": "Assistent",
@@ -172,6 +171,15 @@
         "hold": "Håll ned för att tala",
         "tap": "Tryck för att starta, tryck för att stoppa",
         "call": "Tryck för att starta, igen för att lägga på"
+      },
+      "steps": {
+        "label": "Så fungerar det",
+        "speak": "Säg det du vill skriva",
+        "typed": "Det skrivs där markören är",
+        "select": "Markera text (valfritt)",
+        "use": "Infoga svaret, eller läs det bara",
+        "talk": "Prata bara",
+        "answer": "Den svarar högt"
       },
       "mail": {
         "window": "Nytt meddelande",
@@ -220,15 +228,6 @@
         "assistant": "Assistent",
         "said": "Hjälp mig att planera ett kort anförande till fredagens teammöte.",
         "reply": "Visst. Börja med det resultat du är mest stolt över, ge två skäl till att det fungerade och avsluta med vad som händer härnäst."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Klar",
-        "installing": "Installerar…",
-        "percent": "{{percent}}%",
-        "retry": "Försök igen",
-        "waiting": "Väntar"
       }
     },
     "subtitle": "För att komma igång, välj en transkriptionsmodell",
@@ -461,8 +460,7 @@
     },
     "frame": {
       "setup": "Konfigurera",
-      "tour": "Rundtur",
-      "finish": "Starta"
+      "tour": "Rundtur"
     },
     "welcome": {
       "line": "Prata, så skrivs det. Fråga, så får du svar.",
@@ -489,34 +487,6 @@
       "continue": "Fortsätt",
       "later": "Konfigurera senare",
       "loading": "Letar efter din talmodell"
-    },
-    "start": {
-      "ready": {
-        "title": "Prova nu"
-      },
-      "downloading": {
-        "title": "Nästan klart"
-      },
-      "failed": {
-        "title": "Nedladdningen avbröts"
-      },
-      "none": {
-        "title": "Välj en röstmodell för att börja"
-      },
-      "progress": {
-        "of": "{{done}} av {{total}}",
-        "failed": "Den blev inte klar. Försöka igen?",
-        "underMinute": "Mindre än en minut kvar",
-        "minutes_one": "Ungefär {{count}} minut kvar",
-        "minutes_other": "Ungefär {{count}} minuter kvar"
-      },
-      "try": {
-        "label": "Prova diktering",
-        "placeholder": "Dina ord visas här…",
-        "success": "Så enkelt är det. Det fungerar i alla appar."
-      },
-      "open": "Öppna SpeakoFlow",
-      "choose": "Välj en röstmodell"
     }
   },
   "modelSelector": {
@@ -1857,14 +1827,6 @@
           "large": "Stor",
           "extraLarge": "Extra stor"
         },
-        "panelSizeLabel": "Panelstorlek",
-        "panelSizeDescription": "Den flytande assistentpanelens övergripande storlek.",
-        "panelSizes": {
-          "mini": "Liten",
-          "compact": "Kompakt",
-          "standard": "Standard",
-          "large": "Stor"
-        },
         "askDisplayLabel": "Vilken skärm",
         "askDisplayDescription": "Skärmen som assistenten öppnas på. Som standard den som musen är på.",
         "askDisplays": {
@@ -1988,7 +1950,9 @@
     },
     "delete": {
       "action": "Ta bort mötet",
-      "whileRecording": "Stoppa inspelningen innan du tar bort mötet."
+      "whileRecording": "Stoppa inspelningen innan du tar bort mötet.",
+      "confirmTitle": "Ta bort det här mötet?",
+      "confirmBody": "Transkriptionen, anteckningarna och ljudet tas bort från den här datorn. Det går inte att ångra."
     },
     "detail": {
       "title": "Möte",
@@ -2235,6 +2199,7 @@
       "details": "Detaljer",
       "startHint": "Börja prata, eller skriv ett meddelande.",
       "mutedHint": "Mikrofonen är av. Du kan fortfarande skriva.",
+      "heldHint": "Pausad medan du dikterar.",
       "preparingVoice": "Förbereder rösten… {{progress}}%",
       "history": {
         "title": "Tidigare konversationer",
@@ -2272,6 +2237,7 @@
         "responding": "Tänker…",
         "speaking": "Talar",
         "muted": "Mikrofonen är av",
+        "held": "Pausad för diktering",
         "error": "Samtalet avbröts"
       },
       "errors": {
@@ -2930,7 +2896,6 @@
       "replyLength": "Hur långa svaren brukar vara.",
       "history": "Hur många av de senaste meddelandena den har i minnet.",
       "summarize": "Sammanfattar långa chattar så att den inte glömmer början.",
-      "panelSize": "Hur mycket av skärmen den tar upp.",
       "opacity": "Lägre låter skrivbordet synas igenom.",
       "position": "Klicka på en plats på skärmen.",
       "display": "Skärmen som panelen öppnas på."
@@ -3005,7 +2970,6 @@
     "panel": {
       "where": "Var den öppnas",
       "text": "Textstorlek",
-      "size": "Panelstorlek",
       "opacity": "Opacitet",
       "screen": "Vilken skärm"
     }

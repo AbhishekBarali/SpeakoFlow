@@ -245,13 +245,22 @@ fn select_engine_device_arg(
 /// Ask the engine binary which devices it can see, once per app run.
 fn engine_devices(engine: &Path) -> &'static [EngineDevice] {
     ENGINE_DEVICES.get_or_init(|| {
-        let mut child = match Command::new(engine)
+        let mut command = Command::new(engine);
+        command
             .arg("--list-devices")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
+            .stderr(Stdio::null());
+        // llama-server is a console program: without this, a terminal window
+        // flashes up on screen while it lists devices, the same as the server
+        // spawn below guards against.
+        #[cfg(windows)]
         {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
+        let mut child = match command.spawn() {
             Ok(child) => child,
             Err(error) => {
                 warn!("llama.cpp --list-devices failed to start ({error}) — continuing without a GPU device hint");

@@ -2265,6 +2265,11 @@ impl ShortcutAction for TranscribeAction {
         let is_always_on = settings.always_on_microphone;
         debug!("Microphone mode - always_on: {}", is_always_on);
 
+        // A call running beside this dictation stops listening now, before the
+        // microphone opens, so it never hears what is being dictated. Released
+        // when the recording ends (`stop`) or fails to start (below).
+        crate::voice_conversation::dictation_started(app);
+
         let mut recording_error: Option<String> = None;
         if is_always_on {
             // Always-on mode: Play audio feedback immediately, then apply mute after sound finishes
@@ -2327,6 +2332,8 @@ impl ShortcutAction for TranscribeAction {
             // Revert UI state so we don't stay stuck in the recording overlay.
             utils::hide_recording_overlay(app);
             change_tray_icon(app, TrayIconState::Idle);
+            // Nothing is recording, so a call this was holding listens again.
+            crate::voice_conversation::dictation_cancelled(app);
             // The live-transcription worker was started above, before the mic
             // was tried, and nothing else will release it: this recording never
             // reaches the pipeline whose `FinishGuard` normally does. Left open
@@ -2385,16 +2392,26 @@ impl ShortcutAction for TranscribeAction {
             flow_eligible: !self.post_process,
         };
         let flow_cancel_generation = crate::flow::cancellation_generation();
+        // The coordinator runs this straight after this recording's own start,
+        // so the current generation is this dictation's.
+        let dictation_generation = crate::voice_conversation::dictation_generation();
 
         tauri::async_runtime::spawn(async move {
             let _guard = FinishGuard(ah.clone());
+            // Ends this dictation's claim on Esc however the pipeline exits.
+            let _flight =
+                crate::voice_conversation::DictationFlight::new(ah.clone(), dictation_generation);
             debug!(
                 "Starting async transcription task for binding: {}",
                 binding_id
             );
 
             let stop_recording_time = Instant::now();
-            let Some(samples) = rm.stop_recording(&binding_id) else {
+            let stopped = rm.stop_recording(&binding_id);
+            // The microphone is free: a call held by this dictation listens
+            // again while the transcript is still being worked on.
+            crate::voice_conversation::dictation_recorded(&ah, dictation_generation);
+            let Some(samples) = stopped else {
                 debug!("No samples retrieved from recording stop");
                 finish_idle(&ah);
                 return;
@@ -3133,6 +3150,11 @@ pub fn start_recovery(app: &AppHandle, offer: Offer) {
             return;
         }
         let _guard = FinishGuard(app.clone());
+        // Esc during a recovered dictation cancels it, not a call beside it.
+        let _flight = crate::voice_conversation::DictationFlight::new(
+            app.clone(),
+            crate::voice_conversation::dictation_processing(&app),
+        );
         run_recovery(app, offer).await;
     });
 }
@@ -3339,10 +3361,15 @@ impl ShortcutAction for AssistantAction {
         // that is what tells a fresh ask apart from a follow-up to the card the
         // user is looking at.
         crate::assistant::begin_quick_ask_exchange(app);
+        // "listening" goes out before the show is queued, never after. The show
+        // runs on the main thread and announces itself with
+        // `assistant-panel-shown`; emitted second, "listening" could arrive after
+        // that, and the panel's first frame was then the idle quick ask: its
+        // typing bar, flashed for a moment in a voice-only ask.
+        crate::assistant::emit_state(app, "listening");
         // Show the configured non-focus-stealing overlay right away so the user
         // sees the listening state without opening the full assistant window.
         crate::assistant::show_assistant_voice_overlay(app);
-        crate::assistant::emit_state(app, "listening");
 
         // The assistant panel renders its own listening/transcribing state, so
         // we intentionally do NOT show the STT recording lozenge here — that
@@ -3482,8 +3509,9 @@ impl ShortcutAction for AssistantCallAction {
         }
         // The panel has to be on screen before the webview can act on this: the
         // session is driven from `useVoiceConversation`, which only runs there.
-        crate::assistant::open_assistant_panel(app);
-        let _ = app.emit("assistant-start-conversation", ());
+        // It opens as the call bar, where the call will be, rather than as the
+        // quick ask's frame that then jumps into place.
+        crate::assistant::open_assistant_call(app, None);
     }
 
     fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {

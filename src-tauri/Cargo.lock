@@ -6772,6 +6772,7 @@ name = "speakoflow"
 version = "1.5.0"
 dependencies = [
  "anyhow",
+ "arboard",
  "base64 0.22.1",
  "bzip2",
  "chrono",

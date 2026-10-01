@@ -149,8 +149,7 @@
       "progress": "Passaggio {{current}} di {{total}}",
       "steps": {
         "setup": "Configura",
-        "tour": "Tour",
-        "finish": "Inizia"
+        "tour": "Tour"
       }
     },
     "setup": {
@@ -163,7 +162,7 @@
       "count": "{{current}} di {{total}}",
       "skip": "Salta il tour",
       "next": "Avanti",
-      "done": "Continua",
+      "finish": "Apri SpeakoFlow",
       "tabs": {
         "dictate": "Dettatura",
         "ask": "Assistente",
@@ -173,6 +172,15 @@
         "hold": "Tieni premuto per parlare",
         "tap": "Tocca per iniziare, tocca per fermare",
         "call": "Premi per iniziare, di nuovo per riagganciare"
+      },
+      "steps": {
+        "label": "Come funziona",
+        "speak": "Di' quello che vuoi scrivere",
+        "typed": "Viene scritto dove si trova il cursore",
+        "select": "Seleziona del testo (facoltativo)",
+        "use": "Inserisci la risposta o leggila e basta",
+        "talk": "Parla e basta",
+        "answer": "Risponde ad alta voce"
       },
       "mail": {
         "window": "Nuovo messaggio",
@@ -221,15 +229,6 @@
         "assistant": "Assistente",
         "said": "Aiutami a preparare un breve intervento per la riunione di team di venerdì.",
         "reply": "Certo. Apri con il risultato di cui vai più fiero, spiega due motivi per cui ha funzionato e chiudi con i prossimi passi."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Pronto",
-        "installing": "Installazione…",
-        "percent": "{{percent}}%",
-        "retry": "Riprova",
-        "waiting": "In attesa"
       }
     },
     "subtitle": "Per cominciare, scegli un modello di riconoscimento vocale",
@@ -462,8 +461,7 @@
     },
     "frame": {
       "setup": "Configura",
-      "tour": "Tour",
-      "finish": "Inizia"
+      "tour": "Tour"
     },
     "welcome": {
       "line": "Parli, e scrive. Chiedi, e risponde.",
@@ -492,35 +490,6 @@
       "continue": "Continua",
       "later": "Configura più tardi",
       "loading": "Ricerca del tuo modello vocale"
-    },
-    "start": {
-      "ready": {
-        "title": "Provalo ora"
-      },
-      "downloading": {
-        "title": "Quasi pronto"
-      },
-      "failed": {
-        "title": "Il download si è interrotto"
-      },
-      "none": {
-        "title": "Scegli un modello vocale per iniziare"
-      },
-      "progress": {
-        "of": "{{done}} di {{total}}",
-        "failed": "Non è stato completato. Riprovi?",
-        "underMinute": "Manca meno di un minuto",
-        "minutes_one": "Manca circa {{count}} minuto",
-        "minutes_many": "Mancano circa {{count}} minuti",
-        "minutes_other": "Mancano circa {{count}} minuti"
-      },
-      "try": {
-        "label": "Prova la dettatura",
-        "placeholder": "Le tue parole appaiono qui…",
-        "success": "Ecco fatto. Funziona in qualsiasi app."
-      },
-      "open": "Apri SpeakoFlow",
-      "choose": "Scegli un modello vocale"
     }
   },
   "modelSelector": {
@@ -1868,14 +1837,6 @@
           "large": "Grande",
           "extraLarge": "Molto grande"
         },
-        "panelSizeLabel": "Dimensione del pannello",
-        "panelSizeDescription": "Dimensione complessiva del pannello flottante dell'assistente.",
-        "panelSizes": {
-          "mini": "Piccolo",
-          "compact": "Compatto",
-          "standard": "Standard",
-          "large": "Grande"
-        },
         "askDisplayLabel": "Quale schermo",
         "askDisplayDescription": "Lo schermo su cui si apre l'assistente. Per impostazione predefinita, quello in cui si trova il mouse.",
         "askDisplays": {
@@ -2000,7 +1961,9 @@
     },
     "delete": {
       "action": "Elimina riunione",
-      "whileRecording": "Ferma la registrazione prima di eliminare questa riunione."
+      "whileRecording": "Ferma la registrazione prima di eliminare questa riunione.",
+      "confirmTitle": "Eliminare questa riunione?",
+      "confirmBody": "Trascrizione, note e audio vengono rimossi da questo computer. L'operazione non può essere annullata."
     },
     "detail": {
       "title": "Riunione",
@@ -2250,6 +2213,7 @@
       "details": "Dettagli",
       "startHint": "Inizia a parlare o scrivi un messaggio.",
       "mutedHint": "Microfono disattivato. Puoi comunque scrivere.",
+      "heldHint": "In pausa mentre detti.",
       "preparingVoice": "Preparazione della voce… {{progress}}%",
       "history": {
         "title": "Conversazioni precedenti",
@@ -2288,6 +2252,7 @@
         "responding": "Sto pensando…",
         "speaking": "Sta parlando",
         "muted": "Microfono disattivato",
+        "held": "In pausa per la dettatura",
         "error": "Chiamata interrotta"
       },
       "errors": {
@@ -2956,7 +2921,6 @@
       "replyLength": "Quanto sono lunghe di solito le risposte.",
       "history": "Quanti messaggi recenti tiene a mente.",
       "summarize": "Riassume le chat lunghe per non dimenticarne l'inizio.",
-      "panelSize": "Quanta parte dello schermo occupa.",
       "opacity": "Con valori più bassi il desktop traspare.",
       "position": "Fai clic su un punto dello schermo.",
       "display": "Lo schermo su cui si apre il pannello."
@@ -3033,7 +2997,6 @@
     "panel": {
       "where": "Dove si apre",
       "text": "Dimensione del testo",
-      "size": "Dimensione del pannello",
       "opacity": "Opacità",
       "screen": "Quale schermo"
     }

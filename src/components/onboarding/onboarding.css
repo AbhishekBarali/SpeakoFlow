@@ -56,54 +56,126 @@
   }
 }
 
-/* Something new arriving on the same page: the more-models list opening, the
-   try-it box replacing the download. */
+/* Something new arriving on the same page: the more-models list opening. */
 .ob-reveal {
   animation: ob-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* An indeterminate progress bar for "installing": a short segment sweeping. */
-.ob-indeterminate {
-  width: 35%;
-  animation: ob-sweep 1.1s ease-in-out infinite;
-}
-@keyframes ob-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(300%);
-  }
-}
+/* ---------- Page rhythm ----------
+ * Vertical space is a share of the window's height, not a fixed step. The main
+ * window opens at whatever fits the display (`lib.rs` clamps it to the
+ * monitor), which on a 1366×768 laptop at 125% is about 1000×570 — and with
+ * fixed `py-10` padding, a fixed 25rem preview and a 2.75rem headline the tour
+ * no longer fit: the preview was cut off at the footer, or pushed below it
+ * entirely once the columns stacked. Here a short window gives up padding
+ * first, then type size, and only then scrolls. */
 
-/* The shortcut keys press along with the preview. */
-.ob-keys kbd {
-  transition:
-    transform 110ms ease,
-    background-color 110ms ease,
-    color 110ms ease,
-    border-color 110ms ease;
+.ob-header {
+  padding-top: clamp(0.75rem, 2.5vh, 1.25rem);
 }
-.ob-keys[data-pressed="true"] kbd {
-  transform: translateY(1.5px);
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
-  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
-  color: var(--color-accent);
-  box-shadow: none;
+.ob-page {
+  padding-block: clamp(1rem, 4.5vh, 2.5rem);
+}
+.ob-footer {
+  padding-block: clamp(0.625rem, 2vh, 1rem);
+}
+.ob-title {
+  font-size: clamp(1.625rem, 0.9rem + 2.2vh, 2rem);
+}
+/* The space between a step's heading and what it is about. */
+.ob-gap {
+  margin-top: clamp(1rem, 4vh, 2rem);
+}
+/* A model card on a short window: the same card, a little less air, so the two
+   main choices and "More models" stay above the footer. */
+@media (max-height: 640px) {
+  .ob-option {
+    padding-block: 0.625rem;
+  }
 }
 
 /* ---------- Tour layout ---------- */
 
 .ob-tour {
+  margin-top: clamp(1rem, 3vh, 2rem);
+  gap: clamp(1.5rem, 3.5vw, 3.5rem);
   grid-template-columns: minmax(0, 23rem) minmax(0, 1fr);
+}
+.ob-tour-title {
+  font-size: clamp(2rem, 1rem + 2.4vw, 2.75rem);
+}
+.ob-tour-step {
+  margin-top: clamp(1rem, 3.5vh, 2rem);
+}
+
+/* The numbered steps beside the preview. All three hold still in ink: the
+   preview is the one thing on this screen that moves. */
+.ob-steps {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.5rem, 1.6vh, 0.875rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ob-step {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 1.75rem;
+  color: var(--color-ink);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+.ob-step-num {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 999px;
+  background: var(--color-surface-strong);
+  color: var(--color-body);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ob-step-body {
+  min-width: 0;
+}
+/* On a short window the chips under the steps go first: the steps and the
+   preview are the explanation, the chips only widen it. */
+@media (max-height: 620px) {
+  .ob-tour-extra {
+    display: none;
+  }
 }
 .ob-tour-copy {
   animation: ob-page-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-@media (max-width: 860px) {
+/* A narrower window keeps the preview beside the words for as long as it can:
+   stacked, the preview is below the fold, and the preview is the explanation. */
+@media (max-width: 1040px) {
+  .ob-tour {
+    grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+  }
+}
+@media (max-height: 640px) {
+  .ob-tour-title {
+    font-size: 2rem;
+  }
+}
+@media (max-width: 700px) {
   .ob-tour {
     grid-template-columns: minmax(0, 1fr);
-    gap: 1.75rem;
+  }
+  /* Stacked, the words sit above the preview: keep them short so the preview
+     starts as high as it can. */
+  .ob-tour-title {
+    font-size: 1.75rem;
+  }
+  .ob-tour-step {
+    margin-top: 0.875rem;
   }
 }
 
@@ -114,16 +186,92 @@
 
 .ob-stage {
   position: relative;
-  height: 25rem;
+  /* As tall as the window leaves room for under the title bar, the step list,
+     the tabs and the footer (about 19rem of chrome). The ceiling used to be
+     30rem, which on a large window left the preview a small box with empty
+     bands above and below the whole tour; the scenes now scale up with the
+     stage instead (below), so a bigger stage shows a bigger scene rather than
+     more empty desktop. */
+  height: clamp(15rem, calc(100vh - 19rem), 46rem);
   overflow: hidden;
   border-radius: 1rem;
   pointer-events: none;
   user-select: none;
+  container: ob-stage / size;
 }
+@media (max-width: 700px) {
+  .ob-stage {
+    height: clamp(14rem, calc(100vh - 28rem), 22rem);
+  }
+}
+/* A scene is laid out at its natural size and scaled to fit the stage, rather
+   than reflowed: its parts are real surfaces at their real sizes (the overlay
+   is 400px wide), so squeezing them would show something the app never draws.
+   A small stage scales it down; a large one scales it up, by whichever of
+   height and width allows less, so its proportions never change. `scale`
+   rather than `transform`, which the entrance animation owns. */
 .ob-scene {
+  --ob-scale-h: 1;
+  --ob-scale-w: 1;
+  --ob-scale: min(var(--ob-scale-h), var(--ob-scale-w));
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: calc(100% / var(--ob-scale));
+  height: calc(100% / var(--ob-scale));
+  scale: var(--ob-scale);
+  transform-origin: 0 0;
   animation: ob-rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@container ob-stage (min-height: 31rem) {
+  .ob-scene {
+    --ob-scale-h: 1.12;
+  }
+}
+@container ob-stage (min-height: 36rem) {
+  .ob-scene {
+    --ob-scale-h: 1.25;
+  }
+}
+@container ob-stage (min-height: 41rem) {
+  .ob-scene {
+    --ob-scale-h: 1.38;
+  }
+}
+@container ob-stage (min-width: 44rem) {
+  .ob-scene {
+    --ob-scale-w: 1.12;
+  }
+}
+@container ob-stage (min-width: 50rem) {
+  .ob-scene {
+    --ob-scale-w: 1.25;
+  }
+}
+@container ob-stage (min-width: 56rem) {
+  .ob-scene {
+    --ob-scale-w: 1.38;
+  }
+}
+@container ob-stage (max-height: 22rem) {
+  .ob-scene {
+    --ob-scale-h: 0.88;
+  }
+}
+@container ob-stage (max-height: 18.5rem) {
+  .ob-scene {
+    --ob-scale-h: 0.78;
+  }
+}
+@container ob-stage (max-width: 30rem) {
+  .ob-scene {
+    --ob-scale-w: 0.86;
+  }
+}
+@container ob-stage (max-width: 25rem) {
+  .ob-scene {
+    --ob-scale-w: 0.74;
+  }
 }
 .ob-scene-window {
   position: absolute;
@@ -136,13 +284,215 @@
   top: auto;
   bottom: 1.75rem;
 }
-.ob-selection {
-  padding: 0.1em 0.15em;
+/* Selecting text: the highlight grows under the pointer as it drags. */
+.ob-sweep {
+  padding: 0.1em 0;
   border-radius: 3px;
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-  color: inherit;
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--color-accent) 22%, transparent),
+    color-mix(in srgb, var(--color-accent) 22%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+  transition: background-size 760ms cubic-bezier(0.45, 0, 0.25, 1);
+}
+.ob-sweep[data-on="true"] {
+  background-size: 100% 100%;
+}
+.ob-sweep[data-instant="true"] {
+  transition: none;
+}
+
+/* Where an answer or a dictation lands: it arrives with a brief wash of the
+   accent so the eye goes to it, then settles into ordinary text. */
+.ob-ink-in {
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: ob-ink-in 1500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ob-ink-in {
+  0% {
+    background-color: color-mix(in srgb, var(--color-accent) 28%, transparent);
+    opacity: 0.35;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* The reply box in the "write a reply" example. */
+.ob-reply {
+  min-height: 1.6em;
+  margin-top: 0.75rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--color-hairline);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* The shortcut on the stage while it is down. */
+.ob-stage-keys {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 3;
+  display: inline-flex;
+  padding: 0.375rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 0.75rem;
+  background: rgb(10 14 15 / 0.55);
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+  transition:
+    opacity 160ms ease-out,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ob-stage-keys[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+.ob-stage-keys[data-corner="top"] {
+  top: 1rem;
+  bottom: auto;
+  transform: translateY(-6px) scale(0.96);
+}
+.ob-stage-keys[data-corner="top"][data-visible="true"] {
+  transform: none;
+}
+/* Dictation: the keys sit centred just above the recording card, so the press
+   and the recording it starts read as one thing. The box is the overlay's own
+   footprint (`.ob-overlay`), lifted by its height. On a short stage the mail
+   window comes down to meet the card, so there the keys tuck into the card's
+   own top-right corner, the one spot that is always free. */
+.ob-dictate-keys {
+  position: absolute;
+  left: 50%;
+  bottom: calc(1.5rem + 120px + 0.5rem);
+  z-index: 3;
+  transform: translateX(-50%);
+}
+.ob-dictate-keys[data-compact="true"] {
+  bottom: calc(1.5rem + 44px + 0.5rem);
+}
+.ob-stage-keys[data-corner="overlay"] {
+  position: static;
+}
+/* Below about 24rem the centred keys would overlap the bottom of the mail
+   window (measured: they touch at a 22.2rem stage), so they move earlier than
+   the scene starts scaling down. */
+@container ob-stage (max-height: 24rem) {
+  .ob-dictate-keys {
+    left: calc(50% + 200px - 0.75rem);
+    bottom: calc(1.5rem + 120px - 2.25rem);
+    transform: translateX(-100%);
+  }
+  .ob-dictate-keys[data-compact="true"] {
+    left: calc(50% + 60px + 0.5rem);
+    bottom: 1.5rem;
+    transform: none;
+  }
+  .ob-dictate-keys .ob-stage-keys {
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+    background: transparent;
+    border-color: transparent;
+  }
+}
+.ob-stage-keys kbd {
+  transition: transform 110ms ease;
+}
+.ob-stage-keys[data-visible="true"] kbd {
+  transform: translateY(1.5px);
+}
+
+/* The person's pointer. `--ob-move` is the length of the move in progress. */
+.ob-pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  opacity: 0;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45));
+  transition:
+    transform var(--ob-move, 0ms) cubic-bezier(0.45, 0, 0.25, 1),
+    opacity 180ms ease;
+}
+.ob-pointer[data-shown="true"] {
+  opacity: 1;
+}
+.ob-pointer svg {
+  position: absolute;
+  display: block;
+  transition: transform 110ms ease;
+}
+/* Each glyph is placed so its hotspot is the point being moved. */
+.ob-pointer-arrow {
+  top: -2px;
+  left: -3px;
+}
+.ob-pointer-text {
+  top: -11px;
+  left: -8px;
+}
+.ob-pointer[data-down="true"] .ob-pointer-arrow {
+  transform: scale(0.88);
+  transform-origin: 3px 2px;
+}
+.ob-pointer-ripple {
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid rgb(255 255 255 / 0.85);
+  opacity: 0;
+  pointer-events: none;
+}
+.ob-pointer[data-down="true"][data-shape="arrow"] .ob-pointer-ripple {
+  animation: ob-ripple 520ms ease-out;
+}
+@keyframes ob-ripple {
+  from {
+    opacity: 0.9;
+    transform: scale(0.35);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+/* The button the pointer is clicking. */
+.ob-ask[data-press="true"] .qa-btn.primary {
+  transform: scale(0.95);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 0.18);
+}
+.ob-ask .qa-btn {
+  transition:
+    transform 120ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+/* What you say to the assistant, as a subtitle: the quick ask itself only
+   says "Listening…", and the question is the half of the exchange a viewer
+   otherwise never sees. */
+.ob-ask-caption {
+  position: absolute;
+  top: 34%;
+  left: 2rem;
+  right: 2rem;
+  text-align: center;
+}
+.ob-ask-caption.is-sent {
+  color: #8d9899;
 }
 .ob-caret {
   display: inline-block;
@@ -156,9 +506,6 @@
   50% {
     opacity: 0;
   }
-}
-.ob-landed {
-  animation: ob-rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* The recording overlay, at the size and position the app gives its window:
@@ -293,14 +640,21 @@
 .ob-call .call-orb {
   cursor: default;
 }
-
-@media (max-height: 760px) {
-  .ob-stage {
-    height: 21rem;
-  }
-  .ob-captions {
-    min-height: 7rem;
-  }
+/* Hanging up: the call and what was said leave together. */
+.ob-call,
+.ob-captions {
+  transition:
+    opacity 260ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ob-call[data-leaving="true"],
+.ob-captions[data-leaving="true"] {
+  opacity: 0;
+  transform: translateY(6px);
+}
+/* Holds the bubble's place while it is gone, so the bar does not jump. */
+.ob-call-bubble-space {
+  height: 2.375rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -312,14 +666,13 @@
   .ob-welcome-action,
   .ob-welcome-note,
   .ob-scene,
-  .ob-landed,
+  .ob-ink-in,
   .ob-caption,
-  .ob-caret,
-  .ob-indeterminate {
+  .ob-caret {
     animation: none;
   }
   .ob-overlay,
-  .ob-keys kbd {
+  .ob-sweep {
     transition: none;
   }
 }

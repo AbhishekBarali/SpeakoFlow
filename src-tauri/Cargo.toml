@@ -249,6 +249,11 @@ windows = { version = "0.61.3", features = [
   "Win32_UI_Accessibility",
 ] }
 winreg = "0.55"
+# Clipboard writes that opt out of Win+V history and cloud clipboard sync
+# (`SetExtWindows`, see clipboard.rs `write_transient_clipboard_text`). Already in
+# the graph through tauri-plugin-clipboard-manager; pinned to the version the
+# lockfile resolves so both share one copy.
+arboard = { version = "=3.6.1", default-features = false }
 
 # transcribe.cpp Windows x86_64 backends: dynamic (loadable) backend DLLs +
 # Vulkan GPU acceleration. Build-time prereqs: cmake, Vulkan SDK, and

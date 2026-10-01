@@ -46,24 +46,32 @@ const LEGACY_POSITION_KEYS: [&str; 4] = [
     "assistant_panel_dragged",
 ];
 
-/// The live call's resting form: a small floating bar — type, microphone, the
-/// orb that hangs up, speaker — drawn small and grown on hover, with a status
-/// bubble above it that says what the assistant is doing and shows the reply as
-/// it arrives.
+/// The smallest frame a live call may be drawn in.
 ///
-/// The window is the transparent frame both float in, bar at the bottom. It is
-/// taller than the bar because the bubble grows with its text and must not need
-/// a window resize per line; the empty part passes clicks through (see
-/// `hitRegion.ts`), so the frame costs nothing on the desktop. Keep in step with
-/// `.call-frame` in `CallBar.css`: the bar's slot is 46px, sits 10px above the
-/// frame's bottom edge, and the bubble may use the rest.
-const CALL_BAR_FRAME_WIDTH: f64 = 440.0;
-const CALL_BAR_FRAME_HEIGHT: f64 = 200.0;
+/// At rest a call is a small floating bar — type, microphone, the orb that hangs
+/// up, speaker — with a status bubble above it. The window is a transparent frame
+/// the bar floats in, bar at the bottom, and the empty part passes clicks through
+/// (see `hitRegion.ts`), so the frame costs nothing on the desktop. Keep in step
+/// with `.call-frame` in `CallBar.css`: the bar's slot is 46px, sits 10px above
+/// the frame's bottom edge, and the bubble may use the rest.
+///
+/// The frame is the expanded conversation's size in **both** forms (see
+/// [`conversation_size`]); this is only the floor a small display may squeeze it
+/// to, which must still hold the widest bar and a few lines of bubble.
+const CALL_FRAME_FLOOR_WIDTH: f64 = 440.0;
+const CALL_FRAME_FLOOR_HEIGHT: f64 = 200.0;
 
 /// How far above the bottom of the display the call bar opens, over and above
 /// the taskbar allowance — close enough to read as docked, far enough not to sit
 /// on the taskbar's edge.
 const CALL_BAR_BOTTOM_GAP: f64 = 12.0;
+
+/// How high the docked call reaches above the bottom of the display: the bar's
+/// 46px slot (10px above the frame's edge, per `CallBar.css`), the 6px gap and
+/// a one-line status bubble, plus a little air. The recording overlay sits above
+/// this while a call is up, so dictating beside a call never covers it.
+pub const CALL_STACK_CLEARANCE: f64 =
+    TASKBAR_CLEARANCE + CALL_BAR_BOTTOM_GAP + 10.0 + 46.0 + 6.0 + 34.0 + 8.0;
 
 /// How much of a window's top-left corner must land inside a monitor for the
 /// window to count as reachable. A few pixels are not enough: the user has to be
@@ -77,8 +85,11 @@ const TASKBAR_CLEARANCE: f64 = 40.0;
 ///
 /// The frame is the largest the answer card may grow to. It is a fraction of the
 /// display (see [`ask_shape_for_anchor`]), clamped at both ends so it can neither
-/// shrink to a strip nor sprawl across a huge screen, and the size preset is a
-/// multiplier on top.
+/// shrink to a strip nor sprawl across a huge screen.
+///
+/// There used to be a size preset multiplied on top. It was removed: the frame
+/// is transparent and the card only reaches its edges on a long answer, so the
+/// preset moved a ceiling most answers never touch and read as a dead control.
 const ASK_MIN_WIDTH: f64 = 380.0;
 const ASK_MAX_WIDTH: f64 = 760.0;
 const ASK_MIN_HEIGHT: f64 = 340.0;
@@ -104,34 +115,16 @@ fn ask_shape_for_anchor(anchor: crate::settings::AskAnchor) -> (f64, f64) {
     }
 }
 
-/// The size preset as a multiplier on the display-derived size.
-fn ask_preset_scale(size: &str) -> f64 {
-    match size {
-        "mini" => 0.78,
-        "compact" => 0.88,
-        "large" => 1.22,
-        _ => 1.0,
-    }
-}
-
 /// The quick ask's frame size on a display of the given logical dimensions.
 ///
 /// Pure, so it can be checked against real screen sizes without a monitor. Order
 /// matters: shape to the zone, scale to the display, clamp to the comfortable
 /// band, then make sure it still physically fits — a small screen wins over the
 /// minimum, because a frame larger than the display puts the card off screen.
-fn ask_size_for_display(
-    mon_w: f64,
-    mon_h: f64,
-    preset: &str,
-    anchor: crate::settings::AskAnchor,
-) -> (f64, f64) {
-    let scale = ask_preset_scale(preset);
+fn ask_size_for_display(mon_w: f64, mon_h: f64, anchor: crate::settings::AskAnchor) -> (f64, f64) {
     let (width_fraction, height_fraction) = ask_shape_for_anchor(anchor);
-    // The cap scales with the preset too, or every preset above "mini" saturates
-    // it on a 1440p display and the setting stops meaning anything.
-    let w = (mon_w * width_fraction * scale).clamp(ASK_MIN_WIDTH, ASK_MAX_WIDTH * scale);
-    let h = (mon_h * height_fraction * scale).clamp(ASK_MIN_HEIGHT, ASK_MAX_HEIGHT * scale);
+    let w = (mon_w * width_fraction).clamp(ASK_MIN_WIDTH, ASK_MAX_WIDTH);
+    let h = (mon_h * height_fraction).clamp(ASK_MIN_HEIGHT, ASK_MAX_HEIGHT);
     let max_w = (mon_w - 2.0 * PANEL_MARGIN).max(ASK_FRAME_FLOOR_WIDTH);
     let max_h = (mon_h - 2.0 * PANEL_MARGIN - TASKBAR_CLEARANCE).max(ASK_FRAME_FLOOR_HEIGHT);
     (w.min(max_w), h.min(max_h))
@@ -147,8 +140,8 @@ fn clamp_to_monitor(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
             let size = monitor.size();
             let mon_w = size.width as f64 / scale;
             let mon_h = size.height as f64 / scale;
-            let max_w = (mon_w * 0.92).max(CALL_BAR_FRAME_WIDTH);
-            let max_h = (mon_h * 0.85).max(CALL_BAR_FRAME_HEIGHT);
+            let max_w = (mon_w * 0.92).max(CALL_FRAME_FLOOR_WIDTH);
+            let max_h = (mon_h * 0.85).max(CALL_FRAME_FLOOR_HEIGHT);
             return (w.min(max_w), h.min(max_h));
         }
     }
@@ -295,12 +288,8 @@ struct AskPlacement {
     layout: AskLayout,
 }
 
-/// The quick ask's frame on a display, for a preset and dock zone. Pure.
-fn ask_placement_on(
-    display: DisplayBounds,
-    preset: &str,
-    anchor: crate::settings::AskAnchor,
-) -> AskPlacement {
+/// The quick ask's frame on a display, for a dock zone. Pure.
+fn ask_placement_on(display: DisplayBounds, anchor: crate::settings::AskAnchor) -> AskPlacement {
     use crate::settings::AskAnchor;
     // `Custom` is the legacy value written by an old drag handler; there is no
     // remembered position any more, so it reads as the default.
@@ -308,7 +297,7 @@ fn ask_placement_on(
         AskAnchor::Custom => AskAnchor::Center,
         anchor => anchor,
     };
-    let (width, height) = ask_size_for_display(display.width, display.height, preset, anchor);
+    let (width, height) = ask_size_for_display(display.width, display.height, anchor);
     let (x, y) = anchor_position(anchor, display, width, height);
     AskPlacement {
         x,
@@ -323,11 +312,7 @@ fn ask_placement_on(
 fn ask_placement(app: &AppHandle) -> AskPlacement {
     let settings = get_settings(app);
     let display = active_display_bounds(app).unwrap_or(FALLBACK_DISPLAY);
-    ask_placement_on(
-        display,
-        &settings.assistant_panel_size,
-        settings.assistant_ask_anchor,
-    )
+    ask_placement_on(display, settings.assistant_ask_anchor)
 }
 
 /// A monitor's bounds in logical points.
@@ -466,18 +451,11 @@ fn active_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
 
 /// A live call has two forms, and neither is the quick ask.
 ///
-/// At rest it is the floating call bar (see [`CALL_BAR_FRAME_WIDTH`]). Expanded,
+/// At rest it is the floating call bar (see [`CALL_FRAME_FLOOR_WIDTH`]). Expanded,
 /// it is the same bar with the conversation above it — the transcript, the saved
 /// conversations to go back to, and the call's options — in a window the user
-/// can resize.
-fn conversation_preset_size(size: &str) -> (f64, f64) {
-    match size {
-        "mini" => (400.0, 520.0),
-        "compact" => (440.0, 580.0),
-        "large" => (560.0, 760.0),
-        _ => (480.0, 660.0),
-    }
-}
+/// can resize. This is the call's frame until the user drags it to another size.
+const CONVERSATION_DEFAULT_SIZE: (f64, f64) = (480.0, 660.0);
 
 /// Floor for a manual drag-resize of the expanded call. Wide enough that the
 /// call bar (whose widest form, typing, is 300px) still fits with its margins,
@@ -485,13 +463,14 @@ fn conversation_preset_size(size: &str) -> (f64, f64) {
 const CONVERSATION_MIN_WIDTH: f64 = 400.0;
 const CONVERSATION_MIN_HEIGHT: f64 = 420.0;
 
-/// Session memory of a manual resize of the expanded call. The bar form is a
-/// fixed frame and has nothing to remember.
+/// Session memory of a manual resize of the expanded call. Only the expanded form
+/// has resize grips, but the size is the frame of both forms.
 static CONVERSATION_W: AtomicU32 = AtomicU32::new(0);
 static CONVERSATION_H: AtomicU32 = AtomicU32::new(0);
 
 /// Whether the call is in its expanded form. Reset when a call ends, so the
-/// next one opens as the bar.
+/// next one opens as the bar. It no longer changes the window's size, only what
+/// the webview draws in it and whether the size is remembered.
 static CONVERSATION_EXPANDED: AtomicBool = AtomicBool::new(false);
 
 /// Where the call bar was last left this session, as the window's bottom-centre
@@ -502,14 +481,21 @@ static CONVERSATION_EXPANDED: AtomicBool = AtomicBool::new(false);
 /// stays exactly where the user's eye already is.
 static CALL_BAR_ANCHOR: Mutex<Option<(f64, f64)>> = Mutex::new(None);
 
+/// The call's window, in **both** of its forms.
+///
+/// The bar and the expanded conversation share one frame: the bar floats at the
+/// bottom of it and the transparent rest passes clicks through, exactly as the
+/// quick ask's card does inside its frame. Opening the conversation is then
+/// something the webview draws, not a window resize. It used to be a resize, and
+/// a WebView2 window that changes shape shows its old picture at the new size for
+/// a frame or two: either the bar (or its "Message …" field) flashed at the wrong
+/// height, or — once the webview blanked itself to hide that — the call vanished
+/// for a beat and then reappeared, which is what opening it looked like.
 fn conversation_size(app: &AppHandle) -> (f64, f64) {
-    if !CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
-        return (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT);
-    }
     let w = CONVERSATION_W.load(Ordering::SeqCst);
     let h = CONVERSATION_H.load(Ordering::SeqCst);
     let (w, h) = if w == 0 || h == 0 {
-        conversation_preset_size(&get_settings(app).assistant_panel_size)
+        CONVERSATION_DEFAULT_SIZE
     } else {
         (w as f64, h as f64)
     };
@@ -615,13 +601,21 @@ fn panel_form(call_active: bool, call_expanded: bool) -> PanelForm {
 
 /// The resize floor for one form, or `None` for a form the user cannot resize.
 ///
-/// Only the expanded call is resizable. The quick ask's frame and the call bar are
-/// fixed shapes set by the app, and a floor on them could only ever refuse one of
-/// the app's own resizes.
+/// A call carries the same floor and resizability in both forms, because both
+/// forms are one frame (see [`conversation_size`]). Only the expanded form draws
+/// resize grips, so the bar cannot actually be resized; what matters is that
+/// opening and closing the conversation changes no window style. tao re-shows a
+/// window on every style change, and a re-shown WebView2 window repaints, which
+/// is a flicker in the middle of an animation that is otherwise pure CSS.
+///
+/// The quick ask's frame is a fixed shape set by the app, and a floor on it could
+/// only ever refuse one of the app's own resizes.
 fn panel_min_size(form: PanelForm) -> Option<(f64, f64)> {
     match form {
-        PanelForm::Ask | PanelForm::CallBar => None,
-        PanelForm::CallExpanded => Some((CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT)),
+        PanelForm::Ask => None,
+        PanelForm::CallBar | PanelForm::CallExpanded => {
+            Some((CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT))
+        }
     }
 }
 
@@ -639,11 +633,15 @@ static PANEL_RESIZABLE: AtomicBool = AtomicBool::new(false);
 
 /// Apply the resize floor and resizability for the form the window is in.
 fn apply_panel_constraints(app: &AppHandle, window: &tauri::WebviewWindow) {
-    let form = current_panel_form(app);
+    apply_panel_constraints_for(window, current_panel_form(app));
+}
+
+/// Apply the resize floor and resizability for `form`. Main thread only.
+fn apply_panel_constraints_for(window: &tauri::WebviewWindow, form: PanelForm) {
     let _ = window.set_min_size(
         panel_min_size(form).map(|(w, h)| tauri::Size::Logical(tauri::LogicalSize::new(w, h))),
     );
-    let resizable = form == PanelForm::CallExpanded;
+    let resizable = panel_min_size(form).is_some();
     if PANEL_RESIZABLE.swap(resizable, Ordering::SeqCst) != resizable {
         let _ = window.set_resizable(resizable);
     }
@@ -756,48 +754,51 @@ pub fn leave_conversation_size(app: &AppHandle) {
 }
 
 /// Switch the call between its bar and its expanded form (conversation above
-/// the bar). One flag drives both the window size and what the view renders,
-/// which is what makes the control a toggle in both directions.
+/// the bar). One flag drives what the view renders and whether a drag-resize is
+/// remembered, which is what makes the control a toggle in both directions.
 ///
-/// The window grows and shrinks around its bottom-centre point, so the bar the
-/// user just clicked stays exactly where it was.
-///
-/// Emits `assistant-call-frame` (the form now in place) once the geometry has
-/// been applied. The webview draws nothing while the window changes shape and
-/// waits for this before it animates the new form in.
+/// The window does not change size: both forms are one frame (see
+/// [`conversation_size`]), so the webview morphs the bar into the panel with
+/// nothing on the native side to wait for. The one thing done here is a move —
+/// a bar parked near the top of the display can leave its frame's transparent
+/// top off screen, and the expanded panel's header must not be. A move carries
+/// the picture with it, so unlike a resize it has no stale frame to show.
 pub fn set_conversation_expanded(app: &AppHandle, expanded: bool) {
     if !crate::voice_conversation::is_active(app) {
         return;
     }
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
-        let report = |app: &AppHandle| {
-            let _ = app.emit_to(PANEL_LABEL, "assistant-call-frame", expanded);
-        };
         if CONVERSATION_EXPANDED.load(Ordering::SeqCst) == expanded {
-            report(&app_main);
+            return;
+        }
+        // Capture a manual resize of the expanded form before leaving it.
+        remember_call_size(&app_main);
+        CONVERSATION_EXPANDED.store(expanded, Ordering::SeqCst);
+        if !expanded {
             return;
         }
         let Some(window) = app_main.get_webview_window(PANEL_LABEL) else {
             return;
         };
-        // Capture a manual resize of the expanded form before leaving it.
-        remember_call_size(&app_main);
-        let anchor = window_bottom_centre(&window);
-        CONVERSATION_EXPANDED.store(expanded, Ordering::SeqCst);
-        let (w, h) = conversation_size(&app_main);
-        apply_panel_constraints(&app_main, &window);
-        let _ = window.set_size(tauri::LogicalSize::new(w, h));
-        match (anchor, window.current_monitor()) {
-            (Some(anchor), Ok(Some(monitor))) => {
-                let (x, y) = bottom_anchored_position(anchor, w, h, display_bounds_of(&monitor));
+        let (Some(anchor), Ok(Some(monitor)), Ok(size)) = (
+            window_bottom_centre(&window),
+            window.current_monitor(),
+            window.inner_size(),
+        ) else {
+            return;
+        };
+        let scale = monitor.scale_factor();
+        let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
+        let (x, y) = bottom_anchored_position(anchor, w, h, display_bounds_of(&monitor));
+        if let Ok(pos) = window.outer_position() {
+            let (cx, cy) = (pos.x as f64 / scale, pos.y as f64 / scale);
+            if (cx - x).abs() >= 1.0 || (cy - y).abs() >= 1.0 {
                 place_panel(&window, x, y);
             }
-            _ => keep_panel_on_monitor(&window, w, h),
         }
-        report(&app_main);
     }) {
-        error!("Could not queue conversation resize: {}", e);
+        error!("Could not queue conversation form change: {}", e);
     }
 }
 
@@ -1218,6 +1219,10 @@ pub struct AssistantConversation {
     /// call), so a turn still unwinding from the old one cannot write its reply
     /// into the new one — or into a fresh History row of its own.
     epoch: AtomicU64,
+    /// The meeting this conversation is about ("Discuss in a call"), or `None`.
+    /// Goes with the conversation: cleared when it is, restored when a saved one
+    /// is reopened, and written to its History row.
+    meeting: Mutex<Option<crate::meetings::discuss::MeetingAttachment>>,
 }
 
 impl AssistantConversation {
@@ -1233,6 +1238,19 @@ impl AssistantConversation {
             summarized_len: AtomicUsize::new(0),
             summarizing: AtomicBool::new(false),
             epoch: AtomicU64::new(0),
+            meeting: Mutex::new(None),
+        }
+    }
+
+    /// The meeting this conversation is about, if any.
+    pub fn meeting(&self) -> Option<crate::meetings::discuss::MeetingAttachment> {
+        self.meeting.lock().ok().and_then(|m| m.clone())
+    }
+
+    /// Attach (or detach) the meeting this conversation is about.
+    pub fn set_meeting(&self, meeting: Option<crate::meetings::discuss::MeetingAttachment>) {
+        if let Ok(mut current) = self.meeting.lock() {
+            *current = meeting;
         }
     }
 
@@ -1270,11 +1288,13 @@ impl AssistantConversation {
     }
 
     /// Forget the persisted-session pointer so the next turn starts a brand
-    /// new history row. Called when the conversation is cleared.
+    /// new history row. Called when the conversation is cleared, and the
+    /// meeting it was about goes with it.
     pub fn reset_session(&self) {
         if let Ok(mut id) = self.session_id.lock() {
             *id = None;
         }
+        self.set_meeting(None);
         self.reset_rolling_summary();
     }
 
@@ -1345,13 +1365,19 @@ impl AssistantConversation {
 
     /// Replace the in-memory conversation with a session loaded from History,
     /// pointing future persists at that row so resuming continues it.
-    pub fn load_session(&self, id: i64, messages: Vec<ChatMessage>) {
+    pub fn load_session(
+        &self,
+        id: i64,
+        messages: Vec<ChatMessage>,
+        meeting: Option<crate::meetings::discuss::MeetingAttachment>,
+    ) {
         if let Ok(mut history) = self.messages.lock() {
             *history = messages;
         }
         if let Ok(mut session) = self.session_id.lock() {
             *session = Some(id);
         }
+        self.set_meeting(meeting);
         // A resumed chat has no in-memory summary yet; start fresh so the whole
         // loaded history is treated as verbatim (and re-summarized if long).
         self.reset_rolling_summary();
@@ -1365,13 +1391,20 @@ impl AssistantConversation {
     /// different direction from the middle of it — so the row it came from must be
     /// left exactly as it was. Reusing `load_session` here would point future
     /// persists at the original and quietly overwrite the thing being forked.
-    pub fn load_branch(&self, messages: Vec<ChatMessage>) {
+    ///
+    /// A branch of a conversation about a meeting is still about that meeting.
+    pub fn load_branch(
+        &self,
+        messages: Vec<ChatMessage>,
+        meeting: Option<crate::meetings::discuss::MeetingAttachment>,
+    ) {
         if let Ok(mut history) = self.messages.lock() {
             *history = messages;
         }
         if let Ok(mut session) = self.session_id.lock() {
             *session = None;
         }
+        self.set_meeting(meeting);
         self.reset_rolling_summary();
     }
 
@@ -1440,6 +1473,16 @@ pub fn emit_conversation(app: &AppHandle) {
     let _ = app.emit("assistant-conversation", snapshot);
 }
 
+/// Event carrying the meeting the conversation is about (`null` when none).
+pub const MEETING_EVENT: &str = "assistant-conversation-meeting";
+
+/// Tell the panel which meeting, if any, the conversation is about. Sent only
+/// when that changes; the panel asks for the current value when it mounts.
+pub fn emit_conversation_meeting(app: &AppHandle) {
+    let meeting = app.state::<AssistantConversation>().meeting();
+    let _ = app.emit(MEETING_EVENT, meeting);
+}
+
 /// Persist the current conversation to the history database so it shows up in
 /// the History view (and survives the panel window being recreated). Upserts
 /// against the session's row: creates one on the first turn, updates it on
@@ -1465,18 +1508,25 @@ pub fn persist_assistant_session(app: &AppHandle) {
         Ok(guard) => guard,
         Err(_) => return,
     };
+    let meeting = conversation.meeting();
+    let link = meeting
+        .as_ref()
+        .map(|m| crate::managers::history::MeetingLink {
+            id: m.meeting_id,
+            title: &m.title,
+        });
 
     let saved = match *session_id {
-        Some(id) => match hm.update_assistant_session(id, &messages) {
+        Some(id) => match hm.update_assistant_session(id, &messages, link) {
             Ok(Some(entry)) => Some(entry),
             // Row vanished (deleted in the UI) — start a fresh one.
-            Ok(None) => hm.create_assistant_session(&messages).ok(),
+            Ok(None) => hm.create_assistant_session(&messages, link).ok(),
             Err(e) => {
                 error!("Failed to update assistant session {}: {}", id, e);
                 None
             }
         },
-        None => match hm.create_assistant_session(&messages) {
+        None => match hm.create_assistant_session(&messages, link) {
             Ok(entry) => Some(entry),
             Err(e) => {
                 error!("Failed to create assistant session: {}", e);
@@ -1863,11 +1913,17 @@ impl HitRect {
 
 /// Should the panel window take the pointer right now?
 ///
+/// `hit` is every surface the webview is drawing, each on its own rather than
+/// the box around them all. The call's status bubble ("Searching the web · …")
+/// is far wider than the bar beneath it, and the box around the two took in the
+/// empty corners either side of the bar — so for as long as the bubble was up,
+/// the app underneath stopped answering the mouse there.
+///
 /// Pure, because this is the decision that makes the difference between "the app
 /// is unusable while the assistant is open" and not, and it needs to be answerable
 /// in a test rather than by clicking around a desktop.
 fn panel_should_take_pointer(
-    hit: Option<HitRect>,
+    hit: Option<&[HitRect]>,
     cursor_in_window: Option<(f64, f64)>,
     pointer_held: bool,
     empty_for: Option<std::time::Duration>,
@@ -1883,7 +1939,7 @@ fn panel_should_take_pointer(
         return true;
     }
     match (hit, cursor_in_window) {
-        (Some(hit), Some((x, y))) => hit.contains(x, y),
+        (Some(parts), Some((x, y))) => parts.iter().any(|part| part.contains(x, y)),
         // Nothing measured, or no readable cursor: behave exactly as the window did
         // before this existed.
         _ => true,
@@ -1903,8 +1959,8 @@ const PANEL_INPUT_TICK: std::time::Duration = std::time::Duration::from_millis(9
 /// queued on the main thread must not act on a window that has moved on.
 static PANEL_INPUT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-/// The rectangle the webview last reported drawing. `None` = nothing measured yet.
-static PANEL_HIT_RECT: Mutex<Option<HitRect>> = Mutex::new(None);
+/// The surfaces the webview last reported drawing. `None` = nothing measured yet.
+static PANEL_HIT_RECT: Mutex<Option<Vec<HitRect>>> = Mutex::new(None);
 
 /// When the reported rect last became empty, so `EMPTY_RECT_GRACE` can expire it.
 /// `None` means the current report has a drawn surface in it.
@@ -1922,17 +1978,23 @@ static PANEL_POINTER_HELD: AtomicBool = AtomicBool::new(false);
 /// called when it actually changes.
 static PANEL_PASSTHROUGH: AtomicBool = AtomicBool::new(false);
 
-/// Record the rectangle the panel is drawing, in physical pixels relative to the
-/// window origin. Reported by the webview; see the section comment above.
-pub fn set_panel_hit_rect(app: &AppHandle, x: f64, y: f64, width: f64, height: f64) {
+/// Record the surfaces the panel is drawing, each `(x, y, width, height)` in
+/// physical pixels relative to the window origin. Reported by the webview; see
+/// the section comment above. An empty list means "nothing drawn right now".
+pub fn set_panel_hit_rects(app: &AppHandle, parts: &[(f64, f64, f64, f64)]) {
     store_panel_hit_rect(
         app,
-        Some(HitRect {
-            x,
-            y,
-            width,
-            height,
-        }),
+        Some(
+            parts
+                .iter()
+                .map(|&(x, y, width, height)| HitRect {
+                    x,
+                    y,
+                    width,
+                    height,
+                })
+                .collect(),
+        ),
     );
 }
 
@@ -1946,11 +2008,16 @@ pub fn clear_panel_hit_rect(app: &AppHandle) {
     store_panel_hit_rect(app, None);
 }
 
-fn store_panel_hit_rect(app: &AppHandle, rect: Option<HitRect>) {
+/// A report that something was measured and none of it has any area.
+fn hit_parts_are_empty(parts: &[HitRect]) -> bool {
+    parts.iter().all(|r| r.width <= 0.0 || r.height <= 0.0)
+}
+
+fn store_panel_hit_rect(app: &AppHandle, rect: Option<Vec<HitRect>>) {
     // Start (or clear) the clock on an empty report before anything acts on it.
     // "Empty" is a measurement saying nothing is drawn; `None` is the absence of a
     // measurement, which already resolves to tangible and needs no expiry.
-    let empty = matches!(rect, Some(r) if r.width <= 0.0 || r.height <= 0.0);
+    let empty = matches!(&rect, Some(parts) if hit_parts_are_empty(parts));
     if let Ok(mut since) = PANEL_HIT_EMPTY_SINCE.lock() {
         match (empty, *since) {
             (true, None) => *since = Some(std::time::Instant::now()),
@@ -1987,7 +2054,7 @@ fn tick_panel_input(app: &AppHandle) {
         (Ok(cursor), Ok(origin)) => Some((cursor.x - origin.x as f64, cursor.y - origin.y as f64)),
         _ => None,
     };
-    let hit = PANEL_HIT_RECT.lock().ok().and_then(|rect| *rect);
+    let hit = PANEL_HIT_RECT.lock().ok().and_then(|rect| rect.clone());
     let empty_for = PANEL_HIT_EMPTY_SINCE
         .lock()
         .ok()
@@ -2005,8 +2072,12 @@ fn tick_panel_input(app: &AppHandle) {
             EMPTY_RECT_GRACE
         );
     }
-    let take =
-        panel_should_take_pointer(hit, cursor_in_window, panel_pointer_still_held(), empty_for);
+    let take = panel_should_take_pointer(
+        hit.as_deref(),
+        cursor_in_window,
+        panel_pointer_still_held(),
+        empty_for,
+    );
     apply_panel_passthrough(&window, !take);
 }
 
@@ -2226,6 +2297,7 @@ fn build_assistant_panel(app: &AppHandle) {
         Ok(window) => {
             PANEL_RESIZABLE.store(false, Ordering::SeqCst);
             PANEL_FOCUSABLE.store(ASK_KEYBOARD_ON_SHOW, Ordering::SeqCst);
+            PANEL_PASSTHROUGH.store(false, Ordering::SeqCst);
             // The builder's own `.position()` can surface as a `Moved` event once the
             // window exists, so record it as ours before any handler can see it.
             if let Ok(mut placed) = PLACED_AT.lock() {
@@ -2275,10 +2347,12 @@ pub fn show_assistant_panel(app: &AppHandle) {
 /// Why the panel is being put on screen.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PresentReason {
-    /// The user asked for the assistant: the tray entry, the call key, History.
+    /// The user asked for the assistant: the tray entry, History.
     UserOpened,
     /// A voice ask is showing its own surface.
     VoiceTurn,
+    /// A call is about to start (the call key, History's Continue).
+    CallStarting,
 }
 
 /// Size, place and reveal the existing panel window. Main thread only.
@@ -2287,17 +2361,34 @@ enum PresentReason {
 /// created once and thereafter only hidden and shown, so anything less leaves it
 /// wherever it was last — which is how it used to open somewhere different each
 /// time. A live call keeps its place: it is a surface you park and work beside.
+///
+/// A call that is about to start is shown in the call bar's shape and place
+/// straight away. The session only exists once the webview has asked for it, so
+/// this used to show the quick ask's frame first — at the top of the screen —
+/// and move it into the bar a moment later, which read as the window jumping.
 fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         warn!("present_assistant_panel: the panel window does not exist; nothing to show");
         return;
     };
+    // A hide still waiting out `PANEL_CLEAR_BEFORE_HIDE` must not take this down.
+    PANEL_HIDE_GENERATION.fetch_add(1, Ordering::SeqCst);
     let call_active = crate::voice_conversation::is_active(app);
+    let call_starting = reason == PresentReason::CallStarting && !call_active;
     if call_active {
         let (width, height) = conversation_size(app);
         apply_panel_constraints(app, &window);
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
         ensure_call_on_screen(app, &window);
+    } else if call_starting {
+        CONVERSATION_EXPANDED.store(false, Ordering::SeqCst);
+        // Not active yet, so name the form outright: the call's rules (resizable,
+        // with its floor) applied now, while the window is still hidden, instead
+        // of as a style change on a visible window once the session exists.
+        apply_panel_constraints_for(&window, PanelForm::CallBar);
+        let (width, height) = conversation_size(app);
+        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+        place_call_window(app);
     } else if !PANEL_VISIBLE.load(Ordering::SeqCst) || reason == PresentReason::VoiceTurn {
         // A new ask opens at its dock zone. Opening the window the user can
         // already see (the tray, mid-answer) leaves it where it is.
@@ -2306,8 +2397,11 @@ fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
 
     // A call is a surface you type into, and a panel the user opened on purpose
     // should be ready to type into. A voice ask must leave the foreground alone.
-    let keyboard = call_active || reason == PresentReason::UserOpened || ASK_KEYBOARD_ON_SHOW;
+    let opened = reason != PresentReason::VoiceTurn;
+    let keyboard = call_active || opened || ASK_KEYBOARD_ON_SHOW;
     set_panel_focusable(&window, keyboard);
+    // Tangible until the webview measures what it draws.
+    apply_panel_passthrough(&window, false);
 
     #[cfg(target_os = "windows")]
     if keyboard {
@@ -2326,10 +2420,10 @@ fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
     force_panel_topmost(&window);
     // The panel is absent from the taskbar and from alt-tab, so a window the user
     // just asked for has no other way to reach the foreground.
-    if reason == PresentReason::UserOpened {
+    if opened {
         let _ = window.set_focus();
     }
-    let _ = app.emit("assistant-panel-shown", reason == PresentReason::UserOpened);
+    let _ = app.emit("assistant-panel-shown", opened);
 }
 
 /// Whether the panel window is on screen, tracked rather than asked.
@@ -2382,9 +2476,13 @@ pub fn reset_conversation_for_new_exchange(app: &AppHandle) {
     }
     conversation.bump_epoch();
     let snapshot = conversation.take_distillable();
+    // An empty conversation can still be about a meeting (a call opened from one
+    // and hung up before anything was said). That has to be cleared too, or the
+    // next quick ask would be answered as a question about the meeting.
+    let had_meeting = conversation.meeting().is_some();
     match conversation.messages.lock() {
         Ok(mut messages) => {
-            if messages.is_empty() && snapshot.is_none() {
+            if messages.is_empty() && snapshot.is_none() && !had_meeting {
                 return;
             }
             messages.clear();
@@ -2397,6 +2495,9 @@ pub fn reset_conversation_for_new_exchange(app: &AppHandle) {
     conversation.reset_session();
     conversation.reset_distilled_marker();
     emit_conversation(app);
+    if had_meeting {
+        emit_conversation_meeting(app);
+    }
     if let Some(messages) = snapshot {
         let app_for_memory = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -2413,13 +2514,22 @@ pub fn reset_conversation_for_new_exchange(app: &AppHandle) {
 /// clearing it would. The adopted thread is marked as already distilled, so
 /// hanging up afterwards learns from what was said *since* it was opened rather
 /// than distilling the whole old conversation a second time.
-pub fn adopt_saved_conversation(app: &AppHandle, id: i64, messages: Vec<ChatMessage>) {
+///
+/// `meeting` is the meeting the saved conversation was about, when it still
+/// exists (see [`crate::meetings::discuss::attachment`]).
+pub fn adopt_saved_conversation(
+    app: &AppHandle,
+    id: i64,
+    messages: Vec<ChatMessage>,
+    meeting: Option<crate::meetings::discuss::MeetingAttachment>,
+) {
     let conversation = app.state::<AssistantConversation>();
     let snapshot = conversation.take_distillable();
     conversation.bump_epoch();
-    conversation.load_session(id, messages);
+    conversation.load_session(id, messages, meeting);
     conversation.mark_distilled_current();
     emit_conversation(app);
+    emit_conversation_meeting(app);
     if let Some(messages) = snapshot {
         let app_for_memory = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -2431,13 +2541,18 @@ pub fn adopt_saved_conversation(app: &AppHandle, id: i64, messages: Vec<ChatMess
 /// Put a branch of a saved conversation into the live call: the thread up to the
 /// chosen message, with no History row, so the next turn saves a new one and the
 /// original is left exactly as it was.
-pub fn adopt_branch(app: &AppHandle, messages: Vec<ChatMessage>) {
+pub fn adopt_branch(
+    app: &AppHandle,
+    messages: Vec<ChatMessage>,
+    meeting: Option<crate::meetings::discuss::MeetingAttachment>,
+) {
     let conversation = app.state::<AssistantConversation>();
     let snapshot = conversation.take_distillable();
     conversation.bump_epoch();
-    conversation.load_branch(messages);
+    conversation.load_branch(messages, meeting);
     conversation.mark_distilled_current();
     emit_conversation(app);
+    emit_conversation_meeting(app);
     if let Some(messages) = snapshot {
         let app_for_memory = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -2446,15 +2561,33 @@ pub fn adopt_branch(app: &AppHandle, messages: Vec<ChatMessage>) {
     }
 }
 
-/// A saved conversation for the call to pick up, sent with
-/// `assistant-start-conversation`.
+/// Start a new conversation about `meeting` in the live call. The one before it
+/// is saved and distilled like any ended conversation; the new one has no
+/// messages yet and is saved on its first turn, linked to the meeting.
+pub fn adopt_meeting(app: &AppHandle, meeting: crate::meetings::discuss::MeetingAttachment) {
+    reset_conversation_for_new_exchange(app);
+    let conversation = app.state::<AssistantConversation>();
+    conversation.bump_epoch();
+    // The reset returns early when there was nothing to clear, so the session
+    // pointer is dropped here too: this conversation must get a row of its own.
+    conversation.reset_session();
+    conversation.set_meeting(Some(meeting));
+    emit_conversation(app);
+    emit_conversation_meeting(app);
+}
+
+/// What a call should pick up when it opens, sent with
+/// `assistant-start-conversation`: a saved conversation, or a meeting to talk
+/// about. Exactly one of `id` and `meeting_id` is set.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallContinuation {
     /// The History row to carry on.
-    pub id: i64,
+    pub id: Option<i64>,
     /// Continue from this message as a new branch, rather than from the end.
     pub message_index: Option<usize>,
+    /// Start a new conversation about this meeting.
+    pub meeting_id: Option<i64>,
 }
 
 /// Open the call with a saved conversation in it.
@@ -2463,8 +2596,30 @@ pub struct CallContinuation {
 /// the panel and asks it to start; it loads the conversation once the call has a
 /// session. A call already running loads it in place.
 pub fn continue_in_call(app: &AppHandle, continuation: CallContinuation) {
-    open_assistant_panel(app);
-    let _ = app.emit("assistant-start-conversation", continuation);
+    open_assistant_call(app, Some(continuation));
+}
+
+/// Put the panel on screen for a call that is about to start, already in the
+/// call bar's shape and place (see [`PresentReason::CallStarting`]), and ask the
+/// webview to start it. A call already running is left in whatever form it is
+/// in, and loads `continuation` in place.
+///
+/// The start is sent before the window is shown, from the same main-thread
+/// closure, so the webview is already drawing the call when it learns it is on
+/// screen. Sent separately, the two events could land in either order, and the
+/// first frame was then the quick ask's empty prompt inside the call's frame.
+pub fn open_assistant_call(app: &AppHandle, continuation: Option<CallContinuation>) {
+    if !get_settings(app).assistant_enabled {
+        return;
+    }
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        build_assistant_panel(&app_main);
+        let _ = app_main.emit("assistant-start-conversation", continuation);
+        present_assistant_panel(&app_main, PresentReason::CallStarting);
+    }) {
+        error!("Could not queue assistant call open: {}", e);
+    }
 }
 
 /// Put the quick ask on screen for a voice turn, already listening.
@@ -2518,36 +2673,99 @@ pub fn branch_messages(messages: Vec<ChatMessage>, message_index: usize) -> Vec<
 }
 
 pub fn hide_assistant_panel(app: &AppHandle) {
+    hide_panel(app, true);
+}
+
+/// Hide the panel at once, for a caller that acts on the window behind it the
+/// moment this returns: Insert pastes into the app the panel was covering, and
+/// the window must already be down for the keystroke to reach it. The webview
+/// clears its own picture before asking for this (`onInsert` in
+/// `AssistantPanel.tsx`), so the next show still has no stale frame to reveal.
+pub fn hide_assistant_panel_now(app: &AppHandle) {
+    hide_panel(app, false);
+}
+
+fn hide_panel(app: &AppHandle, clear_first: bool) {
     // A hidden window must not keep the microphone. Ending here also runs the
     // call's own teardown, which is what lets a spoken conversation reach memory.
     crate::voice_conversation::end(app);
     // Window work on the event loop's own thread: this is reached from the
     // keyboard engine's thread as well as from commands (see
     // `build_assistant_panel` for why that distinction matters).
+    let generation = PANEL_HIDE_GENERATION
+        .fetch_add(1, Ordering::SeqCst)
+        .wrapping_add(1);
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
         // Before the window goes down, so a tick already queued cannot flip
         // pass-through on a window that is on its way out.
         stop_panel_input_guard(&app_main);
+        PANEL_VISIBLE.store(false, Ordering::SeqCst);
         if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
-            let _ = window.hide();
-            PANEL_VISIBLE.store(false, Ordering::SeqCst);
-            // Back to the quick ask's policy while nothing is on screen, so the
-            // style change cannot re-show (and activate) the window.
-            set_panel_focusable(&window, ASK_KEYBOARD_ON_SHOW);
+            if clear_first {
+                // Invisible from this moment, so it must not eat clicks either
+                // while it waits to be hidden.
+                apply_panel_passthrough(&window, true);
+            } else {
+                finish_panel_hide(&window);
+            }
         }
         // Tell the webview it is off screen. The window stays alive for the app's
         // lifetime, so this is its cue to give back anything it only needs while
-        // visible — notably the local TTS model's ONNX session and GPU buffers.
+        // visible — notably the local TTS model's ONNX session and GPU buffers —
+        // and to stop drawing (see `PANEL_CLEAR_BEFORE_HIDE`).
         let _ = app_main.emit("assistant-panel-hidden", ());
     }) {
         error!("Could not queue assistant panel hide: {}", e);
+    }
+    if clear_first {
+        let app_later = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(PANEL_CLEAR_BEFORE_HIDE).await;
+            let app_main = app_later.clone();
+            let _ = app_later.run_on_main_thread(move || {
+                // A show since then owns the window now.
+                if PANEL_HIDE_GENERATION.load(Ordering::SeqCst) != generation
+                    || PANEL_VISIBLE.load(Ordering::SeqCst)
+                {
+                    return;
+                }
+                if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
+                    finish_panel_hide(&window);
+                }
+            });
+        });
     }
     // A quick ask is over once its card is gone. Clearing it here (which also hands
     // it to memory, dirty-guarded) is what makes the next open a fresh prompt rather
     // than the last answer reappearing. Everything said is already in History.
     begin_quick_ask_exchange(app);
 }
+
+/// Take the window off screen. Main thread only.
+fn finish_panel_hide(window: &tauri::WebviewWindow) {
+    let _ = window.hide();
+    // Back to the quick ask's policy while nothing is on screen, so the style
+    // change cannot re-show (and activate) the window.
+    set_panel_focusable(window, ASK_KEYBOARD_ON_SHOW);
+}
+
+/// How long the window stays up, drawing nothing, before it is actually hidden.
+///
+/// A hidden window keeps the last frame its webview painted, and the next show
+/// puts that frame on screen before the webview has drawn anything new. Hanging
+/// up from the call's text box left the typing bar as that frame, so the next
+/// quick ask or call opened with a "Message …" bar flashing where the call used
+/// to be. On `assistant-panel-hidden` the webview stops drawing (the shell is
+/// `visibility: hidden` while `native-window-hidden`); this is long enough for
+/// that empty frame to be presented, so the frame a show reveals is blank. The
+/// recording overlay does the same with its 240 ms fade before hiding.
+const PANEL_CLEAR_BEFORE_HIDE: std::time::Duration = std::time::Duration::from_millis(120);
+
+/// Retires a pending deferred hide. Bumped by every hide and every show, so a
+/// panel shown again inside `PANEL_CLEAR_BEFORE_HIDE` is not hidden from under
+/// the user.
+static PANEL_HIDE_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 /// Learn from a conversation that has just ended.
 ///
@@ -2610,22 +2828,6 @@ pub fn destroy_assistant_panel(app: &AppHandle) {
         }
     }) {
         error!("Could not queue assistant panel teardown: {}", e);
-    }
-}
-
-/// Apply a panel-size preset chosen in Settings. Clears the session's manual
-/// resize of the expanded call so the new choice takes effect immediately, and
-/// re-shapes the window if it is on screen.
-pub fn apply_panel_size(app: &AppHandle) {
-    CONVERSATION_W.store(0, Ordering::SeqCst);
-    CONVERSATION_H.store(0, Ordering::SeqCst);
-    let app_main = app.clone();
-    if let Err(e) = app.run_on_main_thread(move || {
-        if PANEL_VISIBLE.load(Ordering::SeqCst) {
-            apply_panel_geometry(&app_main);
-        }
-    }) {
-        error!("Could not queue assistant panel resize: {}", e);
     }
 }
 
@@ -2736,11 +2938,33 @@ fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
     }
 }
 
+/// The app's own answer contract, appended right after the persona on every
+/// typed (non-call) turn. It is not part of the persona because it describes
+/// the surface rather than a personality: a custom profile still answers into
+/// the same Markdown card and still ends in Copy / Insert, so it needs the same
+/// rules. Fixed text, so the prompt prefix stays cache-stable.
+///
+/// The dash rule is spelled out with the characters themselves and a list of
+/// substitutes, because "avoid em dashes" alone is routinely ignored, and a
+/// model that is only told what not to do tends to swap in " - " or "–" as the
+/// same clause break. None of the prompt text the assistant sees uses an em
+/// dash either: a model mirrors the punctuation of its instructions.
+pub const RESPONSE_STYLE_SECTION: &str = "## How to format your reply\n\
+Your reply appears in a small card that renders Markdown. The user can copy it or insert it straight into the app they were using.\n\
+- Write clean, well-organised answers in short paragraphs. Use a numbered list for steps, bullet points for several parallel items, **bold** sparingly for the key term, and fenced code blocks for code or commands. Skip headings unless a long answer needs sections.\n\
+- When the user asks for text to use somewhere else, such as an email, a reply, a message, a rewrite, or a translation, give only that text, ready to paste: no introduction, no closing remark, no quotation marks around it, and no Markdown unless they ask for it.\n\
+- Never use em dashes (—) or en dashes (–), and never use a hyphen with spaces around it ( - ) as a dash. Join or split clauses with a comma, a colon, parentheses, or a new sentence instead. Hyphens belong only inside words like \"follow-up\", and ranges are written \"5 to 10\".";
+
+/// The punctuation half of [`RESPONSE_STYLE_SECTION`] for a call, where the
+/// voice prompt already governs layout (spoken, no Markdown) and repeating the
+/// card's formatting rules would contradict it.
+pub const SPOKEN_STYLE_SECTION: &str = "Never use em dashes (—), en dashes (–), or a spaced hyphen ( - ) as a dash. Join or split clauses with a comma or a new sentence instead.";
+
 /// Instructions attached to the retry that follows a rejected image. The model
 /// is told the picture never arrived and that saying so is part of its answer.
 /// Phrased as an instruction rather than a bare fact because a small model that
 /// is merely told "there was an image" will happily invent its contents.
-const VISION_DROPPED_NOTE: &str = "[System note: an image — a capture of the user's screen, or a picture they attached — was part of this request, but the model answering it cannot read images, so the image was removed and you cannot see it. Do not guess at or describe what it showed. Open your reply by telling the user in one short sentence that the current model can't see images and that they can choose a vision-capable model in Settings → Assistant. Then answer whatever part of their message you can without the image.]";
+const VISION_DROPPED_NOTE: &str = "[System note: an image (a capture of the user's screen, or a picture they attached) was part of this request, but the model answering it cannot read images, so the image was removed and you cannot see it. Do not guess at or describe what it showed. Open your reply by telling the user in one short sentence that the current model can't see images and that they can choose a vision-capable model in Settings → Assistant. Then answer whatever part of their message you can without the image.]";
 
 /// Rebuild a request with every image dropped: the same system prompt and
 /// history, with the final user message reduced to its text plus
@@ -2773,12 +2997,12 @@ fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
     );
     if web {
         s.push_str(
-            "• web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts — news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events — because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n",
+            "• web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts (news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events), because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n",
         );
     }
     s.push_str(
-        "• get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, or before setting a reminder for a named clock time.\n\
-         • set_reminder(text, in_minutes, at, note): schedule a popup on the user's screen. Call it for any request to be reminded, nudged, told later, or timed. Use in_minutes for a duration and at (\"YYYY-MM-DD HH:MM\", local, future) for a named time — check the clock first for the latter. Write text so it stands alone: it is the entire popup, so \"Reply to Sam's email about the quote\", never \"do that thing\". If the request is about something on screen, look first and put what you saw into text or note. After it is set, confirm in one short sentence including when it will arrive.\n\
+        "• get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment: to say what day or time it is, to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, or before setting a reminder for a named clock time.\n\
+         • set_reminder(text, in_minutes, at, note): schedule a popup on the user's screen. Call it for any request to be reminded, nudged, told later, or timed. Use in_minutes for a duration and at (\"YYYY-MM-DD HH:MM\", local, future) for a named time (check the clock first for the latter). Write text so it stands alone: it is the entire popup, so \"Reply to Sam's email about the quote\", never \"do that thing\". If the request is about something on screen, look first and put what you saw into text or note. After it is set, confirm in one short sentence including when it will arrive.\n\
          • list_reminders() and cancel_reminder(id): what is set, and removing one. Look the id up before cancelling, and never cancel something the user did not clearly name.\n",
     );
     if screen {
@@ -2804,8 +3028,8 @@ fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
 /// cloud ones, so each case is concrete.
 fn screen_tool_guidance() -> String {
     format!(
-        "• capture_screen(): take one screenshot of the user's screen. They turned this on so you can look when it helps, and they see every screenshot you take. Most messages need no look — decide per message.\n\
-         \x20 Look when the user asks you to (\"look at my screen\", \"what's on my screen\", \"can you see this?\"), or when the message is about something visible that you were not given as text — \"this error\", \"this chart\", \"reply to this email\", \"what does this button do\" — and you cannot answer without seeing it.\n\
+        "• capture_screen(): take one screenshot of the user's screen. They turned this on so you can look when it helps, and they see every screenshot you take. Most messages need no look, so decide per message.\n\
+         \x20 Look when the user asks you to (\"look at my screen\", \"what's on my screen\", \"can you see this?\"), or when the message is about something visible that you were not given as text (\"this error\", \"this chart\", \"reply to this email\", \"what does this button do\") and you cannot answer without seeing it.\n\
          \x20 Do not look for anything you can answer without seeing: general knowledge, writing, translation, maths, the time, reminders, greetings, or a follow-up about what is already in this conversation.\n\
          \x20 Text between {SELECTION_OPEN} and {SELECTION_CLOSE} is what the user selected, and it is what they mean by \"this\", \"it\" or \"that\". Answer from it and do not look, unless they explicitly ask you to look at the screen as well.\n\
          \x20 At most once per message. If you already looked earlier in this conversation, work from that unless the user says the screen changed or asks you to look again.\n"
@@ -2995,7 +3219,7 @@ fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
             "type": "function",
             "function": {
                 "name": "web_search",
-                "description": "Search the live web for current or external facts — news, prices, weather, sports scores, schedules, product releases/versions, who currently holds a role, or any recent/niche fact your training data wouldn't reliably know. Returns titles and short snippets. Call this ONLY when the answer needs current or external information; for greetings, general knowledge, writing, coding, or math, answer directly without searching.",
+                "description": "Search the live web for current or external facts: news, prices, weather, sports scores, schedules, product releases/versions, who currently holds a role, or any recent/niche fact your training data wouldn't reliably know. Returns titles and short snippets. Call this ONLY when the answer needs current or external information; for greetings, general knowledge, writing, coding, or math, answer directly without searching.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -3023,7 +3247,7 @@ fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
         "type": "function",
         "function": {
             "name": "get_current_datetime",
-            "description": "Get the user's current local date and time. Call this when you need the present moment — to answer what day or time it is, to resolve a relative reference (today, yesterday, tonight, this week, this month, this year, how long until X) into a concrete date, or before setting a reminder for a named time like 'tomorrow at 9'. Takes no arguments.",
+            "description": "Get the user's current local date and time. Call this when you need the present moment: to answer what day or time it is, to resolve a relative reference (today, yesterday, tonight, this week, this month, this year, how long until X) into a concrete date, or before setting a reminder for a named time like 'tomorrow at 9'. Takes no arguments.",
             "parameters": {
                 "type": "object",
                 "properties": {}
@@ -3035,7 +3259,7 @@ fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
         "type": "function",
         "function": {
             "name": "set_reminder",
-            "description": "Schedule a reminder that pops up on the user's screen at a chosen time. Call it whenever the user asks to be reminded, nudged, told later, or wants a timer — 'remind me to call the bank in 20 minutes', 'nudge me about this at 6', 'set a timer for 10 minutes'. It also covers a reminder about something on screen: look first if you need to, then put what you saw in the text so the popup makes sense on its own. Confirm briefly afterwards, saying when it will arrive.",
+            "description": "Schedule a reminder that pops up on the user's screen at a chosen time. Call it whenever the user asks to be reminded, nudged, told later, or wants a timer, for example 'remind me to call the bank in 20 minutes', 'nudge me about this at 6', 'set a timer for 10 minutes'. It also covers a reminder about something on screen: look first if you need to, then put what you saw in the text so the popup makes sense on its own. Confirm briefly afterwards, saying when it will arrive.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -3053,7 +3277,7 @@ fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
                     },
                     "note": {
                         "type": "string",
-                        "description": "Optional supporting detail you worked out rather than were told — a URL or page title you read off the screen, a file name, a phone number. Shown under the main text."
+                        "description": "Optional supporting detail you worked out rather than were told, such as a URL or page title you read off the screen, a file name, a phone number. Shown under the main text."
                     }
                 },
                 "required": ["text"]
@@ -3204,6 +3428,74 @@ impl TurnTimer {
     }
 }
 
+/// Which meeting the `search_meeting` / `read_meeting` tools read this turn, and
+/// how much one result may hold.
+#[derive(Clone, Copy, Debug)]
+struct MeetingToolTarget {
+    meeting_id: i64,
+    budget: usize,
+}
+
+/// The meeting a turn's conversation is about, read fresh for that turn.
+struct TurnMeeting {
+    meeting_id: i64,
+    /// The system-prompt section (`meetings::discuss::build_section`).
+    section: String,
+    /// The transcript is too long to inline: offer the meeting tools.
+    tools: bool,
+    result_budget: usize,
+}
+
+/// Read the attached meeting for this turn, or `None` when there is none or it
+/// can no longer be read. A meeting deleted mid-conversation only costs the
+/// conversation its context; the turn itself carries on.
+async fn load_turn_meeting(
+    app: &AppHandle,
+    provider_id: &str,
+    local_context_tokens: u32,
+    small_body: bool,
+) -> Option<TurnMeeting> {
+    use crate::meetings::discuss;
+    let attachment = app.state::<AssistantConversation>().meeting()?;
+    let store = app
+        .try_state::<Arc<crate::meetings::store::MeetingStore>>()?
+        .inner()
+        .clone();
+    let meeting_id = attachment.meeting_id;
+    let inline = discuss::inline_budget(provider_id, local_context_tokens, small_body);
+    let loaded = tauri::async_runtime::spawn_blocking(move || {
+        discuss::load_context(&store, meeting_id, inline)
+    })
+    .await;
+    match loaded {
+        Ok(Ok(Some(context))) => {
+            debug!(
+                "Turn about meeting {meeting_id}: {} chars of context, tools: {}",
+                context.section.len(),
+                context.tools
+            );
+            Some(TurnMeeting {
+                meeting_id,
+                section: context.section,
+                tools: context.tools,
+                result_budget: discuss::result_budget(provider_id, small_body),
+            })
+        }
+        Ok(Ok(None)) => {
+            warn!("Meeting {meeting_id} is gone; answering without it");
+            None
+        }
+        Ok(Err(e)) => {
+            warn!("Could not read meeting {meeting_id}: {e}");
+            None
+        }
+        Err(e) => {
+            warn!("Reading meeting {meeting_id} panicked: {e}");
+            None
+        }
+    }
+}
+
 /// Run one text-returning tool and format its result for the model.
 ///
 /// Split out of the dispatch loop so several independent calls in one round can
@@ -3218,7 +3510,31 @@ async fn run_text_tool(
     settings: &crate::settings::AppSettings,
     name: &str,
     arguments: &str,
+    meeting: Option<MeetingToolTarget>,
 ) -> String {
+    use crate::meetings::discuss;
+    if discuss::is_meeting_tool(name) {
+        let Some(target) = meeting else {
+            return "No meeting is attached to this conversation.".to_string();
+        };
+        let Some(store) = app.try_state::<Arc<crate::meetings::store::MeetingStore>>() else {
+            return "Meetings storage is unavailable.".to_string();
+        };
+        let store = store.inner().clone();
+        let (name, arguments) = (name.to_string(), arguments.to_string());
+        // SQLite and an FTS query: off the runtime.
+        return tauri::async_runtime::spawn_blocking(move || {
+            if name == discuss::SEARCH_TOOL {
+                let query = discuss::parse_search_args(&arguments);
+                discuss::run_search(&store, target.meeting_id, &query, target.budget)
+            } else {
+                let (from, to) = discuss::parse_read_args(&arguments);
+                discuss::run_read(&store, target.meeting_id, from, to, target.budget)
+            }
+        })
+        .await
+        .unwrap_or_else(|e| format!("Reading the meeting failed: {e}"));
+    }
     match name {
         "web_search" => {
             let (query, freshness, news) = parse_web_search_args(arguments);
@@ -3324,10 +3640,13 @@ fn emit_tool_activity(app: &AppHandle, calls: &[llm_client::ToolCall]) {
         return;
     };
     // Only the search query is worth surfacing; the other tools take no
-    // meaningful argument.
+    // meaningful argument — except the meeting tools, whose query or time range
+    // is what tells the user the assistant went back to the transcript.
     let detail = if first.name == "web_search" {
         let (query, _, _) = parse_web_search_args(&first.arguments);
         query
+    } else if crate::meetings::discuss::is_meeting_tool(&first.name) {
+        crate::meetings::discuss::tool_detail(&first.name, &first.arguments)
     } else {
         String::new()
     };
@@ -3556,7 +3875,29 @@ async fn run_assistant_turn_inner(
             &provider.base_url,
         ));
     }
-    let tool_capabilities = build_assistant_tool_capabilities(web_via_tools, agent_screen);
+    // The meeting this conversation is about, if any: its prompt section, and
+    // whether the transcript is too long to inline and must be read with tools.
+    let turn_meeting = load_turn_meeting(
+        &app,
+        &provider.id,
+        settings.local_llm_context_size,
+        needs_small_body,
+    )
+    .await;
+    let mut tool_capabilities = build_assistant_tool_capabilities(web_via_tools, agent_screen);
+    if turn_meeting.as_ref().is_some_and(|m| m.tools) {
+        if let Some(Value::Array(tools)) = tool_capabilities.as_mut() {
+            tools.extend(crate::meetings::discuss::tool_definitions());
+        }
+    }
+    let meeting_tool_target =
+        turn_meeting
+            .as_ref()
+            .filter(|m| m.tools)
+            .map(|m| MeetingToolTarget {
+                meeting_id: m.meeting_id,
+                budget: m.result_budget,
+            });
     // OpenRouter's `:online` model suffix turns on its built-in web search
     // server-side; every other path uses the model name unchanged.
     let request_model = if web_via_online {
@@ -3635,6 +3976,19 @@ async fn run_assistant_turn_inner(
             sections.push(persona.trim().to_string());
         }
 
+        // 1b. The app's answer contract: how a reply is formatted for the
+        //     surface it lands on, and the no-dash rule. Owned by the app, not
+        //     the persona, so it holds for custom profiles too. A call gets
+        //     only the punctuation rule, since the voice prompt sets layout.
+        sections.push(
+            if voice_ticket.is_some() {
+                SPOKEN_STYLE_SECTION
+            } else {
+                RESPONSE_STYLE_SECTION
+            }
+            .to_string(),
+        );
+
         // 2. Reply-length preference (persona override, else the global dial).
         if let Some(directive) = settings.effective_response_length().directive() {
             sections.push(directive.to_string());
@@ -3643,6 +3997,14 @@ async fn run_assistant_turn_inner(
             sections.push(crate::voice_conversation::voice_prompt(
                 settings.effective_response_length(),
             ));
+        }
+
+        // 2a. The meeting under discussion. Stable for the whole conversation,
+        //     so it sits before the per-turn memory block and stays inside the
+        //     cacheable prefix — which matters, because an inlined transcript is
+        //     by far the largest thing in the request.
+        if let Some(meeting) = &turn_meeting {
+            sections.push(meeting.section.clone());
         }
 
         // 2b. Spoken turns: the voice can only start once the first sentence
@@ -3657,7 +4019,7 @@ async fn run_assistant_turn_inner(
                 sections.push("Keep spoken replies brief by default: one short paragraph. Give more detail when the user asks for it, and avoid padding simple answers.".to_string());
             }
             sections.push(
-                "This reply will be read aloud. Open with one short sentence that stands on its own, then continue. Write in speakable prose — no markdown, no bullet lists, no headings."
+                "This reply will be read aloud. Open with one short sentence that stands on its own, then continue. Write in speakable prose, with no markdown, no bullet lists, and no headings."
                     .to_string(),
             );
         }
@@ -4029,7 +4391,13 @@ async fn run_assistant_turn_inner(
                 let mut text_results: Vec<Option<String>> = vec![None; round_out.tool_calls.len()];
                 let completed = futures_util::future::join_all(text_indexes.iter().map(|&index| {
                     let call = &round_out.tool_calls[index];
-                    run_text_tool(&app_state, &settings_c, &call.name, &call.arguments)
+                    run_text_tool(
+                        &app_state,
+                        &settings_c,
+                        &call.name,
+                        &call.arguments,
+                        meeting_tool_target,
+                    )
                 }))
                 .await;
                 for (&index, content) in text_indexes.iter().zip(completed) {
@@ -4836,6 +5204,58 @@ mod tests {
     use super::*;
     use crate::llm_client::{ChatRound, ToolCall, ToolStreamOutcome};
 
+    /// Every piece of fixed prompt text a typed turn can carry. The answer
+    /// contract forbids em dashes, so the app's own instructions must not model
+    /// them; the contract itself is the one place the character is named.
+    #[test]
+    fn fixed_prompt_text_has_no_em_dashes() {
+        let mut texts: Vec<(String, String)> = vec![
+            (
+                "spoken style".into(),
+                SPOKEN_STYLE_SECTION.replace("(—)", ""),
+            ),
+            ("vision dropped".into(), VISION_DROPPED_NOTE.into()),
+            (
+                "voice prompt".into(),
+                crate::voice_conversation::voice_prompt(
+                    crate::settings::AssistantResponseLength::Default,
+                ),
+            ),
+            (
+                "web capability".into(),
+                web_search::WEB_SEARCH_CAPABILITY_NOTE.into(),
+            ),
+            (
+                "response style".into(),
+                RESPONSE_STYLE_SECTION.replace("(—)", ""),
+            ),
+        ];
+        for web in [false, true] {
+            for screen in [false, true] {
+                for tts in [false, true] {
+                    texts.push((
+                        format!("tools web={web} screen={screen} tts={tts}"),
+                        tools_system_section(web, screen, tts),
+                    ));
+                }
+            }
+        }
+        for (name, text) in texts {
+            assert!(!text.contains('\u{2014}'), "em dash in {name}: {text}");
+        }
+    }
+
+    #[test]
+    fn response_style_names_the_banned_dashes_and_paste_ready_output() {
+        assert!(RESPONSE_STYLE_SECTION.contains("Never use em dashes (—)"));
+        assert!(RESPONSE_STYLE_SECTION.contains("en dashes (–)"));
+        assert!(RESPONSE_STYLE_SECTION.contains("ready to paste"));
+        assert!(SPOKEN_STYLE_SECTION.contains("em dashes (—)"));
+        // The call's version must not reintroduce Markdown guidance that the
+        // voice prompt forbids.
+        assert!(!SPOKEN_STYLE_SECTION.contains("Markdown"));
+    }
+
     /// The user's real desk, and the layout that made the panel unusable: a
     /// landscape primary beside a taller-than-it-is-wide portrait secondary at
     /// negative coordinates.
@@ -4858,8 +5278,8 @@ mod tests {
     #[test]
     fn the_same_anchor_means_very_different_places_on_two_displays() {
         let anchor = crate::settings::AskAnchor::Center;
-        let (lw, lh) = ask_size_for_display(LANDSCAPE.width, LANDSCAPE.height, "compact", anchor);
-        let (pw, ph) = ask_size_for_display(PORTRAIT.width, PORTRAIT.height, "compact", anchor);
+        let (lw, lh) = ask_size_for_display(LANDSCAPE.width, LANDSCAPE.height, anchor);
+        let (pw, ph) = ask_size_for_display(PORTRAIT.width, PORTRAIT.height, anchor);
         assert!(
             (lw - pw).abs() > 200.0,
             "landscape {lw} vs portrait {pw}: the card is a very different shape per display"
@@ -4884,13 +5304,52 @@ mod tests {
             height: 34.0,
         };
         assert!(
-            panel_should_take_pointer(Some(pill), Some((170.0, 28.0)), false, None),
+            panel_should_take_pointer(Some(&[pill]), Some((170.0, 28.0)), false, None),
             "a click on the chip belongs to the panel"
         );
         for outside in [(10.0, 28.0), (330.0, 28.0), (170.0, 2.0), (170.0, 54.0)] {
             assert!(
-                !panel_should_take_pointer(Some(pill), Some(outside), false, None),
+                !panel_should_take_pointer(Some(&[pill]), Some(outside), false, None),
                 "a click at {outside:?} is on the user's desktop, not on the panel"
+            );
+        }
+    }
+
+    /// The call's status bubble is much wider than the bar under it. Each surface
+    /// is tested on its own, so the empty corners beside the bar — under the
+    /// bubble's overhang — belong to the app underneath, not to the panel.
+    #[test]
+    fn a_wide_bubble_does_not_make_the_space_beside_the_bar_tangible() {
+        // A 440x200 call window: "Searching the web · …" at 400px above a 170px bar.
+        let bubble = HitRect {
+            x: 20.0,
+            y: 100.0,
+            width: 400.0,
+            height: 36.0,
+        };
+        let bar = HitRect {
+            x: 135.0,
+            y: 146.0,
+            width: 170.0,
+            height: 38.0,
+        };
+        let parts = [bubble, bar];
+        assert!(panel_should_take_pointer(
+            Some(&parts),
+            Some((220.0, 165.0)),
+            false,
+            None
+        ));
+        assert!(panel_should_take_pointer(
+            Some(&parts),
+            Some((40.0, 118.0)),
+            false,
+            None
+        ));
+        for beside in [(40.0, 165.0), (400.0, 165.0), (60.0, 190.0)] {
+            assert!(
+                !panel_should_take_pointer(Some(&parts), Some(beside), false, None),
+                "{beside:?} is beside the bar and under nothing the panel draws"
             );
         }
     }
@@ -4908,12 +5367,12 @@ mod tests {
             None
         ));
         assert!(panel_should_take_pointer(
-            Some(HitRect {
+            Some(&[HitRect {
                 x: 0.0,
                 y: 0.0,
                 width: 10.0,
                 height: 10.0
-            }),
+            }]),
             None,
             false,
             None
@@ -4933,7 +5392,7 @@ mod tests {
             height: 34.0,
         };
         assert!(
-            panel_should_take_pointer(Some(pill), Some((-4_000.0, 3_000.0)), true, None),
+            panel_should_take_pointer(Some(&[pill]), Some((-4_000.0, 3_000.0)), true, None),
             "a drag in progress must survive the pointer leaving the chip"
         );
     }
@@ -4949,7 +5408,7 @@ mod tests {
             height: 0.0,
         };
         assert!(!panel_should_take_pointer(
-            Some(empty),
+            Some(&[empty]),
             Some((0.0, 0.0)),
             false,
             // Mid-cross-fade, so the empty report is still believed.
@@ -4976,7 +5435,7 @@ mod tests {
         };
         assert!(
             panel_should_take_pointer(
-                Some(empty),
+                Some(&[empty]),
                 Some((170.0, 28.0)),
                 false,
                 Some(EMPTY_RECT_GRACE)
@@ -4985,7 +5444,7 @@ mod tests {
         );
         assert!(
             panel_should_take_pointer(
-                Some(empty),
+                Some(&[empty]),
                 Some((170.0, 28.0)),
                 false,
                 Some(EMPTY_RECT_GRACE + std::time::Duration::from_secs(30))
@@ -5005,7 +5464,7 @@ mod tests {
             height: 34.0,
         };
         assert!(
-            !panel_should_take_pointer(Some(pill), Some((10.0, 28.0)), false, None),
+            !panel_should_take_pointer(Some(&[pill]), Some((10.0, 28.0)), false, None),
             "a measured surface keeps its transparent frame pass-through"
         );
     }
@@ -5229,9 +5688,8 @@ mod tests {
     #[test]
     fn side_docks_are_taller_than_edge_docks() {
         use crate::settings::AskAnchor;
-        let (side_w, side_h) = ask_size_for_display(1920.0, 1080.0, "standard", AskAnchor::Left);
-        let (edge_w, edge_h) =
-            ask_size_for_display(1920.0, 1080.0, "standard", AskAnchor::TopCenter);
+        let (side_w, side_h) = ask_size_for_display(1920.0, 1080.0, AskAnchor::Left);
+        let (edge_w, edge_h) = ask_size_for_display(1920.0, 1080.0, AskAnchor::TopCenter);
         assert!(
             side_h > edge_h,
             "a side rail should be the taller shape: {side_h} vs {edge_h}"
@@ -5252,47 +5710,49 @@ mod tests {
         assert_eq!(panel_form(true, true), PanelForm::CallExpanded);
     }
 
-    /// Only the expanded call is the user's to resize. The quick ask's frame and
-    /// the call bar are fixed shapes the app sets, and a floor on either could only
-    /// ever refuse one of the app's own resizes; the expanded call's floor has to
-    /// sit under every preset or the smallest one could not be applied.
+    /// The quick ask is the app's fixed shape and has no floor. A call carries the
+    /// same floor in both forms, because both forms are one frame — opening the
+    /// conversation must not change a window style. The floor has to sit under
+    /// the default size or that size could not be applied.
     #[test]
-    fn only_the_expanded_call_has_a_resize_floor() {
+    fn a_call_has_one_resize_floor_in_both_forms() {
         assert_eq!(panel_min_size(PanelForm::Ask), None);
-        assert_eq!(panel_min_size(PanelForm::CallBar), None);
+        assert_eq!(
+            panel_min_size(PanelForm::CallBar),
+            panel_min_size(PanelForm::CallExpanded)
+        );
         let (floor_w, floor_h) =
             panel_min_size(PanelForm::CallExpanded).expect("the expanded call is resizable");
-        for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
-            let (w, h) = conversation_preset_size(preset);
-            assert!(
-                w >= floor_w && h >= floor_h,
-                "{preset} is below the conversation resize floor"
-            );
-        }
+        let (w, h) = CONVERSATION_DEFAULT_SIZE;
+        assert!(
+            w >= floor_w && h >= floor_h,
+            "the default expanded call is below its resize floor"
+        );
     }
 
-    /// The call bar's frame has to hold the widest bar (typing, 300px) and a
-    /// status bubble above it, and the expanded call has to be able to shrink
-    /// back to no smaller than that bar — otherwise expanding and resizing could
-    /// clip the controls that hang up.
+    /// The call's frame has to hold the widest bar (typing, 300px) and a status
+    /// bubble above it however small a display squeezes it, and the expanded
+    /// call has to be able to shrink back to no smaller than that bar —
+    /// otherwise resizing could clip the controls that hang up.
     #[test]
-    fn the_call_bar_frame_holds_the_bar_and_its_bubble() {
+    fn the_call_frame_holds_the_bar_and_its_bubble() {
         /// `.call-bar.typing` width and `.call-bar-slot` height in `CallBar.css`.
         const TYPING_BAR_WIDTH: f64 = 300.0;
         const BAR_HEIGHT: f64 = 46.0;
         // Checked at compile time: the frame is made of constants.
-        const _: () = assert!(CALL_BAR_FRAME_WIDTH >= TYPING_BAR_WIDTH + 2.0 * 16.0);
+        const _: () = assert!(CALL_FRAME_FLOOR_WIDTH >= TYPING_BAR_WIDTH + 2.0 * 16.0);
         // Room for at least three lines of status above the bar.
-        const _: () = assert!(CALL_BAR_FRAME_HEIGHT >= BAR_HEIGHT + 3.0 * 22.0);
+        const _: () = assert!(CALL_FRAME_FLOOR_HEIGHT >= BAR_HEIGHT + 3.0 * 22.0);
         let (floor_w, _) = panel_min_size(PanelForm::CallExpanded).expect("resizable");
         assert!(floor_w >= TYPING_BAR_WIDTH + 2.0 * 10.0);
     }
 
-    /// Expanding grows the window upward around its bottom-centre, which is
-    /// what keeps the bar under the user's cursor. Collapsing must land exactly
-    /// where it started, and a window near an edge is kept on the display.
+    /// The call docks by its bottom-centre, which is where the bar sits in both
+    /// forms: centred above the taskbar by default, and a frame parked against
+    /// an edge (or on a monitor to the left) is kept on its display, so the
+    /// expanded panel's header is always reachable.
     #[test]
-    fn the_call_expands_upward_around_the_bar() {
+    fn the_call_docks_by_its_bottom_centre() {
         let display = DisplayBounds {
             x: 0.0,
             y: 0.0,
@@ -5300,26 +5760,19 @@ mod tests {
             height: 1080.0,
         };
         let anchor = default_call_bar_anchor(display);
-        let (bx, by) =
-            bottom_anchored_position(anchor, CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT, display);
+        let (w, h) = CONVERSATION_DEFAULT_SIZE;
+        let (x, y) = bottom_anchored_position(anchor, w, h, display);
         // Centred, and above the taskbar.
-        assert_eq!(bx, (1920.0 - CALL_BAR_FRAME_WIDTH) / 2.0);
-        assert!(by + CALL_BAR_FRAME_HEIGHT <= 1080.0 - TASKBAR_CLEARANCE);
-        let (ew, eh) = conversation_preset_size("standard");
-        let (ex, ey) = bottom_anchored_position(anchor, ew, eh, display);
-        // Same bottom edge and same centre line: the bar does not move.
-        assert_eq!(ey + eh, by + CALL_BAR_FRAME_HEIGHT);
-        assert_eq!(ex + ew / 2.0, bx + CALL_BAR_FRAME_WIDTH / 2.0);
-        // Round trip.
-        let back = bottom_anchored_position(
-            (ex + ew / 2.0, ey + eh),
-            CALL_BAR_FRAME_WIDTH,
-            CALL_BAR_FRAME_HEIGHT,
-            display,
+        assert_eq!(x, (1920.0 - w) / 2.0);
+        assert!(y + h <= 1080.0 - TASKBAR_CLEARANCE);
+        // Placing it again from where it now stands is a no-op: re-anchoring
+        // (a drag that ends, a form change) never nudges the bar.
+        assert_eq!(
+            bottom_anchored_position((x + w / 2.0, y + h), w, h, display),
+            (x, y)
         );
-        assert_eq!(back, (bx, by));
-        // A bar parked at the very top-left still expands onto the display.
-        let (cx, cy) = bottom_anchored_position((10.0, 60.0), ew, eh, display);
+        // A bar parked at the very top-left still has its whole frame on screen.
+        let (cx, cy) = bottom_anchored_position((10.0, 60.0), w, h, display);
         assert!(cx >= 0.0 && cy >= 0.0);
         // And on a second monitor to the left, it stays on that monitor.
         let left = DisplayBounds {
@@ -5328,8 +5781,8 @@ mod tests {
             width: 1920.0,
             height: 1080.0,
         };
-        let (lx, _) = bottom_anchored_position(default_call_bar_anchor(left), ew, eh, left);
-        assert!(lx < 0.0 && lx + ew <= 0.0);
+        let (lx, _) = bottom_anchored_position(default_call_bar_anchor(left), w, h, left);
+        assert!(lx < 0.0 && lx + w <= 0.0);
     }
 
     #[test]
@@ -5408,17 +5861,15 @@ mod tests {
         ));
     }
 
-    /// The expanded call is mostly text, so every preset must be a real panel
-    /// able to hold the call bar below the conversation.
+    /// The expanded call is mostly text, so its default size must be a real
+    /// panel able to hold the call bar below the conversation.
     #[test]
-    fn every_expanded_call_preset_is_a_panel_that_holds_the_bar() {
-        for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
-            let (w, h) = conversation_preset_size(preset);
-            assert!(
-                w >= CALL_BAR_FRAME_WIDTH - 40.0 && h > CALL_BAR_FRAME_HEIGHT * 2.0,
-                "{preset} is too small for a conversation above the bar"
-            );
-        }
+    fn the_expanded_call_is_a_panel_that_holds_the_bar() {
+        let (w, h) = CONVERSATION_DEFAULT_SIZE;
+        assert!(
+            w >= CALL_FRAME_FLOOR_WIDTH - 40.0 && h > CALL_FRAME_FLOOR_HEIGHT * 2.0,
+            "the expanded call is too small for a conversation above the bar"
+        );
     }
 
     /// The rule that decides whether a stored position is still usable. This is
@@ -5545,24 +5996,9 @@ mod tests {
     /// visibly bigger card, and a small one should still fit.
     #[test]
     fn the_card_grows_with_the_display() {
-        let (laptop_w, _) = ask_size_for_display(
-            1366.0,
-            768.0,
-            "standard",
-            crate::settings::AskAnchor::Center,
-        );
-        let (fhd_w, _) = ask_size_for_display(
-            1920.0,
-            1080.0,
-            "standard",
-            crate::settings::AskAnchor::Center,
-        );
-        let (uhd_w, _) = ask_size_for_display(
-            3840.0,
-            2160.0,
-            "standard",
-            crate::settings::AskAnchor::Center,
-        );
+        let (laptop_w, _) = ask_size_for_display(1366.0, 768.0, crate::settings::AskAnchor::Center);
+        let (fhd_w, _) = ask_size_for_display(1920.0, 1080.0, crate::settings::AskAnchor::Center);
+        let (uhd_w, _) = ask_size_for_display(3840.0, 2160.0, crate::settings::AskAnchor::Center);
         assert!(
             laptop_w < fhd_w && fhd_w < uhd_w,
             "a larger display must produce a larger card: {laptop_w} / {fhd_w} / {uhd_w}"
@@ -5580,56 +6016,15 @@ mod tests {
             (3840.0, 2160.0),
             (5120.0, 2880.0),
         ] {
-            for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
-                let (cw, ch) =
-                    ask_size_for_display(w, h, preset, crate::settings::AskAnchor::Center);
-                let scale = ask_preset_scale(preset);
-                assert!(
-                    cw <= ASK_MAX_WIDTH * scale && ch <= ASK_MAX_HEIGHT * scale,
-                    "{preset} on {w}x{h} exceeded the band: {cw}x{ch}"
-                );
-                // And it always physically fits the screen it is on, which is what
-                // stops a card being dragged-to-nowhere on a small display.
-                assert!(
-                    cw <= w && ch <= h,
-                    "{preset} on {w}x{h} did not fit: {cw}x{ch}"
-                );
-            }
-        }
-    }
-
-    /// The preset still has to mean something, or the setting is a lie. On a
-    /// display with room to express them the sizes strictly increase; on a very
-    /// small screen they may collapse onto the readable floor, which is correct —
-    /// but they must never invert.
-    #[test]
-    fn the_size_preset_still_orders_the_card_sizes() {
-        for (mon_w, mon_h) in [
-            (1024.0, 600.0),
-            (1366.0, 768.0),
-            (1920.0, 1080.0),
-            (3840.0, 2160.0),
-        ] {
-            let sizes: Vec<f64> = ["mini", "compact", "standard", "large"]
-                .iter()
-                .map(|p| {
-                    ask_size_for_display(mon_w, mon_h, p, crate::settings::AskAnchor::Center).0
-                })
-                .collect();
+            let (cw, ch) = ask_size_for_display(w, h, crate::settings::AskAnchor::Center);
             assert!(
-                sizes.windows(2).all(|pair| pair[0] <= pair[1]),
-                "presets must never invert on {mon_w}x{mon_h}: {sizes:?}"
+                cw <= ASK_MAX_WIDTH && ch <= ASK_MAX_HEIGHT,
+                "{w}x{h} exceeded the band: {cw}x{ch}"
             );
+            // And it always physically fits the screen it is on, which is what
+            // stops a card being dragged-to-nowhere on a small display.
+            assert!(cw <= w && ch <= h, "{w}x{h} did not fit: {cw}x{ch}");
         }
-        // A display with room to show the difference must actually show it.
-        let sizes: Vec<f64> = ["mini", "compact", "standard", "large"]
-            .iter()
-            .map(|p| ask_size_for_display(2560.0, 1440.0, p, crate::settings::AskAnchor::Center).0)
-            .collect();
-        assert!(
-            sizes.windows(2).all(|pair| pair[0] < pair[1]),
-            "presets must be distinguishable on a large display: {sizes:?}"
-        );
     }
 
     /// A display at the desktop origin, for the geometry tests.
@@ -5749,8 +6144,8 @@ mod tests {
         );
     }
 
-    /// Where the quick ask opens depends on the dock zone, the preset and the
-    /// display, and nothing else — no stored coordinate, no previous drag. This is
+    /// Where the quick ask opens depends on the dock zone and the display, and
+    /// nothing else — no stored coordinate, no previous drag. This is
     /// the fix for "it opens in a random place". `Custom`, the legacy value an old
     /// drag handler wrote, opens exactly where Centre does.
     #[test]
@@ -5765,13 +6160,13 @@ mod tests {
                 AskAnchor::Right,
             ] {
                 assert_eq!(
-                    ask_placement_on(display, "standard", anchor),
-                    ask_placement_on(display, "standard", anchor)
+                    ask_placement_on(display, anchor),
+                    ask_placement_on(display, anchor)
                 );
             }
             assert_eq!(
-                ask_placement_on(display, "compact", AskAnchor::Custom),
-                ask_placement_on(display, "compact", AskAnchor::Center)
+                ask_placement_on(display, AskAnchor::Custom),
+                ask_placement_on(display, AskAnchor::Center)
             );
         }
     }
@@ -5782,18 +6177,18 @@ mod tests {
     fn the_pill_lands_on_the_docked_edge() {
         use crate::settings::AskAnchor;
         let d = LANDSCAPE;
-        let bottom = ask_placement_on(d, "standard", AskAnchor::BottomCenter);
+        let bottom = ask_placement_on(d, AskAnchor::BottomCenter);
         assert_eq!(
             bottom.y + bottom.height,
             d.y + d.height - PANEL_MARGIN - TASKBAR_CLEARANCE
         );
-        let top = ask_placement_on(d, "standard", AskAnchor::TopCenter);
+        let top = ask_placement_on(d, AskAnchor::TopCenter);
         assert_eq!(top.y, d.y + PANEL_MARGIN);
-        let left = ask_placement_on(d, "standard", AskAnchor::Left);
+        let left = ask_placement_on(d, AskAnchor::Left);
         assert_eq!(left.x, d.x + PANEL_MARGIN);
-        let right = ask_placement_on(d, "standard", AskAnchor::Right);
+        let right = ask_placement_on(d, AskAnchor::Right);
         assert_eq!(right.x + right.width, d.x + d.width - PANEL_MARGIN);
-        let centre = ask_placement_on(d, "standard", AskAnchor::Center);
+        let centre = ask_placement_on(d, AskAnchor::Center);
         assert_eq!(centre.x + centre.width / 2.0, d.x + d.width / 2.0);
     }
 
@@ -5810,27 +6205,25 @@ mod tests {
             PORTRAIT,
             screen(3840.0, 2160.0),
         ] {
-            for preset in ["mini", "compact", "standard", "large"] {
-                for anchor in [
-                    AskAnchor::Center,
-                    AskAnchor::TopCenter,
-                    AskAnchor::BottomCenter,
-                    AskAnchor::Left,
-                    AskAnchor::Right,
-                ] {
-                    let p = ask_placement_on(display, preset, anchor);
-                    assert!(
-                        p.width >= ASK_FRAME_FLOOR_WIDTH && p.height >= ASK_FRAME_FLOOR_HEIGHT,
-                        "{preset} {anchor:?} on {display:?} is too small: {p:?}"
-                    );
-                    assert!(
-                        p.x >= display.x
-                            && p.y >= display.y
-                            && p.x + p.width <= display.x + display.width + 0.01
-                            && p.y + p.height <= display.y + display.height + 0.01,
-                        "{preset} {anchor:?} escaped {display:?}: {p:?}"
-                    );
-                }
+            for anchor in [
+                AskAnchor::Center,
+                AskAnchor::TopCenter,
+                AskAnchor::BottomCenter,
+                AskAnchor::Left,
+                AskAnchor::Right,
+            ] {
+                let p = ask_placement_on(display, anchor);
+                assert!(
+                    p.width >= ASK_FRAME_FLOOR_WIDTH && p.height >= ASK_FRAME_FLOOR_HEIGHT,
+                    "{anchor:?} on {display:?} is too small: {p:?}"
+                );
+                assert!(
+                    p.x >= display.x
+                        && p.y >= display.y
+                        && p.x + p.width <= display.x + display.width + 0.01
+                        && p.y + p.height <= display.y + display.height + 0.01,
+                    "{anchor:?} escaped {display:?}: {p:?}"
+                );
             }
         }
     }
@@ -5849,8 +6242,7 @@ mod tests {
             AskAnchor::Custom,
         ] {
             for (mon_w, mon_h) in [(1024.0, 600.0), (1920.0, 1080.0), (3840.0, 2160.0)] {
-                let (w, h) =
-                    ask_size_for_display(mon_w, mon_h, "large", crate::settings::AskAnchor::Center);
+                let (w, h) = ask_size_for_display(mon_w, mon_h, crate::settings::AskAnchor::Center);
                 let (x, y) = anchor_position(anchor, screen(mon_w, mon_h), w, h);
                 assert!(
                     x >= 0.0 && y >= 0.0,

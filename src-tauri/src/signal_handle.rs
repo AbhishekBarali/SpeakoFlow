@@ -28,15 +28,13 @@ pub fn send_transcription_input(app: &AppHandle, binding_id: &str, source: &str)
     }
     // Same rule as the hotkey path (see `shortcut::handler`): an assistant
     // trigger must not hang up a live voice conversation that is already
-    // listening — it surfaces the panel instead. Dictation still ends it,
-    // because it needs the same microphone.
-    if crate::voice_conversation::is_active(app) {
-        if crate::assistant::is_assistant_binding(binding_id) {
-            crate::assistant::show_assistant_panel(app);
-            return;
-        }
-        // Hanging up closes the panel (see `shortcut::handler`).
-        crate::assistant::hide_assistant_panel(app);
+    // listening — it surfaces the panel instead. Dictation leaves the call up
+    // too: it holds the call's microphone while it records.
+    if crate::voice_conversation::is_active(app)
+        && crate::assistant::is_assistant_binding(binding_id)
+    {
+        crate::assistant::show_assistant_panel(app);
+        return;
     }
     if let Some(c) = app.try_state::<TranscriptionCoordinator>() {
         // External triggers can't "hold", so they always run hands-free (lock).

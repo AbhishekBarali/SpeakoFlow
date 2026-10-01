@@ -16,6 +16,7 @@
 
 import { emit } from "@tauri-apps/api/event";
 import { useEffect } from "react";
+import { suppressBrowserContextMenu } from "@/lib/contextMenu";
 
 /**
  * The surfaces that are genuinely visible and clickable in each form the window
@@ -82,14 +83,21 @@ export type MeasuredSurface = {
  *
  * An earlier version of this had two cases and sent an empty rect for both, which
  * would have made a live call impossible to hang up.
+ *
+ * `rects` is every drawn surface on its own, and it is what Rust hit-tests; `rect`
+ * is their bounding box, kept for logging and as a fallback. Testing against the
+ * bounding box alone was a bug of its own: a call's status bubble ("Searching the
+ * web · …") is far wider than the bar under it, so the box around the two took in
+ * the empty corners either side of the bar, and the app underneath stopped
+ * responding to the mouse there for as long as the bubble was up.
  */
 export type HitRegion =
   | { kind: "unknown" }
   | { kind: "none" }
-  | { kind: "rect"; rect: HitRect };
+  | { kind: "rect"; rect: HitRect; rects: HitRect[] };
 
 /**
- * The union of every drawn surface, in PHYSICAL pixels.
+ * Every drawn surface, in PHYSICAL pixels, plus the box around them.
  *
  * Pure and separate from the DOM walk below, because this is the arithmetic that
  * decides whether the user's desktop is reachable, and it should be answerable in
@@ -106,6 +114,8 @@ export function unionHitRect(
 ): HitRegion {
   if (surfaces.length === 0) return { kind: "unknown" };
 
+  const scale = dpr > 0 ? dpr : 1;
+  const rects: HitRect[] = [];
   let left = Infinity;
   let top = Infinity;
   let right = -Infinity;
@@ -115,14 +125,19 @@ export function unionHitRect(
     if (!surface.drawn) continue;
     if (surface.right <= surface.left || surface.bottom <= surface.top)
       continue;
+    rects.push({
+      x: surface.left * scale,
+      y: surface.top * scale,
+      width: (surface.right - surface.left) * scale,
+      height: (surface.bottom - surface.top) * scale,
+    });
     left = Math.min(left, surface.left);
     top = Math.min(top, surface.top);
     right = Math.max(right, surface.right);
     bottom = Math.max(bottom, surface.bottom);
   }
 
-  if (!Number.isFinite(left) || !Number.isFinite(top)) return { kind: "none" };
-  const scale = dpr > 0 ? dpr : 1;
+  if (rects.length === 0) return { kind: "none" };
   return {
     kind: "rect",
     rect: {
@@ -131,6 +146,7 @@ export function unionHitRect(
       width: (right - left) * scale,
       height: (bottom - top) * scale,
     },
+    rects,
   };
 }
 
@@ -168,22 +184,28 @@ export function measureHitRegion(root: ParentNode = document): HitRegion {
 function payloadFor(region: HitRegion) {
   switch (region.kind) {
     case "rect":
-      return region.rect;
+      // The box is sent alongside the list so the payload still reads as one
+      // rect to anything that only understands that shape.
+      return { ...region.rect, rects: region.rects };
     case "none":
-      return { x: 0, y: 0, width: 0, height: 0 };
+      return { x: 0, y: 0, width: 0, height: 0, rects: [] };
     case "unknown":
       return { tangible: true };
   }
 }
 
+const sameRect = (a: HitRect, b: HitRect) =>
+  Math.abs(a.x - b.x) <= CHANGE_EPSILON &&
+  Math.abs(a.y - b.y) <= CHANGE_EPSILON &&
+  Math.abs(a.width - b.width) <= CHANGE_EPSILON &&
+  Math.abs(a.height - b.height) <= CHANGE_EPSILON;
+
 function sameRegion(a: HitRegion | null, b: HitRegion): boolean {
   if (a === null || a.kind !== b.kind) return false;
   if (a.kind !== "rect" || b.kind !== "rect") return true;
   return (
-    Math.abs(a.rect.x - b.rect.x) <= CHANGE_EPSILON &&
-    Math.abs(a.rect.y - b.rect.y) <= CHANGE_EPSILON &&
-    Math.abs(a.rect.width - b.rect.width) <= CHANGE_EPSILON &&
-    Math.abs(a.rect.height - b.rect.height) <= CHANGE_EPSILON
+    a.rects.length === b.rects.length &&
+    a.rects.every((rect, i) => sameRect(rect, b.rects[i]))
   );
 }
 
@@ -238,28 +260,19 @@ export function usePanelHitRegion(active: boolean): void {
 }
 
 /**
- * Suppress WebView2's own context menu, except where it is the right answer.
+ * Suppress the web view's own context menu in the panel — the window-wide rule
+ * in `lib/contextMenu.ts`, kept as a hook so the panel states it where it sets
+ * up the rest of its pointer handling.
  *
- * On an ordinary app window the built-in menu is harmless. On a transparent HUD it
- * is the tell that gave the bug away: a right-click meant for the desktop answered
- * with Copy / Copy link to highlight / Print / Inspect, from a window the user
- * could not see. Pass-through means those clicks no longer reach the webview at
- * all, but a right-click on the pill itself would still raise it, and a browser
- * menu is not a sensible answer for a voice chip.
- *
- * A text field is the exception, and not a grudging one: right-click to paste into
- * the prompt is something people reasonably expect, and blocking it there would
- * trade one small annoyance for another.
+ * On an ordinary app window the built-in menu is merely out of place. On a
+ * transparent HUD it is the tell that gave the bug away: a right-click meant for
+ * the desktop answered with Copy / Copy link to highlight / Print / Inspect, from
+ * a window the user could not see. Pass-through means those clicks no longer
+ * reach the webview at all, but a right-click on the pill itself would still
+ * raise it, and a browser menu is not a sensible answer for a voice chip.
  */
 export function useSuppressContextMenu(): void {
   useEffect(() => {
-    const block = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (target?.closest?.("input, textarea, [contenteditable='true']"))
-        return;
-      event.preventDefault();
-    };
-    window.addEventListener("contextmenu", block);
-    return () => window.removeEventListener("contextmenu", block);
+    suppressBrowserContextMenu();
   }, []);
 }

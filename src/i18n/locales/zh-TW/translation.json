@@ -147,8 +147,7 @@
       "progress": "第 {{current}} 步，共 {{total}} 步",
       "steps": {
         "setup": "設定",
-        "tour": "導覽",
-        "finish": "開始"
+        "tour": "導覽"
       }
     },
     "setup": {
@@ -161,7 +160,7 @@
       "count": "{{current}} / {{total}}",
       "skip": "略過導覽",
       "next": "下一步",
-      "done": "繼續",
+      "finish": "開啟 SpeakoFlow",
       "tabs": {
         "dictate": "語音輸入",
         "ask": "助理",
@@ -171,6 +170,15 @@
         "hold": "按住說話",
         "tap": "點按開始，再點按停止",
         "call": "按一下開始，再按一下掛斷"
+      },
+      "steps": {
+        "label": "使用方式",
+        "speak": "說出您想輸入的內容",
+        "typed": "文字會出現在游標處",
+        "select": "選取文字（選用）",
+        "use": "插入回答，或直接閱讀",
+        "talk": "直接說話",
+        "answer": "它會出聲回答"
       },
       "mail": {
         "window": "新郵件",
@@ -219,15 +227,6 @@
         "assistant": "助理",
         "said": "幫我規劃一段星期五團隊會議上的簡短分享。",
         "reply": "沒問題。先從你最自豪的一項成果開始，說明兩個成功的原因，最後以接下來的計畫收尾。"
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "已就緒",
-        "installing": "安裝中…",
-        "percent": "{{percent}}%",
-        "retry": "重試",
-        "waiting": "等待中"
       }
     },
     "subtitle": "首先，請選擇一種模型",
@@ -460,8 +459,7 @@
     },
     "frame": {
       "setup": "設定",
-      "tour": "導覽",
-      "finish": "開始"
+      "tour": "導覽"
     },
     "welcome": {
       "line": "開口說，它就打字。提出問題，它就回答。",
@@ -486,33 +484,6 @@
       "continue": "繼續",
       "later": "稍後再設定",
       "loading": "正在尋找您的語音模型"
-    },
-    "start": {
-      "ready": {
-        "title": "現在就試試看"
-      },
-      "downloading": {
-        "title": "快好了"
-      },
-      "failed": {
-        "title": "下載已中斷"
-      },
-      "none": {
-        "title": "選擇語音模型以開始使用"
-      },
-      "progress": {
-        "of": "{{done}} / {{total}}",
-        "failed": "未能完成。要再試一次嗎？",
-        "underMinute": "剩不到一分鐘",
-        "minutes_other": "大約還剩 {{count}} 分鐘"
-      },
-      "try": {
-        "label": "試用語音輸入",
-        "placeholder": "您說的話會顯示在這裡…",
-        "success": "就是這樣。在每個應用程式中都能使用。"
-      },
-      "open": "開啟 SpeakoFlow",
-      "choose": "選擇語音模型"
     }
   },
   "modelSelector": {
@@ -1846,14 +1817,6 @@
           "large": "大",
           "extraLarge": "特大"
         },
-        "panelSizeLabel": "面板大小",
-        "panelSizeDescription": "助理浮動面板的整體大小。",
-        "panelSizes": {
-          "mini": "小",
-          "compact": "精簡",
-          "standard": "標準",
-          "large": "大"
-        },
         "askDisplayLabel": "顯示在哪個螢幕",
         "askDisplayDescription": "助理開啟時所在的螢幕。預設為滑鼠所在的螢幕。",
         "askDisplays": {
@@ -1976,7 +1939,9 @@
     },
     "delete": {
       "action": "刪除會議",
-      "whileRecording": "請先停止錄製，再刪除這場會議。"
+      "whileRecording": "請先停止錄製，再刪除這場會議。",
+      "confirmTitle": "刪除這個會議？",
+      "confirmBody": "它的逐字稿、筆記和音訊將從這台電腦刪除。此操作無法復原。"
     },
     "detail": {
       "title": "會議",
@@ -2220,6 +2185,7 @@
       "details": "詳細資訊",
       "startHint": "開始說話，或輸入訊息。",
       "mutedHint": "麥克風已關閉。您仍可輸入文字。",
+      "heldHint": "語音輸入期間已暫停。",
       "preparingVoice": "正在準備語音… {{progress}}%",
       "history": {
         "title": "過去的對話",
@@ -2256,6 +2222,7 @@
         "responding": "思考中…",
         "speaking": "說話中",
         "muted": "麥克風已關閉",
+        "held": "因語音輸入已暫停",
         "error": "通話中斷"
       },
       "errors": {
@@ -2904,7 +2871,6 @@
       "replyLength": "回答通常的長度。",
       "history": "它會記住多少則最近的訊息。",
       "summarize": "濃縮較長的對話，讓它不會忘記開頭的內容。",
-      "panelSize": "面板佔用多少螢幕空間。",
       "opacity": "數值越低，越能透出後方的桌面。",
       "position": "點選螢幕上的一個位置。",
       "display": "面板開啟時所在的螢幕。"
@@ -2977,7 +2943,6 @@
     "panel": {
       "where": "開啟位置",
       "text": "文字大小",
-      "size": "面板大小",
       "opacity": "不透明度",
       "screen": "顯示螢幕"
     }

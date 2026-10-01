@@ -1,8 +1,8 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
     history::{
-        AssistantHistoryEntry, EntryOutcome, HistoryManager, PaginatedAssistantHistory,
-        PaginatedHistory, UsageStats,
+        AssistantHistoryEntry, AssistantHistoryFilter, EntryOutcome, HistoryManager,
+        PaginatedAssistantHistory, PaginatedHistory, UsageStats,
     },
     transcription::TranscriptionManager,
 };
@@ -330,6 +330,26 @@ pub async fn get_assistant_history_entries(
         .get_assistant_history_entries(cursor, limit)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Search and filter saved conversations, most recently active first (the
+/// call's history view, and a meeting's "earlier discussions").
+#[tauri::command]
+#[specta::specta]
+pub async fn list_assistant_conversations(
+    history_manager: State<'_, Arc<HistoryManager>>,
+    filter: AssistantHistoryFilter,
+    offset: usize,
+    limit: usize,
+) -> Result<PaginatedAssistantHistory, String> {
+    let history_manager = history_manager.inner().clone();
+    // Search reads every message of every conversation; keep it off the runtime.
+    tauri::async_runtime::spawn_blocking(move || {
+        history_manager.list_assistant_conversations(&filter, offset, limit)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
 }
 
 /// One saved assistant conversation with its messages, loaded when the History

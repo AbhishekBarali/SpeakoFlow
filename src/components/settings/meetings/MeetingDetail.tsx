@@ -11,8 +11,12 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import {
+  CalendarDays,
   Check,
+  ChevronDown,
+  Clock,
   Copy,
+  FileText,
   Pencil,
   RefreshCw,
   Sparkles,
@@ -20,9 +24,9 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Dropdown } from "@/components/ui/Dropdown";
-import { Textarea } from "@/components/ui/Textarea";
-import { formatDateTime } from "@/utils/dateFormat";
+import { MenuButton, type MenuItem } from "@/components/ui/Menu";
+import { BackLink } from "@/components/ui/Page";
+import { Tabs } from "@/components/ui/Tabs";
 import {
   DEFAULT_NOTES_TEMPLATE,
   generateMeetingNotes,
@@ -45,7 +49,7 @@ import {
   type SegmentEvent,
 } from "./api";
 import {
-  formatClock,
+  formatDuration,
   itemFromEvent,
   itemFromSegment,
   meetingDurationMs,
@@ -53,6 +57,11 @@ import {
   type TranscriptItem,
 } from "./speakers";
 import { MeetingAskPanel } from "./MeetingAskPanel";
+import {
+  DiscussButton,
+  EarlierDiscussions,
+  useMeetingDiscuss,
+} from "./MeetingDiscuss";
 import { toggleTaskAt } from "./notesTasks";
 import { SpeakerIdentification } from "./SpeakerIdentification";
 import { TranscriptView } from "./TranscriptView";
@@ -64,6 +73,9 @@ interface MeetingDetailProps {
   recordingMeetingId: number | null;
   /** Told when the title changes so the list behind this page agrees with it. */
   onChanged: () => void;
+  /** Back to the list. */
+  onBack: () => void;
+  backLabel: string;
 }
 
 type DetailTab = "notes" | "transcript" | "summary" | "ask";
@@ -78,33 +90,36 @@ const NOTES_DEBOUNCE_MS = 700;
  *  turn into an endless request loop. */
 const MAX_TRANSCRIPT_PAGES = 100;
 
-/** Notes are markdown. Same rules as the assistant's replies so a summary reads
- *  like the rest of the app rather than like raw syntax. */
-const notesMarkdown: Components = {
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+/**
+ * Markdown for an answer in the Ask tab: the assistant's reply rules at the
+ * page's reading size, so an answer reads like the rest of the app rather than
+ * like raw syntax.
+ */
+const chatMarkdown: Components = {
+  p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
   ul: ({ children }) => (
-    <ul className="mb-2 list-disc space-y-1 ps-5 last:mb-0">{children}</ul>
+    <ul className="mb-3 list-disc space-y-1.5 ps-5 marker:text-muted-soft last:mb-0">
+      {children}
+    </ul>
   ),
   ol: ({ children }) => (
-    <ol className="mb-2 list-decimal space-y-1 ps-5 last:mb-0">{children}</ol>
+    <ol className="mb-3 list-decimal space-y-1.5 ps-5 marker:text-muted last:mb-0">
+      {children}
+    </ol>
   ),
-  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  li: ({ children }) => <li className="ps-1">{children}</li>,
   strong: ({ children }) => (
     <strong className="font-semibold text-ink">{children}</strong>
   ),
   em: ({ children }) => <em className="italic">{children}</em>,
   h1: ({ children }) => (
-    <p className="mb-1 mt-3 text-[13.5px] font-semibold text-ink first:mt-0">
-      {children}
-    </p>
+    <p className="mb-1.5 mt-4 font-semibold text-ink first:mt-0">{children}</p>
   ),
   h2: ({ children }) => (
-    <p className="mb-1 mt-3 text-[13.5px] font-semibold text-ink first:mt-0">
-      {children}
-    </p>
+    <p className="mb-1.5 mt-4 font-semibold text-ink first:mt-0">{children}</p>
   ),
   h3: ({ children }) => (
-    <p className="mb-1 mt-2 font-semibold text-ink first:mt-0">{children}</p>
+    <p className="mb-1.5 mt-3 font-semibold text-ink first:mt-0">{children}</p>
   ),
   code: ({ children }) => (
     <code className="rounded bg-mid-gray/15 px-1 py-0.5 font-mono text-[0.85em]">
@@ -112,22 +127,22 @@ const notesMarkdown: Components = {
     </code>
   ),
   pre: ({ children }) => (
-    <pre className="my-2 overflow-x-auto rounded-lg border border-hairline bg-mid-gray/10 p-3 text-[0.85em] [&_code]:bg-transparent [&_code]:p-0">
+    <pre className="my-3 overflow-x-auto rounded-lg border border-hairline bg-mid-gray/10 p-3 text-[0.85em] [&_code]:bg-transparent [&_code]:p-0">
       {children}
     </pre>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-2 border-s-2 border-hairline-strong ps-3 text-muted">
+    <blockquote className="my-3 border-s-2 border-hairline-strong ps-3 text-muted">
       {children}
     </blockquote>
   ),
 };
 
-const isTemplateId = (value: string | null): value is NotesTemplateId =>
-  value !== null && NOTES_TEMPLATES.includes(value as NotesTemplateId);
-
 /** How long the copy button says "Copied". */
 const COPIED_MS = 1600;
+
+const isTemplateId = (value: string | null): value is NotesTemplateId =>
+  value !== null && NOTES_TEMPLATES.includes(value as NotesTemplateId);
 
 /** The bits of a hast node the task renderer reads. */
 type TaskNode = {
@@ -142,40 +157,50 @@ type TaskNode = {
 /**
  * Markdown for the finished notes.
  *
- * Styled as a document rather than as a chat reply: section headings are small
- * labels so the content, not the scaffolding, carries the page; topic headings
- * are the scannable spine; and next steps render as real checkboxes that save,
- * because a task list you can tick off is the part of the notes people actually
- * return to.
+ * Set as a document at reading size: each `##` section is a real heading with
+ * a hairline above it, topics are the scannable spine under it, and next steps
+ * render as real checkboxes that save, because a task list you can tick off is
+ * the part of the notes people actually return to. The headings used to be
+ * 11px uppercase labels over 13.5px text, which made the page dense enough to
+ * skim past.
  */
 const summaryMarkdown = (
   onToggleTask: (offset: number) => void,
   toggleLabel: string,
 ): Components => ({
-  ...notesMarkdown,
-  h1: ({ children }) => <SectionLabel>{children}</SectionLabel>,
-  h2: ({ children }) => <SectionLabel>{children}</SectionLabel>,
+  ...chatMarkdown,
+  h1: ({ children }) => <SectionHeading>{children}</SectionHeading>,
+  h2: ({ children }) => <SectionHeading>{children}</SectionHeading>,
   h3: ({ children }) => (
-    <h4 className="mb-1 mt-3.5 text-[13.5px] font-semibold text-ink first:mt-0">
+    <h4 className="mb-1.5 mt-6 text-[0.9375rem] font-semibold text-ink first:mt-0">
       {children}
     </h4>
   ),
   p: ({ children }) => (
-    <p className="mb-2 text-[13.5px] leading-relaxed text-body last:mb-0">
+    <p className="mb-3.5 text-[0.9375rem] leading-[1.75] text-body last:mb-0">
       {children}
     </p>
   ),
   ul: ({ className, children }) =>
     className?.includes("contains-task-list") ? (
-      <ul className="mb-2 space-y-1.5 last:mb-0">{children}</ul>
+      <ul className="mb-4 space-y-2.5 last:mb-0">{children}</ul>
     ) : (
-      <ul className="mb-2 list-disc space-y-1 ps-5 marker:text-muted-soft last:mb-0">
+      <ul className="mb-4 list-disc space-y-2 ps-5 marker:text-muted-soft last:mb-0">
         {children}
       </ul>
     ),
+  ol: ({ children }) => (
+    <ol className="mb-4 list-decimal space-y-2 ps-5 marker:text-muted last:mb-0">
+      {children}
+    </ol>
+  ),
   li: ({ node, className, children }) => {
     if (!className?.includes("task-list-item"))
-      return <li className="text-[13.5px] leading-relaxed">{children}</li>;
+      return (
+        <li className="ps-1 text-[0.9375rem] leading-[1.7] text-body">
+          {children}
+        </li>
+      );
     const task = node as TaskNode | undefined;
     const box = task?.children?.find(
       (child) => child.type === "element" && child.tagName === "input",
@@ -183,7 +208,7 @@ const summaryMarkdown = (
     const checked = Boolean(box?.properties?.checked);
     const offset = task?.position?.start.offset;
     return (
-      <li className="flex items-start gap-2.5 text-[13.5px] leading-relaxed">
+      <li className="flex items-start gap-3 text-[0.9375rem] leading-[1.7] text-body">
         <button
           type="button"
           role="checkbox"
@@ -192,13 +217,13 @@ const summaryMarkdown = (
           title={toggleLabel}
           disabled={offset === undefined}
           onClick={() => offset !== undefined && onToggleTask(offset)}
-          className={`mt-[3px] flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+          className={`mt-[4px] grid h-[18px] w-[18px] shrink-0 cursor-pointer place-items-center rounded-[6px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
             checked
-              ? "border-accent bg-accent text-white"
-              : "border-hairline-strong hover:border-ink/50"
+              ? "border-accent bg-accent text-on-primary"
+              : "border-hairline-strong bg-surface hover:border-ink/50"
           }`}
         >
-          {checked && <Check size={11} strokeWidth={3} />}
+          {checked && <Check className="h-3 w-3" strokeWidth={3} />}
         </button>
         <span
           className={`min-w-0 flex-1 ${checked ? "text-muted line-through decoration-muted-soft" : ""}`}
@@ -213,13 +238,31 @@ const summaryMarkdown = (
   input: () => null,
 });
 
-const SectionLabel: React.FC<{ children?: React.ReactNode }> = ({
+/** A `##` section of the notes. The first one sits flush with the top of the
+ *  document; every later one gets a hairline and room above it. */
+const SectionHeading: React.FC<{ children?: React.ReactNode }> = ({
   children,
 }) => (
-  <h3 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted first:mt-0">
+  <h3 className="mb-3 mt-9 border-t border-hairline pt-7 font-display text-[1.0625rem] text-ink first:mt-0 first:border-t-0 first:pt-0">
     {children}
   </h3>
 );
+
+/** "Oct 1, 2026, 6:16 PM": the full date, since a detail page has no day
+ *  heading above it. */
+const formatWhen = (seconds: number, locale: string): string => {
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(seconds * 1000));
+  } catch {
+    return new Date(seconds * 1000).toLocaleString();
+  }
+};
+
+const ICON_ACTION =
+  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[0.8125rem] font-medium text-muted transition-colors hover:bg-ink/6 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 aria-expanded:bg-ink/6 aria-expanded:text-ink";
 
 /**
  * One meeting: what the user thought, what was said, and what it added up to.
@@ -227,11 +270,17 @@ const SectionLabel: React.FC<{ children?: React.ReactNode }> = ({
  * The transcript is fetched in pages and then windowed, which is two different
  * problems with the same cause — an hour of speech is a thousand segments, and
  * neither one query nor one DOM tree wants all of them at once.
+ *
+ * The page's title is the meeting's own: it used to sit under a generic
+ * "Meeting" heading at 15px, so the one line that says which meeting this is
+ * was the smallest text in the header.
  */
 export const MeetingDetail: React.FC<MeetingDetailProps> = ({
   meetingId,
   recordingMeetingId,
   onChanged,
+  onBack,
+  backLabel,
 }) => {
   const { t, i18n } = useTranslation();
   // Summary first. It used to be "My thoughts", which made sense when notes only
@@ -591,381 +640,427 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
     return keys.size;
   }, [items]);
 
+  const discuss = useMeetingDiscuss(
+    meetingId,
+    isLive || meeting?.status === "recording",
+    (meeting?.segment_count ?? 0) > 0 ||
+      items.length > 0 ||
+      Boolean(meeting?.notes?.trim()),
+  );
+
+  const back = <BackLink label={backLabel} onClick={onBack} className="mb-3" />;
+
   if (!loaded) {
     return (
-      <p className="px-1 py-8 text-center text-[13px] text-muted">
-        {t("common.loading")}
-      </p>
+      <div className="w-full" aria-busy="true">
+        {back}
+        <div className="h-9 w-2/3 animate-pulse rounded-lg bg-surface-strong/70" />
+        <div className="mt-3 h-4 w-1/3 animate-pulse rounded bg-surface-strong/60" />
+        <div className="mt-9 h-64 animate-pulse rounded-2xl bg-surface-strong/50" />
+        <span className="sr-only">{t("common.loading")}</span>
+      </div>
     );
   }
 
   if (!meeting) {
     return (
-      <p className="px-1 py-8 text-center text-[13px] text-muted">
-        {t("meetings.detail.gone")}
-      </p>
+      <div className="w-full">
+        {back}
+        <p className="rounded-2xl border border-dashed border-hairline-strong px-6 py-12 text-center text-sm text-muted">
+          {t("meetings.detail.gone")}
+        </p>
+      </div>
     );
   }
 
   const durationMs = meetingDurationMs(meeting.started_at, meeting.ended_at);
-  const pill = [
-    spokenSpeakers > 0
-      ? t("meetings.list.speakers", { count: spokenSpeakers })
-      : null,
-    durationMs === null ? null : formatClock(durationMs),
-  ]
-    .filter((part): part is string => Boolean(part))
-    .join(" · ");
+  const statusPill =
+    meeting.status === "interrupted" || meeting.status === "processing"
+      ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+      : meeting.status === "recording"
+        ? "border-error/30 bg-error/10 text-error"
+        : null;
+
+  const templateItems: MenuItem[] = templateOptions.map((option) => ({
+    id: option.value,
+    label: option.label,
+    hint: t(`meetings.summary.templateHints.${option.value}`),
+    checked: option.value === template,
+    onSelect: () => setTemplate(option.value),
+  }));
+  const templateLabel =
+    templateOptions.find((option) => option.value === template)?.label ?? "";
+
+  const templatePicker = (
+    <MenuButton
+      items={templateItems}
+      width={300}
+      disabled={generating}
+      ariaLabel={t("meetings.summary.template")}
+      title={t("meetings.summary.template")}
+      className={ICON_ACTION}
+    >
+      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+      {templateLabel}
+      <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+    </MenuButton>
+  );
 
   return (
-    <div className="space-y-4">
-      {/* Title + the "2 speakers · 38:59" summary line. */}
-      <div className="space-y-2">
-        {titleDraft === null ? (
-          <div className="flex items-center gap-2">
-            <h3 className="min-w-0 truncate text-[15px] font-medium text-ink">
-              {meeting.title}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setTitleDraft(meeting.title)}
-              title={t("meetings.detail.rename")}
-              aria-label={t("meetings.detail.rename")}
-              className="shrink-0 cursor-pointer rounded-md p-1 text-muted-soft transition-colors hover:bg-ink/6 hover:text-ink"
-            >
-              <Pencil size={13} />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <input
-              value={titleDraft}
-              autoFocus
-              onChange={(event) => setTitleDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") commitTitle();
-                if (event.key === "Escape") setTitleDraft(null);
-              }}
-              aria-label={t("meetings.detail.rename")}
-              className="min-w-0 flex-1 rounded-lg border border-hairline-strong bg-surface px-2.5 py-1.5 text-[14px] text-ink focus:border-ink focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={commitTitle}
-              title={t("common.save")}
-              aria-label={t("common.save")}
-              className="cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-ink/6 hover:text-ink"
-            >
-              <Check size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setTitleDraft(null)}
-              title={t("common.cancel")}
-              aria-label={t("common.cancel")}
-              className="cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-ink/6 hover:text-ink"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
+    <div className="w-full">
+      {back}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {pill && (
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-strong px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-muted">
-              <Users size={11} />
-              {pill}
-            </span>
+      {/* The meeting's own title is the page title, with the facts under it
+          and the one action that leaves the page beside it. */}
+      <header className="mb-7 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0 flex-1">
+          {titleDraft === null ? (
+            <div className="group flex items-start gap-1.5">
+              <h1 className="min-w-0 font-display text-[1.75rem] text-ink [overflow-wrap:anywhere]">
+                {meeting.title}
+              </h1>
+              <button
+                type="button"
+                onClick={() => setTitleDraft(meeting.title)}
+                title={t("meetings.detail.rename")}
+                aria-label={t("meetings.detail.rename")}
+                className="mt-1.5 grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-soft opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 hover:bg-ink/6 hover:text-ink focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <input
+                value={titleDraft}
+                autoFocus
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") commitTitle();
+                  if (event.key === "Escape") setTitleDraft(null);
+                }}
+                aria-label={t("meetings.detail.rename")}
+                className="h-11 min-w-0 flex-1 rounded-xl border border-hairline-strong bg-surface px-3.5 font-display text-[1.25rem] text-ink focus:border-ink focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={commitTitle}
+                title={t("common.save")}
+                aria-label={t("common.save")}
+                className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-ink/6 hover:text-ink"
+              >
+                <Check className="h-[18px] w-[18px]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setTitleDraft(null)}
+                title={t("common.cancel")}
+                aria-label={t("common.cancel")}
+                className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-ink/6 hover:text-ink"
+              >
+                <X className="h-[18px] w-[18px]" />
+              </button>
+            </div>
           )}
-          <span className="text-[11.5px] text-muted-soft">
-            {formatDateTime(String(meeting.started_at), i18n.language)}
-          </span>
-        </div>
-      </div>
 
-      {/* Tabs across the top, the same segmented control the History filters use. */}
-      <div
-        className="inline-flex items-center rounded-lg bg-surface-strong p-0.5"
-        role="group"
-        aria-label={t("meetings.detail.tabsLabel")}
-      >
-        {(
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays
+                className="h-4 w-4 text-muted-soft"
+                aria-hidden="true"
+              />
+              {formatWhen(meeting.started_at, i18n.language)}
+            </span>
+            {durationMs !== null && (
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <Clock className="h-4 w-4 text-muted-soft" aria-hidden="true" />
+                {formatDuration(durationMs, i18n.language)}
+              </span>
+            )}
+            {spokenSpeakers > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-muted-soft" aria-hidden="true" />
+                {t("meetings.list.speakers", { count: spokenSpeakers })}
+              </span>
+            )}
+            {statusPill && (
+              <span
+                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusPill}`}
+              >
+                {t(`meetings.status.${meeting.status}`)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="shrink-0">
+          <DiscussButton model={discuss} />
+        </div>
+      </header>
+
+      <Tabs
+        label={t("meetings.detail.tabsLabel")}
+        value={tab}
+        onChange={(value) => {
+          // Leaving the notes tab is a good moment to stop trusting a timer.
+          if (tab === "notes" && value !== "notes") flushNotes();
+          setTab(value);
+        }}
+        items={(
           [
             ["summary", "meetings.tabs.summary"],
             ["ask", "meetings.tabs.ask"],
             ["transcript", "meetings.tabs.transcript"],
             ["notes", "meetings.tabs.myNotes"],
           ] as const
-        ).map(([value, labelKey]) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={tab === value}
-            onClick={() => {
-              // Leaving the notes tab is a good moment to stop trusting a timer.
-              if (tab === "notes" && value !== "notes") flushNotes();
-              setTab(value);
-            }}
-            className={`cursor-pointer rounded-[7px] px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-              tab === value
-                ? "bg-surface text-ink shadow-sm"
-                : "text-muted hover:text-ink"
-            }`}
-          >
-            {t(labelKey)}
-          </button>
-        ))}
-      </div>
+        ).map(([id, labelKey]) => ({ id, label: t(labelKey) }))}
+      />
 
-      {tab === "notes" && (
-        <div className="rounded-2xl border border-hairline bg-surface elev-card p-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-xs text-muted">
-              {t("meetings.myNotes.description")}
-            </p>
-            <span className="shrink-0 text-[11px] text-muted-soft">
-              {notesState === "saving"
-                ? t("meetings.myNotes.saving")
-                : notesState === "saved"
-                  ? t("meetings.myNotes.saved")
-                  : null}
-            </span>
-          </div>
-          <Textarea
-            value={myNotes}
-            onChange={(event) => onMyNotesChange(event.target.value)}
-            onBlur={flushNotes}
-            placeholder={t("meetings.myNotes.placeholder")}
-            className="min-h-[220px] w-full"
-          />
-        </div>
-      )}
-
-      {tab === "transcript" && (
-        <div className="space-y-3">
-          <SpeakerIdentification
-            meetingId={meetingId}
-            diarized={meeting.diarized}
-            hasSystemAudio={meeting.system_file !== null}
-            isLive={isLive}
-            onLabelled={() => {
-              // Labels changed every system-side row, so both the transcript and
-              // the speaker list have to be re-read rather than patched.
-              void getMeeting(meetingId)
-                .then((fresh) => {
-                  if (fresh) setMeeting(fresh);
-                })
-                .catch(() => {});
-              refreshSpeakers();
-              void getMeetingSegments(meetingId, SEGMENT_PAGE_SIZE, 0)
-                .then((result) =>
-                  setItems(result.segments.map(itemFromSegment)),
-                )
-                .catch(() => {});
-              onChanged();
-            }}
-          />
-          <div className="rounded-2xl border border-hairline bg-surface elev-card">
-            <TranscriptView
-              items={items}
-              speakers={speakers}
-              onRenameSpeaker={renameSpeaker}
-              heightClassName="max-h-[520px]"
-              emptyLabel={
-                transcriptLoading
-                  ? t("common.loading")
-                  : t("meetings.transcript.empty")
-              }
-              resetKey={meetingId}
-              footer={
-                transcriptLoading && items.length > 0 ? (
-                  <p className="py-2 text-center text-[11.5px] text-muted-soft">
-                    {t("meetings.transcript.loadingMore")}
-                  </p>
-                ) : null
-              }
-            />
-          </div>
-        </div>
-      )}
-
-      {tab === "ask" && (
-        <MeetingAskPanel
-          meetingId={meetingId}
-          hasTranscript={items.length > 0}
-          markdown={notesMarkdown}
-        />
-      )}
-
-      {tab === "summary" && (
-        <div className="space-y-3">
-          {/* The notes are the page. They are written automatically when the
-              call ends, so the controls that act on them — copy, pick another
-              template, rewrite — sit in one quiet row on top of the document
-              instead of in a second card below it. */}
-          <div className="rounded-2xl border border-hairline bg-surface elev-card">
-            {(meeting.notes || generating) && (
-              <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-2.5">
-                <span
-                  className="min-w-0 flex-1 truncate text-[11.5px] text-muted-soft"
-                  role={generating ? "status" : undefined}
-                >
-                  {generating ? (
-                    <span className="inline-flex items-center gap-1.5 text-muted">
-                      <Sparkles size={12} className="animate-pulse" />
-                      {meeting.notes
-                        ? t("meetings.summary.generating")
-                        : t("meetings.summary.writing")}
-                    </span>
-                  ) : (
-                    t("meetings.summary.autoCaption")
-                  )}
-                </span>
-                {meeting.notes && (
-                  <button
-                    type="button"
-                    onClick={copyNotes}
-                    title={
-                      copied
-                        ? t("meetings.summary.copied")
-                        : t("meetings.summary.copy")
-                    }
-                    aria-label={
-                      copied
-                        ? t("meetings.summary.copied")
-                        : t("meetings.summary.copy")
-                    }
-                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs text-muted transition-colors hover:bg-ink/6 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                  >
-                    {copied ? <Check size={13} /> : <Copy size={13} />}
-                    {copied
-                      ? t("meetings.summary.copied")
-                      : t("meetings.summary.copy")}
-                  </button>
-                )}
-                {items.length > 0 && (
-                  <>
-                    <div
-                      className="min-w-[150px]"
-                      title={t(`meetings.summary.templateHints.${template}`)}
-                    >
-                      <Dropdown
-                        options={templateOptions}
-                        selectedValue={template}
-                        onSelect={(value) =>
-                          setTemplate(value as NotesTemplateId)
-                        }
-                        disabled={generating}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={generate}
-                      disabled={generating}
-                      title={t("meetings.summary.regenerate")}
-                      aria-label={t("meetings.summary.regenerate")}
-                      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs text-muted transition-colors hover:bg-ink/6 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <RefreshCw
-                        size={13}
-                        className={generating ? "animate-spin" : ""}
-                      />
-                      {t("meetings.summary.regenerate")}
-                    </button>
-                  </>
-                )}
+      <div className="mt-6">
+        {tab === "summary" && (
+          <div className="space-y-4">
+            {skippedWindows > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-4 py-3 text-sm leading-relaxed text-ink">
+                {t("meetings.summary.skipped", { count: skippedWindows })}
               </div>
             )}
 
-            {meeting.notes ? (
+            {notesError && !generating && (
               <div
-                className={`px-5 py-4 transition-opacity ${
-                  generating ? "opacity-50" : ""
-                }`}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-error/30 bg-error/[0.06] px-4 py-3"
+                role="alert"
               >
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={summaryComponents}
-                >
-                  {meeting.notes}
-                </ReactMarkdown>
-              </div>
-            ) : generating ? (
-              <div className="space-y-2.5 px-5 py-5" aria-hidden="true">
-                {/* A skeleton of the document that is coming, so the wait reads
-                    as progress rather than as an empty page. */}
-                <div className="h-3 w-24 animate-pulse rounded bg-mid-gray/15" />
-                <div className="h-3 w-full animate-pulse rounded bg-mid-gray/10" />
-                <div className="h-3 w-5/6 animate-pulse rounded bg-mid-gray/10" />
-                <div className="mt-5 h-3 w-28 animate-pulse rounded bg-mid-gray/15" />
-                <div className="h-3 w-2/3 animate-pulse rounded bg-mid-gray/10" />
-                <div className="h-3 w-3/4 animate-pulse rounded bg-mid-gray/10" />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
-                <p className="text-[13px] text-muted">
-                  {items.length === 0
-                    ? t("meetings.summary.needsTranscript")
-                    : t("meetings.summary.retryCaption")}
+                <p className="min-w-[12rem] flex-1 text-sm leading-relaxed text-ink">
+                  {t("meetings.summary.failed", { error: notesError })}
                 </p>
                 {items.length > 0 && (
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <div className="min-w-[170px]">
-                      <Dropdown
-                        options={templateOptions}
-                        selectedValue={template}
-                        onSelect={(value) =>
-                          setTemplate(value as NotesTemplateId)
-                        }
-                      />
-                    </div>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={generate}
-                      className="gap-1.5"
-                    >
-                      <Sparkles size={13} />
-                      {t("meetings.summary.generate")}
-                    </Button>
-                  </div>
-                )}
-                {items.length > 0 && (
-                  <p className="text-[11.5px] text-muted-soft">
-                    {t(`meetings.summary.templateHints.${template}`)}
-                  </p>
+                  <Button variant="secondary" size="sm" onClick={generate}>
+                    {t("meetings.summary.tryAgain")}
+                  </Button>
                 )}
               </div>
             )}
-          </div>
 
-          {skippedWindows > 0 && (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2.5">
-              <p className="text-[12.5px] text-amber-700 dark:text-amber-300">
-                {t("meetings.summary.skipped", { count: skippedWindows })}
-              </p>
-            </div>
-          )}
-
-          {notesError && !generating && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-error/40 bg-error/10 px-3.5 py-2.5">
-              <p className="min-w-0 flex-1 text-[12.5px] text-error">
-                {t("meetings.summary.failed", { error: notesError })}
-              </p>
-              {items.length > 0 && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={generate}
-                  className="shrink-0"
-                >
-                  {t("meetings.summary.tryAgain")}
-                </Button>
+            {/* The notes are the page. They are written automatically when the
+                call ends, so the controls that act on them — pick another
+                template, rewrite, copy — sit in one quiet row on top of the
+                document instead of in a second card below it. */}
+            <article className="overflow-hidden rounded-2xl border border-hairline bg-surface elev-card">
+              {(meeting.notes || generating) && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-hairline px-4 py-2 sm:px-5">
+                  <span
+                    className="min-w-0 flex-1 truncate text-[0.8125rem] text-muted"
+                    role={generating ? "status" : undefined}
+                  >
+                    {generating ? (
+                      <span className="inline-flex items-center gap-2 text-body">
+                        <Sparkles
+                          className="h-3.5 w-3.5 text-accent motion-safe:animate-pulse"
+                          aria-hidden="true"
+                        />
+                        {meeting.notes
+                          ? t("meetings.summary.generating")
+                          : t("meetings.summary.writing")}
+                      </span>
+                    ) : (
+                      t("meetings.summary.autoCaption")
+                    )}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {items.length > 0 && (
+                      <>
+                        {templatePicker}
+                        <button
+                          type="button"
+                          onClick={generate}
+                          disabled={generating}
+                          title={t(
+                            `meetings.summary.templateHints.${template}`,
+                          )}
+                          className={ICON_ACTION}
+                        >
+                          <RefreshCw
+                            className={`h-3.5 w-3.5 ${generating ? "animate-spin" : ""}`}
+                            aria-hidden="true"
+                          />
+                          {t("meetings.summary.regenerate")}
+                        </button>
+                      </>
+                    )}
+                    {meeting.notes && (
+                      <button
+                        type="button"
+                        onClick={copyNotes}
+                        className={ICON_ACTION}
+                      >
+                        {copied ? (
+                          <Check
+                            className="h-3.5 w-3.5 text-success"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                        )}
+                        {copied
+                          ? t("meetings.summary.copied")
+                          : t("meetings.summary.copy")}
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
+
+              {meeting.notes ? (
+                <div
+                  className={`px-6 py-7 transition-opacity select-text sm:px-9 sm:py-8 ${
+                    generating ? "opacity-50" : ""
+                  }`}
+                >
+                  <div className="max-w-[70ch]">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={summaryComponents}
+                    >
+                      {meeting.notes}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              ) : generating ? (
+                <div className="space-y-3 px-6 py-8 sm:px-9" aria-hidden="true">
+                  {/* A skeleton of the document that is coming, so the wait
+                      reads as progress rather than as an empty page. */}
+                  <div className="h-4 w-28 animate-pulse rounded bg-mid-gray/15" />
+                  <div className="h-3.5 w-full animate-pulse rounded bg-mid-gray/10" />
+                  <div className="h-3.5 w-11/12 animate-pulse rounded bg-mid-gray/10" />
+                  <div className="h-3.5 w-3/4 animate-pulse rounded bg-mid-gray/10" />
+                  <div className="!mt-9 h-4 w-36 animate-pulse rounded bg-mid-gray/15" />
+                  <div className="h-3.5 w-2/3 animate-pulse rounded bg-mid-gray/10" />
+                  <div className="h-3.5 w-4/5 animate-pulse rounded bg-mid-gray/10" />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center px-6 py-12 text-center">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-surface-strong text-muted">
+                    <FileText className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted text-pretty">
+                    {items.length === 0
+                      ? t("meetings.summary.needsTranscript")
+                      : t("meetings.summary.retryCaption")}
+                  </p>
+                  {items.length > 0 && (
+                    <>
+                      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                        {templatePicker}
+                        <Button variant="primary" size="md" onClick={generate}>
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                          {t("meetings.summary.generate")}
+                        </Button>
+                      </div>
+                      <p className="mt-3 max-w-sm text-xs leading-relaxed text-muted-soft">
+                        {t(`meetings.summary.templateHints.${template}`)}
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </article>
+          </div>
+        )}
+
+        {tab === "ask" && (
+          <>
+            <MeetingAskPanel
+              meetingId={meetingId}
+              hasTranscript={items.length > 0}
+              markdown={chatMarkdown}
+            />
+            <EarlierDiscussions model={discuss} className="mt-8" />
+          </>
+        )}
+
+        {tab === "transcript" && (
+          <div className="space-y-4">
+            <SpeakerIdentification
+              meetingId={meetingId}
+              diarized={meeting.diarized}
+              hasSystemAudio={meeting.system_file !== null}
+              isLive={isLive}
+              onLabelled={() => {
+                // Labels changed every system-side row, so both the transcript
+                // and the speaker list have to be re-read rather than patched.
+                void getMeeting(meetingId)
+                  .then((fresh) => {
+                    if (fresh) setMeeting(fresh);
+                  })
+                  .catch(() => {});
+                refreshSpeakers();
+                void getMeetingSegments(meetingId, SEGMENT_PAGE_SIZE, 0)
+                  .then((result) =>
+                    setItems(result.segments.map(itemFromSegment)),
+                  )
+                  .catch(() => {});
+                onChanged();
+              }}
+            />
+            <div className="overflow-hidden rounded-2xl border border-hairline bg-surface elev-card">
+              <TranscriptView
+                items={items}
+                speakers={speakers}
+                onRenameSpeaker={renameSpeaker}
+                stickToBottom={isLive}
+                heightClassName="max-h-[min(42rem,calc(100vh-17rem))]"
+                emptyLabel={
+                  transcriptLoading
+                    ? t("common.loading")
+                    : t("meetings.transcript.empty")
+                }
+                resetKey={meetingId}
+                footer={
+                  transcriptLoading && items.length > 0 ? (
+                    <p className="pb-4 text-center text-xs text-muted-soft">
+                      {t("meetings.transcript.loadingMore")}
+                    </p>
+                  ) : null
+                }
+              />
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {tab === "notes" && (
+          <div className="overflow-hidden rounded-2xl border border-hairline bg-surface elev-card transition-colors focus-within:border-hairline-strong">
+            <div className="flex items-center justify-between gap-3 border-b border-hairline px-5 py-3">
+              <p className="min-w-0 text-[0.8125rem] leading-relaxed text-muted">
+                {t("meetings.myNotes.description")}
+              </p>
+              <span
+                className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-soft"
+                role="status"
+              >
+                {notesState === "saved" && (
+                  <Check
+                    className="h-3.5 w-3.5 text-success"
+                    aria-hidden="true"
+                  />
+                )}
+                {notesState === "saving"
+                  ? t("meetings.myNotes.saving")
+                  : notesState === "saved"
+                    ? t("meetings.myNotes.saved")
+                    : null}
+              </span>
+            </div>
+            <textarea
+              value={myNotes}
+              onChange={(event) => onMyNotesChange(event.target.value)}
+              onBlur={flushNotes}
+              placeholder={t("meetings.myNotes.placeholder")}
+              aria-label={t("meetings.tabs.myNotes")}
+              className="block min-h-[22rem] w-full resize-y bg-transparent px-6 py-5 text-[0.9375rem] leading-[1.75] text-ink placeholder:text-muted-soft select-text focus:outline-none sm:px-7"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

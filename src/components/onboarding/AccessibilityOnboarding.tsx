@@ -56,6 +56,14 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
   const [resetState, setResetState] = useState<"idle" | "resetting" | "done">(
     "idle",
   );
+  // macOS asks for the microphone exactly once. After an earlier "Don't Allow"
+  // (or a grant an update made stale) the request shows nothing, so "Waiting…"
+  // would never end and this screen has no way past it. After a few seconds,
+  // offer System Settings and a reset that makes macOS ask again.
+  const [microphoneStuck, setMicrophoneStuck] = useState(false);
+  const [micResetState, setMicResetState] = useState<
+    "idle" | "resetting" | "done"
+  >("idle");
 
   const isMacOS = permissionPlatform === "macos";
   const isWindows = permissionPlatform === "windows";
@@ -261,6 +269,12 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
     return () => clearTimeout(timer);
   }, [permissions.accessibility]);
 
+  useEffect(() => {
+    if (!isMacOS || permissions.microphone !== "waiting") return;
+    const timer = setTimeout(() => setMicrophoneStuck(true), STUCK_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [isMacOS, permissions.microphone]);
+
   const handleGrantAccessibility = async () => {
     try {
       await requestAccessibilityPermission();
@@ -327,6 +341,50 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
     }
   };
 
+  const handleOpenMicrophoneSettings = async () => {
+    const opened = await commands
+      .openMicrophonePrivacySettings()
+      .catch((error: unknown) => ({
+        status: "error" as const,
+        error: String(error),
+      }));
+    if (opened.status === "error") {
+      console.warn("Failed to open Microphone settings:", opened.error);
+      toast.error(t("onboarding.permissions.errors.requestFailed"));
+      return;
+    }
+    // The poll picks up the switch being turned on; restart it in case repeated
+    // errors had stopped it.
+    startPolling();
+  };
+
+  const handleResetMicrophone = async () => {
+    setMicResetState("resetting");
+    let reset: Awaited<
+      ReturnType<typeof commands.resetMacosMicrophonePermission>
+    >;
+    try {
+      reset = await commands.resetMacosMicrophonePermission();
+    } catch (error) {
+      reset = { status: "error", error: String(error) };
+    }
+    if (reset.status === "error") {
+      console.error("Failed to reset microphone permission:", reset.error);
+      toast.error(t("onboarding.permissions.errors.requestFailed"));
+      setMicResetState("idle");
+      return;
+    }
+    try {
+      // With the old decision gone, this shows the system prompt again.
+      await requestMicrophonePermission();
+    } catch (error) {
+      console.warn("Failed to re-request microphone permission:", error);
+    }
+    setPermissions((prev) => ({ ...prev, microphone: "waiting" }));
+    startPolling();
+    setMicResetState("done");
+  };
+
   const isChecking =
     permissionPlatform === null ||
     (isMacOS &&
@@ -364,25 +422,59 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
         />
         <ul className="mt-8 divide-y divide-hairline rounded-2xl border border-hairline bg-surface elev-card">
           {showMicrophonePermission && (
-            <li className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-strong text-ink">
-                <Mic className="h-[1.125rem] w-[1.125rem]" aria-hidden="true" />
-              </span>
-              <div className="min-w-[12rem] flex-1">
-                <h2 className="text-sm font-medium text-ink">
-                  {t("onboarding.permissions.microphone.title")}
-                </h2>
-                <p className="mt-0.5 text-[0.8125rem] text-muted">
-                  {t("onboarding.permissions.microphone.description")}
-                </p>
+            <li className="px-5 py-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-strong text-ink">
+                  <Mic
+                    className="h-[1.125rem] w-[1.125rem]"
+                    aria-hidden="true"
+                  />
+                </span>
+                <div className="min-w-[12rem] flex-1">
+                  <h2 className="text-sm font-medium text-ink">
+                    {t("onboarding.permissions.microphone.title")}
+                  </h2>
+                  <p className="mt-0.5 text-[0.8125rem] text-muted">
+                    {t("onboarding.permissions.microphone.description")}
+                  </p>
+                </div>
+                {status(permissions.microphone) ?? (
+                  <Button size="md" onClick={handleGrantMicrophone}>
+                    {isWindows
+                      ? t("accessibility.openSettings")
+                      : t("onboarding.permissions.grant")}
+                  </Button>
+                )}
               </div>
-              {status(permissions.microphone) ?? (
-                <Button size="md" onClick={handleGrantMicrophone}>
-                  {isWindows
-                    ? t("accessibility.openSettings")
-                    : t("onboarding.permissions.grant")}
-                </Button>
-              )}
+              {isMacOS &&
+                permissions.microphone === "waiting" &&
+                (microphoneStuck || micResetState === "done") && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 ps-[3.25rem]">
+                    <p
+                      className="min-w-0 flex-1 text-[0.8125rem] text-muted"
+                      role="status"
+                    >
+                      {t("errors.micPermissionDenied.macos")}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleOpenMicrophoneSettings}
+                    >
+                      {t("accessibility.openSettings")}
+                    </Button>
+                    {microphoneStuck && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleResetMicrophone}
+                        disabled={micResetState === "resetting"}
+                      >
+                        {t("onboarding.permissions.accessibility.reset")}
+                      </Button>
+                    )}
+                  </div>
+                )}
             </li>
           )}
 

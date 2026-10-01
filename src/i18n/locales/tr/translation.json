@@ -148,8 +148,7 @@
       "progress": "Adım {{current}}/{{total}}",
       "steps": {
         "setup": "Kurulum",
-        "tour": "Tur",
-        "finish": "Başla"
+        "tour": "Tur"
       }
     },
     "setup": {
@@ -162,7 +161,7 @@
       "count": "{{current}}/{{total}}",
       "skip": "Turu atla",
       "next": "İleri",
-      "done": "Devam et",
+      "finish": "SpeakoFlow'u aç",
       "tabs": {
         "dictate": "Dikte",
         "ask": "Asistan",
@@ -172,6 +171,15 @@
         "hold": "Konuşmak için basılı tutun",
         "tap": "Başlatmak için dokunun, durdurmak için yine dokunun",
         "call": "Başlatmak için basın, kapatmak için yine basın"
+      },
+      "steps": {
+        "label": "Nasıl çalışır",
+        "speak": "Yazmak istediğinizi söyleyin",
+        "typed": "İmlecin olduğu yere yazılır",
+        "select": "Metin seçin (isteğe bağlı)",
+        "use": "Yanıtı ekleyin ya da sadece okuyun",
+        "talk": "Sadece konuşun",
+        "answer": "Sesli yanıt verir"
       },
       "mail": {
         "window": "Yeni ileti",
@@ -220,15 +228,6 @@
         "assistant": "Asistan",
         "said": "Cuma günkü ekip toplantısı için kısa bir konuşma planlamama yardım et.",
         "reply": "Tabii. En gurur duyduğun sonuçla başla, işe yaramasının iki nedenini anlat ve sıradaki adımla bitir."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Hazır",
-        "installing": "Yükleniyor…",
-        "percent": "{{percent}}%",
-        "retry": "Yeniden dene",
-        "waiting": "Bekleniyor"
       }
     },
     "subtitle": "Başlamak için bir transkripsiyon modeli seçin",
@@ -461,8 +460,7 @@
     },
     "frame": {
       "setup": "Kurulum",
-      "tour": "Tur",
-      "finish": "Başla"
+      "tour": "Tur"
     },
     "welcome": {
       "line": "Konuşun, o yazsın. Sorun, o yanıtlasın.",
@@ -489,34 +487,6 @@
       "continue": "Devam et",
       "later": "Daha sonra kur",
       "loading": "Konuşma modeliniz aranıyor"
-    },
-    "start": {
-      "ready": {
-        "title": "Şimdi deneyin"
-      },
-      "downloading": {
-        "title": "Neredeyse hazır"
-      },
-      "failed": {
-        "title": "İndirme durdu"
-      },
-      "none": {
-        "title": "Başlamak için bir ses modeli seçin"
-      },
-      "progress": {
-        "of": "{{done}} / {{total}}",
-        "failed": "Tamamlanmadı. Tekrar denensin mi?",
-        "underMinute": "Bir dakikadan az kaldı",
-        "minutes_one": "Yaklaşık {{count}} dakika kaldı",
-        "minutes_other": "Yaklaşık {{count}} dakika kaldı"
-      },
-      "try": {
-        "label": "Dikteyi deneyin",
-        "placeholder": "Sözleriniz burada görünür…",
-        "success": "İşte bu kadar. Her uygulamada çalışır."
-      },
-      "open": "SpeakoFlow'u aç",
-      "choose": "Bir ses modeli seçin"
     }
   },
   "modelSelector": {
@@ -1857,14 +1827,6 @@
           "large": "Büyük",
           "extraLarge": "Çok büyük"
         },
-        "panelSizeLabel": "Panel boyutu",
-        "panelSizeDescription": "Yüzen asistan panelinin genel boyutu.",
-        "panelSizes": {
-          "mini": "Küçük",
-          "compact": "Kompakt",
-          "standard": "Standart",
-          "large": "Büyük"
-        },
         "askDisplayLabel": "Hangi ekran",
         "askDisplayDescription": "Asistanın açıldığı ekran. Varsayılan olarak farenizin bulunduğu ekran.",
         "askDisplays": {
@@ -1988,7 +1950,9 @@
     },
     "delete": {
       "action": "Toplantıyı sil",
-      "whileRecording": "Bu toplantıyı silmeden önce kaydı durdurun."
+      "whileRecording": "Bu toplantıyı silmeden önce kaydı durdurun.",
+      "confirmTitle": "Bu toplantı silinsin mi?",
+      "confirmBody": "Dökümü, notları ve sesi bu bilgisayardan kaldırılır. Bu işlem geri alınamaz."
     },
     "detail": {
       "title": "Toplantı",
@@ -2235,6 +2199,7 @@
       "details": "Ayrıntılar",
       "startHint": "Konuşmaya başlayın ya da bir mesaj yazın.",
       "mutedHint": "Mikrofon kapalı. Yine de yazabilirsiniz.",
+      "heldHint": "Dikte ederken duraklatıldı.",
       "preparingVoice": "Ses hazırlanıyor… %{{progress}}",
       "history": {
         "title": "Geçmiş sohbetler",
@@ -2272,6 +2237,7 @@
         "responding": "Düşünüyor…",
         "speaking": "Konuşuyor",
         "muted": "Mikrofon kapalı",
+        "held": "Dikte için duraklatıldı",
         "error": "Görüşme kesildi"
       },
       "errors": {
@@ -2930,7 +2896,6 @@
       "replyLength": "Yanıtların genellikle ne kadar uzun olduğu.",
       "history": "Son mesajlardan kaç tanesini aklında tuttuğu.",
       "summarize": "Uzun sohbetleri özetler, böylece başını unutmaz.",
-      "panelSize": "Ekranınızın ne kadarını kapladığı.",
       "opacity": "Düşük değerde masaüstünüz arkadan görünür.",
       "position": "Ekranda bir noktaya tıklayın.",
       "display": "Panelin açıldığı ekran."
@@ -3005,7 +2970,6 @@
     "panel": {
       "where": "Açıldığı yer",
       "text": "Metin boyutu",
-      "size": "Panel boyutu",
       "opacity": "Opaklık",
       "screen": "Hangi ekran"
     }

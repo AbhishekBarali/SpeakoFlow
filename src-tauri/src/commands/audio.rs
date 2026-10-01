@@ -135,17 +135,29 @@ pub fn get_windows_microphone_permission_status() -> WindowsMicrophonePermission
 pub fn open_microphone_privacy_settings() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         use std::process::Command;
+        // `cmd /C start` is a console program, so without CREATE_NO_WINDOW a
+        // terminal window flashes up behind System Settings.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         Command::new("cmd")
             .args(["/C", "start", "", "ms-settings:privacy-microphone"])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| format!("Failed to open Windows microphone privacy settings: {}", e))?;
         return Ok(());
     }
 
-    #[cfg(not(target_os = "windows"))]
+    // After one "Don't Allow", macOS never shows the microphone prompt again, so
+    // System Settings is the only place the user can turn it back on.
+    #[cfg(target_os = "macos")]
     {
-        Err("Opening microphone privacy settings is only supported on Windows".to_string())
+        crate::commands::open_macos_privacy_pane("Privacy_Microphone")
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        Err("Opening microphone privacy settings is not supported on this platform".to_string())
     }
 }
 

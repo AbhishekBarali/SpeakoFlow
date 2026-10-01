@@ -258,52 +258,115 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Remove this app's own Accessibility entry so macOS will ask again (issue #34).
+/// Remove this app's own entry for one TCC service so macOS will ask again.
 ///
 /// TCC stores a grant together with the code signature it was given to. A build
 /// without a stable signing identity has a different signature every release, so
 /// after an update System Settings still lists SpeakoFlow as switched on (that
-/// row is keyed by bundle identifier) while `AXIsProcessTrusted` answers no for
-/// the new binary. Requesting access again shows nothing, because an entry
-/// already exists; removing it is what lets the next request add a fresh one.
+/// row is keyed by bundle identifier) while the OS answers no for the new
+/// binary. Requesting access again shows nothing, because an entry already
+/// exists; removing it is what lets the next request add a fresh one. The same
+/// reset is the only way back from an earlier "Don't Allow" for the microphone,
+/// which macOS otherwise never asks about again.
 ///
 /// Scoped to our own identifier, taken from the app config: `tccutil reset
-/// Accessibility` without one would revoke every app's access on the machine.
+/// <service>` without one would revoke every app's access on the machine.
 /// No `sudo` — without it the reset applies to the current user's decisions.
+#[cfg(target_os = "macos")]
+fn reset_macos_tcc_service(app: &AppHandle, service: &str) -> Result<(), String> {
+    let identifier = app.config().identifier.clone();
+    if identifier.trim().is_empty() {
+        return Err("The app has no bundle identifier to reset".to_string());
+    }
+    let output = std::process::Command::new("/usr/bin/tccutil")
+        .args(["reset", service, identifier.as_str()])
+        .output()
+        .map_err(|e| format!("Could not run tccutil: {}", e))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log::warn!(
+            "tccutil reset {} {} failed ({}): {}",
+            service,
+            identifier,
+            output.status,
+            stderr.trim()
+        );
+        return Err(format!(
+            "tccutil could not reset {} for {}: {}",
+            service,
+            identifier,
+            stderr.trim()
+        ));
+    }
+    log::info!("Reset the {} permission for {}", service, identifier);
+    Ok(())
+}
+
+/// Open System Settings at one Privacy & Security pane, e.g. `Privacy_Microphone`.
+///
+/// `open` hands the URL to LaunchServices and exits, so waiting is brief and
+/// leaves no child process behind.
+#[cfg(target_os = "macos")]
+pub(crate) fn open_macos_privacy_pane(pane: &str) -> Result<(), String> {
+    let url = format!("x-apple.systempreferences:com.apple.preference.security?{pane}");
+    let status = std::process::Command::new("/usr/bin/open")
+        .arg(&url)
+        .status()
+        .map_err(|e| format!("Could not open System Settings ({pane}): {e}"))?;
+    if !status.success() {
+        return Err(format!("Could not open System Settings ({pane}): {status}"));
+    }
+    Ok(())
+}
+
+/// Remove this app's own Accessibility entry so macOS will ask again (issue #34).
+/// See [`reset_macos_tcc_service`].
 #[specta::specta]
 #[tauri::command]
 pub fn reset_macos_accessibility_permission(app: AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        let identifier = app.config().identifier.clone();
-        if identifier.trim().is_empty() {
-            return Err("The app has no bundle identifier to reset".to_string());
-        }
-        let output = std::process::Command::new("/usr/bin/tccutil")
-            .args(["reset", "Accessibility", identifier.as_str()])
-            .output()
-            .map_err(|e| format!("Could not run tccutil: {}", e))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            log::warn!(
-                "tccutil reset Accessibility {} failed ({}): {}",
-                identifier,
-                output.status,
-                stderr.trim()
-            );
-            return Err(format!(
-                "tccutil could not reset Accessibility for {}: {}",
-                identifier,
-                stderr.trim()
-            ));
-        }
-        log::info!("Reset the Accessibility permission for {}", identifier);
-        Ok(())
+        reset_macos_tcc_service(&app, "Accessibility")
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = app;
         Err("Resetting the Accessibility permission is only supported on macOS".to_string())
+    }
+}
+
+/// Remove this app's own Microphone entry so the next request prompts again.
+///
+/// After one "Don't Allow", `requestAccessForMediaType` returns immediately and
+/// shows nothing, forever. Without this the permission step could only wait.
+#[specta::specta]
+#[tauri::command]
+pub fn reset_macos_microphone_permission(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        reset_macos_tcc_service(&app, "Microphone")
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("Resetting the Microphone permission is only supported on macOS".to_string())
+    }
+}
+
+/// Remove this app's own Screen Recording entry, for the same stale-signature
+/// case as Accessibility: the switch reads on, captures contain only the
+/// wallpaper, and requesting again shows nothing.
+#[specta::specta]
+#[tauri::command]
+pub fn reset_macos_screen_recording_permission(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        reset_macos_tcc_service(&app, "ScreenCapture")
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("Resetting the Screen Recording permission is only supported on macOS".to_string())
     }
 }
 
@@ -313,22 +376,28 @@ pub fn reset_macos_accessibility_permission(app: AppHandle) -> Result<(), String
 pub fn open_macos_accessibility_settings() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        // `open` hands the URL to LaunchServices and exits, so waiting is brief
-        // and leaves no child process behind.
-        let status = std::process::Command::new("/usr/bin/open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-            .status()
-            .map_err(|e| format!("Could not open Accessibility settings: {}", e))?;
-        if !status.success() {
-            return Err(format!(
-                "Could not open Accessibility settings ({})",
-                status
-            ));
-        }
-        Ok(())
+        open_macos_privacy_pane("Privacy_Accessibility")
     }
     #[cfg(not(target_os = "macos"))]
     {
         Err("Opening Accessibility settings is only supported on macOS".to_string())
+    }
+}
+
+/// Open System Settings at Privacy & Security → Screen Recording.
+///
+/// `CGRequestScreenCaptureAccess` only prompts the first time; after a denial, or
+/// for a grant an update made stale, it does nothing, so the settings pane is the
+/// only place the user can act.
+#[specta::specta]
+#[tauri::command]
+pub fn open_macos_screen_recording_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        open_macos_privacy_pane("Privacy_ScreenCapture")
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Opening Screen Recording settings is only supported on macOS".to_string())
     }
 }

@@ -263,3 +263,41 @@ export const meetingDurationMs = (
   endedAt: number | null,
 ): number | null =>
   endedAt === null ? null : Math.max(0, endedAt - startedAt) * 1000;
+
+/**
+ * A meeting's length as people say it: "45 sec", "31 min", "1 hr 5 min".
+ *
+ * `formatClock` is right for a running timer and wrong for a length in a list,
+ * where "30:34" reads as a time of day. Built from `Intl.NumberFormat` units so
+ * every locale gets its own abbreviations without a translation string each.
+ */
+export const formatDuration = (totalMs: number, locale: string): string => {
+  const seconds = Math.max(0, Math.round(totalMs / 1000));
+  try {
+    const unit = (value: number, name: "second" | "minute" | "hour") =>
+      new Intl.NumberFormat(locale, {
+        style: "unit",
+        unit: name,
+        unitDisplay: "short",
+      }).format(value);
+    if (seconds < 60) return unit(seconds, "second");
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return unit(minutes, "minute");
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest === 0
+      ? unit(hours, "hour")
+      : `${unit(hours, "hour")} ${unit(rest, "minute")}`;
+  } catch {
+    return formatClock(totalMs);
+  }
+};
+
+/** The first letter of a speaker's name, for their avatar. Grapheme-aware so a
+ *  name that starts with an emoji or a combining sequence is not split. */
+export const speakerInitial = (name: string): string => {
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const first = Array.from(trimmed)[0] ?? "?";
+  return first.toLocaleUpperCase();
+};

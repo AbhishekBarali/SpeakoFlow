@@ -70,10 +70,17 @@ export const SETUP_MODELS = {
  * "More models". Each carries one word of why you would pick it — the card's
  * only sentence — and a family name, because a catalog name ("Cohere Transcribe
  * 03-2026") is not what anyone calls it. Names are brands, not translated.
+ *
+ * The family name alone is ambiguous, though: "Whisper" is a dozen models from
+ * tiny to large, and "Canary" four. `variant` is which one this is, drawn as a
+ * small label beside the name, so the card says which model it installs
+ * without spelling out the whole catalog name.
  */
 export const SETUP_SPEECH_OPTIONS: ReadonlyArray<{
   id: string;
   name: string;
+  /** Which model of the family, e.g. "Medium" for Whisper. Not translated. */
+  variant: string;
   /** `onboarding.speech.tags.*` */
   tag: "english" | "languages" | "small" | "accurate" | "widest";
   primary: boolean;
@@ -81,28 +88,38 @@ export const SETUP_SPEECH_OPTIONS: ReadonlyArray<{
   {
     id: SETUP_MODELS.speech.english,
     name: "Parakeet",
+    variant: "0.6B",
     tag: "english",
     primary: true,
   },
   {
     id: SETUP_MODELS.speech.multilingual,
     name: "Nemotron",
+    variant: "3.5",
     tag: "languages",
     primary: true,
   },
   {
     id: "canary-180m-flash-gguf",
     name: "Canary",
+    variant: "180M Flash",
     tag: "small",
     primary: false,
   },
   {
     id: "cohere-transcribe-03-2026-gguf",
     name: "Cohere",
+    variant: "Transcribe",
     tag: "accurate",
     primary: false,
   },
-  { id: "whisper-medium-gguf", name: "Whisper", tag: "widest", primary: false },
+  {
+    id: "whisper-medium-gguf",
+    name: "Whisper",
+    variant: "Medium",
+    tag: "widest",
+    primary: false,
+  },
 ];
 
 /** Distinct languages in a model's list: `en-US` and `en-GB` are one. */

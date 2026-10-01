@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Minimize2, Mic, Pause, Play, Square, X } from "lucide-react";
+import { Mic, MicOff, Minimize2, Pause, Play, Square } from "lucide-react";
 import {
   acceptCallOffer,
   dismissCallOffer,
@@ -257,24 +257,7 @@ const MeetingPill: React.FC = () => {
         paused ? t("meetings.recorder.resume") : t("meetings.recorder.pause")
       }
     >
-      {paused ? <Play size={11} /> : <Pause size={11} />}
-    </button>
-  );
-
-  const stopButton = (
-    <button
-      type="button"
-      className="pill-action"
-      data-variant="stop"
-      onClick={(event) => {
-        event.stopPropagation();
-        stop();
-      }}
-      disabled={busy}
-      title={t("meetings.pill.stop")}
-      aria-label={t("meetings.pill.stop")}
-    >
-      <Square size={10} />
+      {paused ? <Play size={12} /> : <Pause size={12} />}
     </button>
   );
 
@@ -324,7 +307,20 @@ const MeetingPill: React.FC = () => {
             </span>
             <span className="mpill-controls">
               {pauseButton}
-              {stopButton}
+              <button
+                type="button"
+                className="pill-action"
+                data-variant="stop"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  stop();
+                }}
+                disabled={busy}
+                title={t("meetings.pill.stop")}
+                aria-label={t("meetings.pill.stop")}
+              >
+                <Square size={10} fill="currentColor" />
+              </button>
             </span>
           </span>
         </div>
@@ -344,9 +340,23 @@ const MeetingPill: React.FC = () => {
         data-origin-y={origin.bottom ? "bottom" : "top"}
       >
         <div className="pill-head" data-tauri-drag-region>
-          <span className="pill-dot" data-state={dotState} aria-hidden="true" />
-          <span className="pill-clock">{clock}</span>
-          <span className="pill-head-label">{statusLabel}</span>
+          <span className="pill-head-status" role="status">
+            <span
+              className="pill-dot"
+              data-state={dotState}
+              aria-hidden="true"
+            />
+            <span className="pill-clock" data-paused={String(paused)}>
+              {clock}
+            </span>
+            {/* The breathing red dot already says "recording"; a paused
+                recording is the state that needs saying in words. */}
+            {paused ? (
+              <span className="pill-head-label">{statusLabel}</span>
+            ) : (
+              <span className="sr-only">{statusLabel}</span>
+            )}
+          </span>
           <span className="pill-head-sides" aria-hidden="true">
             <SideChip
               label={t("meetings.speakers.me")}
@@ -360,21 +370,39 @@ const MeetingPill: React.FC = () => {
             />
           </span>
           <span className="pill-head-spacer" />
-          {pauseButton}
-          {stopButton}
-          <button
-            type="button"
-            className="pill-action"
-            onClick={collapse}
-            title={t("meetings.pill.collapse")}
-            aria-label={t("meetings.pill.collapse")}
-          >
-            <Minimize2 size={12} />
-          </button>
+          <span className="pill-head-actions">
+            {pauseButton}
+            <button
+              type="button"
+              className="pill-btn"
+              data-variant="stop"
+              onClick={stop}
+              disabled={busy}
+              title={t("meetings.pill.stop")}
+            >
+              <Square size={10} aria-hidden="true" />
+              {t("meetings.recorder.stop")}
+            </button>
+            <button
+              type="button"
+              className="pill-action"
+              data-variant="ghost"
+              onClick={collapse}
+              title={t("meetings.pill.collapse")}
+              aria-label={t("meetings.pill.collapse")}
+            >
+              <Minimize2 size={14} />
+            </button>
+          </span>
         </div>
 
         {!state.system_audio && (
-          <p className="pill-notice">{t("meetings.pill.micOnly")}</p>
+          <p className="pill-notice">
+            <MicOff size={13} aria-hidden="true" />
+            <span className="pill-notice-text">
+              {t("meetings.pill.micOnly")}
+            </span>
+          </p>
         )}
 
         <div ref={scrollRef} className="pill-transcript">
@@ -476,36 +504,40 @@ const OfferCard: React.FC<OfferCardProps> = ({ app, onDone }) => {
 
   return (
     <div className="pill-offer" data-tauri-drag-region>
-      <span className="pill-offer-ring" aria-hidden="true" />
-      <span className="pill-offer-body">
-        <span className="pill-offer-text">
-          {app
-            ? t("meetings.offer.detectedApp", { app: friendlyAppName(app) })
-            : t("meetings.offer.detected")}
+      <div className="pill-offer-top">
+        <span className="pill-offer-ring" aria-hidden="true" />
+        <span className="pill-offer-body">
+          <span className="pill-offer-text">
+            {app
+              ? t("meetings.offer.detectedApp", { app: friendlyAppName(app) })
+              : t("meetings.offer.detected")}
+          </span>
+          <span className="pill-offer-state">{t("meetings.offer.idle")}</span>
         </span>
-        <span className="pill-offer-state">{t("meetings.offer.idle")}</span>
-      </span>
-      <button
-        type="button"
-        className="pill-action"
-        data-variant="accept"
-        onClick={accept}
-        disabled={busy}
-        title={t("meetings.offer.record")}
-        aria-label={t("meetings.offer.record")}
-      >
-        <Mic size={12} />
-      </button>
-      <button
-        type="button"
-        className="pill-action"
-        onClick={dismiss}
-        disabled={busy}
-        title={t("meetings.offer.dismiss")}
-        aria-label={t("meetings.offer.dismiss")}
-      >
-        <X size={13} />
-      </button>
+      </div>
+      {/* Both answers in words. Two bare icons — a microphone and an X — made
+          the one decision this card asks for a guess. */}
+      <div className="pill-offer-actions">
+        <button
+          type="button"
+          className="pill-btn"
+          data-variant="primary"
+          onClick={accept}
+          disabled={busy}
+        >
+          <Mic size={13} aria-hidden="true" />
+          {t("meetings.offer.record")}
+        </button>
+        <button
+          type="button"
+          className="pill-btn"
+          data-variant="ghost"
+          onClick={dismiss}
+          disabled={busy}
+        >
+          {t("meetings.offer.dismiss")}
+        </button>
+      </div>
     </div>
   );
 };
@@ -528,9 +560,14 @@ interface TurnRowProps {
 
 const TurnRow: React.FC<TurnRowProps> = ({ turn, name, color }) => (
   <div className="pill-turn" data-uncertain={String(turn.lowConfidence)}>
-    <span className="pill-turn-who" style={{ color }}>
-      <span className="pill-turn-swatch" aria-hidden="true" />
+    <span className="pill-turn-who">
+      <span
+        className="pill-turn-swatch"
+        style={{ background: color }}
+        aria-hidden="true"
+      />
       {name}
+      <span className="pill-turn-time">{formatClock(turn.startMs)}</span>
     </span>
     <p className="pill-turn-text">{turn.text}</p>
   </div>

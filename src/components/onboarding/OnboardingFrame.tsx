@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Check } from "lucide-react";
 import "./onboarding.css";
 
-export type FlowStep = "setup" | "tour" | "finish";
-const STEPS: FlowStep[] = ["setup", "tour", "finish"];
+export type FlowStep = "setup" | "tour";
+const STEPS: FlowStep[] = ["setup", "tour"];
 
 /**
  * The page every onboarding step sits on, drawn with the main window's own
@@ -22,11 +22,11 @@ export const OnboardingFrame: React.FC<{
 }> = ({ step, children, footer, width = "narrow" }) => {
   const { t } = useTranslation();
   const index = STEPS.indexOf(step);
-  const column = width === "wide" ? "max-w-5xl" : "max-w-3xl";
+  const column = width === "wide" ? "max-w-7xl" : "max-w-3xl";
   return (
     <div className="flex h-full min-h-0 flex-col bg-canvas-soft">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[1.25rem] border-t border-hairline bg-canvas elev-pane">
-        <header className="shrink-0 px-6 pt-5 sm:px-10">
+        <header className="ob-header shrink-0 px-6 sm:px-10">
           <ol
             className={`mx-auto flex w-full ${column} items-center gap-2`}
             aria-label={t("onboarding.flow.progress", {
@@ -82,12 +82,12 @@ export const OnboardingFrame: React.FC<{
         <main className="ob-scroll min-h-0 flex-1 overflow-y-auto px-6 sm:px-10">
           <div
             key={step}
-            className={`ob-page mx-auto flex min-h-full w-full ${column} flex-col justify-center py-10`}
+            className={`ob-page mx-auto flex min-h-full w-full ${column} flex-col justify-center`}
           >
             {children}
           </div>
         </main>
-        <footer className="shrink-0 border-t border-hairline px-6 py-4 sm:px-10">
+        <footer className="ob-footer shrink-0 border-t border-hairline px-6 sm:px-10">
           <div
             className={`mx-auto flex w-full ${column} items-center justify-between gap-3`}
           >
@@ -103,13 +103,13 @@ export const OnboardingFrame: React.FC<{
 export const StepHeading: React.FC<{
   title: React.ReactNode;
   body?: React.ReactNode;
-  /** Keeps a changing title announced (the finish step's download state). */
+  /** Keeps a changing title announced. */
   live?: boolean;
   className?: string;
 }> = ({ title, body, live = false, className = "" }) => (
   <div className={className}>
     <h1
-      className="font-display text-[2rem] text-ink"
+      className="ob-title font-display text-ink"
       aria-live={live ? "polite" : undefined}
     >
       {title}

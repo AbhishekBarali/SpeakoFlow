@@ -604,12 +604,22 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             assistant::clear_panel_hit_rect(&app_handle_for_hit_rect);
             return;
         }
-        let number = |key: &str| value.get(key).and_then(|v| v.as_f64());
-        match (number("x"), number("y"), number("width"), number("height")) {
-            (Some(x), Some(y), Some(width), Some(height)) => {
-                assistant::set_panel_hit_rect(&app_handle_for_hit_rect, x, y, width, height)
+        let rect_of = |value: &serde_json::Value| {
+            let number = |key: &str| value.get(key).and_then(|v| v.as_f64());
+            match (number("x"), number("y"), number("width"), number("height")) {
+                (Some(x), Some(y), Some(width), Some(height)) => Some((x, y, width, height)),
+                _ => None,
             }
-            _ => log::debug!("Ignoring assistant-hit-rect with no usable rect: {payload}"),
+        };
+        // Each drawn surface on its own (`rects`), so the empty space between them
+        // passes clicks through. A payload without the list is one rect.
+        let parts = match value.get("rects").and_then(|r| r.as_array()) {
+            Some(list) => Some(list.iter().filter_map(rect_of).collect::<Vec<_>>()),
+            None => rect_of(&value).map(|rect| vec![rect]),
+        };
+        match parts {
+            Some(parts) => assistant::set_panel_hit_rects(&app_handle_for_hit_rect, &parts),
+            None => log::debug!("Ignoring assistant-hit-rect with no usable rect: {payload}"),
         }
     });
 
@@ -774,6 +784,146 @@ fn disable_webview2_browser_accelerators<R: tauri::Runtime>(webview: &tauri::Web
     });
 }
 
+/// Context-menu items an app window may show, by WebView2's unlocalized name
+/// (the English label in lower camel case). Everything else — Back, Reload,
+/// Save as, Print, Copy link to highlight, Share, More tools, Inspect — is a
+/// browser command that has no place in an app window.
+///
+/// An allowlist rather than a blocklist on purpose: WebView2 adds entries
+/// across runtime versions, and a blocklist lets each new one through until
+/// someone notices it in a screenshot.
+#[cfg(target_os = "windows")]
+const ALLOWED_CONTEXT_MENU_ITEMS: &[&str] = &[
+    "undo",
+    "redo",
+    "cut",
+    "copy",
+    "paste",
+    "pasteAsPlainText",
+    "pasteAndMatchStyle",
+    "selectAll",
+    "emoji",
+    "spellCheck",
+    "addToDictionary",
+];
+
+/// Whether a WebView2 context-menu item survives the filter. Inspect is kept in
+/// development builds only, where it is the reason anyone right-clicks.
+#[cfg(target_os = "windows")]
+fn context_menu_item_allowed(name: &str) -> bool {
+    ALLOWED_CONTEXT_MENU_ITEMS.contains(&name)
+        || (cfg!(debug_assertions) && matches!(name, "inspectElement" | "inspect"))
+}
+
+/// Which items of a menu to keep, given each item's name and whether it is a
+/// separator. Separators survive only between two kept items, so removing
+/// everything around one never leaves a stray rule at an edge or two in a row.
+#[cfg(any(target_os = "windows", test))]
+fn context_menu_keep_mask(items: &[(String, bool)], allowed: impl Fn(&str) -> bool) -> Vec<bool> {
+    let mut keep: Vec<bool> = items
+        .iter()
+        .map(|(name, separator)| !separator && allowed(name))
+        .collect();
+    let mut seen_item = false;
+    let mut pending_separator: Option<usize> = None;
+    for (index, (_, separator)) in items.iter().enumerate() {
+        if *separator {
+            if seen_item && pending_separator.is_none() {
+                pending_separator = Some(index);
+            }
+        } else if keep[index] {
+            if let Some(separator) = pending_separator.take() {
+                keep[separator] = true;
+            }
+            seen_item = true;
+        }
+    }
+    keep
+}
+
+/// Trim WebView2's own right-click menu down to editing commands.
+///
+/// `lib/contextMenu.ts` decides *whether* the menu opens (text fields and
+/// selected text only). This decides what is *in* it: the stock menu on a
+/// selection carried Copy link to highlight, Print, More tools and Inspect, so
+/// selecting a word in an assistant answer and right-clicking still read as a
+/// browser. If nothing survives the filter the menu is suppressed entirely,
+/// which also covers any window whose script has not installed the JS half.
+///
+/// Registered on every page load, so the previous registration on the same
+/// webview is removed first rather than stacking handlers.
+#[cfg(target_os = "windows")]
+fn filter_webview2_context_menu<R: tauri::Runtime>(webview: &tauri::Webview<R>) {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    static TOKENS: once_cell::sync::Lazy<Mutex<HashMap<String, i64>>> =
+        once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+
+    let label = webview.label().to_string();
+    let _ = webview.with_webview(move |platform| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2_11, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND,
+            COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR,
+        };
+        use webview2_com::{take_pwstr, ContextMenuRequestedEventHandler};
+        use windows::core::{Interface, PWSTR};
+
+        let handler = ContextMenuRequestedEventHandler::create(Box::new(|_, args| {
+            let Some(args) = args else { return Ok(()) };
+            let items = args.MenuItems()?;
+            let mut count = 0u32;
+            items.Count(&mut count)?;
+
+            let mut described = Vec::with_capacity(count as usize);
+            for index in 0..count {
+                let item = items.GetValueAtIndex(index)?;
+                let mut kind = COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND::default();
+                item.Kind(&mut kind)?;
+                let mut name = PWSTR::null();
+                item.Name(&mut name)?;
+                described.push((
+                    take_pwstr(name),
+                    kind == COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR,
+                ));
+            }
+
+            let keep = context_menu_keep_mask(&described, context_menu_item_allowed);
+            // Back to front, so removing an item never shifts one still to visit.
+            for index in (0..count).rev() {
+                if !keep[index as usize] {
+                    items.RemoveValueAtIndex(index)?;
+                }
+            }
+            if !keep.contains(&true) {
+                // Handled with no menu of our own: nothing is shown.
+                args.SetHandled(true)?;
+            }
+            Ok(())
+        }));
+
+        let result = platform
+            .controller()
+            .CoreWebView2()
+            .and_then(|core| core.cast::<ICoreWebView2_11>())
+            .and_then(|core| {
+                let mut tokens = TOKENS.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(previous) = tokens.remove(&label) {
+                    // Fails harmlessly when this is a new webview reusing the label.
+                    let _ = core.remove_ContextMenuRequested(previous);
+                }
+                let mut token = 0i64;
+                core.add_ContextMenuRequested(&handler, &mut token)?;
+                tokens.insert(label.clone(), token);
+                Ok(())
+            });
+
+        if let Err(error) = result {
+            log::warn!("Failed to filter the WebView2 context menu for '{label}': {error}");
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(cli_args: CliArgs) {
     // Detect portable mode before anything else
@@ -916,6 +1066,9 @@ pub fn run(cli_args: CliArgs) {
             commands::initialize_shortcuts,
             commands::reset_macos_accessibility_permission,
             commands::open_macos_accessibility_settings,
+            commands::reset_macos_microphone_permission,
+            commands::reset_macos_screen_recording_permission,
+            commands::open_macos_screen_recording_settings,
             commands::models::get_available_models,
             commands::models::get_model_info,
             commands::models::download_model,
@@ -983,6 +1136,7 @@ pub fn run(cli_args: CliArgs) {
             commands::history::preview_recording_retention,
             commands::history::enforce_recording_retention,
             commands::history::get_assistant_history_entries,
+            commands::history::list_assistant_conversations,
             commands::history::get_assistant_history_entry,
             commands::history::delete_assistant_history_entry,
             commands::history::get_usage_stats,
@@ -996,6 +1150,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_clear_conversation,
             commands::assistant::hide_assistant_panel,
             commands::assistant::assistant_branch_session,
+            commands::assistant::assistant_discuss_meeting,
+            commands::assistant::assistant_conversation_meeting,
             commands::assistant::set_assistant_ask_anchor,
             commands::assistant::set_assistant_ask_display,
             commands::assistant::list_assistant_displays,
@@ -1033,7 +1189,6 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_conversation_pace,
             commands::assistant::set_assistant_conversation_sensitivity,
             commands::assistant::set_assistant_panel_opacity,
-            commands::assistant::set_assistant_panel_size,
             commands::assistant::set_assistant_tts_stop_on_dictation,
             commands::assistant::redirect_transcription_to_assistant,
             commands::assistant::assistant_finish_local_tts,
@@ -1061,7 +1216,9 @@ pub fn run(cli_args: CliArgs) {
             voice_conversation::assistant_conversation_new,
             voice_conversation::assistant_conversation_load,
             voice_conversation::assistant_conversation_branch,
+            voice_conversation::assistant_conversation_discuss,
             voice_conversation::assistant_conversation_set_speaker,
+            voice_conversation::assistant_conversation_dictation_active,
             commands::assistant::set_assistant_max_history_messages,
             commands::assistant::set_assistant_auto_summarize,
             commands::assistant::set_assistant_web_search_enabled,
@@ -1211,6 +1368,7 @@ pub fn run(cli_args: CliArgs) {
         builder = builder.on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 disable_webview2_browser_accelerators(webview);
+                filter_webview2_context_menu(webview);
             }
         });
     }
@@ -1543,4 +1701,56 @@ pub fn run(cli_args: CliArgs) {
             }
             let _ = (app, event); // suppress unused warnings on non-macOS
         });
+}
+
+#[cfg(test)]
+mod context_menu_tests {
+    use super::context_menu_keep_mask;
+
+    fn menu(entries: &[&str]) -> Vec<(String, bool)> {
+        entries.iter().map(|e| (e.to_string(), *e == "-")).collect()
+    }
+
+    fn kept(entries: &[&str], allowed: &[&str]) -> Vec<String> {
+        let items = menu(entries);
+        let mask = context_menu_keep_mask(&items, |n| allowed.contains(&n));
+        items
+            .into_iter()
+            .zip(mask)
+            .filter(|(_, k)| *k)
+            .map(|((n, _), _)| n)
+            .collect()
+    }
+
+    /// The menu from the screenshot: selected text in an assistant answer.
+    #[test]
+    fn selection_menu_keeps_only_copy() {
+        let entries = [
+            "copy",
+            "copyLinkToHighlight",
+            "print",
+            "-",
+            "other",
+            "-",
+            "inspectElement",
+        ];
+        assert_eq!(kept(&entries, &["copy"]), ["copy"]);
+    }
+
+    #[test]
+    fn separators_only_between_kept_items() {
+        let entries = [
+            "-", "undo", "redo", "-", "-", "back", "-", "cut", "copy", "paste", "-", "print",
+        ];
+        assert_eq!(
+            kept(&entries, &["undo", "redo", "cut", "copy", "paste"]),
+            ["undo", "redo", "-", "cut", "copy", "paste"]
+        );
+    }
+
+    #[test]
+    fn nothing_allowed_keeps_nothing() {
+        let entries = ["back", "reload", "-", "saveAs", "print"];
+        assert!(kept(&entries, &[]).is_empty());
+    }
 }

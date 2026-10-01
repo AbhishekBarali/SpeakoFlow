@@ -4,8 +4,10 @@
  * imports it because a reminder *is* the assistant's card and must not drift from
  * it, whereas the pill is a different object — a status indicator that expands —
  * and inheriting a stylesheet built around `.ask-card` would mean fighting its
- * layout on every rule. The design tokens below are copied deliberately so the
- * two windows read as the same application.
+ * layout on every rule. The tokens below are the assistant's own values
+ * (`--as-*` in `AssistantPanel.css`), copied so the two windows read as one
+ * application. They used to be a warm brown-black with an amber waveform, which
+ * beside the graphite call bar looked like a different product.
  *
  * Three rules here are load-bearing rather than cosmetic:
  *
@@ -22,23 +24,24 @@
  */
 
 :root {
-  --mp-surface: rgba(21, 19, 17, 0.96);
-  --mp-surface-hover: rgba(30, 27, 24, 0.97);
-  --mp-surface-raised: rgba(255, 255, 255, 0.075);
-  --mp-surface-raised-strong: rgba(255, 255, 255, 0.13);
-  --mp-inset: rgba(0, 0, 0, 0.3);
-  --mp-ink: #f7f6f4;
-  --mp-body: #d9d6d2;
-  --mp-muted: #a9a39c;
-  --mp-faint: #7b756d;
-  --mp-hairline: rgba(255, 255, 255, 0.09);
-  --mp-hairline-strong: rgba(255, 255, 255, 0.16);
+  --mp-surface: rgba(19, 22, 23, 0.97);
+  --mp-surface-hover: rgba(25, 29, 30, 0.98);
+  --mp-raise: rgba(255, 255, 255, 0.06);
+  --mp-raise-strong: rgba(255, 255, 255, 0.11);
+  --mp-inset: rgba(0, 0, 0, 0.28);
+  --mp-ink: #eef2f2;
+  --mp-body: #d2d8d8;
+  --mp-muted: #9ba5a6;
+  --mp-faint: #6e797a;
+  --mp-hairline: rgba(255, 255, 255, 0.08);
+  --mp-hairline-strong: rgba(255, 255, 255, 0.14);
   --mp-inner:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
-  --mp-live: #e5484d;
-  --mp-accent: #2dd4bf;
-  --mp-warn: #fbbf24;
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.5);
+  --mp-live: #ff5a52;
+  --mp-accent: #5cd6be;
+  --mp-warn: #f5c46b;
+  --mp-error: #fda4af;
   --mp-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
   --mp-ease-zoom: cubic-bezier(0.2, 0.9, 0.25, 1);
   --mp-font:
@@ -47,6 +50,10 @@
 
   color: var(--mp-ink);
   font-family: var(--mp-font);
+  /* The app's own Inter settings (single-storey a, open digits). */
+  font-feature-settings:
+    "cv11" 1,
+    "ss01" 1;
   color-scheme: dark;
   font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
@@ -64,6 +71,19 @@
   overflow: hidden;
 }
 
+/* This window has no Tailwind, so the one utility it needs is here. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- the recording dot ---------- */
 
 .pill-dot {
@@ -72,7 +92,10 @@
   height: 8px;
   border-radius: 50%;
   background: var(--mp-live);
-  transition: background 160ms ease;
+  box-shadow: 0 0 0 3px rgba(255, 90, 82, 0.16);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -82,40 +105,38 @@
 }
 
 @keyframes pill-breathe {
-  0%,
-  100% {
-    opacity: 1;
-  }
   50% {
-    opacity: 0.35;
+    opacity: 0.55;
+    box-shadow: 0 0 0 5px rgba(255, 90, 82, 0.04);
   }
 }
 
 /* Recording, but only the user's own microphone. */
 .pill-dot[data-state="mic-only"] {
   background: var(--mp-warn);
+  box-shadow: 0 0 0 3px rgba(245, 196, 107, 0.16);
 }
 
 .pill-dot[data-state="paused"] {
   background: var(--mp-faint);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
 }
 
 /* ---------- collapsed: the compact pill ---------- */
 
 /* Dot, clock, and a small waveform at the trailing edge — the dictation
- * overlay's compact pill in a meeting's colours. The whole pill is the way in
- * (click) and the handle (drag); pause and stop take the waveform's place under
- * the pointer. */
+ * overlay's compact pill. The whole pill is the way in (click) and the handle
+ * (drag); pause and stop take the waveform's place under the pointer. */
 .mpill {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
   height: 36px;
-  padding: 0 5px 0 13px;
+  padding: 0 5px 0 14px;
   border-radius: 999px;
   background: var(--mp-surface);
-  border: 1px solid var(--mp-hairline);
+  border: 1px solid var(--mp-hairline-strong);
   box-shadow: var(--mp-inner);
   cursor: pointer;
   /* A drag that starts on the clock must move the window, not select text. */
@@ -129,7 +150,7 @@
 
 .mpill:hover {
   background: var(--mp-surface-hover);
-  border-color: var(--mp-hairline-strong);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 /* A press gives before it opens, so the zoom that follows reads as the result
@@ -153,8 +174,8 @@
 
 .mpill-clock {
   flex: none;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 560;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
   color: var(--mp-ink);
@@ -193,6 +214,17 @@
 
 .mpill-wave .audio-waveform {
   width: 40px;
+  direction: ltr;
+}
+
+/* Grey, like the dictation overlay's: the shared waveform is amber by default,
+ * and state is not where colour belongs. */
+.mpill .audio-waveform .wave-base {
+  stop-color: #8f9a9b;
+}
+
+.mpill .audio-waveform .wave-tip {
+  stop-color: #e4e9e9;
 }
 
 .mpill-controls {
@@ -223,17 +255,18 @@
 
 /* ---------- buttons ---------- */
 
+/* A round icon button: pause, collapse, the collapsed pill's controls. */
 .pill-action {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: var(--mp-surface-raised);
+  background: var(--mp-raise);
   color: var(--mp-body);
   cursor: pointer;
   transition:
@@ -242,31 +275,111 @@
     transform 120ms ease;
 }
 
-.pill-action:hover {
-  background: var(--mp-surface-raised-strong);
+.pill-action:hover:not(:disabled) {
+  background: var(--mp-raise-strong);
   color: var(--mp-ink);
 }
 
-.pill-action:active {
+.pill-action:active:not(:disabled) {
   transform: scale(0.92);
 }
 
-.pill-action:focus-visible {
-  outline: 2px solid var(--mp-accent);
-  outline-offset: 1px;
+.pill-action[data-variant="ghost"] {
+  background: transparent;
+  color: var(--mp-muted);
+}
+
+.pill-action[data-variant="ghost"]:hover:not(:disabled) {
+  background: var(--mp-raise);
+  color: var(--mp-ink);
 }
 
 .pill-action[data-variant="stop"] {
-  background: rgba(229, 72, 77, 0.16);
-  color: #fda4af;
+  background: rgba(255, 90, 82, 0.16);
+  color: #ffb0ab;
 }
 
-.pill-action[data-variant="stop"]:hover {
-  background: rgba(229, 72, 77, 0.3);
+.pill-action[data-variant="stop"]:hover:not(:disabled) {
+  background: rgba(255, 90, 82, 0.3);
   color: #fff;
 }
 
-.pill-action:disabled {
+/* A labelled button: Stop in the card's head, the offer's two answers. */
+.pill-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--mp-raise);
+  color: var(--mp-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.pill-btn:hover:not(:disabled) {
+  background: var(--mp-raise-strong);
+}
+
+.pill-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* The one primary action, ink-filled like the call's send button. */
+.pill-btn[data-variant="primary"] {
+  background: var(--mp-ink);
+  color: #111415;
+}
+
+.pill-btn[data-variant="primary"]:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.pill-btn[data-variant="ghost"] {
+  background: transparent;
+  border-color: var(--mp-hairline-strong);
+  color: var(--mp-body);
+}
+
+.pill-btn[data-variant="ghost"]:hover:not(:disabled) {
+  background: var(--mp-raise);
+  color: var(--mp-ink);
+}
+
+.pill-btn[data-variant="stop"] {
+  background: rgba(255, 90, 82, 0.15);
+  color: #ffb0ab;
+}
+
+.pill-btn[data-variant="stop"]:hover:not(:disabled) {
+  background: rgba(255, 90, 82, 0.28);
+  color: #fff;
+}
+
+.pill-btn[data-variant="stop"] svg {
+  fill: currentColor;
+}
+
+.pill-action:focus-visible,
+.pill-btn:focus-visible {
+  outline: 2px solid var(--mp-ink);
+  outline-offset: 2px;
+}
+
+.pill-action:disabled,
+.pill-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -278,13 +391,13 @@
  * card in the way is exactly the one you want to move. */
 .pill-offer {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  flex-direction: column;
+  gap: 12px;
   width: 100%;
-  padding: 8px 8px 8px 12px;
-  border-radius: 14px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
   background: var(--mp-surface);
-  border: 1px solid var(--mp-hairline);
+  border: 1px solid var(--mp-hairline-strong);
   box-shadow: var(--mp-inner);
   cursor: grab;
   user-select: none;
@@ -295,13 +408,19 @@
   cursor: grabbing;
 }
 
+.pill-offer-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 /* A hollow, static ring — deliberately a shape the live recorder can never take.
  * A filled breathing red dot here read as "this app began recording my call by
  * itself" on a card that has started nothing. */
 .pill-offer-ring {
   flex: none;
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   margin-block-start: 4px;
   border-radius: 50%;
   border: 1.5px solid var(--mp-accent);
@@ -313,34 +432,29 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
 }
 
 .pill-offer-text {
   min-width: 0;
-  font-size: 12.5px;
-  line-height: 1.35;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--mp-ink);
 }
 
 /* Redundant next to "Record it?", and kept anyway: this is the one card in the app
  * where being misread costs trust rather than a click. */
 .pill-offer-state {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 12px;
   color: var(--mp-faint);
 }
 
-.pill-action[data-variant="accept"] {
-  background: rgba(45, 212, 191, 0.18);
-  color: var(--mp-accent);
-}
-
-.pill-action[data-variant="accept"]:hover {
-  background: rgba(45, 212, 191, 0.3);
-  color: #fff;
+.pill-offer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-inline-start: 20px;
 }
 
 /* ---------- expanded card ---------- */
@@ -356,9 +470,9 @@
   width: 100%;
   max-height: 100%;
   min-height: 0;
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--mp-surface);
-  border: 1px solid var(--mp-hairline);
+  border: 1px solid var(--mp-hairline-strong);
   box-shadow: var(--mp-inner);
   overflow: hidden;
   transform-origin: var(--origin-x) var(--origin-y);
@@ -389,7 +503,7 @@
   to {
     opacity: 1;
     transform: scale(1);
-    border-radius: 16px;
+    border-radius: 18px;
   }
 }
 
@@ -404,12 +518,15 @@
   }
 }
 
+/* The head: what is happening on the left, what you can do about it on the
+ * right. The whole row is the drag handle. */
 .pill-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: none;
-  padding: 8px 8px 8px 12px;
+  min-height: 48px;
+  padding: 9px 9px 9px 14px;
   border-bottom: 1px solid var(--mp-hairline);
   cursor: grab;
   user-select: none;
@@ -419,22 +536,32 @@
   cursor: grabbing;
 }
 
+.pill-head-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+}
+
 .pill-clock {
   flex: none;
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 560;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
   color: var(--mp-ink);
 }
 
+.pill-clock[data-paused="true"] {
+  color: var(--mp-muted);
+}
+
+/* Only shown while paused: the breathing red dot already says "recording". */
 .pill-head-label {
   flex: 0 1 auto;
   min-width: 0;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--mp-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -443,141 +570,210 @@
 
 .pill-head-spacer {
   flex: 1 1 auto;
+  min-width: 4px;
+}
+
+.pill-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
 }
 
 /* ---------- which side is audible ---------- */
 
 .pill-head-sides {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-inline-start: 2px;
 }
 
+/* The same chips the main window's recorder draws. */
 .pill-side {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 20px;
-  padding: 0 8px 0 7px;
+  gap: 6px;
+  height: 22px;
+  min-width: 0;
+  padding: 0 9px 0 8px;
   border-radius: 999px;
-  background: var(--mp-surface-raised);
-  font-size: 10.5px;
+  border: 1px solid var(--mp-hairline);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--mp-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: color 120ms ease;
 }
 
 .pill-side-light {
-  width: 5px;
-  height: 5px;
+  flex: none;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--mp-faint);
+  background: rgba(255, 255, 255, 0.22);
   transition:
     background 120ms ease,
     box-shadow 120ms ease;
 }
 
 .pill-side[data-active="true"] {
-  color: var(--mp-body);
+  color: var(--mp-ink);
 }
 
 .pill-side[data-active="true"] .pill-side-light {
   background: var(--mp-accent);
-  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.2);
+  box-shadow: 0 0 0 3px rgba(92, 214, 190, 0.2);
 }
 
 /* Not being recorded at all — different from quiet, and it must look it. */
 .pill-side[data-captured="false"] {
-  color: #fcd34d;
+  color: var(--mp-warn);
+  border-color: rgba(245, 196, 107, 0.3);
   text-decoration: line-through;
-  text-decoration-color: rgba(252, 211, 77, 0.6);
+  text-decoration-color: rgba(245, 196, 107, 0.6);
 }
 
 .pill-side[data-captured="false"] .pill-side-light {
   background: var(--mp-warn);
 }
 
+/* A line the user needs to read: the far side is not captured, or an ask
+ * failed. Full width, under the head, never a floating toast. */
 .pill-notice {
   flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0;
-  padding: 6px 12px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: #fcd34d;
-  background: rgba(251, 191, 36, 0.1);
+  padding: 9px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mp-warn);
+  background: rgba(245, 196, 107, 0.07);
   border-bottom: 1px solid var(--mp-hairline);
+}
+
+.pill-notice svg {
+  flex: none;
+  margin-block-start: 2px;
+}
+
+.pill-notice[data-tone="error"] {
+  color: var(--mp-error);
+  background: rgba(244, 63, 94, 0.08);
+  border-bottom: 0;
+  border-top: 1px solid var(--mp-hairline);
+  cursor: pointer;
+}
+
+.pill-notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* The one scroll container in the window. */
 .pill-transcript {
   flex: 1 1 auto;
-  min-height: 96px;
-  max-height: 260px;
+  min-height: 104px;
+  max-height: 280px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 10px 12px;
+  padding: 14px 16px 6px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--mp-hairline-strong) transparent;
+  gap: 14px;
 }
 
-.pill-transcript::-webkit-scrollbar {
-  width: 6px;
+.pill-transcript::-webkit-scrollbar,
+.pill-answer::-webkit-scrollbar {
+  width: 8px;
 }
 
-.pill-transcript::-webkit-scrollbar-thumb {
-  border-radius: 3px;
+.pill-transcript::-webkit-scrollbar-track,
+.pill-answer::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 6px;
+}
+
+.pill-transcript::-webkit-scrollbar-thumb,
+.pill-answer::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
   background: var(--mp-hairline-strong);
+  background-clip: padding-box;
+}
+
+/* The list keeps its last line clear of the edge it scrolls under. */
+.pill-transcript::after {
+  content: "";
+  flex: none;
+  height: 4px;
 }
 
 .pill-empty {
-  margin: 0;
-  padding: 22px 6px;
+  margin: auto 0;
+  padding: 18px 8px;
   text-align: center;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--mp-faint);
 }
 
 .pill-turn {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .pill-turn-who {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 10.5px;
+  gap: 7px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  color: var(--mp-ink);
 }
 
+/* The speaker's colour lives on the dot only; names are ink, so the
+ * transcript reads as text rather than as a row of coloured labels. */
 .pill-turn-swatch {
-  width: 6px;
-  height: 6px;
+  flex: none;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: currentColor;
+}
+
+.pill-turn-time {
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--mp-faint);
 }
 
 .pill-turn-text {
   margin: 0;
-  font-size: 12.5px;
-  line-height: 1.5;
+  padding-inline-start: 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
   color: var(--mp-body);
   overflow-wrap: break-word;
+  user-select: text;
 }
 
 /* A diarization label the pass was not confident about. De-emphasised rather
  * than hidden: a confidently wrong speaker name is worse than a visibly
  * uncertain one. */
 .pill-turn[data-uncertain="true"] .pill-turn-who {
+  color: var(--mp-muted);
+}
+
+.pill-turn[data-uncertain="true"] .pill-turn-swatch {
   opacity: 0.55;
 }
 
@@ -590,71 +786,192 @@
  * finite. */
 .pill-answer {
   flex: none;
-  max-height: 132px;
+  max-height: 168px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 8px 12px;
+  padding: 12px 16px 12px;
   border-top: 1px solid var(--mp-hairline);
-  background: rgba(45, 212, 191, 0.05);
-  scrollbar-width: thin;
-  scrollbar-color: var(--mp-hairline-strong) transparent;
+  background: rgba(255, 255, 255, 0.025);
 }
 
-.pill-answer::-webkit-scrollbar {
-  width: 6px;
-}
-
-.pill-answer::-webkit-scrollbar-thumb {
-  border-radius: 3px;
-  background: var(--mp-hairline-strong);
+/* What was asked: context for the answer, so one quiet line. */
+.pill-answer-question {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mp-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pill-answer-text {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--mp-ink);
-  white-space: pre-wrap;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--mp-body);
   overflow-wrap: break-word;
+  user-select: text;
 }
 
-.pill-answer-text[data-thinking="true"] {
+.pill-answer-text p {
+  margin: 0 0 6px;
+}
+
+.pill-answer-text ul,
+.pill-answer-text ol {
+  margin: 0 0 6px;
+  padding-inline-start: 18px;
+}
+
+.pill-answer-text li {
+  margin: 2px 0;
+}
+
+.pill-answer-text li::marker {
   color: var(--mp-faint);
-  font-style: italic;
 }
 
-.pill-ask {
-  flex: none;
+.pill-answer-text > :last-child {
+  margin-bottom: 0;
+}
+
+.pill-answer-text strong {
+  font-weight: 600;
+  color: var(--mp-ink);
+}
+
+.pill-answer-text code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--mp-raise-strong);
+  font-size: 0.88em;
+}
+
+.pill-answer-thinking {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--mp-faint);
+}
+
+.pill-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.pill-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--mp-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pill-dots span {
+    animation: pill-dot 1.2s ease-in-out infinite;
+  }
+  .pill-dots span:nth-child(2) {
+    animation-delay: 160ms;
+  }
+  .pill-dots span:nth-child(3) {
+    animation-delay: 320ms;
+  }
+}
+
+@keyframes pill-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* The ask bar: the call's typing bar, a rounded field with the send button
+ * inside it. */
+.pill-ask {
+  flex: none;
+  padding: 10px;
   border-top: 1px solid var(--mp-hairline);
+}
+
+.pill-ask-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 0 5px 0 14px;
+  border-radius: 999px;
+  background: var(--mp-inset);
+  border: 1px solid var(--mp-hairline);
+  transition: border-color 140ms ease;
+}
+
+.pill-ask-field:focus-within {
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .pill-ask-input {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 7px 10px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--mp-ink);
-  background: var(--mp-inset);
-  border: 1px solid var(--mp-hairline);
-  border-radius: 10px;
 }
 
 .pill-ask-input::placeholder {
   color: var(--mp-faint);
 }
 
-.pill-ask-input:focus {
-  outline: none;
-  border-color: var(--mp-hairline-strong);
-}
-
 .pill-ask-input:disabled {
   opacity: 0.5;
+}
+
+.pill-send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--mp-ink);
+  color: #111415;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.pill-send:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.pill-send:disabled {
+  background: var(--mp-raise-strong);
+  color: var(--mp-faint);
+  cursor: default;
+}
+
+.pill-send[data-variant="stop"] {
+  background: var(--mp-raise-strong);
+  color: var(--mp-ink);
+}
+
+.pill-send:focus-visible {
+  outline: 2px solid var(--mp-ink);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -667,11 +984,14 @@
   .mpill,
   .mpill-wave,
   .mpill-controls,
-  .pill-action {
+  .pill-action,
+  .pill-btn,
+  .pill-send {
     transition: none;
   }
   .mpill:active:not(:has(.pill-action:active)),
-  .pill-action:active {
+  .pill-action:active,
+  .pill-btn:active {
     transform: none;
   }
 }

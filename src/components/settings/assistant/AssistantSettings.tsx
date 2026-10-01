@@ -2241,37 +2241,6 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
               }
             />
           </SettingContainer>
-          <SettingContainer
-            title={t("settings.assistant.appearance.panelSizeLabel")}
-            info={t("settings.assistant.appearance.panelSizeDescription")}
-            layout="horizontal"
-            grouped={true}
-          >
-            <Dropdown
-              options={[
-                {
-                  value: "mini",
-                  label: t("settings.assistant.appearance.panelSizes.mini"),
-                },
-                {
-                  value: "compact",
-                  label: t("settings.assistant.appearance.panelSizes.compact"),
-                },
-                {
-                  value: "standard",
-                  label: t("settings.assistant.appearance.panelSizes.standard"),
-                },
-                {
-                  value: "large",
-                  label: t("settings.assistant.appearance.panelSizes.large"),
-                },
-              ]}
-              selectedValue={settings?.assistant_panel_size ?? "standard"}
-              onSelect={(size) =>
-                setAndRefresh(commands.setAssistantPanelSize(size))
-              }
-            />
-          </SettingContainer>
           {/* Only worth showing when there is a choice to make. On one monitor the
             row would be a dropdown with a single meaningful entry. */}
           {displays.length > 1 && (

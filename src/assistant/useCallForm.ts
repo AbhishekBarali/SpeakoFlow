@@ -1,42 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { commands } from "@/bindings";
 
 /**
- * Which form the live call is in, including the moments in between.
+ * Which form the live call is in, including the fold in between.
  *
- * Opening and closing the conversation resizes the window, and a window resize
- * is not something a webview can animate: for a frame or two the old picture is
- * drawn at the new window's corner, so whatever is on screen at that instant
- * visibly jumps. That jump is what made the conversation open and close with a
- * lurch. So, like the quick-ask card, nothing is on screen while the window
- * changes shape, and each form animates in only once its window exists:
+ * Both forms are drawn in one window that never changes size (see
+ * `conversation_size` in `assistant.rs`): the bar floats at the bottom of a
+ * transparent frame, and the conversation panel grows up out of it in the same
+ * frame. Opening and closing are therefore pure CSS, with nothing on the native
+ * side to wait for:
  *
- *   open    bar ─► leaving (the bar fades out) ─► opening (Rust grows the
- *           window; nothing drawn) ─► open (the panel grows up out of the bar)
- *   close   open ─► closing (the panel folds down into the bar) ─► shrinking
- *           (Rust shrinks the window; nothing drawn) ─► bar (the bar settles in)
+ *   open    bar ─► open (the panel grows up out of the bar)
+ *   close   open ─► closing (the panel folds down into the bar) ─► bar
  *
- * Rust reports when the new geometry is in place (`assistant-call-frame`). A
- * fallback timer covers a report that never comes, so a lost event costs a
- * moment rather than a call stuck between forms.
+ * It used to resize the window, and a WebView2 window that changes shape shows
+ * its old picture at the new size for a frame or two. Drawing through that made
+ * the bar (and its "Message …" field) flash at the wrong height; blanking the
+ * window to hide it made the call vanish for a beat on every open and close.
+ *
+ * Rust is still told which form is showing (`assistantConversationSetExpanded`),
+ * because it remembers a drag-resize of the expanded panel and keeps the panel's
+ * header on screen.
  */
-export type CallForm =
-  | "bar"
-  | "leaving"
-  | "opening"
-  | "open"
-  | "closing"
-  | "shrinking";
+export type CallForm = "bar" | "open" | "closing";
 
-/** Keep in step with the `call-*` animations in `CallBar.css`. */
+/** Keep in step with the `call-panel-fold` animation in `CallBar.css`. */
 export const CALL_FORM_MS = {
-  /** The bar and bubble fading out before the window grows. */
-  leave: 120,
-  /** The panel folding down before the window shrinks. */
+  /** The panel folding down into the bar. */
   close: 220,
-  /** How long to wait for Rust's geometry report before going on anyway. */
-  fallback: 600,
 } as const;
 
 function reducedMotion(): boolean {
@@ -47,100 +38,62 @@ function reducedMotion(): boolean {
   );
 }
 
-/** Run after the next paint, so a just-resized webview has laid itself out. */
-function afterPaint(run: () => void) {
-  if (typeof requestAnimationFrame === "function")
-    requestAnimationFrame(() => run());
-  else run();
-}
-
 export function useCallForm(active: boolean) {
   const [form, setFormState] = useState<CallForm>("bar");
   // Updated with the state rather than on render, so two clicks inside one
-  // React batch cannot both see `bar` and queue two resizes.
+  // React batch cannot both see `bar` and report the change twice.
   const formRef = useRef(form);
   const setForm = useCallback((next: CallForm) => {
     formRef.current = next;
     setFormState(next);
   }, []);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearTimers = useCallback(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
+  const clearTimer = useCallback(() => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
   }, []);
-  const later = useCallback((ms: number, run: () => void) => {
-    timers.current.push(setTimeout(run, ms));
-  }, []);
-
-  // The window now has the shape the next form needs: draw it.
-  const arrive = useCallback(
-    (expanded: boolean) => {
-      const waiting = expanded ? "opening" : "shrinking";
-      if (formRef.current !== waiting) return;
-      clearTimers();
-      afterPaint(() => {
-        if (formRef.current === waiting) setForm(expanded ? "open" : "bar");
-      });
-    },
-    [clearTimers, setForm],
-  );
-
-  useEffect(() => {
-    let disposed = false;
-    let stop: (() => void) | undefined;
-    void listen<boolean>("assistant-call-frame", ({ payload }) =>
-      arrive(payload === true),
-    ).then((unlisten) => {
-      if (disposed) unlisten();
-      else stop = unlisten;
-    });
-    return () => {
-      disposed = true;
-      stop?.();
-    };
-  }, [arrive]);
 
   // A call that ends leaves no form behind: the next one opens as the bar.
   useEffect(() => {
     if (active) return;
-    clearTimers();
+    clearTimer();
     setForm("bar");
-  }, [active, clearTimers, setForm]);
+  }, [active, clearTimer, setForm]);
 
-  useEffect(() => clearTimers, [clearTimers]);
-
-  const resize = useCallback(
-    (expanded: boolean) => {
-      setForm(expanded ? "opening" : "shrinking");
-      void commands.assistantConversationSetExpanded(expanded);
-      later(CALL_FORM_MS.fallback, () => arrive(expanded));
-    },
-    [arrive, later, setForm],
-  );
+  useEffect(() => clearTimer, [clearTimer]);
 
   const expand = useCallback(() => {
     if (formRef.current !== "bar") return;
-    setForm("leaving");
-    later(reducedMotion() ? 0 : CALL_FORM_MS.leave, () => resize(true));
-  }, [later, resize, setForm]);
+    setForm("open");
+    void commands.assistantConversationSetExpanded(true);
+  }, [setForm]);
 
   const collapse = useCallback(() => {
     if (formRef.current !== "open") return;
     setForm("closing");
-    later(reducedMotion() ? 0 : CALL_FORM_MS.close, () => resize(false));
-  }, [later, resize, setForm]);
+    clearTimer();
+    timer.current = setTimeout(
+      () => {
+        timer.current = null;
+        if (formRef.current !== "closing") return;
+        setForm("bar");
+        void commands.assistantConversationSetExpanded(false);
+      },
+      reducedMotion() ? 0 : CALL_FORM_MS.close,
+    );
+  }, [clearTimer, setForm]);
 
   const toggle = useCallback(() => {
     if (formRef.current === "open") collapse();
     else expand();
   }, [collapse, expand]);
 
-  /** Back to the bar at once, with no window change (a call starting). */
+  /** Back to the bar at once (a call starting). */
   const reset = useCallback(() => {
-    clearTimers();
+    clearTimer();
     setForm("bar");
-  }, [clearTimers, setForm]);
+  }, [clearTimer, setForm]);
 
   return {
     form,

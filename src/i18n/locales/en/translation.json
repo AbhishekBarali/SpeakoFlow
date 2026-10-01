@@ -148,8 +148,7 @@
       "progress": "Step {{current}} of {{total}}",
       "steps": {
         "setup": "Set up",
-        "tour": "Tour",
-        "finish": "Start"
+        "tour": "Tour"
       }
     },
     "setup": {
@@ -162,7 +161,7 @@
       "count": "{{current}} of {{total}}",
       "skip": "Skip tour",
       "next": "Next",
-      "done": "Continue",
+      "finish": "Open SpeakoFlow",
       "tabs": {
         "dictate": "Dictation",
         "ask": "Assistant",
@@ -172,6 +171,15 @@
         "hold": "Hold to talk",
         "tap": "Tap to start, tap to stop",
         "call": "Press to start, again to hang up"
+      },
+      "steps": {
+        "label": "How it works",
+        "speak": "Say what you want to type",
+        "typed": "It's typed where your cursor is",
+        "select": "Select text (optional)",
+        "use": "Insert the answer, or just read it",
+        "talk": "Just talk",
+        "answer": "It answers out loud"
       },
       "mail": {
         "window": "New message",
@@ -220,15 +228,6 @@
         "assistant": "Assistant",
         "said": "Help me plan a short talk for Friday's team meeting.",
         "reply": "Sure. Open with the one result you're proudest of, give two reasons it worked, and end on what's next."
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "Ready",
-        "installing": "Installing…",
-        "percent": "{{percent}}%",
-        "retry": "Retry",
-        "waiting": "Waiting"
       }
     },
     "subtitle": "To get started, choose a transcription model",
@@ -461,8 +460,7 @@
     },
     "frame": {
       "setup": "Set up",
-      "tour": "Tour",
-      "finish": "Start"
+      "tour": "Tour"
     },
     "welcome": {
       "line": "Talk, and it types. Ask, and it answers.",
@@ -489,34 +487,6 @@
       "continue": "Continue",
       "later": "Set up later",
       "loading": "Finding your speech model"
-    },
-    "start": {
-      "ready": {
-        "title": "Try it now"
-      },
-      "downloading": {
-        "title": "Almost ready"
-      },
-      "failed": {
-        "title": "The download stopped"
-      },
-      "none": {
-        "title": "Pick a voice model to start"
-      },
-      "progress": {
-        "of": "{{done}} of {{total}}",
-        "failed": "It didn't finish. Try again?",
-        "underMinute": "Less than a minute left",
-        "minutes_one": "About {{count}} minute left",
-        "minutes_other": "About {{count}} minutes left"
-      },
-      "try": {
-        "label": "Try dictation",
-        "placeholder": "Your words appear here…",
-        "success": "That's it. It works in every app."
-      },
-      "open": "Open SpeakoFlow",
-      "choose": "Choose a voice model"
     }
   },
   "modelSelector": {
@@ -1857,14 +1827,6 @@
           "large": "Large",
           "extraLarge": "Extra large"
         },
-        "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "How large the assistant is, relative to your screen. A bigger display gets a bigger card.",
-        "panelSizes": {
-          "mini": "Small",
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Large"
-        },
         "askDisplayLabel": "Which screen",
         "askDisplayDescription": "The screen the assistant opens on. By default, the one your mouse is on.",
         "askDisplays": {
@@ -1988,7 +1950,9 @@
     },
     "delete": {
       "action": "Delete meeting",
-      "whileRecording": "Stop the recording before deleting this meeting."
+      "whileRecording": "Stop the recording before deleting this meeting.",
+      "confirmTitle": "Delete this meeting?",
+      "confirmBody": "Its transcript, notes and audio are removed from this computer. This can't be undone."
     },
     "detail": {
       "title": "Meeting",
@@ -2001,6 +1965,19 @@
       "transcript": "Transcript",
       "summary": "Summary",
       "ask": "Ask"
+    },
+    "discuss": {
+      "button": "Discuss in a call",
+      "hint": "Talk this meeting over with the assistant. It knows what was said and can look things up in the transcript.",
+      "whileRecording": "Available once the recording stops.",
+      "nothingYet": "Nothing was transcribed yet.",
+      "failed": "Couldn't start the call: {{error}}",
+      "earlier": "Earlier discussions",
+      "continue": "Continue this discussion in a call",
+      "untitled": "Untitled discussion",
+      "messages_one": "{{count}} message",
+      "messages_other": "{{count}} messages",
+      "more": "More in the call's past conversations."
     },
     "myNotes": {
       "description": "Type what matters to you. It is merged with the transcript when notes are generated.",
@@ -2235,18 +2212,49 @@
       "details": "Details",
       "startHint": "Start talking, or type a message.",
       "mutedHint": "Microphone off. You can still type.",
+      "heldHint": "Paused while you dictate.",
       "preparingVoice": "Preparing the voice… {{progress}}%",
       "history": {
         "title": "Past conversations",
         "hint": "Pick one to carry on where you left off. The call stays connected.",
         "empty": "No saved conversations yet.",
+        "noMatches": "Nothing matches that search.",
+        "noMeetings": "No conversations about meetings yet. Open a meeting and choose Discuss in a call.",
         "loading": "Loading…",
         "failed": "Couldn't load your conversations.",
         "more": "Show more",
         "untitled": "Untitled conversation",
         "current": "Open now",
+        "search": "Search conversations",
+        "clearSearch": "Clear search",
+        "scopeLabel": "Which conversations",
+        "scopes": {
+          "all": "All",
+          "meetings": "Meetings"
+        },
+        "groups": {
+          "today": "Today",
+          "yesterday": "Yesterday",
+          "week": "Previous 7 days",
+          "earlier": "Earlier"
+        },
+        "matchCount_one": "{{count}} conversation",
+        "matchCount_other": "{{count}} conversations",
         "messages_one": "{{count}} message",
         "messages_other": "{{count}} messages"
+      },
+      "meeting": {
+        "about": "About {{title}}",
+        "chipHint": "The assistant has this meeting's notes and can search its transcript.",
+        "untitled": "Untitled meeting",
+        "startTitle": "Let's talk about {{title}}",
+        "startHint": "Ask anything about it, or what to do next. Start talking, or pick one:",
+        "prompts": {
+          "recap": "Give me a quick recap",
+          "next": "What should I do next?",
+          "followUp": "Draft a follow-up message",
+          "missed": "Anything I might have missed?"
+        }
       },
       "options": "Call options",
       "pace": "Time to finish speaking",
@@ -2272,6 +2280,7 @@
         "responding": "Thinking…",
         "speaking": "Speaking",
         "muted": "Microphone off",
+        "held": "Paused for dictation",
         "error": "Call interrupted"
       },
       "errors": {
@@ -2338,6 +2347,8 @@
     "tool": {
       "search": "Searching the web",
       "screen": "Looking at your screen…",
+      "meetingSearch": "Searching the meeting",
+      "meetingRead": "Reading the meeting",
       "working": "Working on it",
       "elapsed": "{{seconds}}s"
     },
@@ -2814,7 +2825,7 @@
       },
       "appearance": {
         "title": "Panel",
-        "description": "Size, text, position, and opacity of the floating panel.",
+        "description": "Text, position, and opacity of the floating panel.",
         "status": "Customize"
       }
     },
@@ -2930,7 +2941,6 @@
       "replyLength": "How long answers usually are.",
       "history": "How many recent messages it keeps in mind.",
       "summarize": "Condenses long chats so it doesn't forget the start.",
-      "panelSize": "How much of your screen it takes.",
       "opacity": "Lower lets your desktop show through.",
       "position": "Click a spot on the screen.",
       "display": "The screen the panel opens on."
@@ -3005,7 +3015,6 @@
     "panel": {
       "where": "Where it opens",
       "text": "Text size",
-      "size": "Panel size",
       "opacity": "Opacity",
       "screen": "Which screen"
     }

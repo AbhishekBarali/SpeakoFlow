@@ -543,6 +543,112 @@
   color: var(--color-hero-ink);
   background: var(--color-hero-hover);
 }
+/* A second action beside the warm white one: glass, so the stage keeps a
+ * single primary. */
+.hero-glass {
+  color: var(--color-hero-ink);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+.hero-glass:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.hero-glass:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ---------- The live meeting on the stage ----------
+ * The banner turns into the recorder while a meeting runs, so starting one
+ * does not swap the page's one dark object for an unrelated white card. */
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ff5a52;
+  box-shadow: 0 0 0 4px rgba(255, 90, 82, 0.16);
+}
+.rec-dot[data-paused="true"] {
+  background: var(--color-hero-muted);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rec-dot:not([data-paused="true"]) {
+    animation: rec-breathe 2s ease-in-out infinite;
+  }
+}
+@keyframes rec-breathe {
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 90, 82, 0.05);
+    opacity: 0.75;
+  }
+}
+.rec-clock {
+  font-family: var(--font-sans);
+  font-size: 3rem;
+  line-height: 1;
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-hero-ink);
+}
+.rec-clock[data-paused="true"] {
+  color: var(--color-hero-muted);
+}
+/* "You" / "Others", lit while that side is audible. Struck through and amber
+ * when the side is not being captured at all, because quiet and missing must
+ * not look alike. */
+.rec-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-hero-muted);
+  transition: color 140ms ease;
+}
+.rec-side-light {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.rec-side[data-active="true"] {
+  color: var(--color-hero-ink);
+}
+.rec-side[data-active="true"] .rec-side-light {
+  background: #5cd6be;
+  box-shadow: 0 0 0 3px rgba(92, 214, 190, 0.22);
+}
+.rec-side[data-captured="false"] {
+  color: #f5c46b;
+  border-color: rgba(245, 196, 107, 0.3);
+  text-decoration: line-through;
+  text-decoration-color: rgba(245, 196, 107, 0.6);
+}
+.rec-side[data-captured="false"] .rec-side-light {
+  background: #f5c46b;
+}
+/* Paused: the light goes grey. A filter rather than opacity, because the
+ * page-entry animation holds the art's opacity at its end value. */
+.hero-stage[data-paused="true"] .hero-art {
+  filter: saturate(0) brightness(0.55);
+  transition: filter 400ms ease;
+}
 /* The tips button in the corner. It can sit over the art, so it carries its
  * own dark glass rather than relying on what is behind it. */
 .hero-corner {

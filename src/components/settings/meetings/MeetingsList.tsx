@@ -1,11 +1,19 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Trash2, Users } from "lucide-react";
+import {
+  AudioLines,
+  ChevronRight,
+  FileText,
+  MoreHorizontal,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { TONE_PILL } from "@/components/ui/tones";
-import { formatDateTime } from "@/utils/dateFormat";
+import { Dialog } from "@/components/ui/Dialog";
+import { MenuButton, type MenuItem } from "@/components/ui/Menu";
+import { formatTimeOfDay, groupByDay } from "@/utils/dayGroups";
 import type { Meeting, MeetingStatus } from "./api";
-import { formatClock, meetingDurationMs } from "./speakers";
+import { formatDuration, meetingDurationMs } from "./speakers";
 
 interface MeetingsListProps {
   meetings: readonly Meeting[];
@@ -24,12 +32,23 @@ interface MeetingsListProps {
 
 /** Only states worth a badge get one; "complete" is the normal case and a pill
  *  on every row is noise. */
-const STATUS_TONE: Partial<Record<MeetingStatus, keyof typeof TONE_PILL>> = {
-  recording: "rose",
-  processing: "amber",
-  interrupted: "amber",
+const STATUS_PILL: Partial<Record<MeetingStatus, string>> = {
+  recording: "border-error/30 bg-error/10 text-error",
+  processing:
+    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  interrupted:
+    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
 };
 
+const ICON_BUTTON =
+  "grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-ink/6 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 aria-expanded:bg-ink/6 aria-expanded:text-ink";
+
+/**
+ * Recorded meetings, newest first, grouped by day exactly like History: a
+ * day heading, then one card of rows for that day. A row is the title and one
+ * line of facts (time, length, who spoke, whether notes exist); opening it is
+ * the whole row, and the rare actions sit behind a ⋯ that shows on hover.
+ */
 export const MeetingsList: React.FC<MeetingsListProps> = ({
   meetings,
   speakerCounts,
@@ -41,26 +60,41 @@ export const MeetingsList: React.FC<MeetingsListProps> = ({
   recordingMeetingId,
 }) => {
   const { t, i18n } = useTranslation();
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState<Meeting | null>(null);
+
+  const groups = useMemo(
+    () =>
+      groupByDay(meetings, (meeting) => meeting.started_at, i18n.language, {
+        today: t("historyPage.today"),
+        yesterday: t("historyPage.yesterday"),
+      }),
+    [meetings, i18n.language, t],
+  );
 
   if (loading && meetings.length === 0) {
     return (
-      <div className="px-4 py-10 text-center text-[13px] text-muted">
-        {t("common.loading")}
+      <div className="space-y-3" aria-busy="true">
+        {[0, 1].map((index) => (
+          <div
+            key={index}
+            className="h-[4.25rem] animate-pulse rounded-xl bg-surface-strong/60"
+          />
+        ))}
+        <span className="sr-only">{t("common.loading")}</span>
       </div>
     );
   }
 
   if (meetings.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-strong text-muted-soft">
-          <Users size={18} />
+      <div className="flex flex-col items-center rounded-2xl border border-dashed border-hairline-strong px-6 py-12 text-center">
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-surface-strong text-muted">
+          <AudioLines className="h-5 w-5" aria-hidden="true" />
         </span>
-        <p className="text-[13.5px] font-medium text-ink">
+        <p className="mt-4 text-[0.9375rem] font-medium text-ink">
           {t("meetings.list.emptyTitle")}
         </p>
-        <p className="max-w-sm text-[12.5px] leading-relaxed text-muted">
+        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted text-pretty">
           {t("meetings.list.emptyHint")}
         </p>
       </div>
@@ -69,109 +103,30 @@ export const MeetingsList: React.FC<MeetingsListProps> = ({
 
   return (
     <>
-      <ul className="divide-y divide-hairline">
-        {meetings.map((meeting) => {
-          const durationMs = meetingDurationMs(
-            meeting.started_at,
-            meeting.ended_at,
-          );
-          const speakerCount = speakerCounts.get(meeting.id);
-          // Assembled in JS rather than as JSX text so the separator is not a
-          // literal string in markup, and so an unknown value drops out of the
-          // line instead of rendering as an em dash nobody can interpret.
-          const meta = [
-            formatDateTime(String(meeting.started_at), i18n.language),
-            durationMs === null ? null : formatClock(durationMs),
-            speakerCount === undefined
-              ? null
-              : t("meetings.list.speakers", { count: speakerCount }),
-          ]
-            .filter((part): part is string => Boolean(part))
-            .join(" · ");
-          const tone = STATUS_TONE[meeting.status];
-          const confirming = confirmingId === meeting.id;
-          const isRecording = recordingMeetingId === meeting.id;
-
-          return (
-            <li
-              key={meeting.id}
-              className="group flex items-center gap-2 px-3 py-2"
-            >
-              <button
-                type="button"
-                onClick={() => onOpen(meeting.id)}
-                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-start transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink">
-                    {meeting.title}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs text-muted">
-                    {meta}
-                  </span>
-                </span>
-                {meeting.notes && (
-                  <span className="shrink-0 text-xs text-muted">
-                    {t("meetings.list.notesBadge")}
-                  </span>
-                )}
-                {tone && (
-                  <span
-                    className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[0.6875rem] font-medium ${TONE_PILL[tone]}`}
-                  >
-                    {t(`meetings.status.${meeting.status}`)}
-                  </span>
-                )}
-                <ChevronRight
-                  size={15}
-                  className="shrink-0 text-muted-soft rtl:rotate-180"
-                  aria-hidden="true"
+      <div className="space-y-6">
+        {groups.map((group) => (
+          <section key={group.key} aria-label={group.label}>
+            <h3 className="sticky top-0 z-10 -mx-1 mb-2 bg-canvas/95 px-1 py-1.5 text-sm font-semibold text-muted backdrop-blur-[2px]">
+              {group.label}
+            </h3>
+            <ul className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-surface elev-card">
+              {group.items.map((meeting) => (
+                <MeetingRow
+                  key={meeting.id}
+                  meeting={meeting}
+                  speakerCount={speakerCounts.get(meeting.id)}
+                  isRecording={recordingMeetingId === meeting.id}
+                  onOpen={() => onOpen(meeting.id)}
+                  onDelete={() => setConfirming(meeting)}
                 />
-              </button>
-
-              {confirming ? (
-                <span className="flex shrink-0 items-center gap-1.5">
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => {
-                      setConfirmingId(null);
-                      onDelete(meeting.id);
-                    }}
-                  >
-                    {t("common.delete")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmingId(null)}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmingId(meeting.id)}
-                  disabled={isRecording}
-                  title={
-                    isRecording
-                      ? t("meetings.delete.whileRecording")
-                      : t("meetings.delete.action")
-                  }
-                  aria-label={t("meetings.delete.action")}
-                  className="shrink-0 cursor-pointer rounded-lg p-2 text-muted opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 hover:bg-error/10 hover:text-error focus-visible:opacity-100 disabled:cursor-not-allowed disabled:text-muted-soft/50 disabled:hover:bg-transparent"
-                >
-                  <Trash2 size={15} />
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
 
       {hasMore && (
-        <div className="flex justify-center border-t border-hairline px-4 py-3">
+        <div className="mt-5 flex justify-center">
           <Button
             variant="secondary"
             size="sm"
@@ -182,6 +137,158 @@ export const MeetingsList: React.FC<MeetingsListProps> = ({
           </Button>
         </div>
       )}
+
+      <Dialog
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        size="sm"
+        title={t("meetings.delete.confirmTitle")}
+        description={confirming?.title}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ms-auto"
+              onClick={() => setConfirming(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                if (confirming) onDelete(confirming.id);
+                setConfirming(null);
+              }}
+            >
+              {t("common.delete")}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-relaxed text-body">
+          {t("meetings.delete.confirmBody")}
+        </p>
+      </Dialog>
     </>
   );
 };
+
+interface MeetingRowProps {
+  meeting: Meeting;
+  speakerCount: number | undefined;
+  isRecording: boolean;
+  onOpen: () => void;
+  onDelete: () => void;
+}
+
+const MeetingRow: React.FC<MeetingRowProps> = ({
+  meeting,
+  speakerCount,
+  isRecording,
+  onOpen,
+  onDelete,
+}) => {
+  const { t, i18n } = useTranslation();
+  const durationMs = meetingDurationMs(meeting.started_at, meeting.ended_at);
+  const pill = STATUS_PILL[meeting.status];
+
+  const menuItems: MenuItem[] = [
+    {
+      id: "open",
+      label: t("common.open"),
+      icon: ChevronRight,
+      onSelect: onOpen,
+    },
+    {
+      id: "delete",
+      label: t("meetings.delete.action"),
+      hint: isRecording ? t("meetings.delete.whileRecording") : undefined,
+      icon: Trash2,
+      tone: "danger",
+      separated: true,
+      disabled: isRecording,
+      onSelect: onDelete,
+    },
+  ];
+
+  return (
+    <li className="group relative flex items-center gap-2 pe-2 transition-colors hover:bg-surface-muted/70">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="min-w-0 flex-1 cursor-pointer py-3.5 ps-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          {isRecording && (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full bg-error motion-safe:animate-pulse"
+              aria-hidden="true"
+            />
+          )}
+          <span className="truncate text-sm font-medium text-ink">
+            {meeting.title}
+          </span>
+        </span>
+        <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+          <span className="tabular-nums">
+            {formatTimeOfDay(meeting.started_at, i18n.language)}
+          </span>
+          {durationMs !== null && (
+            <>
+              <Dot />
+              <span className="tabular-nums">
+                {formatDuration(durationMs, i18n.language)}
+              </span>
+            </>
+          )}
+          {speakerCount !== undefined && speakerCount > 0 && (
+            <>
+              <Dot />
+              <span className="inline-flex items-center gap-1">
+                <Users width={11} height={11} aria-hidden="true" />
+                {t("meetings.list.speakers", { count: speakerCount })}
+              </span>
+            </>
+          )}
+          {meeting.notes && (
+            <>
+              <Dot />
+              <span className="inline-flex items-center gap-1">
+                <FileText width={11} height={11} aria-hidden="true" />
+                {t("meetings.list.notesBadge")}
+              </span>
+            </>
+          )}
+        </span>
+      </button>
+
+      {pill && (
+        <span
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium ${pill}`}
+        >
+          {t(`meetings.status.${meeting.status}`)}
+        </span>
+      )}
+
+      <div className="shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+        <MenuButton
+          items={menuItems}
+          width={240}
+          ariaLabel={t("common.more")}
+          title={t("common.more")}
+          className={ICON_BUTTON}
+        >
+          <MoreHorizontal width={16} height={16} />
+        </MenuButton>
+      </div>
+    </li>
+  );
+};
+
+const Dot: React.FC = () => (
+  <span aria-hidden="true" className="text-muted-soft">
+    ·
+  </span>
+);

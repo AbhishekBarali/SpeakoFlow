@@ -25,8 +25,10 @@ use tauri::WebviewUrl;
 #[cfg(target_os = "macos")]
 use tauri_nspanel::{tauri_panel, CollectionBehavior, PanelBuilder, PanelLevel};
 
+// Aliased: `Edge` in this module is `overlay_follow::Edge` (which edge of the
+// display the pill sits against); this one names a layer-surface anchor.
 #[cfg(target_os = "linux")]
-use gtk_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
+use gtk_layer_shell::{Edge as LayerEdge, KeyboardMode, Layer, LayerShell};
 
 #[cfg(target_os = "linux")]
 use std::env;
@@ -250,12 +252,12 @@ fn update_gtk_layer_shell_anchors(overlay_window: &tauri::webview::WebviewWindow
             let settings = settings::get_settings(window_clone.app_handle());
             match settings.overlay_position {
                 OverlayPosition::Top => {
-                    gtk_window.set_anchor(Edge::Top, true);
-                    gtk_window.set_anchor(Edge::Bottom, false);
+                    gtk_window.set_anchor(LayerEdge::Top, true);
+                    gtk_window.set_anchor(LayerEdge::Bottom, false);
                 }
                 OverlayPosition::Bottom | OverlayPosition::None => {
-                    gtk_window.set_anchor(Edge::Bottom, true);
-                    gtk_window.set_anchor(Edge::Top, false);
+                    gtk_window.set_anchor(LayerEdge::Bottom, true);
+                    gtk_window.set_anchor(LayerEdge::Top, false);
                 }
             }
         }
@@ -526,10 +528,26 @@ fn monitor_bounds(monitor: &tauri::Monitor) -> MonitorBounds {
 /// return incorrect coordinates on macOS for monitors with negative positions.
 /// The per-platform OVERLAY_TOP_OFFSET / OVERLAY_BOTTOM_OFFSET constants
 /// already account for system chrome (menu bar, taskbar).
-fn overlay_edge(position: OverlayPosition) -> Edge {
+///
+/// A call docks its bar at the bottom centre too. Dictation used to hang the
+/// call up, so the two never met; now that dictation runs beside a call, a
+/// bottom overlay rises above the call's bar and bubble instead of covering
+/// them (`call_on_screen`).
+fn overlay_edge(position: OverlayPosition, call_on_screen: bool) -> Edge {
     match position {
         OverlayPosition::Top => Edge::Top(OVERLAY_TOP_OFFSET),
-        OverlayPosition::Bottom | OverlayPosition::None => Edge::Bottom(OVERLAY_BOTTOM_OFFSET),
+        OverlayPosition::Bottom | OverlayPosition::None => {
+            Edge::Bottom(bottom_overlay_offset(call_on_screen))
+        }
+    }
+}
+
+/// How far above the bottom of the display the overlay sits.
+fn bottom_overlay_offset(call_on_screen: bool) -> f64 {
+    if call_on_screen {
+        OVERLAY_BOTTOM_OFFSET.max(crate::assistant::CALL_STACK_CLEARANCE)
+    } else {
+        OVERLAY_BOTTOM_OFFSET
     }
 }
 
@@ -540,11 +558,12 @@ fn placement_for(
     width: f64,
     height: f64,
     position: OverlayPosition,
+    call_on_screen: bool,
 ) -> Point {
     placement_on(
         monitor_bounds(monitor),
         (width, height),
-        overlay_edge(position),
+        overlay_edge(position, call_on_screen),
         PLACE_IN_PHYSICAL,
     )
 }
@@ -605,7 +624,10 @@ fn start_overlay_follow(
     let Some(placed_on) = placed_on else {
         return;
     };
-    let edge = overlay_edge(settings::get_settings(app_handle).overlay_position);
+    let edge = overlay_edge(
+        settings::get_settings(app_handle).overlay_position,
+        crate::voice_conversation::is_active(app_handle),
+    );
     let app = app_handle.clone();
     std::thread::spawn(move || {
         let alive = || OVERLAY_FOLLOW.load(Ordering::SeqCst) == generation;
@@ -709,6 +731,7 @@ fn calculate_overlay_position_sized(
         width,
         height,
         settings.overlay_position,
+        crate::voice_conversation::is_active(app_handle),
     ))
 }
 
@@ -1175,7 +1198,13 @@ fn place_overlay_on(
     let position = settings::get_settings(app_handle).overlay_position;
     set_overlay_placement(
         overlay_window,
-        placement_for(&monitor, width, height, position),
+        placement_for(
+            &monitor,
+            width,
+            height,
+            position,
+            crate::voice_conversation::is_active(app_handle),
+        ),
     );
     Some(monitor)
 }

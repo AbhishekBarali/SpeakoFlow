@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, HelpCircle, X } from "lucide-react";
-import { TONE_PILL, type SettingTone } from "@/components/ui/tones";
+import { Check, HelpCircle, Pencil, X } from "lucide-react";
+import type { SettingTone } from "@/components/ui/tones";
 import type { MeetingSpeaker } from "./api";
 import {
   formatClock,
   groupIntoTurns,
   otherSpeakerOrder,
+  speakerInitial,
   speakerNameResolver,
   speakerTone,
   type SpeakerTurn,
@@ -35,7 +36,23 @@ interface TranscriptViewProps {
 
 /** Rows are one line or twenty; this is only the first guess for a row that has
  *  never been on screen, and the scrollbar corrects as rows are measured. */
-const ESTIMATED_TURN_HEIGHT = 92;
+const ESTIMATED_TURN_HEIGHT = 104;
+
+/**
+ * The avatar's tint per speaker. The colour lives only here, on a small
+ * circle: names are ordinary ink, so a transcript reads as text rather than as
+ * a row of coloured badges — which is what the uppercase rainbow tags it
+ * replaced looked like.
+ */
+const AVATAR: Record<SettingTone, string> = {
+  teal: "bg-accent/12 text-accent",
+  violet: "bg-violet-500/12 text-violet-700 dark:text-violet-300",
+  amber: "bg-amber-500/14 text-amber-700 dark:text-amber-300",
+  sky: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
+  rose: "bg-rose-500/12 text-rose-700 dark:text-rose-300",
+  indigo: "bg-indigo-500/12 text-indigo-700 dark:text-indigo-300",
+  emerald: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+};
 
 /**
  * A meeting transcript: consecutive utterances grouped into speaker turns, one
@@ -114,7 +131,7 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
 
   if (turns.length === 0) {
     return (
-      <div className="px-4 py-10 text-center text-[13px] text-muted">
+      <div className="px-6 py-12 text-center text-sm text-muted">
         {emptyLabel}
       </div>
     );
@@ -122,7 +139,7 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
 
   return (
     <div ref={containerRef} className={`overflow-y-auto ${heightClassName}`}>
-      <div className="px-4 py-3">
+      <div className="px-5 pt-5 pb-2 sm:px-6">
         {/* The spacer holds the scrollbar at full length; rows are positioned
             inside it so only the visible ones exist in the DOM. */}
         <div className="relative" style={{ height: totalHeight }}>
@@ -170,7 +187,8 @@ interface TurnRowProps {
   onCancelRename: () => void;
 }
 
-/** One speaker turn: a coloured name above the words they said. */
+/** One speaker turn: an avatar, the name and when they started, then what
+ *  they said as an ordinary paragraph. */
 const TurnRow: React.FC<TurnRowProps> = ({
   turn,
   name,
@@ -190,81 +208,101 @@ const TurnRow: React.FC<TurnRowProps> = ({
     if (editing) inputRef.current?.select();
   }, [editing]);
 
+  // A low-confidence label is a guess. It keeps the speaker's colour so the
+  // transcript still scans, but says so rather than asserting a name the
+  // diarizer was unsure about.
+  const uncertain = turn.lowConfidence;
+
   return (
-    <div className="pb-4">
-      <div className="mb-1 flex items-center gap-2">
-        {editing ? (
-          <span className="flex items-center gap-1">
-            <input
-              ref={inputRef}
-              value={draft}
-              onChange={(event) => onDraftChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") onCommitRename();
-                if (event.key === "Escape") onCancelRename();
-              }}
-              aria-label={t("meetings.transcript.renameSpeaker")}
-              className="w-40 rounded-md border border-hairline-strong bg-surface px-2 py-1 text-[12px] text-ink focus:border-ink focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={onCommitRename}
-              title={t("common.save")}
-              aria-label={t("common.save")}
-              className="cursor-pointer rounded-md p-1 text-muted transition-colors hover:bg-ink/6 hover:text-ink"
-            >
-              <Check size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={onCancelRename}
-              title={t("common.cancel")}
-              aria-label={t("common.cancel")}
-              className="cursor-pointer rounded-md p-1 text-muted transition-colors hover:bg-ink/6 hover:text-ink"
-            >
-              <X size={13} />
-            </button>
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onStartRename}
-            disabled={!editable}
-            title={
-              editable ? t("meetings.transcript.renameSpeaker") : undefined
-            }
-            className={`rounded-md border px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide transition-colors ${
-              // A low-confidence label is a guess. It keeps the speaker's colour
-              // so the transcript still scans, but says so rather than asserting
-              // a name the diarizer was unsure about.
-              turn.lowConfidence
-                ? "border-dashed border-hairline-strong bg-surface-strong/60 text-muted"
-                : TONE_PILL[tone]
-            } ${editable ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
-          >
-            {name}
-          </button>
-        )}
-        {turn.lowConfidence && (
-          <span
-            className="flex items-center gap-1 text-[10.5px] text-muted-soft"
-            title={t("meetings.transcript.lowConfidenceHelp")}
-          >
-            <HelpCircle size={11} />
-            {t("meetings.transcript.lowConfidence")}
-          </span>
-        )}
-        <span className="text-[10.5px] tabular-nums text-muted-soft">
-          {formatClock(turn.startMs)}
-        </span>
-      </div>
-      <p
-        className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${
-          turn.lowConfidence ? "text-muted" : "text-body"
+    <div className="flex gap-3.5 pb-6">
+      <span
+        className={`mt-px grid h-8 w-8 shrink-0 select-none place-items-center rounded-full text-[0.8125rem] font-semibold ${AVATAR[tone]} ${
+          uncertain
+            ? "opacity-60 outline-1 outline-offset-2 outline-dashed"
+            : ""
         }`}
+        aria-hidden="true"
       >
-        {turn.text}
-      </p>
+        {speakerInitial(name)}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex min-h-8 flex-wrap items-center gap-x-2.5 gap-y-1">
+          {editing ? (
+            <span className="flex items-center gap-1">
+              <input
+                ref={inputRef}
+                value={draft}
+                onChange={(event) => onDraftChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") onCommitRename();
+                  if (event.key === "Escape") onCancelRename();
+                }}
+                aria-label={t("meetings.transcript.renameSpeaker")}
+                className="h-8 w-44 rounded-lg border border-hairline-strong bg-surface px-2.5 text-sm text-ink focus:border-ink focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={onCommitRename}
+                title={t("common.save")}
+                aria-label={t("common.save")}
+                className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-ink/6 hover:text-ink"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onCancelRename}
+                title={t("common.cancel")}
+                aria-label={t("common.cancel")}
+                className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-ink/6 hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </span>
+          ) : editable ? (
+            <button
+              type="button"
+              onClick={onStartRename}
+              title={t("meetings.transcript.renameSpeaker")}
+              className={`group/name -mx-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-sm font-semibold transition-colors hover:bg-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                uncertain ? "text-muted" : "text-ink"
+              }`}
+            >
+              {name}
+              <Pencil
+                className="h-3 w-3 text-muted-soft opacity-0 transition-opacity group-hover/name:opacity-100 group-focus-visible/name:opacity-100"
+                aria-hidden="true"
+              />
+            </button>
+          ) : (
+            <span
+              className={`text-sm font-semibold ${uncertain ? "text-muted" : "text-ink"}`}
+            >
+              {name}
+            </span>
+          )}
+          <span className="text-xs tabular-nums text-muted-soft">
+            {formatClock(turn.startMs)}
+          </span>
+          {uncertain && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-hairline-strong px-2 py-px text-[0.6875rem] font-medium text-muted"
+              title={t("meetings.transcript.lowConfidenceHelp")}
+            >
+              <HelpCircle className="h-3 w-3" aria-hidden="true" />
+              {t("meetings.transcript.lowConfidence")}
+            </span>
+          )}
+        </div>
+        <p
+          className={`mt-0.5 max-w-[72ch] whitespace-pre-wrap break-words text-[0.9375rem] leading-[1.7] select-text ${
+            uncertain ? "text-muted" : "text-body"
+          }`}
+        >
+          {turn.text}
+        </p>
+      </div>
     </div>
   );
 };

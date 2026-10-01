@@ -147,8 +147,7 @@
       "progress": "第 {{current}} 步，共 {{total}} 步",
       "steps": {
         "setup": "设置",
-        "tour": "导览",
-        "finish": "开始"
+        "tour": "导览"
       }
     },
     "setup": {
@@ -161,7 +160,7 @@
       "count": "{{current}} / {{total}}",
       "skip": "跳过导览",
       "next": "下一步",
-      "done": "继续",
+      "finish": "打开 SpeakoFlow",
       "tabs": {
         "dictate": "语音输入",
         "ask": "助手",
@@ -171,6 +170,15 @@
         "hold": "按住说话",
         "tap": "按一下开始，再按一下停止",
         "call": "按下开始，再按一次挂断"
+      },
+      "steps": {
+        "label": "使用方法",
+        "speak": "说出您想输入的内容",
+        "typed": "文字会出现在光标处",
+        "select": "选中文本（可选）",
+        "use": "插入回答，或直接阅读",
+        "talk": "直接说话",
+        "answer": "它会出声回答"
       },
       "mail": {
         "window": "新邮件",
@@ -219,15 +227,6 @@
         "assistant": "助手",
         "said": "帮我准备一段在周五团队会议上的简短发言。",
         "reply": "没问题。先讲你最引以为豪的一项成果，再给出它成功的两个原因，最后说说下一步计划。"
-      }
-    },
-    "finish": {
-      "status": {
-        "ready": "就绪",
-        "installing": "正在安装…",
-        "percent": "{{percent}}%",
-        "retry": "重试",
-        "waiting": "等待中"
       }
     },
     "subtitle": "请选择一个转录模型以开始使用",
@@ -460,8 +459,7 @@
     },
     "frame": {
       "setup": "设置",
-      "tour": "导览",
-      "finish": "开始"
+      "tour": "导览"
     },
     "welcome": {
       "line": "开口说，它来打字。提个问，它来回答。",
@@ -486,33 +484,6 @@
       "continue": "继续",
       "later": "稍后设置",
       "loading": "正在查找您的语音模型"
-    },
-    "start": {
-      "ready": {
-        "title": "现在试试看"
-      },
-      "downloading": {
-        "title": "马上就好"
-      },
-      "failed": {
-        "title": "下载已中断"
-      },
-      "none": {
-        "title": "选择一个语音模型即可开始"
-      },
-      "progress": {
-        "of": "{{done}} / {{total}}",
-        "failed": "下载未完成。要重试吗？",
-        "underMinute": "剩余不到一分钟",
-        "minutes_other": "大约还剩 {{count}} 分钟"
-      },
-      "try": {
-        "label": "试试语音输入",
-        "placeholder": "您说的话会显示在这里…",
-        "success": "就这么简单。它在所有应用中都能用。"
-      },
-      "open": "打开 SpeakoFlow",
-      "choose": "选择语音模型"
     }
   },
   "modelSelector": {
@@ -1846,14 +1817,6 @@
           "large": "大",
           "extraLarge": "特大"
         },
-        "panelSizeLabel": "面板尺寸",
-        "panelSizeDescription": "悬浮助手面板的整体尺寸。",
-        "panelSizes": {
-          "mini": "小",
-          "compact": "紧凑",
-          "standard": "标准",
-          "large": "大"
-        },
         "askDisplayLabel": "显示在哪个屏幕",
         "askDisplayDescription": "助手在哪个屏幕上打开。默认是鼠标所在的屏幕。",
         "askDisplays": {
@@ -1976,7 +1939,9 @@
     },
     "delete": {
       "action": "删除会议",
-      "whileRecording": "请先停止录制，再删除这场会议。"
+      "whileRecording": "请先停止录制，再删除这场会议。",
+      "confirmTitle": "删除这个会议？",
+      "confirmBody": "它的转录、笔记和音频将从这台电脑上删除。此操作无法撤销。"
     },
     "detail": {
       "title": "会议",
@@ -2220,6 +2185,7 @@
       "details": "详细信息",
       "startHint": "开始说话，或输入消息。",
       "mutedHint": "麦克风已关闭。您仍然可以打字。",
+      "heldHint": "语音输入期间已暂停。",
       "preparingVoice": "正在准备语音… {{progress}}%",
       "history": {
         "title": "过往对话",
@@ -2256,6 +2222,7 @@
         "responding": "正在思考…",
         "speaking": "正在朗读",
         "muted": "麦克风已关闭",
+        "held": "因语音输入已暂停",
         "error": "通话已中断"
       },
       "errors": {
@@ -2904,7 +2871,6 @@
       "replyLength": "回答通常的长度。",
       "history": "它会记住多少条最近的消息。",
       "summarize": "压缩较长的聊天，以免忘记开头的内容。",
-      "panelSize": "它占用多少屏幕空间。",
       "opacity": "调低后可透出您的桌面。",
       "position": "点击屏幕上的一个位置。",
       "display": "面板在哪个屏幕上打开。"
@@ -2977,7 +2943,6 @@
     "panel": {
       "where": "打开位置",
       "text": "文字大小",
-      "size": "面板大小",
       "opacity": "不透明度",
       "screen": "显示屏幕"
     }

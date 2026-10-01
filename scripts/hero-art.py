@@ -4,19 +4,26 @@ Render the artwork behind each feature page's banner (src/assets/hero/*.webp).
 Dev-only and deterministic: every image comes from a fixed seed, so running this
 again reproduces the shipped files byte-for-byte on the same numpy/Pillow.
 
-The look is long-exposure light rather than vector graphics: every element is
-accumulated as *light* in a linear HDR buffer, blurred at several radii (a sharp
-core, a glow, a bloom, a haze), tone-mapped with an exponential curve so bright
-cores burn toward white the way film does, and only then converted to sRGB.
-That is what makes a handful of lines read as a photograph of light instead of
-a CSS gradient. Then `camera` photographs it with a shallow depth of field:
-the subject stays crisp and the frame goes soft away from it. The palette is
-warm tungsten against the brand teal, the classic cinematic pairing, on the
-banner's own near-black so the left edge can be faded out in CSS without a
-seam.
+Every element is accumulated as *light* in a linear HDR buffer, tone-mapped
+with an exponential curve, and only then converted to sRGB, so shapes keep the
+soft edge of something lit rather than the hard edge of a vector. The look is
+deliberately restrained: crisp shapes, a little glow, and only a trace of
+coloured room light (`GLOW`, `ACCENT_GLOW`, `AMBIENCE`). The first versions
+leaned on heavy bloom and wide amber and teal washes, and on the dark theme
+that read as glare across the top of every page. The palette is warm white
+against the brand teal, on the banner's own near-black so the left edge can be
+faded out in CSS without a seam.
 
 Each image keeps its subject in the right ~60%: the banner's title and controls
 sit on the left, where the image is masked away.
+
+The pieces share two motifs so the pages read as one family: a voice is a
+waveform of vertical bars (Meetings, Home), and text is a line of rounded bars,
+one per word, seen too small to read its letters (AI cleanup, Dictionary),
+which also keeps the art language-neutral. Each picture is one recognisable
+object with one thing happening to it; the versions that failed were the ones
+with nothing to recognise (a tangle of threads, floating capsules) or that
+drew text as a single row of dashes, which reads as a dashed line.
 
     python scripts/hero-art.py            # write src/assets/hero/*.webp
     python scripts/hero-art.py --sheet    # also write a contact sheet to %TEMP%
@@ -109,23 +116,6 @@ def splat(buf: np.ndarray, xs, ys, colors, weights) -> None:
         np.add.at(buf, (yi[m], xi[m]), colors[m] * (weights[m] * w[m])[:, None])
 
 
-def stroke(buf, xs, ys, color, weight) -> None:
-    """A polyline as light with constant energy per pixel of length.
-
-    `weight` is a scalar or one value per vertex (for a line that fades)."""
-    xs = np.asarray(xs, dtype=np.float32)
-    ys = np.asarray(ys, dtype=np.float32)
-    seg = np.hypot(np.diff(xs), np.diff(ys))
-    length = np.concatenate([[0.0], np.cumsum(seg)])
-    samples = max(2, int(length[-1] / 0.5))
-    at = np.linspace(0.0, length[-1], samples)
-    px = np.interp(at, length, xs)
-    py = np.interp(at, length, ys)
-    per_vertex = np.broadcast_to(np.asarray(weight, dtype=np.float32), xs.shape)
-    w = 0.5 * np.interp(at, length, per_vertex).astype(np.float32)
-    splat(buf, px, py, color, w)
-
-
 def disc(buf, cx, cy, r, color, intensity, rim=0.35) -> None:
     """An out-of-focus highlight: a flat disc with a slightly brighter rim."""
     x0, x1 = int(max(0, cx - r - 3)), int(min(W, cx + r + 4))
@@ -138,6 +128,31 @@ def disc(buf, cx, cy, r, color, intensity, rim=0.35) -> None:
     edge = np.clip((d - r * 0.62) / (r * 0.38), 0.0, 1.0)
     alpha *= 1.0 + rim * edge**2
     buf[y0:y1, x0:x1] += np.asarray(color)[None, None, :] * (intensity * alpha)[..., None]
+
+
+def capsule(buf, x0, x1, cy, h, color, intensity, angle=0.0) -> None:
+    """A filled, rounded bar of light from x0 to x1 on the line y = cy: one
+    word of text seen too small (or too soft) to read its letters. `angle`
+    tilts it about its own centre."""
+    r = h / 2
+    mx = (x0 + x1) / 2
+    half = max(0.0, (x1 - x0) / 2 - r)
+    ux, uy = np.cos(angle), np.sin(angle)
+    pad = half + r + 3
+    bx0, bx1 = int(max(0, mx - pad)), int(min(W, mx + pad + 1))
+    by0, by1 = int(max(0, cy - pad)), int(min(H, cy + pad + 1))
+    if bx0 >= bx1 or by0 >= by1:
+        return
+    yy, xx = np.mgrid[by0:by1, bx0:bx1].astype(np.float32)
+    # Distance to the bar's spine, a segment through its centre.
+    along = np.clip((xx - mx) * ux + (yy - cy) * uy, -half, half)
+    d = np.hypot(xx - (mx + along * ux), yy - (cy + along * uy))
+    alpha = np.clip(r - d + 0.5, 0.0, 1.0)
+    buf[by0:by1, bx0:bx1] += np.asarray(color)[None, None, :] * (intensity * alpha)[..., None]
+
+
+# How many letters a word has, weighted like running prose: mostly short.
+WORD_LETTERS = np.array([2, 3, 4, 4, 5, 5, 6, 7, 8, 10])
 
 
 def smoothstep(e0, e1, x):
@@ -170,7 +185,34 @@ def lens(fine, glow=0.55, bloom=0.4, haze=0.25, core_sigma=0.9):
     )
 
 
-def soften(light: np.ndarray, focus: float, drift: float, wash: float = 0.3) -> np.ndarray:
+# The house style, shared by every piece: crisp shapes with a little glow,
+# a touch more on the one accent (a cursor, your word), and only a trace
+# of coloured room light behind the subject. The first versions used a
+# heavy bloom and wide amber and teal washes; on the dark theme that read
+# as glare across the top of every page. A second pass halved what was left:
+# even at a "trace", the amber pool behind a subject and the halo round the
+# accent were the first thing the eye went to.
+GLOW = dict(glow=0.07, bloom=0.02, haze=0.0, core_sigma=0.6)
+ACCENT_GLOW = dict(glow=0.16, bloom=0.05, haze=0.0, core_sigma=0.6)
+AMBIENCE = 190.0
+
+
+def ambience(spots) -> np.ndarray:
+    """A trace of coloured light behind the subject, so it sits in a room
+    rather than on flat black. `spots` is [(x, y, colour), ...]."""
+    room = new_buffer()
+    for x, y, color in spots:
+        splat(room, [x], [y], color, [AMBIENCE])
+    return blur(room, 100) + 0.5 * blur(room, 190)
+
+
+def bar(buf, x, centre, half, color, intensity=0.3) -> None:
+    """One bar of a waveform, a crisp rounded stroke as an audio app draws
+    one, from centre - half to centre + half."""
+    capsule(buf, x - half, x + half, centre, 2.6, color, intensity, angle=np.pi / 2)
+
+
+def soften(light: np.ndarray, focus: float, drift: float, wash: float = 0.05) -> np.ndarray:
     """The out-of-focus version of a frame: soft, with a little horizontal
     drift like a handheld long exposure. `focus` and `drift` are in source
     pixels; the art is shown at roughly 0.45x."""
@@ -205,8 +247,10 @@ def camera(light: np.ndarray, plane: np.ndarray, focus: float, drift: float) -> 
     sharp = light
     soft = soften(light, focus, drift)
     # The in-focus part keeps a whisper of the soft layer's glow, so the
-    # sharp lines sit in atmosphere instead of on flat black.
-    out = plane[..., None] * (sharp + 0.18 * soft) + (1.0 - plane[..., None]) * soft
+    # sharp lines sit in atmosphere instead of on flat black. Only a
+    # whisper: this and `soften`'s wide wash are glow too, and at their old
+    # strength they undid the house style's restraint.
+    out = plane[..., None] * (sharp + 0.04 * soft) + (1.0 - plane[..., None]) * soft
     # A gentle vertical vignette, so the light fades into the stage above
     # and below instead of being cut off by the banner's edge.
     y = (np.arange(H, dtype=np.float32) - H / 2) / (H / 2)
@@ -228,104 +272,97 @@ def dust(buf, rng, count, x_range, y_range, colors, size=(4, 22), strength=(0.04
 
 
 def art_home(rng) -> np.ndarray:
-    """Dictation: a ribbon of voice on the right that settles, leftward, into
-    four calm lines of text."""
-    fine = new_buffer()
-    x = np.linspace(360, W + 40, 1800, dtype=np.float32)
-    t = (x - 360) / (W + 40 - 360)
-    calm = smoothstep(0.18, 0.72, t)  # 0 = text, 1 = voice
-    lines = 4
-    spacing = 22.0
-    strands = 42
+    """Dictation: a voice that runs into a text cursor. One waveform, drawn
+    the way Meetings draws a voice, swells in from the left and then narrows
+    as it reaches the teal cursor, taking on the cursor's colour as it goes.
+    Speak, and it types where you are.
+
+    No text is drawn: the cursor says "this is where words appear" on its
+    own. (An earlier version collapsed each spoken word into a dash of
+    text, and a row of dashes reads as a dashed line, not as writing.)
+
+    This is the first thing on screen when the app opens, and it set the
+    house style the other pieces follow (see `GLOW`)."""
     base = H * 0.5
-    for i in range(strands):
-        u = (i / (strands - 1)) * 2 - 1
-        # Strands are grouped by line in the same order they sit in the
-        # ribbon, so settling into text never makes them cross.
-        k = min(lines - 1, i * lines // strands)
-        text_y = base + (k - (lines - 1) / 2) * spacing + rng.normal(0, 0.6)
-        wave = (
-            np.sin(x / 118.0 + 0.9 + u * 0.9) * 58
-            + np.sin(x / 47.0 + 2.1 - u * 1.6) * 20
-            + np.sin(x / 23.0 + u * 3.1) * 6
-        )
-        envelope = smoothstep(0.25, 0.95, t) * (0.55 + 0.45 * np.sin(x / 210.0 + 1.3))
-        voice_y = base + wave * envelope + u * (34 + 58 * envelope)
-        y = text_y + (voice_y - text_y) * calm
-        # Lines of text end raggedly on the left, like a paragraph.
-        start = rng.uniform(0.0, 0.14) + (0.1 if k == lines - 1 else 0.0)
-        fade = smoothstep(start, start + 0.08, t)
-        centre = 1.0 - abs(u)
-        if rng.random() < 0.22:
-            color = mix(TEAL, MINT, rng.random())
-        elif rng.random() < 0.25:
-            color = ROSE
-        else:
-            color = mix(AMBER, TUNGSTEN, 0.3 + 0.7 * centre)
-        weight = (0.2 + 0.26 * centre) * (0.7 + 0.9 * calm) * fade
-        stroke(fine, x, y, color, weight)
-    light = lens(fine, glow=0.75, bloom=0.6, haze=0.4)
-    backdrop = new_buffer()
-    disc(backdrop, 1120, base, 150, AMBER, 0.08, rim=0.0)
-    disc(backdrop, 1320, base + 40, 120, TEAL, 0.05, rim=0.0)
-    light += blur(backdrop, 70)
-    specks = new_buffer()
-    dust(specks, rng, 12, (760, W), (70, H - 70), [AMBER, TUNGSTEN, TEAL], size=(3, 12),
-         strength=(0.03, 0.1))
-    # Dust is always out of focus: a crisp speck reads as a dead pixel.
-    light += blur(specks, 7.0) * 1.6
+    caret_x, caret_half = 1240.0, 25.0
+    x0, x1 = 560.0, caret_x - 24.0
+    max_amp = 74.0
+    xs = np.arange(x0, x1, 6.0, dtype=np.float32)
+    t = (xs - x0) / (x1 - x0)
+
+    # Speech: words as swells of syllables with short silences between
+    # them, the rhythm Meetings has, so it reads as someone talking.
+    speech = np.zeros_like(xs)
+    edge = x0
+    while edge < x1:
+        length = rng.uniform(28, 90)
+        at = (xs >= edge) & (xs < edge + length)
+        n = int(at.sum())
+        if n:
+            raw = np.abs(rng.normal(0, 1, n)) ** 1.4
+            kernel = np.hanning(min(3, n) + 2)[1:-1]
+            syllables = np.convolve(raw, kernel / kernel.sum(), mode="same")
+            shape = np.sin(np.pi * (np.arange(n) + 0.5) / n) ** 0.6
+            speech[at] = (0.25 + 0.75 * syllables / max(syllables.max(), 1e-3)) * shape
+        edge += length + rng.uniform(8, 20)
+    # Swell in from the left, then narrow into the cursor, ending well
+    # below its height so the cursor still stands on its own.
+    swell = smoothstep(0.0, 0.2, t) * (1.0 - 0.88 * smoothstep(0.4, 1.0, t))
+    half = max_amp * swell * speech
+    into_caret = smoothstep(0.55, 1.0, t)
+
+    bars, caret = new_buffer(), new_buffer()
+    for xb, a, c in zip(xs, half, into_caret):
+        if a < 1.2:
+            continue
+        # Warm white rather than saturated amber.
+        warm = mix(TUNGSTEN, WHITE, 0.25 + 0.2 * rng.random())
+        bar(bars, xb, base, a, mix(warm, mix(TEAL, MINT, 0.4), c))
+    capsule(caret, caret_x - caret_half, caret_x + caret_half, base, 3.6,
+            mix(TEAL, MINT, 0.5), 0.75, angle=np.pi / 2)
+
+    light = lens(bars, **GLOW) + lens(caret, **ACCENT_GLOW)
+    light += ambience([(820.0, base, AMBER), (caret_x - 40, base, TEAL)])
     return light
 
 
 def art_assistant(rng) -> np.ndarray:
-    """The assistant: a softly lit sphere with a warm core and a teal rim,
-    with faint filaments inside like the call's voice orb."""
-    cx, cy, r = 1060.0, H * 0.5, 150.0
+    """The assistant: the call's orb, at rest. A dark sphere whose only light
+    is a thin rim, warm on the upper left and teal on the lower right, like
+    a planet at the edge of an eclipse.
+
+    It is deliberately the quietest picture of the set. The page under it is
+    a long list of settings, and a glowing ball with a highlight and light
+    swirling inside (the previous version) was the brightest object on it and
+    kept pulling the eye away from them. A rim alone still reads as a sphere,
+    and as the call's orb, at a fraction of the brightness."""
+    cx, cy, r = 1060.0, H * 0.5, 124.0
     yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
     dx, dy = (xx - cx) / r, (yy - cy) / r
     d = np.hypot(dx, dy)
-    # A soft edge (several pixels), not a cut: a hard rim on a bright orb
-    # read as a sharp line on screen.
-    inside = np.clip((1.0 - d) * r / 7.0, 0.0, 1.0)
+    # Anti-aliased over ~2 source pixels: crisp, but not a cut.
+    inside = np.clip((1.0 - d) * r / 2.0, 0.0, 1.0)
     nz = np.sqrt(np.clip(1.0 - d**2, 0.0, 1.0))
-    rim = (1.0 - nz) ** 2.4
-    # Key light from the upper left warms that side of the rim.
-    key = np.clip(-(dx * 0.7 + dy * 0.7) / np.maximum(d, 1e-3), 0.0, 1.0)
-    sphere = new_buffer()
-    sphere += (TEAL * 0.95)[None, None, :] * (rim * (1 - key) * inside)[..., None]
-    sphere += (AMBER * 0.85)[None, None, :] * (rim * key * inside)[..., None]
-    core = np.exp(-((dx + 0.18) ** 2 + (dy + 0.2) ** 2) / 0.2)
-    sphere += (TUNGSTEN * 0.3)[None, None, :] * (core * inside)[..., None]
-    sphere += (TEAL * 0.05)[None, None, :] * (nz * inside)[..., None]
+    fresnel = (1.0 - nz) ** 3.4
+    # Which way each point of the rim faces: +1 toward the warm key light
+    # (upper left), -1 toward the teal fill (lower right).
+    facing = -(dx + dy) / np.sqrt(2.0) / np.maximum(d, 1e-3)
+    warm = smoothstep(0.0, 1.0, facing)
+    cool = smoothstep(0.0, 1.0, -facing)
+    rim = new_buffer()
+    rim += mix(AMBER, TUNGSTEN, 0.5)[None, None, :] * (0.55 * fresnel * warm * inside)[..., None]
+    rim += mix(TEAL, MINT, 0.3)[None, None, :] * (0.6 * fresnel * cool * inside)[..., None]
+    # A faint rim all the way round, so the silhouette never breaks.
+    rim += mix(TUNGSTEN, TEAL, 0.5)[None, None, :] * (0.06 * fresnel * inside)[..., None]
+    # Just enough light inside that the sphere is glass, not a hole.
+    body = new_buffer()
+    body += (TEAL * 0.03)[None, None, :] * (
+        np.exp(-((dx - 0.3) ** 2 + (dy - 0.35) ** 2) / 0.35) * inside
+    )[..., None]
 
-    # Filaments inside the sphere, like the call's voice orb.
-    fine = new_buffer()
-    for i in range(9):
-        phase = rng.uniform(0, 2 * np.pi)
-        amp = rng.uniform(0.18, 0.5)
-        tilt = rng.uniform(-0.35, 0.35)
-        s = np.linspace(-0.92, 0.92, 700)
-        fx = cx + s * r
-        fy = cy + (np.sin(s * rng.uniform(2.2, 4.2) + phase) * amp + s * tilt) * r * np.sqrt(
-            np.clip(1 - s**2, 0, 1)
-        )
-        color = mix(TEAL, TUNGSTEN, rng.random() * 0.8)
-        stroke(fine, fx, fy, color, 0.14 * np.sin(np.pi * (s + 1) / 2) ** 1.5)
-
-    light = blur(sphere, 2.5) + 0.6 * blur(sphere, 16) + 0.6 * blur(sphere, 60)
-    light += lens(fine, glow=0.8, bloom=0.5, haze=0.2, core_sigma=1.4)
-    halo = new_buffer()
-    disc(halo, cx, cy, r * 1.2, TEAL, 0.14, rim=0.0)
-    disc(halo, cx - 40, cy - 30, r * 0.9, AMBER, 0.08, rim=0.0)
-    light += blur(halo, 90)
-    # No lens streak: a line of light straight through the orb and across
-    # the banner was the one hard edge in the picture, and it drew the eye
-    # every time.
-    specks = new_buffer()
-    dust(specks, rng, 12, (700, W), (50, H - 50), [TEAL, AMBER, MINT], size=(3, 12),
-         strength=(0.03, 0.1))
-    # Dust is always out of focus: a crisp speck reads as a dead pixel.
-    light += blur(specks, 7.0) * 1.6
+    light = blur(rim, 1.0) + GLOW["glow"] * blur(rim, 6) + GLOW["bloom"] * blur(rim, 28)
+    light += blur(body, 12.0)
+    light += ambience([(cx - 50, cy - 40, AMBER), (cx + 20, cy + 20, TEAL)])
     return light
 
 
@@ -340,7 +377,7 @@ def art_meetings(rng) -> np.ndarray:
     gap = 66.0
     max_amp = 58.0
     x0, x1 = 500.0, W + 20.0
-    xs = np.arange(x0, x1, 5.0, dtype=np.float32)
+    xs = np.arange(x0, x1, 6.0, dtype=np.float32)
     t = (xs - x0) / (x1 - x0)
 
     # Who is talking, as 1 (you) → 0 (them), with soft handovers.
@@ -366,127 +403,121 @@ def art_meetings(rng) -> np.ndarray:
 
     fade = smoothstep(0.0, 0.2, t)
     tracks = (
-        (base - gap, who, speech(), AMBER, TUNGSTEN),
+        (base - gap, who, speech(), TUNGSTEN, WHITE),
         (base + gap, 1.0 - who, speech(), TEAL, MINT),
     )
-    fine = new_buffer()
+    bars = new_buffer()
     for centre, active, envelope, c1, c2 in tracks:
-        # The quiet side still picks up a little room noise.
+        # Between words a track is a thin, continuous line, as an audio
+        # editor draws silence. Drawing the room noise as bars instead left
+        # rows of dots, which read as a dotted line.
+        line = smoothstep(x0, x0 + 160.0, xs)
+        for xa, xb_, wa in zip(xs[:-1], xs[1:], line[:-1]):
+            capsule(bars, xa, xb_ + 0.5, centre, 1.2, mix(c1, c2, 0.3), 0.12 * wa)
         amp = max_amp * fade * (0.08 + 0.92 * active) * envelope
         for x, a in zip(xs, amp):
-            if a < 0.8:
+            if a < 2.5:
                 continue
-            ys = np.linspace(centre - a, centre + a, max(2, int(2 * a / 0.7)))
-            color = mix(c1, c2, 0.25 + 0.5 * rng.random())
-            splat(fine, np.full_like(ys, x), ys, color, 0.5)
+            bar(bars, x, centre, a, mix(c1, c2, 0.25 + 0.25 * rng.random()))
 
-    light = lens(fine, glow=0.6, bloom=0.5, haze=0.3, core_sigma=1.2)
-    room = new_buffer()
-    splat(room, [900.0], [base - gap], AMBER, [7000.0])
-    splat(room, [1250.0], [base + gap], TEAL, [7000.0])
-    light += 0.8 * blur(room, 90) + 0.6 * blur(room, 180)
+    light = lens(bars, **GLOW)
+    light += ambience([(900.0, base - gap, AMBER), (1250.0, base + gap, TEAL)])
     return light
 
 
 def art_cleanup(rng) -> np.ndarray:
-    """AI cleanup: a tangle of threads on the right that combs out, leftward,
-    into five clean lines of text.
+    """AI cleanup: a paragraph that tidies itself as it reads. On the left
+    the words are jumbled (off the line, tilted, crowding each other) with
+    a few rose "um"s among them; to the right the same lines sit straight
+    and evenly spaced, and that half is the brightest.
 
-    It speaks Home's language on purpose, the same silk-like strands, and the
-    difference is the point: Home's strands move together as one voice,
-    these each wander and loop on their own, which is what reads as mess.
-    (Earlier versions scattered short sticks, which read as noise, and then
-    blurred them, which read as dirt.)"""
+    Each word is a rounded bar of light, text seen too small to read, so
+    the picture works in every language. (The previous version was a tangle
+    of looping threads combing out into lines: it read as busy rather than
+    as messy, and nothing in it looked like text.)"""
     fine = new_buffer()
-    x0, x1 = 380.0, W + 60.0
-    x = np.linspace(x0, x1, 2600, dtype=np.float32)
-    t = (x - x0) / (x1 - x0)
-    tangle = smoothstep(0.3, 0.9, t)  # 0 = clean text, 1 = loose thread
-    lines, spacing, base = 5, 24.0, H * 0.5
-    strands = 40
-    accents = [TEAL, ROSE, AMBER, MINT, TEAL]
-    for i in range(strands):
-        k = min(lines - 1, i * lines // strands)
-        text_y = base + (k - (lines - 1) / 2) * spacing + rng.normal(0, 0.5)
-        # Each thread wanders on its own...
-        wander = np.zeros_like(x)
-        for _ in range(3):
-            wander += rng.uniform(22, 62) * np.sin(
-                x / rng.uniform(45, 150) + rng.uniform(0, 2 * np.pi)
-            )
-        # ...and loops: a small circle travelled along the thread, which is
-        # what turns a wave into a scribble. Radius and speed both drift, so
-        # the loops are irregular like a real tangle, not a coiled spring.
-        size = rng.uniform(6, 24) * (
-            0.35 + 0.65 * np.abs(np.sin(x / rng.uniform(50, 150) + rng.uniform(0, 6.3)))
-        )
-        speed = rng.uniform(1 / 44, 1 / 22) * (
-            0.6 + 0.4 * np.sin(x / rng.uniform(60, 180) + rng.uniform(0, 6.3))
-        )
-        phase = np.cumsum(speed * np.gradient(x)) * 2 * np.pi + rng.uniform(0, 6.3)
-        xs = x + tangle * size * np.cos(phase)
-        ys = text_y + tangle * (wander + size * np.sin(phase))
-        # Lines of text end raggedly on the left, like a paragraph.
-        start = rng.uniform(0.0, 0.1) + (0.07 if k == lines - 1 else 0.0)
-        fade = smoothstep(start, start + 0.07, t)
-        weight = 0.22 * fade * (0.8 + 0.4 * rng.random())
-        # Clean text is warm white; a loose thread takes an accent colour.
-        # Looping makes a thread several times longer per pixel of width,
-        # so the loose part is drawn fainter to keep the same brightness.
-        stroke(fine, xs, ys, mix(TUNGSTEN, WHITE, 0.35), weight * (1 - tangle))
-        accent = mix(accents[i % len(accents)], TUNGSTEN, 0.15)
-        stroke(fine, xs, ys, accent, weight * tangle * 0.42)
-    light = lens(fine, glow=0.75, bloom=0.55, haze=0.35)
-    back = new_buffer()
-    splat(back, [1180.0], [base], AMBER, [3500.0])
-    splat(back, [1320.0], [base + 20], TEAL, [3000.0])
-    light += blur(back, 120)
+    lines, spacing, h = 5, 38.0, 10.0
+    base = H * 0.5
+    letter = 7.5
+    clean_word = mix(TUNGSTEN, WHITE, 0.45)
+    for k in range(lines):
+        cy = base + (k - (lines - 1) / 2) * spacing
+        # A paragraph: ragged at the right, last line short.
+        end = 1340.0 - (rng.uniform(0, 60) if k < lines - 1 else rng.uniform(240, 300))
+        x = 560.0 - rng.uniform(0, 70)
+        while x < end:
+            # 1 where the text is still messy, 0 once it is clean.
+            m = float(1.0 - smoothstep(860.0, 1060.0, x))
+            if m > 0.5 and rng.random() < 0.2 * m:
+                # A filler word: short, rose, a little off the line.
+                wd = h * rng.uniform(1.4, 2.0)
+                capsule(fine, x, x + wd, cy + rng.normal(0, 5) * m, h,
+                        mix(ROSE, AMBER, 0.15), 0.3 * m)
+                x += wd + rng.uniform(3, 12)
+                continue
+            n = float(rng.choice(WORD_LETTERS))
+            wd = n * letter * (1 + rng.normal(0, 0.12) * m)
+            dy = rng.normal(0, 8.0) * m
+            tilt = rng.normal(0, 0.16) * m
+            height = h * (1 + rng.normal(0, 0.12) * m)
+            color = mix(clean_word, mix(AMBER, TUNGSTEN, 0.5), 0.7 * m)
+            # The tidy half is the subject, so it is also the brightest.
+            capsule(fine, x, x + wd, cy + dy, height, color,
+                    (0.32 - 0.1 * m) * (1 + rng.normal(0, 0.12) * m), angle=tilt)
+            # A word space; mess crowds some words together and strands others.
+            x += wd + 8.0 + m * rng.uniform(-8, 16)
+    light = lens(fine, **GLOW)
+    light += ambience([(780.0, base, AMBER), (1220.0, base, TEAL)])
     return light
 
 
 def art_dictionary(rng) -> np.ndarray:
-    """Dictionary: a field of out-of-focus light with a few words in focus."""
-    light = new_buffer()
-    bokeh = new_buffer()
-    for _ in range(20):
-        cx = rng.uniform(640, W + 30)
-        cy = rng.uniform(-20, H + 20)
-        r = rng.uniform(18, 70)
-        color = [AMBER, TEAL, TUNGSTEN, MINT][rng.integers(4)]
-        disc(bokeh, cx, cy, r, color, rng.uniform(0.04, 0.09) * (30 / (r + 10)))
-    light += blur(bokeh, 5.0) + 0.5 * blur(bokeh, 40)
-    haze = new_buffer()
-    splat(haze, [1050.0], [H * 0.5], AMBER, [6000.0])
-    splat(haze, [1250.0], [H * 0.55], TEAL, [4000.0])
-    light += blur(haze, 120)
+    """Dictionary: a paragraph in quiet warm white, and one word in it lit
+    teal. That word is yours, the name or term SpeakoFlow now spells your
+    way every time it comes up.
 
-    words = new_buffer()
-    chips = [(820, 214, 70), (930, 262, 108), (1118, 226, 56), (1010, 330, 84),
-             (1220, 300, 124), (870, 372, 62), (1300, 196, 72)]
-    for i, (cx, cy, wd) in enumerate(chips):
-        h = 26.0
-        s = np.linspace(0, 1, 900)
-        # A capsule outline, traced as one closed stroke.
-        ang = s * 2 * np.pi
-        px = cx + np.sign(np.cos(ang)) * (wd / 2 - h / 2) + np.cos(ang) * h / 2
-        py = cy + np.sin(ang) * h / 2
-        color = TEAL if i % 3 == 1 else TUNGSTEN
-        stroke(words, px, py, color, 0.7 if i in (1, 4) else 0.42)
-    light += lens(words, glow=0.7, bloom=0.55, haze=0.25)
+    It shares cleanup's vocabulary, words as rounded bars of light, so the
+    two writing pages read as one family. (The previous version floated
+    capsule outlines over bokeh, which nobody read as words, let alone as
+    one word among many.)"""
+    lines, spacing, h, letter = 4, 36.0, 10.0, 7.5
+    base = H * 0.5
+    focus_line, focus_at, focus_len = 1, 990.0, 11 * letter
+    prose = new_buffer()
+    word = new_buffer()
+    focus_x = 0.0
+    for k in range(lines):
+        cy = base + (k - (lines - 1) / 2) * spacing
+        end = 1350.0 - (rng.uniform(0, 60) if k < lines - 1 else rng.uniform(220, 280))
+        x = 600.0 - rng.uniform(0, 80)
+        placed = False
+        while x < end:
+            if k == focus_line and not placed and x > focus_at:
+                focus_x = x
+                capsule(word, x, x + focus_len, cy, h, mix(TEAL, MINT, 0.5), 0.75)
+                x += focus_len + 9.0
+                placed = True
+                continue
+            wd = float(rng.choice(WORD_LETTERS)) * letter
+            capsule(prose, x, x + wd, cy, h, mix(TUNGSTEN, WHITE, 0.3),
+                    0.22 * (1 + rng.normal(0, 0.06)))
+            x += wd + 9.0
+    focus_y = base + (focus_line - (lines - 1) / 2) * spacing
+    light = lens(prose, **GLOW) + lens(word, **ACCENT_GLOW)
+    light += ambience([(800.0, base + 20, AMBER), (focus_x + focus_len / 2, focus_y, TEAL)])
     return light
 
 
 # name: (piece, seed, exposure, focal plane, focus, drift, crisp) — see
-# `camera`. Each focal plane sits on the part of the picture that tells the
-# story: where the voice becomes text, the orb, the two voices, where the
-# threads comb out, the words among the bokeh. `crisp` caps how sharp that
-# part gets: a bright orb at full sharpness read as a hard edge.
+# `camera`. The focal planes are wide: every subject is meant to be read
+# sharp, with only the far edges going soft. (Tight planes left the rest of
+# each picture as a blurred smudge of light, which is glow by another name.)
 PIECES = {
-    "home": (art_home, 11, 1.0, (1030, H * 0.5, 400, 230), 9.0, 30.0, 1.0),
-    "assistant": (art_assistant, 23, 0.9, (1060, H * 0.5, 300, 300), 9.0, 22.0, 0.55),
-    "meetings": (art_meetings, 5, 1.0, (1000, H * 0.5, 440, 240), 7.0, 18.0, 1.0),
-    "cleanup": (art_cleanup, 17, 1.0, (900, H * 0.5, 440, 230), 8.0, 26.0, 1.0),
-    "dictionary": (art_dictionary, 3, 1.0, (1060, 285, 380, 180), 9.0, 22.0, 1.0),
+    "home": (art_home, 11, 1.0, (930, H * 0.5, 540, 230), 6.0, 12.0, 1.0),
+    "assistant": (art_assistant, 23, 1.0, (1060, H * 0.5, 260, 260), 8.0, 16.0, 0.9),
+    "meetings": (art_meetings, 5, 1.0, (980, H * 0.5, 640, 280), 7.0, 18.0, 1.0),
+    "cleanup": (art_cleanup, 17, 1.0, (980, H * 0.5, 600, 260), 6.0, 12.0, 1.0),
+    "dictionary": (art_dictionary, 3, 1.0, (1000, H * 0.5 - 18, 520, 200), 7.0, 12.0, 1.0),
 }
 
 

@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Mic } from "lucide-react";
 import { PageHeader, SectionTitle } from "@/components/ui/Page";
 import Badge from "@/components/ui/Badge";
-import { SubPage } from "@/components/ui/SubPage";
 import { Hero, HeroTitle } from "@/components/ui/Hero";
 import { usePageReset } from "@/components/shell/navigation";
 import {
@@ -266,17 +265,13 @@ export const MeetingsSection: React.FC<{
 
   if (openId !== null) {
     return (
-      <SubPage
-        title={t("meetings.detail.title")}
+      <MeetingDetail
+        meetingId={openId}
+        recordingMeetingId={liveMeetingId(state)}
+        onChanged={refresh}
         onBack={() => setOpenId(null)}
         backLabel={t("nav.meetings")}
-      >
-        <MeetingDetail
-          meetingId={openId}
-          recordingMeetingId={liveMeetingId(state)}
-          onChanged={refresh}
-        />
-      </SubPage>
+      />
     );
   }
 
@@ -290,12 +285,6 @@ export const MeetingsSection: React.FC<{
         description={t("sectionSubtitles.meetings")}
       />
 
-      {!systemAudioSupported && !recording && (
-        <div className="mb-5">
-          <SystemAudioNotice live={false} detail={systemAudioHelp} />
-        </div>
-      )}
-
       {recording ? (
         <RecorderCard
           state={state}
@@ -305,49 +294,52 @@ export const MeetingsSection: React.FC<{
           // are the two channel-derived ones, whose stored names are the
           // English seeds, and the transcript view translates those itself.
           speakers={[]}
-          systemAudioHelp={systemAudioHelp}
-          systemAudioSupported={systemAudioSupported}
-          onStart={start}
           onStop={stop}
           onTogglePause={togglePause}
         />
       ) : (
-        <Hero
-          art="meetings"
-          title={<HeroTitle i18nKey="meetingsPage.hero.title" />}
-          subtitle={t("meetingsPage.hero.subtitle")}
-          actions={
-            <button
-              type="button"
-              onClick={start}
-              disabled={busy !== null}
-              className="hero-button inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full ps-5 pe-6 text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-ink focus-visible:ring-offset-2 focus-visible:ring-offset-hero-surface disabled:cursor-wait disabled:opacity-70"
-            >
-              <Mic className="h-4 w-4" aria-hidden="true" />
-              {busy === "starting"
-                ? t("meetings.recorder.starting")
-                : t("meetings.recorder.start")}
-            </button>
-          }
-        />
+        <>
+          {/* Before anything is recorded, the machine's own capability is the
+              warning worth showing. */}
+          {!systemAudioSupported && (
+            <div className="mb-5">
+              <SystemAudioNotice live={false} detail={systemAudioHelp} />
+            </div>
+          )}
+          <Hero
+            art="meetings"
+            title={<HeroTitle i18nKey="meetingsPage.hero.title" />}
+            subtitle={t("meetingsPage.hero.subtitle")}
+            actions={
+              <button
+                type="button"
+                onClick={start}
+                disabled={busy !== null}
+                className="hero-button inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full ps-5 pe-6 text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-ink focus-visible:ring-offset-2 focus-visible:ring-offset-hero-surface disabled:cursor-wait disabled:opacity-70"
+              >
+                <Mic className="h-4 w-4" aria-hidden="true" />
+                {busy === "starting"
+                  ? t("meetings.recorder.starting")
+                  : t("meetings.recorder.start")}
+              </button>
+            }
+          />
+          {settings && <div className="mt-6">{settings}</div>}
+        </>
       )}
-
-      {!recording && settings && <div className="mt-6">{settings}</div>}
 
       <section className="mt-10">
         <SectionTitle title={t("meetings.list.title")} />
-        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface elev-card">
-          <MeetingsList
-            meetings={meetings}
-            speakerCounts={speakerCounts}
-            loading={loading}
-            hasMore={hasMore}
-            onLoadMore={() => setPages((value) => value + 1)}
-            onOpen={setOpenId}
-            onDelete={remove}
-            recordingMeetingId={liveMeetingId(state)}
-          />
-        </div>
+        <MeetingsList
+          meetings={meetings}
+          speakerCounts={speakerCounts}
+          loading={loading}
+          hasMore={hasMore}
+          onLoadMore={() => setPages((value) => value + 1)}
+          onOpen={setOpenId}
+          onDelete={remove}
+          recordingMeetingId={liveMeetingId(state)}
+        />
       </section>
     </div>
   );

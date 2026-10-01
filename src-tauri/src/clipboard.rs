@@ -31,6 +31,41 @@ pub fn write_clipboard_text(app_handle: &AppHandle, text: &str) -> Result<(), St
         .map_err(|e| format!("Failed to write to clipboard: {}", e))
 }
 
+/// Put text on the clipboard *for a moment*: the transcript a paste is about to
+/// deliver, and the user's own content put back straight after it.
+///
+/// On Windows an ordinary write lands in Win+V clipboard history and, with "Sync
+/// across your devices" on, in the user's Microsoft account. Every dictation
+/// therefore added two history entries (the transcript, then a duplicate of
+/// whatever was there before) and shipped the transcript off the machine, which
+/// is not something a local dictation app gets to do behind the user's back.
+/// The `CanIncludeInClipboardHistory` / `CanUploadToCloudClipboard` formats opt
+/// these writes out of both. Monitoring is deliberately left on: remote-desktop
+/// and VM clients watch the clipboard to forward it into the session, and the
+/// paste would land the session's stale clipboard instead.
+///
+/// Writes the user asks for (the copy buttons, "copy to clipboard" after a paste)
+/// go through [`write_clipboard_text`] and stay in history as usual.
+fn write_transient_clipboard_text(app_handle: &AppHandle, text: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use arboard::SetExtWindows;
+        match arboard::Clipboard::new().and_then(|mut clipboard| {
+            clipboard
+                .set()
+                .exclude_from_history()
+                .exclude_from_cloud()
+                .text(text)
+        }) {
+            Ok(()) => return Ok(()),
+            // Never fail a paste over the history opt-out: fall back to the
+            // ordinary write, which is what every earlier version did.
+            Err(e) => debug!("History-excluded clipboard write failed, retrying plainly: {e}"),
+        }
+    }
+    write_clipboard_text(app_handle, text)
+}
+
 /// A monotonic counter that changes whenever the clipboard's contents change.
 ///
 /// This is what makes harvesting a text selection safe. A synthetic Ctrl+C that
@@ -86,7 +121,7 @@ pub fn snapshot_clipboard(app_handle: &AppHandle) -> ClipboardSnapshot {
 /// Put back what [`snapshot_clipboard`] recorded.
 pub fn restore_clipboard(app_handle: &AppHandle, snapshot: &ClipboardSnapshot) {
     if let ClipboardSnapshot::Text(text) = snapshot {
-        if let Err(e) = write_clipboard_text(app_handle, text) {
+        if let Err(e) = write_transient_clipboard_text(app_handle, text) {
             // Worth a real warning: the user's clipboard now holds the harvested
             // selection instead of what they put there.
             log::warn!("Could not restore the clipboard after a selection capture: {e}");
@@ -115,7 +150,7 @@ fn paste_via_clipboard(
     };
 
     // Write text to clipboard first
-    write_clipboard_text(app_handle, text)?;
+    write_transient_clipboard_text(app_handle, text)?;
 
     std::thread::sleep(Duration::from_millis(paste_delay_ms));
 
@@ -158,7 +193,7 @@ fn paste_via_clipboard(
         }
 
         #[cfg(not(target_os = "linux"))]
-        let _ = clipboard.write_text(&clipboard_content);
+        let _ = write_transient_clipboard_text(app_handle, &clipboard_content);
     } else if let Some(image) = saved_image {
         debug!("Restoring image to clipboard");
         if let Err(e) = clipboard.write_image(&image) {
@@ -498,19 +533,41 @@ fn type_text_via_kwtype(text: &str) -> Result<(), String> {
 }
 
 /// Write text to clipboard via wl-copy (Wayland clipboard tool).
-/// Uses Stdio::null() to avoid blocking on repeated calls — wl-copy forks a
-/// daemon that inherits piped fds, causing read_to_end to hang indefinitely.
+///
+/// The text goes in on stdin, never as an argument. wl-copy keeps serving the
+/// clipboard from a forked daemon, and that daemon's command line is readable
+/// by every local process in `/proc/<pid>/cmdline` for as long as it lives — so
+/// as an argument, the transcript (or the user's restored clipboard, which can
+/// be a password) sat there in plain view. An argument is also capped at about
+/// 128 KiB, which a long dictation can exceed.
+///
+/// `--type` pins the MIME type; reading stdin, wl-copy would otherwise guess it
+/// from the content. stdout/stderr stay null: the daemon inherits them, and a
+/// pipe there would keep a reader waiting for as long as the daemon lives.
 #[cfg(target_os = "linux")]
 fn write_clipboard_via_wl_copy(text: &str) -> Result<(), String> {
+    use std::io::Write;
     use std::process::Stdio;
-    let status = Command::new("wl-copy")
-        .arg("--")
-        .arg(text)
+    let mut child = Command::new("wl-copy")
+        .args(["--type", "text/plain;charset=utf-8"])
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
+        .spawn()
         .map_err(|e| format!("Failed to execute wl-copy: {}", e))?;
 
+    // Dropping the handle closes the pipe, which is the EOF wl-copy waits for.
+    let written = match child.stdin.take() {
+        Some(mut stdin) => stdin
+            .write_all(text.as_bytes())
+            .map_err(|e| format!("Failed to send text to wl-copy: {}", e)),
+        None => Err("wl-copy has no stdin".to_string()),
+    };
+
+    let status = child
+        .wait()
+        .map_err(|e| format!("Failed to wait for wl-copy: {}", e))?;
+    written?;
     if !status.success() {
         return Err("wl-copy failed".into());
     }

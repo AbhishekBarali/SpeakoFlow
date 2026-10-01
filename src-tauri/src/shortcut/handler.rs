@@ -53,17 +53,16 @@ pub fn handle_shortcut_event(
     // shortcut uses the default mode (push-to-talk hold by default); tapping the
     // lock key on top converts a hold to hands-free mid-recording.
     if is_transcribe_binding(base_id) {
-        // Every recording shortcut explicitly takes the microphone back from
-        // a call. In particular, Assistant must remain a quick ask during a call.
-        if is_pressed && crate::voice_conversation::is_active(app) {
-            if crate::assistant::is_assistant_binding(base_id) {
-                // The quick ask that follows takes the window over.
-                crate::voice_conversation::end(app);
-            } else {
-                // Dictation takes the microphone, and a call's window without
-                // the call is nothing: hanging up closes the panel.
-                crate::assistant::hide_assistant_panel(app);
-            }
+        // The assistant's own shortcut is a quick ask, which takes the window
+        // over, so it ends a call. Dictation does not: it holds the call's
+        // microphone while it records (see `voice_conversation::DictationTracker`)
+        // and the call carries on afterwards. Hanging up here used to throw the
+        // call's whole conversation away just to type a sentence somewhere else.
+        if is_pressed
+            && crate::assistant::is_assistant_binding(base_id)
+            && crate::voice_conversation::is_active(app)
+        {
+            crate::voice_conversation::end(app);
         }
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
             // Every recording shortcut — dictation, dictation + post-processing,
@@ -99,7 +98,8 @@ pub fn handle_shortcut_event(
         let flow_busy = crate::flow::is_generation_active();
         if is_pressed {
             // Esc during a call: stop the reply if there is one, hang up if
-            // there isn't.
+            // there isn't — unless a dictation is running beside the call, in
+            // which case Esc is the dictation's and the call is left alone.
             //
             // It used to hang up unconditionally, which is the worst of both.
             // Mid-answer it threw away the thing the user was listening to, and
@@ -108,7 +108,11 @@ pub fn handle_shortcut_event(
             // call had silently died behind it. A hang-up now goes through
             // `hide_assistant_panel` (which ends the session itself), so the
             // surface always leaves with the call.
-            if crate::voice_conversation::is_active(app) && !assistant_busy {
+            if crate::voice_conversation::esc_hangs_up(
+                crate::voice_conversation::is_active(app),
+                assistant_busy,
+                crate::voice_conversation::dictation_in_flight(),
+            ) {
                 crate::assistant::hide_assistant_panel(app);
             }
             if audio_manager.is_recording() || assistant_busy || flow_busy {

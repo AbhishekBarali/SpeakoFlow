@@ -963,17 +963,7 @@ async initializeShortcuts() : Promise<Result<null, string>> {
 },
 /**
  * Remove this app's own Accessibility entry so macOS will ask again (issue #34).
- * 
- * TCC stores a grant together with the code signature it was given to. A build
- * without a stable signing identity has a different signature every release, so
- * after an update System Settings still lists SpeakoFlow as switched on (that
- * row is keyed by bundle identifier) while `AXIsProcessTrusted` answers no for
- * the new binary. Requesting access again shows nothing, because an entry
- * already exists; removing it is what lets the next request add a fresh one.
- * 
- * Scoped to our own identifier, taken from the app config: `tccutil reset
- * Accessibility` without one would revoke every app's access on the machine.
- * No `sudo` — without it the reset applies to the current user's decisions.
+ * See [`reset_macos_tcc_service`].
  */
 async resetMacosAccessibilityPermission() : Promise<Result<null, string>> {
     try {
@@ -989,6 +979,48 @@ async resetMacosAccessibilityPermission() : Promise<Result<null, string>> {
 async openMacosAccessibilitySettings() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("open_macos_accessibility_settings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Remove this app's own Microphone entry so the next request prompts again.
+ * 
+ * After one "Don't Allow", `requestAccessForMediaType` returns immediately and
+ * shows nothing, forever. Without this the permission step could only wait.
+ */
+async resetMacosMicrophonePermission() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reset_macos_microphone_permission") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Remove this app's own Screen Recording entry, for the same stale-signature
+ * case as Accessibility: the switch reads on, captures contain only the
+ * wallpaper, and requesting again shows nothing.
+ */
+async resetMacosScreenRecordingPermission() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reset_macos_screen_recording_permission") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Open System Settings at Privacy & Security → Screen Recording.
+ * 
+ * `CGRequestScreenCaptureAccess` only prompts the first time; after a denial, or
+ * for a grant an update made stale, it does nothing, so the settings pane is the
+ * only place the user can act.
+ */
+async openMacosScreenRecordingSettings() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_macos_screen_recording_settings") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1606,6 +1638,18 @@ async getAssistantHistoryEntries(cursor: number | null, limit: number | null) : 
 }
 },
 /**
+ * Search and filter saved conversations, most recently active first (the
+ * call's history view, and a meeting's "earlier discussions").
+ */
+async listAssistantConversations(filter: AssistantHistoryFilter, offset: number, limit: number) : Promise<Result<PaginatedAssistantHistory, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_assistant_conversations", { filter, offset, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * One saved assistant conversation with its messages, loaded when the History
  * list expands it. `None` when it has been deleted since the list was fetched.
  */
@@ -1759,6 +1803,31 @@ async assistantBranchSession(id: number, messageIndex: number) : Promise<Result<
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Open a call about a meeting ("Discuss in a call" on the meeting page).
+ * 
+ * The call starts a new conversation with the meeting attached: its notes, the
+ * user's own notes and — when it fits — the whole transcript go into every
+ * turn's system prompt, and a longer transcript is read on demand through the
+ * `search_meeting` / `read_meeting` tools (see `meetings::discuss`). A call
+ * already running switches to the new conversation in place; the one it was
+ * having is saved first.
+ */
+async assistantDiscussMeeting(meetingId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_discuss_meeting", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The meeting the live conversation is about, for a panel that mounted after
+ * it was attached.
+ */
+async assistantConversationMeeting() : Promise<MeetingAttachment | null> {
+    return await TAURI_INVOKE("assistant_conversation_meeting");
 },
 /**
  * Choose where the quick ask opens.
@@ -2177,18 +2246,6 @@ async setAssistantPanelOpacity(opacity: number) : Promise<Result<null, string>> 
 }
 },
 /**
- * Set the panel size preset ("mini", "compact", "standard", or "large") and
- * re-shape the live panel window to match when it is on screen.
- */
-async setAssistantPanelSize(size: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_size", { size }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
  * Whether starting a dictation silences a still-playing assistant reply.
  */
 async setAssistantTtsStopOnDictation(enabled: boolean) : Promise<Result<null, string>> {
@@ -2495,6 +2552,18 @@ async assistantConversationBranch(session: number, id: number, messageIndex: num
 }
 },
 /**
+ * Start a new conversation about a meeting inside the live call ("Discuss in a
+ * call" while a call is already up, or the call that button just opened).
+ */
+async assistantConversationDiscuss(session: number, meetingId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_discuss", { session, meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * The call bar's speaker switch.
  * 
  * Off stops what is being read out right now but lets the reply finish as
@@ -2509,6 +2578,13 @@ async assistantConversationSetSpeaker(session: number, on: boolean) : Promise<Re
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Whether a dictation holds the microphone. A call that starts after the
+ * hold began asks this, because it missed the event.
+ */
+async assistantConversationDictationActive() : Promise<boolean> {
+    return await TAURI_INVOKE("assistant_conversation_dictation_active");
 },
 /**
  * How many prior messages the model receives as conversation context.
@@ -3513,23 +3589,29 @@ overlay_linger?: OverlayLinger; debug_mode?: boolean; log_level?: LogLevel; cust
 /**
  * Offer to record when a call appears to be in progress.
  * 
- * On by default. It is safe to default on because the detector's entire output
- * is a *question*: it has no route by which it could start recording, and
- * software that began recording a private conversation because it inferred one
- * was happening is software nobody should leave installed. If the inference is
- * wrong the cost is one dismissed card.
+ * **Off by default; the user opts in.** The detector's only output is a
+ * question, so it can never start a recording on its own — but "some other
+ * process holds the microphone" is also true of plenty that is not a call,
+ * and in practice the card kept appearing around ordinary dictation. A card
+ * that interrupts more often than it helps is worse than no card.
  */
 meeting_auto_detect?: boolean; 
 /**
  * Show the small floating indicator while a meeting records.
  * 
- * On by default, because a recording nobody can see is indistinguishable
- * from one that silently stopped. Off is for people who find any floating
- * window during a call distracting — the recording then lives only in
- * Settings → Meetings, which is where it is stopped. Other note takers were
- * asked for exactly this switch.
+ * **Off by default; the user opts in.** With it off the recording lives in
+ * Meetings, where it is started and stopped, and the floating pill is there
+ * for people who want it on screen during a call.
  */
 meeting_show_indicator?: boolean; 
+/**
+ * Whether the opt-in defaults for the two meeting switches above have been
+ * applied to this store. Both used to default on and every store wrote
+ * `true` for them, so changing the default alone would only reach fresh
+ * installs; this one-time pass turns them off once for existing stores and
+ * then never touches them again, so a later opt-in sticks.
+ */
+meeting_opt_in_defaults_applied?: boolean; 
 /**
  * Learn a spelling when the user corrects a dictated word.
  * 
@@ -3780,16 +3862,11 @@ assistant_memory_incognito?: boolean; assistant_font_size?: string;
  * 
  * Note: the old `assistant_accent`, `assistant_panel_size`, and
  * `assistant_panel_theme` customization fields were removed (the panel is
- * dark-only now) — serde silently ignores those keys in previously stored
- * settings.
+ * dark-only now, and its size follows the display alone — a size preset
+ * only moved the ceiling of an invisible frame) — serde silently ignores
+ * those keys in previously stored settings.
  */
 assistant_panel_opacity?: number; 
-/**
- * Size preset of the floating assistant: "mini", "compact", "standard"
- * (default), or "large". A multiplier on the display-derived size of the
- * quick ask's frame and of the expanded call.
- */
-assistant_panel_size?: string; 
 /**
  * Where the quick ask opens. Centre by default. `Custom` is a legacy value
  * from when dragging remembered a position; it reads as `Center`.
@@ -3986,7 +4063,31 @@ updated_at: number;
 /**
  * Short label derived from the first user message.
  */
-title: string; messages: ChatMessage[] }
+title: string; messages: ChatMessage[]; 
+/**
+ * The meeting this conversation discusses, when it was started from one.
+ */
+meeting_id: number | null; 
+/**
+ * That meeting's title when the conversation last saved.
+ */
+meeting_title: string | null }
+/**
+ * Which conversations a list asks for. Every field narrows; the default is all.
+ */
+export type AssistantHistoryFilter = { 
+/**
+ * Words to find in the title, the meeting title, or anything said.
+ */
+query: string | null; 
+/**
+ * Only conversations about meetings.
+ */
+meetings_only?: boolean; 
+/**
+ * Only conversations about this meeting.
+ */
+meeting_id: number | null }
 /**
  * One row of the conversation list: what a list row shows, without the
  * messages. Messages carry base64 screenshot thumbnails and the History page
@@ -4006,7 +4107,11 @@ updated_at: number;
 /**
  * Short label derived from the first user message.
  */
-title: string; message_count: number }
+title: string; message_count: number; 
+/**
+ * The meeting this conversation discusses, when it was started from one.
+ */
+meeting_id: number | null; meeting_title: string | null }
 /**
  * Desired length of the assistant's replies. Appended as a directive to the
  * system prompt at request time, so it works with the single main prompt
@@ -4604,6 +4709,11 @@ diarized: boolean;
  * loading the transcript.
  */
 segment_count: number }
+/**
+ * The meeting a conversation is about. Kept on the live conversation and on its
+ * History row, so continuing the conversation later brings the meeting back.
+ */
+export type MeetingAttachment = { meetingId: number; title: string }
 /**
  * One utterance in a meeting transcript.
  */

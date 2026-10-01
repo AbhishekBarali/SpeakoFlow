@@ -30,6 +30,7 @@ export type ConversationPhase =
   | "responding"
   | "speaking"
   | "muted"
+  | "held"
   | "error";
 type VoiceError = {
   code:
@@ -114,6 +115,17 @@ interface Session {
   /** Microphone off. Input only: a muted call still speaks and still types. */
   muted: boolean;
   /**
+   * A dictation is recording beside the call, so the call is not listening.
+   * Set and cleared by the backend (`assistant-conversation-dictation`), never
+   * by the user. Like mute it is input only: replies keep coming.
+   *
+   * Dictation used to hang the call up instead, which threw the conversation
+   * away just to type a sentence somewhere else.
+   */
+  held: boolean;
+  /** Whether the VAD has the microphone open right now. */
+  micOpen: boolean;
+  /**
    * Replies are not read aloud. Output only: the microphone stays live.
    *
    * This replaced a "sound off" switch that closed the microphone as well,
@@ -148,8 +160,21 @@ interface Session {
   releaseBackgroundLock?: () => void;
 }
 
-const micLive = (s: Session) => !s.muted;
+const micLive = (s: Session) => !s.muted && !s.held;
 const canHear = (s: Session) => !s.speakerOff;
+
+/** The microphone is closing, so whatever was being said is abandoned. */
+const forgetSpeech = (s: Session) => {
+  s.hearing = false;
+  s.pending = null;
+  s.discard = false;
+  // Nothing heard before the microphone closed may open the first utterance
+  // after it reopens.
+  s.heard = [];
+  s.lead = null;
+  if (s.timeout) clearTimeout(s.timeout);
+  s.timeout = null;
+};
 
 export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const callbacksRef = useRef(callbacks);
@@ -195,6 +220,13 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
    */
   const closedSessions = useRef(new Set<number>());
   const lastLevelAt = useRef(0);
+  /**
+   * Whether a dictation holds the microphone, kept outside any session so a
+   * call that starts mid-dictation begins held. `holdEvents` counts the
+   * events, so a slower answer to the start-up query cannot overwrite one.
+   */
+  const dictationHeld = useRef(false);
+  const holdEvents = useRef(0);
 
   const refreshPhase = useCallback((s: Session) => {
     if (sessionRef.current !== s) return;
@@ -205,9 +237,11 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           ? "speaking"
           : !s.turnDone || !s.synthesisDone
             ? "responding"
-            : s.muted
-              ? "muted"
-              : "listening",
+            : s.held
+              ? "held"
+              : s.muted
+                ? "muted"
+                : "listening",
     );
   }, []);
 
@@ -381,6 +415,71 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     [recover, refreshPhase],
   );
 
+  /**
+   * Open or close the microphone to match its two switches: mute, and a
+   * dictation holding the call.
+   *
+   * Serialized, because either can flip while the VAD is still pausing or
+   * starting. Whoever gets here first runs the loop, and the loop keeps going
+   * until the microphone matches whatever the switches say by then, so a
+   * change made mid-transition is picked up rather than dropped.
+   */
+  const syncMic = useCallback(
+    async (s: Session) => {
+      if (!s.vad || s.changingMic) return;
+      s.changingMic = true;
+      try {
+        while (sessionRef.current === s && s.vad && s.micOpen !== micLive(s)) {
+          const open = micLive(s);
+          try {
+            if (open) await s.vad.start();
+            else await s.vad.pause();
+            s.micOpen = open;
+          } catch (cause) {
+            if (sessionRef.current !== s) return;
+            if (!open) {
+              // Still open, but nothing it hears is used (`micLive`).
+              console.warn(
+                "Voice conversation: could not pause the microphone",
+                cause,
+              );
+              return;
+            }
+            // Reopening fails whenever another app has taken the microphone in
+            // the meantime. That is retryable: leave the call muted and alive,
+            // so tapping unmute tries again.
+            s.muted = true;
+            setMuted(true);
+            recover({ code: "microphone", detail: String(cause) }, s);
+            return;
+          }
+        }
+      } finally {
+        s.changingMic = false;
+      }
+    },
+    [recover],
+  );
+
+  /**
+   * A dictation started or stopped recording. The call stops listening while
+   * it records and picks up again afterwards; nothing else about the call —
+   * the reply in flight, the speaker, the conversation — changes.
+   */
+  const applyHold = useCallback(
+    (s: Session, held: boolean) => {
+      if (s.held === held) return;
+      s.held = held;
+      if (held) {
+        forgetSpeech(s);
+        setLevel(0);
+      }
+      refreshPhase(s);
+      void syncMic(s);
+    },
+    [refreshPhase, syncMic],
+  );
+
   const start = useCallback(async () => {
     end();
     callbacksRef.current.stopLocal();
@@ -408,6 +507,8 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           callbacksRef.current.volume,
         ),
         muted: false,
+        held: false,
+        micOpen: false,
         speakerOff: speakerStartsOff,
         changingMic: false,
         hearing: false,
@@ -550,6 +651,20 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         session: ticket.session,
         on: !session.speakerOff,
       }).catch(() => {});
+      // A dictation already recording when the call started holds it from the
+      // first frame, exactly as one that starts during the call does. Asked
+      // rather than assumed: the event may have fired before this call existed.
+      const seen = holdEvents.current;
+      const heldNow =
+        (await invoke<boolean>("assistant_conversation_dictation_active").catch(
+          () => dictationHeld.current,
+        )) === true;
+      if (holdEvents.current === seen) dictationHeld.current = heldNow;
+      session.held = dictationHeld.current;
+      if (!lifecycle.current.accepts(generation)) {
+        release(session);
+        return;
+      }
       const tuning = VAD_SENSITIVITY[sensitivityRef.current];
       session.vad = await MicVAD.new({
         model: "v5",
@@ -685,6 +800,10 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         release(session);
         return;
       }
+      // `startOnLoad` opened it. If a dictation is holding the call, close it
+      // again straight away; nothing it heard in between was listened to.
+      session.micOpen = true;
+      void syncMic(session);
       refreshPhase(session);
     } catch (cause) {
       if (!lifecycle.current.accepts(generation)) {
@@ -702,46 +821,22 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         detail: String(cause),
       });
     }
-  }, [confirmSpeech, end, fail, refreshPhase, release, submit]);
+  }, [confirmSpeech, end, fail, refreshPhase, release, submit, syncMic]);
 
   /** Microphone on or off. The speaker and the reply in flight are untouched. */
   const toggleMute = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s?.vad || s.changingMic) return;
+    if (!s?.vad) return;
     const next = !s.muted;
     s.muted = next;
     setMuted(next);
-    if (next) {
-      // The microphone is closing, so an utterance in progress is abandoned.
-      // Nothing to cancel on the backend: `submit` drops it before it is sent.
-      s.hearing = false;
-      s.pending = null;
-      s.discard = false;
-      // Nothing heard before the mute may open the first utterance after it.
-      s.heard = [];
-      s.lead = null;
-      if (s.timeout) clearTimeout(s.timeout);
-      s.timeout = null;
-    }
+    // The microphone is closing, so an utterance in progress is abandoned.
+    // Nothing to cancel on the backend: `submit` drops it before it is sent.
+    if (next) forgetSpeech(s);
     refreshPhase(s);
     setLevel(0);
-    s.changingMic = true;
-    try {
-      if (next) await s.vad.pause();
-      else await s.vad.start();
-    } catch (cause) {
-      // Reopening the microphone fails whenever another app has taken it in
-      // the meantime. That is retryable: put the switch back and keep the call
-      // alive so a second tap can succeed.
-      if (sessionRef.current === s) {
-        s.muted = !next;
-        setMuted(!next);
-        recover({ code: "microphone", detail: String(cause) }, s);
-      }
-    } finally {
-      s.changingMic = false;
-    }
-  }, [recover, refreshPhase]);
+    await syncMic(s);
+  }, [refreshPhase, syncMic]);
 
   /**
    * Replies read aloud, or not. Turning it off stops what is being said right
@@ -832,7 +927,8 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       command:
         | "assistant_conversation_new"
         | "assistant_conversation_load"
-        | "assistant_conversation_branch",
+        | "assistant_conversation_branch"
+        | "assistant_conversation_discuss",
       args: Record<string, number>,
     ): Promise<boolean> => {
       const s = sessionRef.current;
@@ -872,6 +968,12 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         id,
         messageIndex,
       }),
+    [switchConversation],
+  );
+  /** Start a new conversation about a meeting, without hanging up. */
+  const discussMeeting = useCallback(
+    (meetingId: number) =>
+      switchConversation("assistant_conversation_discuss", { meetingId }),
     [switchConversation],
   );
 
@@ -1023,6 +1125,18 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       // surface changes must dismiss it too, or the call UI masks quick asks.
       track(await listen("assistant-panel-hidden", end));
       track(await listen("assistant-quick-ask", end));
+      // Dictation holds the call while it records instead of hanging it up.
+      track(
+        await listen<boolean>(
+          "assistant-conversation-dictation",
+          ({ payload }) => {
+            holdEvents.current++;
+            dictationHeld.current = payload === true;
+            const s = sessionRef.current;
+            if (s) applyHold(s, dictationHeld.current);
+          },
+        ),
+      );
       track(
         await listen<{ code: string; detail: string }>(
           "assistant-error",
@@ -1067,7 +1181,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       window.removeEventListener("pagehide", end);
       end();
     };
-  }, [end, fail, recover, refreshPhase]);
+  }, [applyHold, end, fail, recover, refreshPhase]);
 
   const browserSink = useRef({
     enqueue: async (blob: Blob, epoch: number | null) => {
@@ -1106,6 +1220,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     newConversation,
     loadConversation,
     branchConversation,
+    discussMeeting,
     setComposing,
     browserSink,
   };

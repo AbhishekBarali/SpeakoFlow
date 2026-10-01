@@ -3,34 +3,21 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
 /**
- * The open and close of the call's conversation, beat by beat.
+ * The open and close of the call's conversation.
  *
- * The lurch this exists to remove came from the window resizing while
- * something was drawn in it, so the property under test is ordering: the
- * window is only asked to change shape once the old form has gone, and the
- * new form only appears once the window reports that its geometry is in place.
+ * Both forms share one window that never changes size, so the property under
+ * test is that nothing waits on the native side: opening draws the panel in the
+ * same render as the click, and closing is only the fold animation. A form that
+ * waited on a geometry report is what made the call vanish for a beat.
  */
 
-const resizes: boolean[] = [];
-let frameListener: ((event: { payload: unknown }) => void) | null = null;
+const reports: boolean[] = [];
 
 mock.module("@/bindings", () => ({
   commands: {
     assistantConversationSetExpanded: async (expanded: boolean) => {
-      resizes.push(expanded);
+      reports.push(expanded);
     },
-  },
-}));
-mock.module("@tauri-apps/api/event", () => ({
-  emit: async () => {},
-  listen: async (
-    name: string,
-    handler: (event: { payload: unknown }) => void,
-  ) => {
-    if (name === "assistant-call-frame") frameListener = handler;
-    return () => {
-      if (frameListener === handler) frameListener = null;
-    };
   },
 }));
 
@@ -44,13 +31,8 @@ function Harness({ active }: { active: boolean }) {
   return null;
 }
 
-/** Rust applying the geometry and saying so. */
-const report = async (expanded: boolean) => {
-  await act(async () => frameListener?.({ payload: expanded }));
-};
-
 beforeEach(async () => {
-  resizes.length = 0;
+  reports.length = 0;
   jest.useFakeTimers();
   await act(async () => {
     renderer = create(<Harness active />);
@@ -62,72 +44,59 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("opening resizes only after the bar has gone, and draws only after the resize", async () => {
+test("opening draws the panel at once, with no blank beat to wait out", () => {
   expect(hook.form).toBe("bar");
   act(() => hook.expand());
-  expect(hook.form).toBe("leaving");
-  expect(resizes).toEqual([]);
-  act(() => jest.advanceTimersByTime(CALL_FORM_MS.leave));
-  expect(hook.form).toBe("opening");
-  expect(resizes).toEqual([true]);
-  expect(hook.expanded).toBe(false);
-  await report(true);
   expect(hook.form).toBe("open");
   expect(hook.expanded).toBe(true);
+  expect(reports).toEqual([true]);
 });
 
-test("closing folds the panel first, then resizes, then brings the bar back", async () => {
+test("closing folds the panel, then brings the bar back", () => {
   act(() => hook.expand());
-  act(() => jest.advanceTimersByTime(CALL_FORM_MS.leave));
-  await report(true);
-  resizes.length = 0;
+  reports.length = 0;
 
   act(() => hook.collapse());
   expect(hook.form).toBe("closing");
-  // Still mounted while it folds away.
+  // Still mounted while it folds away, and Rust still sees it expanded.
   expect(hook.expanded).toBe(true);
-  expect(resizes).toEqual([]);
+  expect(reports).toEqual([]);
   act(() => jest.advanceTimersByTime(CALL_FORM_MS.close));
-  expect(hook.form).toBe("shrinking");
-  expect(resizes).toEqual([false]);
-  await report(false);
   expect(hook.form).toBe("bar");
+  expect(hook.expanded).toBe(false);
+  expect(reports).toEqual([false]);
 });
 
-test("a geometry report that never comes does not strand the call", () => {
-  act(() => hook.expand());
-  act(() => jest.advanceTimersByTime(CALL_FORM_MS.leave));
-  expect(hook.form).toBe("opening");
-  act(() => jest.advanceTimersByTime(CALL_FORM_MS.fallback));
-  expect(hook.form).toBe("open");
-});
-
-test("a report for the other direction is ignored", async () => {
-  act(() => hook.expand());
-  act(() => jest.advanceTimersByTime(CALL_FORM_MS.leave));
-  await report(false);
-  expect(hook.form).toBe("opening");
-});
-
-test("double clicks do not queue a second resize", () => {
+test("double clicks report the change once", () => {
   act(() => {
     hook.expand();
     hook.expand();
   });
-  act(() => jest.advanceTimersByTime(CALL_FORM_MS.leave));
-  expect(resizes).toEqual([true]);
-  // Collapsing is only possible from the open form.
+  expect(reports).toEqual([true]);
+  act(() => {
+    hook.collapse();
+    hook.collapse();
+  });
+  act(() => jest.advanceTimersByTime(CALL_FORM_MS.close));
+  expect(reports).toEqual([true, false]);
+});
+
+test("the bar cannot be collapsed and a fold cannot be re-opened midway", () => {
   act(() => hook.collapse());
-  expect(hook.form).toBe("opening");
+  expect(hook.form).toBe("bar");
+  act(() => hook.expand());
+  act(() => hook.collapse());
+  act(() => hook.expand());
+  expect(hook.form).toBe("closing");
 });
 
 test("ending the call returns to the bar, with nothing left pending", async () => {
   act(() => hook.expand());
+  act(() => hook.collapse());
   await act(async () => renderer.update(<Harness active={false} />));
   expect(hook.form).toBe("bar");
-  act(() =>
-    jest.advanceTimersByTime(CALL_FORM_MS.leave + CALL_FORM_MS.fallback),
-  );
+  act(() => jest.advanceTimersByTime(CALL_FORM_MS.close));
   expect(hook.form).toBe("bar");
-  expect(resizes).toEqual([]);
+  // The fold never finished, so it never reported.
+  expect(reports).toEqual([true]);
 });

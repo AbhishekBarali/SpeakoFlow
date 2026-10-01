@@ -3,11 +3,14 @@
  * bar under the conversation when expanded. See `CallBar.tsx`.
  *
  * Geometry is shared with Rust, so keep these in step with `assistant.rs`:
- *   window at rest   CALL_BAR_FRAME_WIDTH x CALL_BAR_FRAME_HEIGHT (440 x 200)
+ *   window           conversation_size() in both forms (480 x 660 by default,
+ *                    never below CALL_FRAME_FLOOR_WIDTH x _HEIGHT, 440 x 200)
  *   bar slot         46px tall, 10px above the window's bottom edge
  *   typing bar       300px wide
- * The bar sits at the same bottom-centre point in both forms, which is what
- * lets the window grow around it without the bar moving.
+ * The bar sits at the same bottom-centre point in both forms, and the window
+ * does not change size between them: at rest the bar floats at the bottom of a
+ * transparent frame whose empty part passes clicks through, and the
+ * conversation grows up out of the bar inside that same frame.
  *
  * At rest the bar is drawn small and grows when the pointer is over the call.
  * It grows inside a slot of fixed height, centred, so the bubble above it does
@@ -441,12 +444,8 @@
   gap: 6px;
   padding: 9px 34px 9px 14px;
   color: var(--as-error);
-  background: color-mix(
-    in srgb,
-    var(--as-error-bg) 70%,
-    var(--as-chip-surface)
-  );
-  border-color: color-mix(in srgb, var(--as-error) 25%, transparent);
+  background: var(--as-error-surface);
+  border-color: var(--as-error-line);
   overflow-wrap: anywhere;
 }
 
@@ -524,20 +523,6 @@
 
 /* ---------- Expanded: the conversation above the bar ---------- */
 
-/* Opening, beat 1: the bar and its bubble step back before the window grows
-   (see `useCallForm`). */
-.call-frame.leaving .call-stack {
-  animation: call-leave 120ms ease-in forwards;
-  pointer-events: none;
-}
-
-@keyframes call-leave {
-  to {
-    opacity: 0;
-    transform: translateY(3px) scale(0.97);
-  }
-}
-
 .call-frame.expanded {
   padding: 0;
   gap: 0;
@@ -571,8 +556,8 @@
   animation: call-panel-grow 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Opening, beat 3: the panel grows up out of the bar, and its contents
-   arrive a moment behind the edge. */
+/* Opening: the panel grows up out of the bar, and its contents arrive a moment
+   behind the edge. */
 @keyframes call-panel-grow {
   from {
     clip-path: inset(
@@ -844,6 +829,222 @@
   background: var(--as-raise);
 }
 
+.call-history-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 8px;
+}
+
+.call-history-search {
+  display: flex;
+  flex: 1 1 160px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 6px 0 9px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 9px;
+  color: var(--as-faint);
+  transition: border-color 140ms ease;
+}
+
+.call-history-search:focus-within {
+  border-color: var(--as-muted);
+  color: var(--as-muted);
+}
+
+.call-history-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--as-ink);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.call-history-search input::placeholder {
+  color: var(--as-faint);
+}
+
+/* The browser's own clear glyph duplicates the button beside it. */
+.call-history-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.call-history-clear {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--as-faint);
+  cursor: pointer;
+}
+
+.call-history-clear:hover {
+  background: var(--as-raise);
+  color: var(--as-ink);
+}
+
+.call-history-scope {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--as-raise);
+}
+
+.call-history-scope button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--as-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.call-history-scope button[aria-pressed="true"] {
+  background: var(--as-raise-strong);
+  color: var(--as-ink);
+}
+
+.call-history-scope button:focus-visible,
+.call-history-search input:focus-visible,
+.call-history-clear:focus-visible {
+  outline: 2px solid var(--as-accent-line);
+  outline-offset: 1px;
+}
+
+.call-history-group + .call-history-group {
+  margin-top: 8px;
+}
+
+.call-history-group h3 {
+  margin: 6px 10px 4px;
+  color: var(--as-faint);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.call-history-meeting {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--as-muted);
+  font-size: 11.5px;
+}
+
+.call-history-meeting span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.call-history-note.end {
+  margin-top: 10px;
+  color: var(--as-faint);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* ---------- A call about a meeting ---------- */
+
+.call-meeting-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0 12px 4px;
+  padding: 5px 9px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 9px;
+  color: var(--as-muted);
+  font-size: 11.5px;
+}
+
+.call-meeting-chip span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.call-meeting-start {
+  margin: auto 0;
+  padding: 18px 16px;
+  text-align: center;
+}
+
+.call-meeting-start-title {
+  margin: 0;
+  color: var(--as-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.call-meeting-start-hint {
+  margin: 6px auto 0;
+  max-width: 34ch;
+  color: var(--as-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.call-meeting-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.call-meeting-prompts button {
+  padding: 6px 11px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--as-body);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.call-meeting-prompts button:hover:not(:disabled) {
+  background: var(--as-raise);
+  color: var(--as-ink);
+}
+
+.call-meeting-prompts button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.call-meeting-prompts button:focus-visible {
+  outline: 2px solid var(--as-accent-line);
+  outline-offset: 1px;
+}
+
 /* ---------- Options ---------- */
 
 .call-options {
@@ -1058,6 +1259,7 @@
 }
 
 .voice-orb.muted .voice-orb-body,
+.voice-orb.held .voice-orb-body,
 .voice-orb.error .voice-orb-body,
 .voice-orb.off .voice-orb-body {
   filter: grayscale(0.95);
@@ -1065,6 +1267,7 @@
 }
 
 .voice-orb.muted .voice-orb-flow,
+.voice-orb.held .voice-orb-flow,
 .voice-orb.error .voice-orb-flow,
 .voice-orb.off .voice-orb-flow {
   animation-play-state: paused;
@@ -1101,7 +1304,6 @@
   .call-panel,
   .call-panel > .call-panel-head,
   .call-panel > .call-panel-body,
-  .call-frame.leaving .call-stack,
   .call-spin {
     animation: none;
   }

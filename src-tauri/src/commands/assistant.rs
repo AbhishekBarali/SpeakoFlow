@@ -112,8 +112,9 @@ pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
     assistant::continue_in_call(
         &app,
         assistant::CallContinuation {
-            id,
+            id: Some(id),
             message_index: None,
+            meeting_id: None,
         },
     );
     Ok(())
@@ -139,11 +140,66 @@ pub fn assistant_branch_session(
     assistant::continue_in_call(
         &app,
         assistant::CallContinuation {
-            id,
+            id: Some(id),
             message_index: Some(message_index),
+            meeting_id: None,
         },
     );
     Ok(())
+}
+
+/// Open a call about a meeting ("Discuss in a call" on the meeting page).
+///
+/// The call starts a new conversation with the meeting attached: its notes, the
+/// user's own notes and — when it fits — the whole transcript go into every
+/// turn's system prompt, and a longer transcript is read on demand through the
+/// `search_meeting` / `read_meeting` tools (see `meetings::discuss`). A call
+/// already running switches to the new conversation in place; the one it was
+/// having is saved first.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_discuss_meeting(app: AppHandle, meeting_id: i64) -> Result<(), String> {
+    let settings = get_settings(&app);
+    if !settings.assistant_enabled {
+        return Err("The assistant is switched off.".to_string());
+    }
+    if settings.active_character_is_cat() {
+        return Err("Choose a conversational profile to discuss a meeting.".to_string());
+    }
+    let conversation = app.state::<AssistantConversation>();
+    if conversation.is_busy() && !crate::voice_conversation::is_active(&app) {
+        return Err("The assistant is answering right now — stop it first.".to_string());
+    }
+    let store = app
+        .try_state::<Arc<crate::meetings::store::MeetingStore>>()
+        .ok_or("Meetings storage is unavailable.")?
+        .inner()
+        .clone();
+    let meeting = tauri::async_runtime::spawn_blocking(move || store.get_meeting(meeting_id))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?
+        .ok_or("That meeting no longer exists.")?;
+    crate::meetings::discuss::discussable(&meeting)?;
+    assistant::continue_in_call(
+        &app,
+        assistant::CallContinuation {
+            id: None,
+            message_index: None,
+            meeting_id: Some(meeting_id),
+        },
+    );
+    Ok(())
+}
+
+/// The meeting the live conversation is about, for a panel that mounted after
+/// it was attached.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_conversation_meeting(
+    app: AppHandle,
+) -> Option<crate::meetings::discuss::MeetingAttachment> {
+    app.state::<AssistantConversation>().meeting()
 }
 
 /// Refuse to continue a saved conversation that cannot be continued right now:
@@ -190,6 +246,7 @@ pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
     conversation.reset_session();
     conversation.reset_distilled_marker();
     assistant::emit_conversation(&app);
+    assistant::emit_conversation_meeting(&app);
 
     // Fire-and-forget distillation of the just-ended conversation, off the hot
     // path. `distill_and_store` re-checks the memory toggles before doing work.
@@ -268,8 +325,9 @@ pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String>
     // The panel is focusable when expanded, so clicking Insert put our own window
     // in front. Hide first, then paste: the paste path's `restore_paste_target`
     // only repairs a foreground that one of our own windows took, and it needs the
-    // real target to be next in line.
-    assistant::hide_assistant_panel(&app);
+    // real target to be next in line. So the hide is immediate here, not the
+    // deferred one every other path uses.
+    assistant::hide_assistant_panel_now(&app);
 
     // On macOS the click on Insert made SpeakoFlow the active app, and ordering a
     // window out does not give activation back (`restore_paste_target` is
@@ -780,22 +838,6 @@ pub fn set_assistant_panel_opacity(app: AppHandle, opacity: f64) -> Result<(), S
     let mut settings = get_settings(&app);
     settings.assistant_panel_opacity = opacity.clamp(0.5, 1.0);
     write_settings(&app, settings);
-    emit_settings_changed(&app);
-    Ok(())
-}
-
-/// Set the panel size preset ("mini", "compact", "standard", or "large") and
-/// re-shape the live panel window to match when it is on screen.
-#[tauri::command]
-#[specta::specta]
-pub fn set_assistant_panel_size(app: AppHandle, size: String) -> Result<(), String> {
-    if !crate::settings::is_assistant_panel_size(&size) {
-        return Err(format!("Unknown panel size: {}", size));
-    }
-    let mut settings = get_settings(&app);
-    settings.assistant_panel_size = size;
-    write_settings(&app, settings);
-    assistant::apply_panel_size(&app);
     emit_settings_changed(&app);
     Ok(())
 }
@@ -1553,7 +1595,7 @@ pub async fn assistant_generate_character(
 
     let call = resolve_assistant_call(&app).await?;
 
-    let system = "You design personas for a voice assistant. Given the user's description, invent a single character and respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys: \"name\" (a short display name, 2-24 characters), \"prompt\" (the system prompt for the persona, written in the second person — define its personality, tone, speaking style, and any quirks or constraints; it must stay genuinely helpful and must never be hateful, harassing, or target real people or protected groups), and \"greeting\" (a short in-character opening line, one sentence). Keep it tasteful and PG.".to_string();
+    let system = "You design personas for a voice assistant. Given the user's description, invent a single character and respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys: \"name\" (a short display name, 2-24 characters), \"prompt\" (the system prompt for the persona, written in the second person. Define its personality, tone, speaking style, and any quirks or constraints; it must stay genuinely helpful and must never be hateful, harassing, or target real people or protected groups. Write it without em dashes), and \"greeting\" (a short in-character opening line, one sentence). Keep it tasteful and PG.".to_string();
 
     let schema = if call.provider.supports_structured_output {
         Some(serde_json::json!({

@@ -170,6 +170,21 @@ impl MeetingStore {
         Ok(store)
     }
 
+    /// A store in a temp directory, for tests in other modules that need real
+    /// SQLite and FTS behaviour rather than a mock of it.
+    #[cfg(test)]
+    pub(crate) fn temp_for_tests() -> (Self, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let audio_dir = dir.path().join("meetings");
+        fs::create_dir_all(&audio_dir).expect("audio dir");
+        let store = Self {
+            db_path: dir.path().join("meetings.db"),
+            audio_dir,
+        };
+        store.init().expect("migrations");
+        (store, dir)
+    }
+
     /// Where meeting audio lives. Recordings are referenced by file name in the
     /// database and resolved against this directory, so the whole app data
     /// folder stays movable (portable installs depend on that).

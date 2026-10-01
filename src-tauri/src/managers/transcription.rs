@@ -619,6 +619,10 @@ impl TranscriptionManager {
 
         let loaded_engine = match model_info.engine_type {
             EngineType::Whisper => {
+                if !whisper_cpu_supported() {
+                    emit_loading_failed(WHISPER_NEEDS_AVX2);
+                    return Err(anyhow::anyhow!(WHISPER_NEEDS_AVX2));
+                }
                 if !vulkan_runtime_available() {
                     emit_loading_failed(WHISPER_NEEDS_VULKAN);
                     return Err(anyhow::anyhow!(WHISPER_NEEDS_VULKAN));
@@ -2551,6 +2555,50 @@ pub const WHISPER_NEEDS_VULKAN: &str = "Whisper models need Vulkan, which comes 
     graphics driver, and it isn't installed on this PC. Update your graphics driver (NVIDIA, \
     AMD or Intel) and restart SpeakoFlow, or choose a Parakeet model, which works without it.";
 
+/// Shown when a Whisper model is picked on an x86 CPU older than the engine's
+/// instruction-set baseline.
+pub const WHISPER_NEEDS_AVX2: &str = "Whisper models need a processor with AVX2 (most \
+    computers from 2013 on), and this one doesn't have it. Choose a Parakeet model, which \
+    works on this processor.";
+
+/// Whether this CPU can run the statically linked whisper.cpp.
+///
+/// Release builds compile whisper.cpp with `GGML_NATIVE=OFF` (see
+/// `.github/workflows/build.yml`), which on x86-64 means a fixed AVX2 + FMA +
+/// F16C + BMI2 baseline rather than whatever the build runner had (Intel macOS
+/// uses an even lower one). Code built for that
+/// baseline raises SIGILL on a CPU without it, and SIGILL cannot be caught: it
+/// takes the whole app down, at launch if it happens during device listing.
+/// Budget Celeron/Pentium Silver and Atom parts (Gemini Lake, Jasper Lake) and
+/// pre-2013 desktops are the ones that lack it, so Whisper is refused there with
+/// a message instead. The Parakeet path is unaffected: transcribe-cpp picks its
+/// CPU kernels at run time.
+///
+/// Non-x86 targets have no such floor to check.
+pub fn whisper_cpu_supported() -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        static SUPPORTED: OnceLock<bool> = OnceLock::new();
+        *SUPPORTED.get_or_init(|| {
+            let supported = std::arch::is_x86_feature_detected!("avx2")
+                && std::arch::is_x86_feature_detected!("fma")
+                && std::arch::is_x86_feature_detected!("f16c")
+                && std::arch::is_x86_feature_detected!("bmi2");
+            if !supported {
+                warn!(
+                    "This CPU lacks AVX2/FMA/F16C/BMI2, which the bundled Whisper engine \
+                     requires; Whisper models are unavailable"
+                );
+            }
+            supported
+        })
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        true
+    }
+}
+
 /// Both device lists, as produced by one enumeration pass. Serialized to a
 /// single JSON line so the Linux out-of-process probe can hand them back to the
 /// parent (see `probe_devices_out_of_process`).
@@ -2563,13 +2611,15 @@ pub struct DeviceProbe {
 /// Enumerate the whisper GPU devices in THIS process.
 ///
 /// Loads ggml's Vulkan backend, which is the risky part: the statically linked
-/// whisper.cpp/ggml in `transcribe-rs` is compiled with ggml's default
-/// `GGML_NATIVE=ON` (i.e. `-march=native`), so a package built on a machine with
-/// a wider instruction set than the one running it can raise SIGILL right here —
-/// an uncatchable crash that takes the whole app down at launch. On Linux, where
-/// packages are routinely built on a different machine than they run on, callers
-/// go through `probe_devices_out_of_process` instead so a crash costs us a GPU
-/// listing rather than the app.
+/// whisper.cpp/ggml in `transcribe-rs` is compiled for a fixed CPU baseline in
+/// release builds (`GGML_NATIVE=OFF`, see `whisper_cpu_supported`), but a local
+/// or older build uses ggml's default `GGML_NATIVE=ON` (`-march=native`), and a
+/// binary built on a machine with a wider instruction set than the one running
+/// it can raise SIGILL right here — an uncatchable crash that takes the whole
+/// app down at launch. On Linux, where packages are routinely built on a
+/// different machine than they run on, callers go through
+/// `probe_devices_out_of_process` instead so a crash costs us a GPU listing
+/// rather than the app.
 fn enumerate_whisper_gpu_devices() -> Vec<GpuDeviceOption> {
     use transcribe_rs::whisper_cpp::gpu::list_gpu_devices;
 
@@ -2578,13 +2628,12 @@ fn enumerate_whisper_gpu_devices() -> Vec<GpuDeviceOption> {
         return Vec::new();
     }
 
-    // ggml's Vulkan backend uses FMA3 instructions internally.
-    // On older CPUs without FMA3 (e.g. Sandy Bridge Xeons) this causes
-    // a SIGILL crash that cannot be caught. Skip enumeration entirely
-    // on those CPUs — GPU-accelerated whisper won't work there anyway.
-    #[cfg(target_arch = "x86_64")]
-    if !std::arch::is_x86_feature_detected!("fma") {
-        warn!("CPU lacks FMA3 support — skipping GPU device enumeration");
+    // ggml's Vulkan backend uses FMA3 instructions internally, and the engine
+    // around it is built for an AVX2 baseline (see `whisper_cpu_supported`).
+    // On a CPU without them this raises a SIGILL that cannot be caught. Skip
+    // enumeration entirely there — Whisper is refused on such CPUs anyway.
+    if !whisper_cpu_supported() {
+        warn!("CPU lacks AVX2/FMA/F16C/BMI2 — skipping Whisper GPU device enumeration");
         return Vec::new();
     }
 

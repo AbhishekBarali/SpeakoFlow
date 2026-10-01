@@ -18,6 +18,9 @@
  *            &installed=1 (existing setup when previewing onboarding)
  *            &failDownload=stt|cleanup|assistant|voice|all (comma-separated)
  *            &failOnce=1 (failed downloads succeed on retry) &failLoad=stt
+ *            &meeting=live (a meeting recording now) &sysaudio=0 &paused=1
+ *            &notes=writing (the newest meeting's notes still being written)
+ *            &pill=collapsed|expanded|offer (only in src/preview/meeting.html)
  */
 import {
   mockConvertFileSrc,
@@ -759,30 +762,304 @@ const assistantSessions = fresh
         { role: "user", content: question },
         { role: "assistant", content: answer },
       ],
+      meeting_id: index === 1 ? 40 : null,
+      meeting_title:
+        index === 1 ? "The meeting was an informal technical discussion" : null,
     }));
 
-const meetings = fresh
+/* ── Meetings ──
+ * `?meeting=live` (or the pill harness) records one right now; `&sysaudio=0`
+ * loses the far side; `&paused=1` pauses it; `&notes=writing` opens a meeting
+ * whose notes are still being written. */
+const liveMeeting =
+  params.get("meeting") === "live" || params.has("pill")
+    ? params.get("pill") !== "offer"
+    : false;
+const LIVE_MEETING_ID = 41;
+
+const MEETING_NOTES = `## Summary
+
+A planning call for the 1.6 release. The team agreed to ship the meetings feature as a beta behind its own switch, and to hold the Linux overlay fix for a patch release so it does not block the date.
+
+## Key takeaways
+
+- Meetings ships in 1.6 as a **beta**, off by default.
+- The release date stays on **Friday the 14th**.
+- Speaker identification needs a one-time 27 MB download, offered on first use.
+- The Linux overlay fix moves to 1.6.1.
+
+## Topics
+
+### Release scope
+
+Priya walked through the open issues. Everything tagged for 1.6 is done except the overlay on GNOME, which needs another round of testing on Wayland.
+
+### Speaker labels
+
+The diarization model is accurate on two or three voices and drifts on larger calls. Labels below a confidence threshold are shown as uncertain rather than hidden.
+
+## Decisions
+
+- Ship meetings as a beta in 1.6 (agreed by everyone).
+- Move the GNOME overlay fix to 1.6.1 (Priya).
+
+## Next steps
+
+- [x] **You** — Write the release notes draft (Wednesday)
+- [ ] **Priya** — Re-test the overlay on GNOME Wayland (Thursday)
+- [ ] **Marco** — Record the meetings demo for the site (before Friday)
+`;
+
+type Turn = [
+  speaker: string,
+  source: "mic" | "system",
+  at: number,
+  text: string,
+];
+const MEETING_TURNS: Turn[] = [
+  [
+    "me",
+    "mic",
+    4,
+    "Okay, I think everyone's here. The main thing today is the 1.6 release and whether meetings goes in.",
+  ],
+  [
+    "spk_1",
+    "system",
+    12,
+    "I went through the board this morning. Everything tagged for 1.6 is closed except the overlay on GNOME.",
+  ],
+  [
+    "spk_1",
+    "system",
+    21,
+    "It works on X11, but on Wayland it still drops behind full-screen windows about one time in five.",
+  ],
+  [
+    "me",
+    "mic",
+    33,
+    "Is that something we can fix this week, or is it a deeper problem?",
+  ],
+  [
+    "spk_1",
+    "system",
+    40,
+    "Honestly, I'd rather not rush it. I want another round on a clean Fedora install before we call it done.",
+  ],
+  [
+    "spk_2",
+    "system",
+    52,
+    "Then let's not hold the release for it. We can ship it in a patch a week later. Nobody on Linux is worse off than today.",
+  ],
+  [
+    "me",
+    "mic",
+    64,
+    "Agreed. So 1.6.1 for the overlay. What about meetings itself — are we comfortable calling it ready?",
+  ],
+  [
+    "spk_2",
+    "system",
+    75,
+    "Ready as a beta, yes. The transcript is solid. Speaker labels are good on two or three people and get shaky on bigger calls.",
+  ],
+  [
+    "spk_1",
+    "system",
+    88,
+    "And the low-confidence ones are marked as uncertain now, so it doesn't claim a name it isn't sure about.",
+  ],
+  [
+    "me",
+    "mic",
+    99,
+    "Good. Then it ships off by default, behind its own switch, with the beta badge. I'll write the release notes.",
+  ],
+  [
+    "spk_2",
+    "system",
+    110,
+    "I can record the demo for the site. Two people, ten minutes, so the labels look right.",
+  ],
+  [
+    "me",
+    "mic",
+    121,
+    "Perfect. Friday the 14th still stands. Thanks, everyone.",
+  ],
+];
+
+const segmentsFor = (meetingId: number): Json[] =>
+  MEETING_TURNS.map(([speaker, source, at, text], index) => ({
+    id: meetingId * 100 + index,
+    meeting_id: meetingId,
+    source,
+    speaker_key: speaker,
+    start_ms: at * 1000,
+    end_ms: (at + 8) * 1000,
+    text,
+    // One low-confidence label, so the "uncertain" treatment is on show.
+    confidence: speaker === "me" ? null : index === 8 ? 0.31 : 0.82,
+  }));
+
+const day = 86400;
+const meetings: Json[] = fresh
   ? []
-  : [
-      ["The meeting was an informal technical discussion", 4, 434],
-      ["A brief technical check focused on verifying the build", 2, 61],
-      ["No decisions were reached during this meeting", 7, 1003],
-      ["Reviewing the performance of the new cleanup model", 2, 463],
-    ].map(([title, _speakers, secs], index) => ({
+  : (
+      [
+        [
+          "Planning the 1.6 release and the meetings beta",
+          2 * 3600,
+          1834,
+          "complete",
+          true,
+        ],
+        [
+          "Weekly sync with the design team",
+          day + 3 * 3600,
+          2410,
+          "complete",
+          true,
+        ],
+        [
+          "Interview: frontend engineer",
+          day + 7 * 3600,
+          2705,
+          "complete",
+          false,
+        ],
+        [
+          "A brief technical check focused on verifying the build",
+          3 * day,
+          61,
+          "complete",
+          false,
+        ],
+        [
+          "Reviewing the performance of the new cleanup model",
+          4 * day,
+          463,
+          "interrupted",
+          false,
+        ],
+        ["Customer call with Northwind", 12 * day, 3302, "complete", true],
+      ] as const
+    ).map(([title, ago, secs, status, notes], index) => ({
       id: 40 - index,
       title,
-      started_at: now - 86400 * (index + 1),
-      ended_at: now - 86400 * (index + 1) + (secs as number),
-      status: index === 3 ? "interrupted" : "complete",
-      mic_file: null,
-      system_file: null,
-      my_notes: "",
-      notes: index % 2 === 0 ? "Notes" : null,
-      notes_template: null,
+      started_at: now - ago,
+      ended_at: now - ago + secs,
+      status,
+      mic_file: "mic.wav",
+      system_file: index === 3 ? null : "system.wav",
+      my_notes:
+        index === 0
+          ? "Ask Marco about the demo length.\nCheck the 27 MB figure."
+          : "",
+      notes:
+        notes || index === 0
+          ? params.get("notes") === "writing" && index === 0
+            ? null
+            : MEETING_NOTES
+          : null,
+      notes_template: "general",
       language: null,
-      diarized: true,
-      segment_count: 12,
+      diarized: index !== 4,
+      segment_count: MEETING_TURNS.length,
     }));
+
+if (liveMeeting) {
+  meetings.unshift({
+    id: LIVE_MEETING_ID,
+    title: "Meeting 1 Oct 2026, 20:10",
+    started_at: now - 754,
+    ended_at: null,
+    status: "recording",
+    mic_file: "mic.wav",
+    system_file: "system.wav",
+    my_notes: "",
+    notes: null,
+    notes_template: null,
+    language: null,
+    diarized: false,
+    segment_count: 0,
+  });
+}
+
+const liveState = (): Json => ({
+  meeting_id: liveMeeting ? LIVE_MEETING_ID : null,
+  status: liveMeeting ? "recording" : "complete",
+  paused: params.get("paused") === "1",
+  system_audio: params.get("sysaudio") !== "0",
+  system_audio_error:
+    params.get("sysaudio") === "0"
+      ? "No loopback device: the default output is a Bluetooth headset in hands-free mode."
+      : null,
+  elapsed_ms: liveMeeting ? 754_000 : 0,
+  dropped_chunks: 0,
+});
+
+const meetingChat: Json[] = fresh
+  ? []
+  : [
+      {
+        role: "user",
+        content: "What did we decide about the overlay?",
+        images: [],
+      },
+      {
+        role: "assistant",
+        content:
+          "It moves to **1.6.1**. Priya wants another test round on a clean Fedora install, and the team agreed not to hold the release for it, since nobody on Linux is worse off than today.",
+        images: [],
+      },
+      { role: "user", content: "Who owns what?", images: [] },
+      {
+        role: "assistant",
+        content:
+          "- **You** — the release notes draft\n- **Priya** — re-testing the overlay on GNOME Wayland\n- **Marco** — recording the meetings demo for the site",
+        images: [],
+      },
+    ];
+
+/** A live call, arriving the way the recorder announces it. */
+const startLiveFeed = () => {
+  if (!liveMeeting) return;
+  const turns = MEETING_TURNS.slice(0, params.has("pill") ? 7 : 5);
+  window.setTimeout(() => {
+    for (const [speaker, source, at, text] of turns) {
+      const keyed =
+        source === "mic"
+          ? "me"
+          : speaker === "spk_1" || speaker === "spk_2"
+            ? "them"
+            : speaker;
+      void emit("meeting-segment", {
+        meeting_id: LIVE_MEETING_ID,
+        source,
+        speaker_key: keyed,
+        start_ms: at * 1000,
+        end_ms: (at + 8) * 1000,
+        text,
+      });
+    }
+  }, 350);
+  let phase = 0;
+  window.setInterval(() => {
+    phase += 1;
+    void emit("meeting-level", {
+      mic: phase % 40 < 14 ? 0.35 + 0.3 * Math.abs(Math.sin(phase)) : 0.01,
+      system:
+        params.get("sysaudio") === "0"
+          ? 0
+          : phase % 40 >= 18
+            ? 0.3 + 0.4 * Math.abs(Math.sin(phase * 1.3))
+            : 0.01,
+    });
+  }, 90);
+};
 
 const readiness = (): Json => {
   const providerId = settings.post_process_provider_id as string;
@@ -839,6 +1116,49 @@ const handlers: Record<string, (args: Json) => unknown> = {
   }),
   get_assistant_history_entry: (args) =>
     assistantSessions.find((session) => session.id === args.id) ?? null,
+  list_assistant_conversations: (args) => {
+    const filter = (args.filter ?? {}) as {
+      query?: string | null;
+      meetings_only?: boolean;
+      meeting_id?: number | null;
+    };
+    const words = (filter.query ?? "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    const matching = assistantSessions
+      .filter((s) => !filter.meetings_only || s.meeting_id !== null)
+      .filter(
+        (s) =>
+          filter.meeting_id === null ||
+          filter.meeting_id === undefined ||
+          s.meeting_id === filter.meeting_id,
+      )
+      .filter((s) => {
+        const text = [
+          s.title,
+          s.meeting_title ?? "",
+          ...s.messages.map((m) => m.content),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return words.every((word) => text.includes(word));
+      })
+      .sort((a, b) => b.updated_at - a.updated_at);
+    const offset = Number(args.offset ?? 0);
+    const limit = Number(args.limit ?? 30);
+    return {
+      entries: matching
+        .slice(offset, offset + limit)
+        .map(({ messages, ...summary }) => ({
+          ...summary,
+          message_count: messages.length,
+        })),
+      has_more: matching.length > offset + limit,
+    };
+  },
+  assistant_conversation_meeting: () => null,
+  assistant_discuss_meeting: () => null,
   get_usage_stats: () =>
     fresh
       ? {
@@ -866,22 +1186,39 @@ const handlers: Record<string, (args: Json) => unknown> = {
           recent_days: recentDays(),
         },
   list_meetings: () => ({ meetings, has_more: false }),
-  get_meeting_speakers: () => [
-    { speaker_key: "mic", display_name: "Me", is_me: true },
-    { speaker_key: "system", display_name: "Them", is_me: false },
+  get_meeting: ({ meetingId }) =>
+    structuredClone(meetings.find((entry) => entry.id === meetingId) ?? null),
+  get_meeting_segments: ({ meetingId, offset }) =>
+    meetingId === LIVE_MEETING_ID || Number(offset ?? 0) > 0
+      ? { segments: [], has_more: false, total: 0 }
+      : {
+          segments: segmentsFor(meetingId as number),
+          has_more: false,
+          total: MEETING_TURNS.length,
+        },
+  // The seeded pair is English, as Rust writes it; the UI translates it. One
+  // diarized voice has been renamed by the user and one has not.
+  get_meeting_speakers: ({ meetingId }) => [
+    { speaker_key: "me", display_name: "You", is_me: true },
+    { speaker_key: "them", display_name: "Others", is_me: false },
+    ...(meetingId === LIVE_MEETING_ID
+      ? []
+      : [
+          { speaker_key: "spk_1", display_name: "Priya", is_me: false },
+          { speaker_key: "spk_2", display_name: "Speaker 2", is_me: false },
+        ]),
   ],
-  get_meeting_state: () => ({
-    meeting_id: null,
-    status: "complete",
-    paused: false,
-    system_audio: true,
-    system_audio_error: null,
-    elapsed_ms: 0,
-    dropped_chunks: 0,
-  }),
+  get_meeting_state: () => liveState(),
+  is_meeting_notes_running: () => params.get("notes") === "writing",
+  get_meeting_chat: ({ meetingId }) =>
+    meetingId === 40 || meetingId === LIVE_MEETING_ID
+      ? structuredClone(meetingChat)
+      : [],
+  get_diarization_status: () => ({ installed: false, download_mb: 27 }),
+  get_meeting_pill_expanded: () => params.get("pill") === "expanded",
   get_system_audio_status: () => ({ supported: true, help: null }),
-  get_call_detection_status: () => ({ supported: true, enabled: true }),
-  get_meeting_indicator: () => true,
+  get_call_detection_status: () => ({ supported: true, enabled: false }),
+  get_meeting_indicator: () => liveMeeting,
   get_auto_learn_status: () => ({
     supported: true,
     enabled: false,
@@ -1212,7 +1549,6 @@ const handlers: Record<string, (args: Json) => unknown> = {
         ],
         ["set_assistant_auto_summarize", "enabled", "assistant_auto_summarize"],
         ["set_assistant_font_size", "size", "assistant_font_size"],
-        ["set_assistant_panel_size", "size", "assistant_panel_size"],
         ["set_assistant_panel_opacity", "opacity", "assistant_panel_opacity"],
         ["set_assistant_ask_anchor", "anchor", "assistant_ask_anchor"],
         ["set_assistant_ask_display", "display", "assistant_ask_display"],
@@ -1235,6 +1571,24 @@ const handlers: Record<string, (args: Json) => unknown> = {
     settings.custom_words = words;
     return null;
   },
+  // The pill harness plays the window: Rust's sizing and mode, as DOM events.
+  fit_meeting_pill: ({ height }) => {
+    window.dispatchEvent(
+      new CustomEvent("preview-pill", { detail: { height } }),
+    );
+    return null;
+  },
+  set_meeting_pill_expanded: ({ expanded }) => {
+    window.dispatchEvent(
+      new CustomEvent("preview-pill", { detail: { expanded } }),
+    );
+    return null;
+  },
+  set_meeting_paused: ({ paused }) => {
+    params.set("paused", paused ? "1" : "0");
+    void emit("meeting-state", liveState());
+    return null;
+  },
 };
 
 mockWindows("main");
@@ -1248,5 +1602,12 @@ mockIPC(
   },
   { shouldMockEvents: true },
 );
+
+startLiveFeed();
+if (params.get("pill") === "offer") {
+  window.setTimeout(() => {
+    void emit("meeting-call-detected", { active: true, app: "Zoom.exe" });
+  }, 300);
+}
 
 export const previewParams = params;
