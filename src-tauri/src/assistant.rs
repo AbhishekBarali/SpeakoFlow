@@ -1082,6 +1082,11 @@ pub const SCREENSHOT_MARKER: &str = "[screenshot attached]";
 /// sync with AssistantPanel.tsx, which collapses the block for display.
 pub const SELECTION_OPEN: &str = "<selected_text>";
 pub const SELECTION_CLOSE: &str = "</selected_text>";
+/// The two fixed phrases [`compose_selection_request`] writes around the block.
+/// History strips both when it derives a conversation's title, and so does
+/// AssistantPanel.tsx for display.
+pub const SELECTION_LEAD_IN: &str = "The user has this text selected in another application:";
+pub const SELECTION_REQUEST_PREFIX: &str = "Their request about it: ";
 
 /// Whether a turn should speak its reply aloud.
 ///
@@ -1107,9 +1112,8 @@ fn should_speak_reply(is_call: bool, speaker_on: bool) -> bool {
 /// is the "this" in question.
 pub fn compose_selection_request(selection: &str, user_text: &str) -> String {
     format!(
-        "The user has this text selected in another application:\n\
-         {SELECTION_OPEN}\n{selection}\n{SELECTION_CLOSE}\n\n\
-         Their request about it: {user_text}"
+        "{SELECTION_LEAD_IN}\n{SELECTION_OPEN}\n{selection}\n{SELECTION_CLOSE}\n\n\
+         {SELECTION_REQUEST_PREFIX}{user_text}"
     )
 }
 
@@ -1515,18 +1519,25 @@ pub fn persist_assistant_session(app: &AppHandle) {
             id: m.meeting_id,
             title: &m.title,
         });
+    // The quick ask and a call never run at once (the ask hotkey ends a call
+    // first), so a live call is what makes this turn a call's.
+    let kind = if crate::voice_conversation::is_active(app) {
+        crate::managers::history::ConversationKind::Call
+    } else {
+        crate::managers::history::ConversationKind::Ask
+    };
 
     let saved = match *session_id {
-        Some(id) => match hm.update_assistant_session(id, &messages, link) {
+        Some(id) => match hm.update_assistant_session(id, &messages, link, kind) {
             Ok(Some(entry)) => Some(entry),
             // Row vanished (deleted in the UI) — start a fresh one.
-            Ok(None) => hm.create_assistant_session(&messages, link).ok(),
+            Ok(None) => hm.create_assistant_session(&messages, link, kind).ok(),
             Err(e) => {
                 error!("Failed to update assistant session {}: {}", id, e);
                 None
             }
         },
-        None => match hm.create_assistant_session(&messages, link) {
+        None => match hm.create_assistant_session(&messages, link, kind) {
             Ok(entry) => Some(entry),
             Err(e) => {
                 error!("Failed to create assistant session: {}", e);

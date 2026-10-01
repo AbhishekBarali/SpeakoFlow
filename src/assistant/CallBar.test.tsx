@@ -24,6 +24,8 @@ type Row = {
   message_count: number;
   meeting_id: number | null;
   meeting_title: string | null;
+  kind: "ask" | "call";
+  preview: string | null;
 };
 let historyRows: Row[] = [];
 let listCalls: unknown[][] = [];
@@ -343,6 +345,8 @@ test("past conversations can be narrowed to meetings, and show which meeting", a
       message_count: 4,
       meeting_id: 9,
       meeting_title: "Pricing review",
+      kind: "call",
+      preview: null,
     },
   ];
   render(surface({ form: "open" }));
@@ -352,6 +356,7 @@ test("past conversations can be narrowed to meetings, and show which meeting", a
     query: null,
     meetings_only: false,
     meeting_id: null,
+    kind: "call",
   });
 
   const scope = renderer.root.find(

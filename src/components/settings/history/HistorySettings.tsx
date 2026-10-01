@@ -12,24 +12,23 @@ import { listen } from "@tauri-apps/api/event";
 import { readFile } from "@tauri-apps/plugin-fs";
 import {
   ArrowUpRight,
-  Check,
-  ChevronDown,
-  Copy,
-  FolderOpen,
   Camera,
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
   FileText,
+  FolderOpen,
   GitBranch,
   HardDrive,
-  MessageCircle,
-  Mic,
   MoreHorizontal,
   Pause,
   Play,
   RotateCcw,
-  Sparkles,
   Star,
+  TextSelect,
   Trash2,
-  Wand2,
+  Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -50,52 +49,21 @@ import { MenuButton, type MenuItem } from "../../ui/Menu";
 import { PageHeader } from "../../ui/Page";
 import { Tabs } from "../../ui/Tabs";
 import { useNavigation } from "../../shell/navigation";
-import { VOICE_INTERRUPTED_MARKER } from "@/assistant/conversationPolicy";
 import { formatTimeOfDay, groupByDay } from "@/utils/dayGroups";
-
-/** Must match the marker constants in src-tauri/src/assistant.rs */
-const SCREENSHOT_MARKER = "[screenshot attached]";
-const IMAGE_MARKER = "[image attached]";
-const FILE_MARKER_PREFIX = "[file attached:";
-
-/** Stable marker written by src-tauri/src/flow.rs. Existing successful Flow
- *  rows already carry this value, so they appear in the new filter too. */
-const FLOW_HISTORY_MARKER = "Generate with Flow";
-
-const isFlowHistoryEntry = (entry: HistoryEntry): boolean =>
-  entry.post_process_prompt === FLOW_HISTORY_MARKER;
-
-/** Strip the attachment markers the backend appends to stored user messages,
- *  returning the clean text plus what rode along (screen capture / files). */
-const cleanMessageContent = (
-  raw: string,
-): { text: string; screenshot: boolean; files: string[] } => {
-  let screenshot = false;
-  const files: string[] = [];
-  const kept: string[] = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed === VOICE_INTERRUPTED_MARKER) continue;
-    if (trimmed === SCREENSHOT_MARKER) {
-      screenshot = true;
-      continue;
-    }
-    if (trimmed === IMAGE_MARKER) {
-      continue;
-    }
-    if (trimmed.startsWith(FILE_MARKER_PREFIX) && trimmed.endsWith("]")) {
-      files.push(trimmed.slice(FILE_MARKER_PREFIX.length, -1).trim());
-      continue;
-    }
-    kept.push(line);
-  }
-  return { text: kept.join("\n").trim(), screenshot, files };
-};
+import {
+  buildFeed,
+  cleanMessageContent,
+  isFlowHistoryEntry,
+  matchesFilter,
+  rowKind,
+  visibleFilters,
+  type HistoryFilter,
+  type RowKind,
+} from "./historyFeed";
 
 /**
- * Markdown styling for assistant replies in the expanded conversation —
- * mirrors the assistant panel so bold, lists, code, etc. render properly
- * instead of leaking raw markdown syntax.
+ * Markdown styling for assistant replies — mirrors the assistant panel so
+ * bold, lists, code, etc. render properly instead of leaking raw markdown.
  */
 const assistantMarkdown: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -154,6 +122,14 @@ const ICON_BUTTON_SHAPE =
 const ICON_BUTTON_TONE = "text-muted hover:text-ink";
 const ICON_BUTTON = `${ICON_BUTTON_SHAPE} ${ICON_BUTTON_TONE}`;
 
+/** Hover/focus reveal for a row's actions. An open menu keeps them shown. */
+const REVEAL_ON_HOVER =
+  "flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100";
+
+/** A quiet inline link inside a row ("Try again", "Recover"). */
+const INLINE_LINK =
+  "cursor-pointer rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50";
+
 const IconButton: React.FC<{
   onClick: () => void;
   title: string;
@@ -172,6 +148,60 @@ const IconButton: React.FC<{
   >
     {children}
   </button>
+);
+
+/** The kind of a row, named only in the mixed "All" list. A dictation is the
+ *  default and goes unnamed: labelling every one of them is what made the list
+ *  read as a column of "Dictation". */
+const KIND_LABEL_KEYS: Partial<Record<RowKind, string>> = {
+  flow: "settings.history.flowLabel",
+  ask: "settings.history.kinds.ask",
+  call: "settings.history.kinds.call",
+};
+
+const FILTER_LABEL_KEYS: Record<HistoryFilter, string> = {
+  all: "settings.history.filters.all",
+  recordings: "settings.history.filters.recordings",
+  flow: "settings.history.filters.flow",
+  asks: "settings.history.filters.asks",
+  calls: "settings.history.filters.calls",
+};
+
+const EMPTY_KEYS: Record<HistoryFilter, string> = {
+  all: "settings.history.empty",
+  recordings: "settings.history.emptyRecordings",
+  flow: "settings.history.emptyFlow",
+  asks: "settings.history.emptyAsks",
+  calls: "settings.history.emptyCalls",
+};
+
+/**
+ * Every row's frame: the time in a column of its own on the left, the content
+ * beside it, and a few quiet actions on the right. The time column is what
+ * lets a row be just its text — there is no caption line under each entry to
+ * repeat the time, the kind and an icon.
+ */
+const RowFrame: React.FC<{
+  time: string;
+  /** Named in the mixed list only; see `KIND_LABEL_KEYS`. */
+  kindLabel?: string;
+  actions: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ time, kindLabel, actions, children }) => (
+  <div className="group flex items-baseline gap-4 px-4 py-3 transition-colors hover:bg-surface-muted/70">
+    <div className="w-[4.75rem] shrink-0 text-xs text-muted">
+      <span className="block whitespace-nowrap tabular-nums">{time}</span>
+      {kindLabel && (
+        <span className="mt-0.5 block truncate text-[11px] text-muted-soft">
+          {kindLabel}
+        </span>
+      )}
+    </div>
+    <div className="min-w-0 flex-1">{children}</div>
+    <div className="-my-1 flex shrink-0 items-center gap-0.5 self-start">
+      {actions}
+    </div>
+  </div>
 );
 
 /** Thumbnails of the image(s) sent with a stored message — the screen capture
@@ -254,52 +284,30 @@ const HistoryThumbnails: React.FC<{
 };
 
 const PAGE_SIZE = 30;
-interface OpenRecordingsButtonProps {
-  onClick: () => void;
-  label: string;
-}
-
-const OpenRecordingsButton: React.FC<OpenRecordingsButtonProps> = ({
-  onClick,
-  label,
-}) => (
-  <Button
-    onClick={onClick}
-    variant="secondary"
-    size="sm"
-    className="flex items-center gap-2"
-    title={label}
-  >
-    <FolderOpen className="w-4 h-4" />
-    <span>{label}</span>
-  </Button>
-);
-
-/**
- * A single item in the unified history feed. Transcriptions and assistant
- * conversations are interleaved by time; `sortTime` is the seconds-epoch used
- * for ordering (last activity for conversations, recording time otherwise).
- */
-type FeedItem =
-  | { kind: "transcription"; sortTime: number; entry: HistoryEntry }
-  | { kind: "assistant"; sortTime: number; session: AssistantHistorySummary };
-
-type HistoryFilter = "all" | "recordings" | "flow" | "assistant";
 
 export const HistorySettings: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { openSettings, navigate } = useNavigation();
   const { getSetting } = useSettings();
   const assistantEnabled = getSetting("assistant_enabled") ?? true;
+  const flowEnabled = getSetting("flow_enabled") ?? false;
   const osType = useOsType();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<HistoryFilter>("all");
+  const [selectedFilter, setFilter] = useState<HistoryFilter>("all");
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const entriesRef = useRef<HistoryEntry[]>([]);
   const loadingRef = useRef(false);
   const pageGenerationRef = useRef(0);
+
+  const filters = useMemo(
+    () => visibleFilters({ flowEnabled, assistantEnabled }),
+    [flowEnabled, assistantEnabled],
+  );
+  // A tab whose feature was switched off while it was selected falls back to
+  // All rather than leaving the page on a filter with no tab.
+  const filter = filters.includes(selectedFilter) ? selectedFilter : "all";
 
   // Assistant conversations are stored separately from transcriptions, so we
   // load them as their own list and merge for display. The list carries only
@@ -597,7 +605,7 @@ export const HistorySettings: React.FC = () => {
     [loadAssistantSessions],
   );
 
-  /** Load a past conversation back into the assistant panel and open it. */
+  /** Load a past conversation into a call and open it. */
   const resumeAssistantSession = useCallback(
     async (id: number) => {
       // With the assistant off the panel cannot open, and the click would
@@ -644,40 +652,13 @@ export const HistorySettings: React.FC = () => {
     }
   };
 
-  // Merge transcriptions and assistant conversations into a single feed,
-  // newest activity first.
-  const feed = useMemo<FeedItem[]>(() => {
-    const items: FeedItem[] = [];
-    for (const entry of entries) {
-      items.push({ kind: "transcription", sortTime: entry.timestamp, entry });
-    }
-    for (const session of assistantSessions) {
-      items.push({
-        kind: "assistant",
-        sortTime: session.updated_at,
-        session,
-      });
-    }
-    items.sort((a, b) => b.sortTime - a.sortTime);
-    return items;
-  }, [entries, assistantSessions]);
+  const feed = useMemo(
+    () => buildFeed(entries, assistantSessions),
+    [entries, assistantSessions],
+  );
 
   const filteredFeed = useMemo(
-    () =>
-      feed.filter((item) => {
-        if (filter === "recordings") {
-          return (
-            item.kind === "transcription" && !isFlowHistoryEntry(item.entry)
-          );
-        }
-        if (filter === "flow") {
-          return (
-            item.kind === "transcription" && isFlowHistoryEntry(item.entry)
-          );
-        }
-        if (filter === "assistant") return item.kind === "assistant";
-        return true;
-      }),
+    () => feed.filter((item) => matchesFilter(item, filter)),
     [feed, filter],
   );
 
@@ -689,6 +670,13 @@ export const HistorySettings: React.FC = () => {
       }),
     [filteredFeed, i18n.language, t],
   );
+
+  /** Only the mixed list needs to say what each row is. */
+  const kindLabelFor = (kind: RowKind): string | undefined => {
+    if (filter !== "all") return undefined;
+    const key = KIND_LABEL_KEYS[kind];
+    return key ? t(key) : undefined;
+  };
 
   let content: React.ReactNode;
 
@@ -705,17 +693,9 @@ export const HistorySettings: React.FC = () => {
       </div>
     );
   } else if (filteredFeed.length === 0) {
-    const emptyKey =
-      filter === "recordings"
-        ? "settings.history.emptyRecordings"
-        : filter === "flow"
-          ? "settings.history.emptyFlow"
-          : filter === "assistant"
-            ? "settings.history.emptyAssistant"
-            : "settings.history.empty";
     content = (
       <div className="rounded-xl border border-dashed border-hairline-strong px-6 py-12 text-center">
-        <p className="text-sm text-muted">{t(emptyKey)}</p>
+        <p className="text-sm text-muted">{t(EMPTY_KEYS[filter])}</p>
       </div>
     );
   } else {
@@ -735,6 +715,7 @@ export const HistorySettings: React.FC = () => {
                     <HistoryEntryComponent
                       key={`t-${item.entry.id}`}
                       entry={item.entry}
+                      kindLabel={kindLabelFor(rowKind(item))}
                       onToggleSaved={() => toggleSaved(item.entry.id)}
                       onCopyText={() =>
                         copyToClipboard(
@@ -752,10 +733,12 @@ export const HistorySettings: React.FC = () => {
                     <AssistantHistoryEntryComponent
                       key={`a-${item.session.id}`}
                       session={item.session}
+                      kindLabel={kindLabelFor(rowKind(item))}
                       expanded={expandedAssistant.has(item.session.id)}
                       onToggleExpand={() =>
                         toggleExpandAssistant(item.session.id)
                       }
+                      onCopyText={copyToClipboard}
                       onCopyConversation={copyConversation}
                       onDelete={() => deleteAssistantSession(item.session.id)}
                       onResume={() =>
@@ -774,8 +757,10 @@ export const HistorySettings: React.FC = () => {
             </section>
           ))}
         </div>
-        {/* Pagination belongs to recordings; assistant sessions are loaded in one page. */}
-        {filter !== "assistant" && <div ref={sentinelRef} className="h-1" />}
+        {/* Pagination belongs to recordings; conversations are loaded in one page. */}
+        {filter !== "asks" && filter !== "calls" && (
+          <div ref={sentinelRef} className="h-1" />
+        )}
       </>
     );
   }
@@ -795,10 +780,16 @@ export const HistorySettings: React.FC = () => {
               <HardDrive className="h-3.5 w-3.5" aria-hidden="true" />
               {t("historyPage.storage")}
             </Button>
-            <OpenRecordingsButton
+            <Button
               onClick={openRecordingsFolder}
-              label={t("settings.history.openFolder")}
-            />
+              variant="secondary"
+              size="sm"
+              className="flex items-center gap-2"
+              title={t("settings.history.openFolder")}
+            >
+              <FolderOpen className="h-4 w-4" />
+              <span>{t("settings.history.openFolder")}</span>
+            </Button>
           </>
         }
       />
@@ -806,14 +797,10 @@ export const HistorySettings: React.FC = () => {
         label={t("settings.history.filters.label")}
         value={filter}
         onChange={setFilter}
-        items={(
-          [
-            ["all", "settings.history.filters.all"],
-            ["recordings", "settings.history.filters.recordings"],
-            ["flow", "settings.history.filters.flow"],
-            ["assistant", "settings.history.filters.assistant"],
-          ] as const
-        ).map(([value, labelKey]) => ({ id: value, label: t(labelKey) }))}
+        items={filters.map((value) => ({
+          id: value,
+          label: t(FILTER_LABEL_KEYS[value]),
+        }))}
       />
       <div className="mt-6">{content}</div>
     </div>
@@ -822,6 +809,7 @@ export const HistorySettings: React.FC = () => {
 
 interface HistoryEntryProps {
   entry: HistoryEntry;
+  kindLabel?: string;
   onToggleSaved: () => void;
   onCopyText: () => void;
   getAudioUrl: (fileName: string) => Promise<string | null>;
@@ -832,13 +820,14 @@ interface HistoryEntryProps {
 }
 
 /**
- * One dictation. The text that was actually pasted comes first, because that
- * is what people come back for; what the recogniser heard before cleanup or
- * Flow rewrote it is one click away rather than stacked on top. The recording
- * loads only when asked for, instead of every row carrying a full-width player.
+ * One dictation, which is its text and nothing else. What the recogniser heard
+ * before cleanup or Flow rewrote it, the recording, and the rest live in the ⋯
+ * menu: they are occasional, and a link, a wand and a label under every row
+ * read as noise in a list that is mostly dictations.
  */
 const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   entry,
+  kindLabel,
   onToggleSaved,
   onCopyText,
   getAudioUrl,
@@ -865,20 +854,6 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const hasDistinctProcessedText =
     processedText !== null &&
     processedText.trim() !== entry.transcription_text.trim();
-  /**
-   * Cleanup ran and deliberately changed nothing.
-   *
-   * `post_processed_text` is present-but-identical in that case, and absent when
-   * cleanup never ran, so the two are distinguishable. With a restrained cleanup
-   * model that returns already-correct dictation byte for byte (the common case,
-   * and the point of a cleanup fine-tune) the feature looked broken every time it
-   * worked perfectly unless the row says so.
-   */
-  const cleanupMadeNoChanges =
-    !dismissed &&
-    !flowEntry &&
-    processedText !== null &&
-    !hasDistinctProcessedText;
   // What was pasted, and what it was made from (when those differ).
   const finalText = flowEntry
     ? processedText
@@ -951,10 +926,6 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     }
   };
 
-  const kindLabel = flowEntry
-    ? t("settings.history.flowLabel")
-    : t("settings.history.recordingLabel");
-  const KindIcon = flowEntry ? Sparkles : Mic;
   const failed = !retrying && !dismissed && finalText === null;
   const copyTitle = t(
     flowEntry && processedText
@@ -965,6 +936,20 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   );
 
   const menuItems: MenuItem[] = [
+    ...(originalText
+      ? [
+          {
+            id: "original",
+            label: showOriginal
+              ? t("historyPage.hideOriginal")
+              : flowEntry
+                ? t("historyPage.showSaid")
+                : t("historyPage.showOriginal"),
+            icon: showOriginal ? EyeOff : Eye,
+            onSelect: () => setShowOriginal((value) => !value),
+          },
+        ]
+      : []),
     {
       id: "play",
       label: audioSrc
@@ -1003,139 +988,77 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     },
   ];
 
-  return (
-    <div className="group px-4 py-3.5 transition-colors hover:bg-surface-muted/70">
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          {retrying && (
-            <style>{`
-              @keyframes transcribe-pulse {
-                0%, 100% { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
-                50% { color: color-mix(in srgb, var(--color-text) 90%, transparent); }
-              }
-            `}</style>
-          )}
-          {dismissed && !retrying ? (
-            // Said plainly and in the same quiet grey as a failed row: a
-            // dismissal is the user's own choice, not an error to flag.
-            <p className="max-w-[75ch] text-sm leading-relaxed text-muted">
-              {t("historyPage.dismissed")}{" "}
-              <button
-                type="button"
-                onClick={() => void handleRecover()}
-                title={t("historyPage.recoverTitle")}
-                className="cursor-pointer rounded text-muted underline decoration-hairline-strong underline-offset-2 transition-colors hover:text-ink hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-              >
-                {t("historyPage.recover")}
-              </button>
-            </p>
-          ) : (
-            <p
-              className={`max-w-[75ch] text-sm leading-relaxed ${
-                retrying
-                  ? ""
-                  : finalText !== null
-                    ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
-                    : "text-muted-soft"
-              }`}
-              style={
-                retrying
-                  ? { animation: "transcribe-pulse 3s ease-in-out infinite" }
-                  : undefined
-              }
+  let body: React.ReactNode;
+  if (retrying) {
+    body = (
+      <p
+        className="text-sm leading-relaxed"
+        style={{ animation: "transcribe-pulse 3s ease-in-out infinite" }}
+      >
+        <style>{`
+          @keyframes transcribe-pulse {
+            0%, 100% { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
+            50% { color: color-mix(in srgb, var(--color-text) 90%, transparent); }
+          }
+        `}</style>
+        {t("settings.history.transcribing")}
+      </p>
+    );
+  } else if (dismissed) {
+    // Said plainly and in the same quiet grey as a failed row: a dismissal is
+    // the user's own choice, not an error to flag.
+    body = (
+      <p className="text-sm leading-relaxed text-muted">
+        {t("historyPage.dismissed")}{" "}
+        <button
+          type="button"
+          onClick={() => void handleRecover()}
+          title={t("historyPage.recoverTitle")}
+          className={INLINE_LINK}
+        >
+          {t("historyPage.recover")}
+        </button>
+      </p>
+    );
+  } else if (finalText !== null) {
+    body = (
+      <p className="max-w-[75ch] cursor-text select-text whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
+        {finalText}
+      </p>
+    );
+  } else if (flowEntry && hasTranscription) {
+    body = (
+      <p className="text-sm leading-relaxed text-muted">
+        {t("settings.history.flowNoOutput")}
+      </p>
+    );
+  } else {
+    body = (
+      <p className="text-sm leading-relaxed text-muted">
+        {t("historyPage.failed")}
+        {failed && (
+          <>
+            {" "}
+            <button
+              type="button"
+              onClick={() => void handleRetranscribe()}
+              className={INLINE_LINK}
             >
-              {retrying
-                ? t("settings.history.transcribing")
-                : finalText !== null
-                  ? finalText
-                  : flowEntry && hasTranscription
-                    ? t("settings.history.flowNoOutput")
-                    : t("historyPage.failed")}
-            </p>
-          )}
+              {t("historyPage.retry")}
+            </button>
+          </>
+        )}
+      </p>
+    );
+  }
 
-          {showOriginal && originalText && (
-            <div className="mt-2.5 rounded-lg border border-hairline bg-canvas px-3 py-2.5">
-              <p className="mb-1 text-xs font-medium text-muted">
-                {t(
-                  flowEntry
-                    ? "settings.history.flowTranscriptLabel"
-                    : "settings.history.originalTranscriptionLabel",
-                )}
-              </p>
-              <p className="select-text whitespace-pre-wrap break-words text-[0.8125rem] leading-relaxed text-body">
-                {originalText}
-              </p>
-            </div>
-          )}
-
-          {/* Time and kind, then at most one action. Cleanup is the wand on the
-              "Show original" link rather than a label of its own — the icon
-              already says it, and a caption per row was most of the clutter. */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-            <span className="tabular-nums">
-              {formatTimeOfDay(entry.timestamp, i18n.language)}
-            </span>
-            <span aria-hidden="true" className="text-muted-soft">
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <KindIcon width={11} height={11} aria-hidden="true" />
-              {kindLabel}
-            </span>
-            {cleanupMadeNoChanges && (
-              <span
-                role="img"
-                aria-label={t("settings.history.cleanupNoChanges")}
-                title={t("settings.history.cleanupNoChanges")}
-                className="inline-flex items-center text-accent"
-              >
-                <Wand2 width={12} height={12} aria-hidden="true" />
-              </span>
-            )}
-            {originalText && (
-              <button
-                type="button"
-                onClick={() => setShowOriginal((value) => !value)}
-                aria-expanded={showOriginal}
-                title={
-                  hasDistinctProcessedText && !flowEntry
-                    ? t("historyPage.cleaned")
-                    : undefined
-                }
-                className="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-              >
-                {!flowEntry && (
-                  <Wand2 width={12} height={12} aria-hidden="true" />
-                )}
-                {showOriginal
-                  ? t("historyPage.hideOriginal")
-                  : flowEntry
-                    ? t("historyPage.showSaid")
-                    : t("historyPage.showOriginal")}
-                <ChevronDown
-                  className={`-ms-0.5 h-3 w-3 transition-transform ${showOriginal ? "rotate-180" : ""}`}
-                  aria-hidden="true"
-                />
-              </button>
-            )}
-            {failed && !(flowEntry && hasTranscription) && (
-              <button
-                type="button"
-                onClick={() => void handleRetranscribe()}
-                className="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-              >
-                <RotateCcw width={11} height={11} aria-hidden="true" />
-                {t("historyPage.retry")}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Copy and a ⋯ menu, shown on hover or focus. The rest — play, save,
-            re-transcribe, delete — are occasional, and five icons on every
-            row read as noise. A saved entry keeps its star in view. */}
-        <div className="flex shrink-0 items-center gap-0.5">
+  return (
+    <RowFrame
+      time={formatTimeOfDay(entry.timestamp, i18n.language)}
+      kindLabel={kindLabel}
+      actions={
+        <>
+          {/* A saved entry keeps its star in view. */}
           {entry.saved && (
             <IconButton
               onClick={onToggleSaved}
@@ -1146,7 +1069,7 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
               <Star width={14} height={14} fill="currentColor" />
             </IconButton>
           )}
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+          <div className={REVEAL_ON_HOVER}>
             <IconButton
               onClick={handleCopyText}
               disabled={!hasCopyableText || retrying}
@@ -1176,20 +1099,39 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
               )}
             </MenuButton>
           </div>
+        </>
+      }
+    >
+      {body}
+
+      {showOriginal && originalText && (
+        <div className="mt-2.5 max-w-[75ch] rounded-lg border border-hairline bg-canvas px-3 py-2.5">
+          <p className="mb-1 text-xs font-medium text-muted">
+            {t(
+              flowEntry
+                ? "settings.history.flowTranscriptLabel"
+                : "settings.history.originalTranscriptionLabel",
+            )}
+          </p>
+          <p className="select-text whitespace-pre-wrap break-words text-[0.8125rem] leading-relaxed text-body">
+            {originalText}
+          </p>
         </div>
-      </div>
+      )}
 
       {audioSrc && (
         <AudioPlayer src={audioSrc} autoPlay className="mt-2.5 w-full" />
       )}
-    </div>
+    </RowFrame>
   );
 };
 
 interface AssistantHistoryEntryProps {
   session: AssistantHistorySummary;
+  kindLabel?: string;
   expanded: boolean;
   onToggleExpand: () => void;
+  onCopyText: (text: string) => Promise<void>;
   onCopyConversation: (messages: ChatMessage[]) => void;
   onDelete: () => Promise<void>;
   onResume: () => void;
@@ -1206,16 +1148,31 @@ const fetchConversationMessages = async (
   return result.data?.messages ?? null;
 };
 
+/** The answer a quick ask got: its last reply, as stored. */
+const lastAnswer = (messages: ChatMessage[]): string | null => {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") {
+      return cleanMessageContent(messages[i].content).text || null;
+    }
+  }
+  return null;
+};
+
 /**
- * Assistant conversations render as collapsible entries: a header with the
- * date and an "Assistant" badge, a one-line preview when collapsed, and the
- * full turn-by-turn transcript when expanded. No audio or re-transcribe
- * controls — these are chats, not recordings.
+ * One quick ask or one call.
+ *
+ * A quick ask is a question and its answer, so the row is the question and the
+ * start of the answer; opening it shows the whole answer. A call is a
+ * conversation, so the row is how it began and how long it ran; opening it
+ * shows the thread. Neither repeats what it is on every row — the tab already
+ * says, and the "All" list names it in the time column.
  */
 const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
   session,
+  kindLabel,
   expanded,
   onToggleExpand,
+  onCopyText,
   onCopyConversation,
   onDelete,
   onResume,
@@ -1227,6 +1184,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
   // conversation gains a turn while open, and let go on collapse, so the page
   // never accumulates every thread it has shown.
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  const isCall = session.kind === "call";
 
   useEffect(() => {
     if (!expanded) {
@@ -1247,15 +1205,23 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
     };
   }, [expanded, session.id, session.updated_at, session.message_count]);
 
-  const formattedDate = formatTimeOfDay(session.updated_at, i18n.language);
+  const flashCopied = () => {
+    setShowCopied(true);
+    setTimeout(() => setShowCopied(false), 2000);
+  };
 
   const handleCopy = async () => {
     try {
       const loaded = messages ?? (await fetchConversationMessages(session.id));
       if (!loaded) return;
-      onCopyConversation(loaded);
-      setShowCopied(true);
-      setTimeout(() => setShowCopied(false), 2000);
+      if (isCall) {
+        onCopyConversation(loaded);
+      } else {
+        const answer = lastAnswer(loaded);
+        if (!answer) return;
+        await onCopyText(answer);
+      }
+      flashCopied();
     } catch (error) {
       console.error("Failed to copy assistant conversation:", error);
     }
@@ -1270,17 +1236,23 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
     }
   };
 
+  const canCopy = isCall || session.preview !== null;
+  const copyLabel = isCall
+    ? t("settings.history.copyConversation")
+    : t("settings.history.copyAnswer");
+
   const menuItems: MenuItem[] = [
     {
       id: "continue",
-      label: t("historyPage.chat.continueTitle"),
+      label: t("historyPage.chat.continueInCall"),
       icon: ArrowUpRight,
       onSelect: onResume,
     },
     {
       id: "copy",
-      label: t("settings.history.copyConversation"),
+      label: copyLabel,
       icon: Copy,
+      disabled: !canCopy,
       onSelect: () => void handleCopy(),
     },
     {
@@ -1293,64 +1265,36 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
     },
   ];
 
+  // A quick ask that grew past one exchange (possible before calls owned
+  // follow-ups) reads as a thread, like a call.
+  const showAsThread = isCall || (messages !== null && messages.length > 2);
+
   return (
-    <div className="group flex flex-col gap-1.5 px-4 py-3.5 transition-colors hover:bg-surface-muted/70">
-      {/* The question, and the way back into the chat. Clicking the question
-          opens it: a past conversation is something you pick up again, not a
-          transcript to copy. The same two quiet actions as a dictation sit on
-          the right, shown on hover. */}
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onResume}
-            title={t("historyPage.chat.continueTitle")}
-            className="block w-full cursor-pointer rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          >
-            <span
-              className={`block break-words text-sm leading-relaxed text-ink transition-colors group-hover:text-accent ${
-                expanded ? "" : "line-clamp-2"
-              }`}
+    <RowFrame
+      time={formatTimeOfDay(session.updated_at, i18n.language)}
+      kindLabel={kindLabel}
+      actions={
+        <div className={REVEAL_ON_HOVER}>
+          {isCall ? (
+            <IconButton
+              onClick={onResume}
+              title={t("historyPage.chat.continueInCall")}
             >
-              {session.title}
-            </span>
-          </button>
-
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-            <span className="tabular-nums">{formattedDate}</span>
-            <span aria-hidden="true" className="text-muted-soft">
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <MessageCircle width={11} height={11} aria-hidden="true" />
-              {t("settings.history.assistantLabel")}
-            </span>
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              aria-expanded={expanded}
-              className="inline-flex cursor-pointer items-center gap-0.5 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              <ArrowUpRight width={15} height={15} />
+            </IconButton>
+          ) : (
+            <IconButton
+              onClick={() => void handleCopy()}
+              disabled={!canCopy}
+              title={copyLabel}
             >
-              {expanded
-                ? t("historyPage.chat.hideMessages")
-                : t("settings.history.messageCount", {
-                    count: session.message_count,
-                  })}
-              <ChevronDown
-                className={`h-3 w-3 transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
-          <IconButton
-            onClick={onResume}
-            title={t("historyPage.chat.continueTitle")}
-          >
-            <ArrowUpRight width={15} height={15} />
-          </IconButton>
+              {showCopied ? (
+                <Check width={14} height={14} className="text-success" />
+              ) : (
+                <Copy width={14} height={14} />
+              )}
+            </IconButton>
+          )}
           <MenuButton
             items={menuItems}
             width={240}
@@ -1358,104 +1302,239 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
             title={t("historyPage.more")}
             className={ICON_BUTTON}
           >
-            {showCopied ? (
+            {isCall && showCopied ? (
               <Check width={14} height={14} className="text-success" />
             ) : (
               <MoreHorizontal width={15} height={15} />
             )}
           </MenuButton>
         </div>
-      </div>
+      }
+    >
+      {/* The whole summary opens the row. Picking a conversation back up is in
+          the actions; reading it again is what a click on it is for. */}
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        aria-expanded={expanded}
+        className="block w-full max-w-[75ch] cursor-pointer rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      >
+        <span
+          className={`block break-words text-sm leading-relaxed text-ink ${
+            expanded ? "" : "line-clamp-2"
+          }`}
+        >
+          {session.title.trim() || t("assistant.conversation.history.untitled")}
+        </span>
+        {!isCall && !expanded && session.preview && (
+          <span className="mt-0.5 line-clamp-2 block break-words text-[0.8125rem] leading-relaxed text-muted">
+            {session.preview}
+          </span>
+        )}
+        {isCall && (
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+            <span>
+              {t("settings.history.messageCount", {
+                count: session.message_count,
+              })}
+            </span>
+            {session.meeting_id !== null && (
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Users width={11} height={11} aria-hidden="true" />
+                <span className="truncate">
+                  {session.meeting_title?.trim() ||
+                    t("assistant.conversation.meeting.untitled")}
+                </span>
+              </span>
+            )}
+          </span>
+        )}
+      </button>
 
       {expanded && messages === null && (
         <div
-          className="h-9 animate-pulse rounded-xl bg-surface-strong/60"
+          className="mt-2 h-9 animate-pulse rounded-xl bg-surface-strong/60"
           aria-busy="true"
         />
       )}
 
-      {expanded && messages !== null && (
-        <div className="flex flex-col gap-2 pt-1.5">
-          {messages.map((message, index) => {
-            const { text, screenshot, files } = cleanMessageContent(
-              message.content,
-            );
-            const isUser = message.role === "user";
-            const thumbnails = message.images ?? [];
-            return (
-              <div
-                key={index}
-                className={`group/msg flex items-center gap-1.5 ${isUser ? "justify-end" : "justify-start"}`}
-              >
-                {/* Branch from here. Placed on the message rather than the
-                    conversation because the point is to pick the moment to diverge
-                    from. Reveals on hover so a long thread stays readable.
-                    Non-destructive: this copies the thread up to this message into a
-                    new conversation and leaves this one exactly as it is. */}
-                {isUser && (
-                  <button
-                    onClick={() => onBranch(index)}
-                    title={t("settings.history.branchConversation")}
-                    aria-label={t("settings.history.branchConversation")}
-                    className="shrink-0 rounded-md p-1 text-muted-soft opacity-0 transition-opacity duration-150 hover:bg-surface-strong hover:text-ink focus-visible:opacity-100 group-hover/msg:opacity-100"
-                  >
-                    <GitBranch width={13} height={13} />
-                  </button>
-                )}
-                <div
-                  className={
-                    isUser
-                      ? "max-w-[85%] rounded-xl rounded-br-sm bg-accent px-3 py-2 text-[13px] leading-relaxed text-on-primary select-text whitespace-pre-wrap break-words"
-                      : "max-w-[85%] rounded-xl rounded-bl-sm bg-surface-strong px-3 py-2 text-[13px] leading-relaxed text-ink select-text break-words"
-                  }
-                >
-                  {isUser ? (
-                    text
-                  ) : (
-                    <ReactMarkdown components={assistantMarkdown}>
-                      {text}
-                    </ReactMarkdown>
-                  )}
-                  {thumbnails.length > 0 ? (
-                    <HistoryThumbnails
-                      urls={thumbnails}
-                      hasScreen={screenshot}
-                      isUser={isUser}
-                      screenLabel={t("settings.history.screenshotAttached")}
-                    />
-                  ) : (
-                    screenshot && (
-                      <span
-                        className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          isUser
-                            ? "bg-on-primary/20 text-on-primary/90"
-                            : "bg-mid-gray/15 text-muted"
-                        }`}
-                      >
-                        <Camera width={10} height={10} />
-                        {t("settings.history.screenshotAttached")}
-                      </span>
-                    )
-                  )}
-                  {files.map((name) => (
-                    <span
-                      key={name}
-                      className={`mt-1.5 me-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        isUser
-                          ? "bg-on-primary/20 text-on-primary/90"
-                          : "bg-mid-gray/15 text-muted"
-                      }`}
-                    >
-                      <FileText width={10} height={10} />
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+      {expanded &&
+        messages !== null &&
+        (showAsThread ? (
+          <ConversationThread messages={messages} onBranch={onBranch} />
+        ) : (
+          <AskAnswer messages={messages} title={session.title} />
+        ))}
+    </RowFrame>
+  );
+};
+
+/** Chips for what rode along with a user message: a selection, files. */
+const AttachmentChips: React.FC<{
+  selectionChars: number;
+  files: string[];
+  onAccent: boolean;
+}> = ({ selectionChars, files, onAccent }) => {
+  const { t } = useTranslation();
+  const chip = `mt-1.5 me-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+    onAccent
+      ? "bg-on-primary/20 text-on-primary/90"
+      : "bg-mid-gray/15 text-muted"
+  }`;
+  return (
+    <>
+      {selectionChars > 0 && (
+        <span className={chip}>
+          <TextSelect width={10} height={10} />
+          {t("assistant.selectionAttached", { count: selectionChars })}
+        </span>
+      )}
+      {files.map((name) => (
+        <span key={name} className={chip}>
+          <FileText width={10} height={10} />
+          {name}
+        </span>
+      ))}
+    </>
+  );
+};
+
+/**
+ * An opened quick ask: what it was asked about, then the answer. The question
+ * is already the row's title, so it is repeated only when the title had to be
+ * cut short.
+ */
+const AskAnswer: React.FC<{ messages: ChatMessage[]; title: string }> = ({
+  messages,
+  title,
+}) => {
+  const { t } = useTranslation();
+  const question = messages.find((m) => m.role === "user");
+  const asked = question ? cleanMessageContent(question.content) : null;
+  const answer = lastAnswer(messages);
+  const thumbnails = question?.images ?? [];
+  const showQuestion =
+    asked !== null && asked.text !== "" && title.trimEnd().endsWith("…");
+
+  return (
+    <div className="mt-2 max-w-[75ch]">
+      {showQuestion && (
+        <p className="mb-2 select-text whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
+          {asked.text}
+        </p>
+      )}
+      {asked && (asked.selectionChars > 0 || asked.files.length > 0) && (
+        <div className="-mt-1 mb-1">
+          <AttachmentChips
+            selectionChars={asked.selectionChars}
+            files={asked.files}
+            onAccent={false}
+          />
         </div>
       )}
+      {thumbnails.length > 0 && (
+        <div className="mb-2">
+          <HistoryThumbnails
+            urls={thumbnails}
+            hasScreen={asked?.screenshot}
+            isUser={false}
+            screenLabel={t("settings.history.screenshotAttached")}
+          />
+        </div>
+      )}
+      {answer ? (
+        <div className="select-text break-words text-[0.8125rem] leading-relaxed text-body">
+          <ReactMarkdown components={assistantMarkdown}>{answer}</ReactMarkdown>
+        </div>
+      ) : (
+        <p className="text-[0.8125rem] text-muted">
+          {t("settings.history.noAnswer")}
+        </p>
+      )}
+    </div>
+  );
+};
+
+/** An opened call: the turn-by-turn transcript, with a branch point on each
+ *  of the user's messages. */
+const ConversationThread: React.FC<{
+  messages: ChatMessage[];
+  onBranch: (messageIndex: number) => void;
+}> = ({ messages, onBranch }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-2 pt-2.5">
+      {messages.map((message, index) => {
+        const { text, screenshot, files, selectionChars } = cleanMessageContent(
+          message.content,
+        );
+        const isUser = message.role === "user";
+        const thumbnails = message.images ?? [];
+        return (
+          <div
+            key={index}
+            className={`group/msg flex items-center gap-1.5 ${isUser ? "justify-end" : "justify-start"}`}
+          >
+            {/* Branch from here. Placed on the message rather than the
+                conversation because the point is to pick the moment to diverge
+                from. Reveals on hover so a long thread stays readable.
+                Non-destructive: this copies the thread up to this message into a
+                new conversation and leaves this one exactly as it is. */}
+            {isUser && (
+              <button
+                type="button"
+                onClick={() => onBranch(index)}
+                title={t("settings.history.branchConversation")}
+                aria-label={t("settings.history.branchConversation")}
+                className="shrink-0 rounded-md p-1 text-muted-soft opacity-0 transition-opacity duration-150 hover:bg-surface-strong hover:text-ink focus-visible:opacity-100 group-hover/msg:opacity-100"
+              >
+                <GitBranch width={13} height={13} />
+              </button>
+            )}
+            <div
+              className={
+                isUser
+                  ? "max-w-[85%] rounded-xl rounded-br-sm bg-accent px-3 py-2 text-[13px] leading-relaxed text-on-primary select-text whitespace-pre-wrap break-words"
+                  : "max-w-[85%] rounded-xl rounded-bl-sm bg-surface-strong px-3 py-2 text-[13px] leading-relaxed text-ink select-text break-words"
+              }
+            >
+              {isUser ? (
+                text
+              ) : (
+                <ReactMarkdown components={assistantMarkdown}>
+                  {text}
+                </ReactMarkdown>
+              )}
+              {thumbnails.length > 0 ? (
+                <HistoryThumbnails
+                  urls={thumbnails}
+                  hasScreen={screenshot}
+                  isUser={isUser}
+                  screenLabel={t("settings.history.screenshotAttached")}
+                />
+              ) : (
+                screenshot && (
+                  <span
+                    className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      isUser
+                        ? "bg-on-primary/20 text-on-primary/90"
+                        : "bg-mid-gray/15 text-muted"
+                    }`}
+                  >
+                    <Camera width={10} height={10} />
+                    {t("settings.history.screenshotAttached")}
+                  </span>
+                )
+              )}
+              <AttachmentChips
+                selectionChars={selectionChars}
+                files={files}
+                onAccent={isUser}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };

@@ -4087,7 +4087,11 @@ meetings_only?: boolean;
 /**
  * Only conversations about this meeting.
  */
-meeting_id: number | null }
+meeting_id: number | null; 
+/**
+ * Only quick asks, or only calls.
+ */
+kind?: ConversationKind | null }
 /**
  * One row of the conversation list: what a list row shows, without the
  * messages. Messages carry base64 screenshot thumbnails and the History page
@@ -4111,7 +4115,16 @@ title: string; message_count: number;
 /**
  * The meeting this conversation discusses, when it was started from one.
  */
-meeting_id: number | null; meeting_title: string | null }
+meeting_id: number | null; meeting_title: string | null; 
+/**
+ * The quick ask or a call.
+ */
+kind: ConversationKind; 
+/**
+ * The start of the answer, as plain text, for a quick ask. `None` for a
+ * call, and for an ask that never got an answer.
+ */
+preview: string | null }
 /**
  * Desired length of the assistant's replies. Appended as a directive to the
  * system prompt at request time, so it works with the single main prompt
@@ -4353,6 +4366,12 @@ export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missi
  * The provider's endpoint is the user's own resource and none is set.
  */
 "missing_endpoint"
+/**
+ * Where a conversation happened. The quick ask is one question and one answer;
+ * a call is a back-and-forth conversation. History lists them separately and
+ * the call's own history shows only calls.
+ */
+export type ConversationKind = "ask" | "call"
 /**
  * How long the assistant waits for you to finish speaking before it treats an
  * utterance as a complete turn, in a hands-free voice conversation.

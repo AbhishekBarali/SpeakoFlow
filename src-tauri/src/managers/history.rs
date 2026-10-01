@@ -83,6 +83,25 @@ static MIGRATIONS: &[M] = &[
         "ALTER TABLE assistant_history ADD COLUMN meeting_id INTEGER;
          ALTER TABLE assistant_history ADD COLUMN meeting_title TEXT;",
     ),
+    // Which surface a conversation came from: the quick ask (one question, one
+    // answer) or a call. They were one undifferentiated list, so History showed
+    // every one-line question as an "Assistant chat" beside hour-long calls, and
+    // the call's own history listed every quick ask.
+    //
+    // Nothing recorded the surface before this column, so existing rows are
+    // classified by what only a call produces: a meeting link ("Discuss in a
+    // call"), a reply cut off by speech, or more than one exchange. A quick ask
+    // has had no follow-up field for several releases, so a longer thread is a
+    // call unless it began with a selection, which only the quick ask captures.
+    M::up(
+        "ALTER TABLE assistant_history ADD COLUMN kind TEXT NOT NULL DEFAULT 'ask';
+         UPDATE assistant_history SET kind = 'call'
+         WHERE meeting_id IS NOT NULL
+            OR instr(messages, '[Voice reply interrupted') > 0
+            OR (json_valid(messages)
+                AND json_array_length(messages) > 2
+                AND instr(messages, '<selected_text>') = 0);",
+    ),
 ];
 
 /// Every `transcription_history` column [`HistoryManager::map_history_entry`]
@@ -120,6 +139,34 @@ pub struct AssistantHistoryEntry {
     pub meeting_title: Option<String>,
 }
 
+/// Where a conversation happened. The quick ask is one question and one answer;
+/// a call is a back-and-forth conversation. History lists them separately and
+/// the call's own history shows only calls.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum ConversationKind {
+    #[default]
+    Ask,
+    Call,
+}
+
+impl ConversationKind {
+    fn as_db(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Call => "call",
+        }
+    }
+
+    fn from_db(value: &str) -> Self {
+        if value == "call" {
+            Self::Call
+        } else {
+            Self::Ask
+        }
+    }
+}
+
 /// One row of the conversation list: what a list row shows, without the
 /// messages. Messages carry base64 screenshot thumbnails and the History page
 /// reloads its list after every assistant turn, so listing whole conversations
@@ -138,6 +185,11 @@ pub struct AssistantHistorySummary {
     /// The meeting this conversation discusses, when it was started from one.
     pub meeting_id: Option<i64>,
     pub meeting_title: Option<String>,
+    /// The quick ask or a call.
+    pub kind: ConversationKind,
+    /// The start of the answer, as plain text, for a quick ask. `None` for a
+    /// call, and for an ask that never got an answer.
+    pub preview: Option<String>,
 }
 
 /// Which conversations a list asks for. Every field narrows; the default is all.
@@ -150,6 +202,9 @@ pub struct AssistantHistoryFilter {
     pub meetings_only: bool,
     /// Only conversations about this meeting.
     pub meeting_id: Option<i64>,
+    /// Only quick asks, or only calls.
+    #[serde(default)]
+    pub kind: Option<ConversationKind>,
 }
 
 /// The meeting a conversation is saved against.
@@ -732,6 +787,13 @@ impl HistoryManager {
             Ok(0) => {}
             Ok(counted) => info!("Backfilled usage stats from {} history entries", counted),
             Err(e) => error!("Usage stats backfill failed: {}", e),
+        }
+
+        // Cosmetic, so a failure is logged and the launch carries on.
+        match Self::repair_assistant_titles(&conn) {
+            Ok(0) => {}
+            Ok(repaired) => info!("Repaired {} assistant conversation titles", repaired),
+            Err(e) => error!("Assistant title repair failed: {}", e),
         }
 
         Ok(())
@@ -1380,18 +1442,58 @@ impl HistoryManager {
             .find(|m| m.role == "user")
             .map(|m| m.content.as_str())
             .unwrap_or("");
-        // Stored user messages may carry the screenshot marker; drop it.
-        let cleaned = raw.replace(crate::assistant::SCREENSHOT_MARKER, "");
-        let trimmed = cleaned.trim();
-        if trimmed.is_empty() {
+        let text = user_request_text(raw);
+        if text.is_empty() {
             return "Conversation".to_string();
         }
-        let title: String = trimmed.chars().take(80).collect();
-        if trimmed.chars().count() > 80 {
-            format!("{}…", title)
-        } else {
-            title
+        truncate_chars(&text, 80)
+    }
+
+    /// Re-derive titles that were saved with the app's own scaffolding in them.
+    ///
+    /// Titles used to be the first 80 characters of the stored message, which
+    /// for a question about a selection is the selection's lead-in sentence, so
+    /// History showed "The user has this text selected in another application:
+    /// <selected_text> …" instead of what was asked. Only rows that still carry
+    /// that scaffolding are touched, so this is idempotent and cheap on launch.
+    fn repair_assistant_titles(conn: &Connection) -> Result<usize> {
+        let rows: Vec<(i64, String, String)> = {
+            let mut stmt = conn.prepare(
+                "SELECT id, title, messages FROM assistant_history
+                 WHERE instr(title, ?1) > 0
+                    OR instr(title, ?2) > 0
+                    OR instr(title, ?3) > 0
+                    OR instr(title, ?4) > 0
+                    OR instr(title, ?5) > 0",
+            )?;
+            let rows = stmt
+                .query_map(
+                    params![
+                        crate::assistant::SELECTION_LEAD_IN,
+                        crate::assistant::SELECTION_OPEN,
+                        crate::assistant::IMAGE_MARKER,
+                        crate::assistant::FILE_MARKER_PREFIX,
+                        crate::voice_conversation::INTERRUPTED_MARKER,
+                    ],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            rows
+        };
+        let mut repaired = 0;
+        for (id, title, messages_json) in rows {
+            let messages =
+                serde_json::from_str::<Vec<ChatMessage>>(&messages_json).unwrap_or_default();
+            let fixed = Self::derive_assistant_title(&messages);
+            if fixed != title {
+                conn.execute(
+                    "UPDATE assistant_history SET title = ?1 WHERE id = ?2",
+                    params![fixed, id],
+                )?;
+                repaired += 1;
+            }
         }
+        Ok(repaired)
     }
 
     /// Insert a new assistant conversation row and return it.
@@ -1399,6 +1501,7 @@ impl HistoryManager {
         &self,
         messages: &[ChatMessage],
         meeting: Option<MeetingLink<'_>>,
+        kind: ConversationKind,
     ) -> Result<AssistantHistoryEntry> {
         let now = Utc::now().timestamp();
         let title = Self::derive_assistant_title(messages);
@@ -1409,9 +1512,17 @@ impl HistoryManager {
         let conn = self.get_connection()?;
         conn.execute(
             "INSERT INTO assistant_history
-                 (timestamp, updated_at, title, messages, meeting_id, meeting_title)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![now, now, &title, &messages_json, meeting_id, &meeting_title],
+                 (timestamp, updated_at, title, messages, meeting_id, meeting_title, kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                now,
+                now,
+                &title,
+                &messages_json,
+                meeting_id,
+                &meeting_title,
+                kind.as_db()
+            ],
         )?;
         let id = conn.last_insert_rowid();
 
@@ -1437,11 +1548,16 @@ impl HistoryManager {
     /// `meeting` only ever sets the link. `None` leaves a stored one alone, so a
     /// conversation whose meeting could not be restored (deleted since) still
     /// says, in History, what it was about.
+    ///
+    /// `kind` only ever upgrades a quick ask to a call: a quick ask continued in
+    /// a call has become a conversation, while a call that a later save sees with
+    /// no call running (the hang-up's own bookkeeping) is still a call.
     pub fn update_assistant_session(
         &self,
         id: i64,
         messages: &[ChatMessage],
         meeting: Option<MeetingLink<'_>>,
+        kind: ConversationKind,
     ) -> Result<Option<AssistantHistoryEntry>> {
         let now = Utc::now().timestamp();
         let title = Self::derive_assistant_title(messages);
@@ -1452,7 +1568,8 @@ impl HistoryManager {
             "UPDATE assistant_history
              SET updated_at = ?1, title = ?2, messages = ?3,
                  meeting_id = COALESCE(?5, meeting_id),
-                 meeting_title = COALESCE(?6, meeting_title)
+                 meeting_title = COALESCE(?6, meeting_title),
+                 kind = CASE WHEN ?7 = 'call' THEN 'call' ELSE kind END
              WHERE id = ?4",
             params![
                 now,
@@ -1460,7 +1577,8 @@ impl HistoryManager {
                 &messages_json,
                 id,
                 meeting.map(|m| m.id),
-                meeting.map(|m| m.title)
+                meeting.map(|m| m.title),
+                kind.as_db()
             ],
         )?;
 
@@ -1502,12 +1620,28 @@ impl HistoryManager {
     /// The count is taken in SQL so the messages never leave the database.
     /// Malformed JSON counts as an empty conversation instead of failing the
     /// whole list, the same leniency `map_assistant_entry` applies.
+    ///
+    /// The preview is the head of the first answer, for quick asks only: a
+    /// call's first answer says nothing about the call, and skipping calls keeps
+    /// the long threads from being walked a second time on every reload.
     const SUMMARY_COLUMNS: &'static str =
-        "id, timestamp, updated_at, title, meeting_id, meeting_title,
+        "id, timestamp, updated_at, title, meeting_id, meeting_title, kind,
         CASE WHEN json_valid(messages) THEN json_array_length(messages) ELSE 0 END
-            AS message_count";
+            AS message_count,
+        CASE WHEN kind = 'ask' THEN (
+            SELECT substr(json_extract(m.value, '$.content'), 1, 600)
+            FROM json_each(
+                CASE WHEN json_valid(messages) AND json_type(messages) = 'array'
+                    THEN messages ELSE '[]' END
+            ) AS m
+            WHERE CASE WHEN m.type = 'object'
+                THEN json_extract(m.value, '$.role') END = 'assistant'
+            LIMIT 1
+        ) END AS preview";
 
     fn map_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<AssistantHistorySummary> {
+        let kind: String = row.get("kind")?;
+        let preview: Option<String> = row.get("preview")?;
         Ok(AssistantHistorySummary {
             id: row.get("id")?,
             timestamp: row.get("timestamp")?,
@@ -1516,6 +1650,8 @@ impl HistoryManager {
             message_count: row.get("message_count")?,
             meeting_id: row.get("meeting_id")?,
             meeting_title: row.get("meeting_title")?,
+            kind: ConversationKind::from_db(&kind),
+            preview: preview.as_deref().and_then(answer_preview),
         })
     }
 
@@ -1577,6 +1713,10 @@ impl HistoryManager {
 
         if filter.meetings_only {
             clauses.push("meeting_id IS NOT NULL".to_string());
+        }
+        if let Some(kind) = filter.kind {
+            values.push(Box::new(kind.as_db()));
+            clauses.push(format!("kind = ?{}", values.len()));
         }
         if let Some(meeting_id) = filter.meeting_id {
             values.push(Box::new(meeting_id));
@@ -1664,6 +1804,117 @@ impl HistoryManager {
             params![Self::ASSISTANT_SESSION_CAP],
         )?;
         Ok(())
+    }
+}
+
+/// What the user actually asked, from a stored user message.
+///
+/// A stored message carries scaffolding the model needs and a person does not:
+/// the lead-in and delimiters around a selection, the "their request" prefix,
+/// attachment markers, and the barge-in note. The selection itself is dropped
+/// too, because the request is what identifies the conversation ("translate this
+/// to Nepali"); only a selection asked about with no words at all falls back to
+/// the selected text.
+fn user_request_text(content: &str) -> String {
+    use crate::assistant::{
+        FILE_MARKER_PREFIX, IMAGE_MARKER, SCREENSHOT_MARKER, SELECTION_CLOSE, SELECTION_LEAD_IN,
+        SELECTION_OPEN, SELECTION_REQUEST_PREFIX,
+    };
+    let mut request: Vec<&str> = Vec::new();
+    let mut selection: Vec<&str> = Vec::new();
+    let mut in_selection = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed == SELECTION_OPEN {
+            in_selection = true;
+            continue;
+        }
+        if trimmed == SELECTION_CLOSE {
+            in_selection = false;
+            continue;
+        }
+        if in_selection {
+            if !trimmed.is_empty() {
+                selection.push(trimmed);
+            }
+            continue;
+        }
+        if trimmed == SELECTION_LEAD_IN
+            || trimmed == SCREENSHOT_MARKER
+            || trimmed == IMAGE_MARKER
+            || trimmed == crate::voice_conversation::INTERRUPTED_MARKER
+            || (trimmed.starts_with(FILE_MARKER_PREFIX) && trimmed.ends_with(']'))
+        {
+            continue;
+        }
+        let trimmed = trimmed
+            .strip_prefix(SELECTION_REQUEST_PREFIX.trim_end())
+            .map(str::trim_start)
+            .unwrap_or(trimmed);
+        if !trimmed.is_empty() {
+            request.push(trimmed);
+        }
+    }
+    let words = if request.is_empty() {
+        selection
+    } else {
+        request
+    };
+    words
+        .join(" ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// `text` cut to at most `max` characters, with an ellipsis when it was cut.
+fn truncate_chars(text: &str, max: usize) -> String {
+    if text.chars().count() <= max {
+        return text.to_string();
+    }
+    let cut: String = text.chars().take(max).collect();
+    format!("{}…", cut.trim_end())
+}
+
+/// Longest answer preview a list row receives. Rows clamp to two lines; this
+/// only bounds what crosses the IPC boundary.
+const PREVIEW_CHARS: usize = 240;
+
+/// The head of an answer as one line of plain text, for a History row.
+///
+/// Answers are markdown, and a row is not the place to render it: headings,
+/// list bullets, emphasis and code fences become plain words, and the barge-in
+/// note (which only a call writes) is dropped. `None` when nothing readable is
+/// left.
+fn answer_preview(raw: &str) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    for line in raw.lines() {
+        let mut line = line.trim();
+        if line.is_empty()
+            || line.starts_with("```")
+            || line == crate::voice_conversation::INTERRUPTED_MARKER
+        {
+            continue;
+        }
+        line = line.trim_start_matches(['#', '>']).trim_start();
+        for bullet in ["- ", "* ", "+ "] {
+            if let Some(rest) = line.strip_prefix(bullet) {
+                line = rest;
+                break;
+            }
+        }
+        let cleaned = line.replace("**", "").replace("__", "").replace('`', "");
+        let cleaned = cleaned.trim();
+        if !cleaned.is_empty() {
+            parts.push(cleaned.to_string());
+        }
+    }
+    let joined = parts.join(" ");
+    let collapsed = joined.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        None
+    } else {
+        Some(truncate_chars(&collapsed, PREVIEW_CHARS))
     }
 }
 
@@ -2728,5 +2979,268 @@ mod tests {
         let rest = HistoryManager::filtered_summaries_with_conn(&conn, &filter, 2, 2).unwrap();
         assert!(!rest.has_more);
         assert_eq!(ids(&rest), vec![newest_row]);
+    }
+
+    // ---- quick asks and calls ----
+
+    fn message(role: &str, content: &str) -> ChatMessage {
+        ChatMessage {
+            role: role.into(),
+            content: content.into(),
+            images: Vec::new(),
+        }
+    }
+
+    fn kind_of(conn: &Connection, id: i64) -> String {
+        conn.query_row(
+            "SELECT kind FROM assistant_history WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .expect("read kind")
+    }
+
+    /// Rows saved before the column existed are sorted by what only a call
+    /// produces. Run against the schema one migration short of current.
+    #[test]
+    fn existing_conversations_are_classified_when_the_kind_column_arrives() {
+        let mut conn = Connection::open_in_memory().expect("open db");
+        let before_kind = MIGRATIONS.len() - 1;
+        Migrations::new(MIGRATIONS[..before_kind].to_vec())
+            .to_latest(&mut conn)
+            .expect("migrate to the version before kind");
+
+        let insert = |messages: &[ChatMessage], meeting: Option<i64>| -> i64 {
+            conn.execute(
+                "INSERT INTO assistant_history (timestamp, updated_at, title, messages, meeting_id)
+                 VALUES (1, 1, 't', ?1, ?2)",
+                params![serde_json::to_string(messages).unwrap(), meeting],
+            )
+            .expect("insert legacy conversation");
+            conn.last_insert_rowid()
+        };
+        let one_exchange = insert(
+            &[message("user", "hi"), message("assistant", "hello")],
+            None,
+        );
+        let unanswered = insert(&[message("user", "hi")], None);
+        let long_thread = insert(
+            &[
+                message("user", "a"),
+                message("assistant", "b"),
+                message("user", "c"),
+                message("assistant", "d"),
+            ],
+            None,
+        );
+        let barged_in = insert(
+            &[
+                message("user", "a"),
+                message(
+                    "assistant",
+                    &format!("b\n{}", crate::voice_conversation::INTERRUPTED_MARKER),
+                ),
+            ],
+            None,
+        );
+        let about_meeting = insert(&[message("user", "recap")], Some(4));
+        let selection_follow_ups = insert(
+            &[
+                message(
+                    "user",
+                    &crate::assistant::compose_selection_request("text", "shorter"),
+                ),
+                message("assistant", "b"),
+                message("user", "again"),
+            ],
+            None,
+        );
+
+        Migrations::new(MIGRATIONS.to_vec())
+            .to_latest(&mut conn)
+            .expect("apply the kind migration");
+
+        assert_eq!(kind_of(&conn, one_exchange), "ask");
+        assert_eq!(kind_of(&conn, unanswered), "ask");
+        assert_eq!(kind_of(&conn, selection_follow_ups), "ask");
+        assert_eq!(kind_of(&conn, long_thread), "call");
+        assert_eq!(kind_of(&conn, barged_in), "call");
+        assert_eq!(kind_of(&conn, about_meeting), "call");
+    }
+
+    #[test]
+    fn the_list_filters_by_kind_and_reports_it() {
+        let conn = migrated_conn();
+        let ask = insert_conversation(&conn, 1_000, "[]");
+        let call = insert_conversation(&conn, 2_000, "[]");
+        conn.execute(
+            "UPDATE assistant_history SET kind = 'call' WHERE id = ?1",
+            params![call],
+        )
+        .unwrap();
+
+        let all = HistoryManager::filtered_summaries_with_conn(
+            &conn,
+            &AssistantHistoryFilter::default(),
+            0,
+            10,
+        )
+        .unwrap();
+        assert_eq!(ids(&all), vec![call, ask]);
+        assert_eq!(all.entries[0].kind, ConversationKind::Call);
+        assert_eq!(all.entries[1].kind, ConversationKind::Ask);
+
+        let calls = AssistantHistoryFilter {
+            kind: Some(ConversationKind::Call),
+            ..Default::default()
+        };
+        let page = HistoryManager::filtered_summaries_with_conn(&conn, &calls, 0, 10).unwrap();
+        assert_eq!(ids(&page), vec![call]);
+
+        let asks = AssistantHistoryFilter {
+            kind: Some(ConversationKind::Ask),
+            ..Default::default()
+        };
+        let page = HistoryManager::filtered_summaries_with_conn(&conn, &asks, 0, 10).unwrap();
+        assert_eq!(ids(&page), vec![ask]);
+    }
+
+    /// The filter arrives from the webview as JSON, and the call bar's older
+    /// shape has no `kind` at all.
+    #[test]
+    fn a_filter_without_kind_still_deserializes() {
+        let filter: AssistantHistoryFilter =
+            serde_json::from_str(r#"{"query":null,"meeting_id":null}"#).unwrap();
+        assert_eq!(filter.kind, None);
+        let filter: AssistantHistoryFilter =
+            serde_json::from_str(r#"{"query":null,"meeting_id":null,"kind":"call"}"#).unwrap();
+        assert_eq!(filter.kind, Some(ConversationKind::Call));
+    }
+
+    #[test]
+    fn an_ask_lists_the_start_of_its_answer_and_a_call_does_not() {
+        let conn = migrated_conn();
+        let messages = serde_json::to_string(&[
+            message("user", "what is apple"),
+            message(
+                "assistant",
+                "## Apple\n\n**Apple Inc.** is a `tech` company.\n- Makes phones",
+            ),
+        ])
+        .unwrap();
+        let ask = insert_conversation(&conn, 1_000, &messages);
+        let call = insert_conversation(&conn, 2_000, &messages);
+        let unanswered = insert_conversation(
+            &conn,
+            3_000,
+            &serde_json::to_string(&[message("user", "hello?")]).unwrap(),
+        );
+        conn.execute(
+            "UPDATE assistant_history SET kind = 'call' WHERE id = ?1",
+            params![call],
+        )
+        .unwrap();
+
+        let page = HistoryManager::assistant_summaries_with_conn(&conn, None, None).unwrap();
+        let preview = |id: i64| {
+            page.entries
+                .iter()
+                .find(|e| e.id == id)
+                .and_then(|e| e.preview.clone())
+        };
+        assert_eq!(
+            preview(ask).as_deref(),
+            Some("Apple Apple Inc. is a tech company. Makes phones")
+        );
+        assert_eq!(preview(call), None);
+        assert_eq!(preview(unanswered), None);
+    }
+
+    #[test]
+    fn answer_previews_are_plain_bounded_and_skip_the_barge_in_note() {
+        assert_eq!(answer_preview(""), None);
+        assert_eq!(answer_preview("```\n\n```"), None);
+        assert_eq!(
+            answer_preview(&format!(
+                "Sure.\n{}",
+                crate::voice_conversation::INTERRUPTED_MARKER
+            ))
+            .as_deref(),
+            Some("Sure.")
+        );
+        let long = "word ".repeat(200);
+        let preview = answer_preview(&long).unwrap();
+        assert!(preview.ends_with('…'));
+        assert!(preview.chars().count() <= PREVIEW_CHARS + 1);
+    }
+
+    #[test]
+    fn a_title_is_what_was_asked_not_the_selection_scaffolding() {
+        let selected = crate::assistant::compose_selection_request(
+            "Photosynthesis is the process…",
+            "explain this simply",
+        );
+        assert_eq!(
+            HistoryManager::derive_assistant_title(&[message("user", &selected)]),
+            "explain this simply"
+        );
+
+        // Asked about a selection without saying anything: the selection is
+        // the only thing that identifies the conversation.
+        let wordless = crate::assistant::compose_selection_request("Photosynthesis", "");
+        assert_eq!(
+            HistoryManager::derive_assistant_title(&[message("user", &wordless)]),
+            "Photosynthesis"
+        );
+
+        let with_markers = format!(
+            "what is this\n{}\n{} notes.txt]\n{}",
+            crate::assistant::SCREENSHOT_MARKER,
+            crate::assistant::FILE_MARKER_PREFIX,
+            crate::assistant::IMAGE_MARKER
+        );
+        assert_eq!(
+            HistoryManager::derive_assistant_title(&[message("user", &with_markers)]),
+            "what is this"
+        );
+        assert_eq!(
+            HistoryManager::derive_assistant_title(&[message("user", "  ")]),
+            "Conversation"
+        );
+        let long = "a".repeat(100);
+        let title = HistoryManager::derive_assistant_title(&[message("user", &long)]);
+        assert_eq!(title.chars().count(), 81);
+        assert!(title.ends_with('…'));
+    }
+
+    #[test]
+    fn titles_saved_with_scaffolding_are_repaired_once() {
+        let conn = migrated_conn();
+        let selected = crate::assistant::compose_selection_request("Hey, what", "reply to this");
+        let messages = serde_json::to_string(&[message("user", &selected)]).unwrap();
+        let stale_title: String = selected.chars().take(80).collect();
+        conn.execute(
+            "INSERT INTO assistant_history (timestamp, updated_at, title, messages)
+             VALUES (1, 1, ?1, ?2)",
+            params![stale_title, messages],
+        )
+        .unwrap();
+        let fine = insert_conversation(&conn, 1_000, "[]");
+
+        assert_eq!(HistoryManager::repair_assistant_titles(&conn).unwrap(), 1);
+        let titles: Vec<String> = conn
+            .prepare("SELECT title FROM assistant_history ORDER BY id")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(
+            titles,
+            vec!["reply to this".to_string(), format!("Chat {}", 1_000)]
+        );
+        assert_eq!(fine, 2);
+        // Nothing left to repair.
+        assert_eq!(HistoryManager::repair_assistant_titles(&conn).unwrap(), 0);
     }
 }

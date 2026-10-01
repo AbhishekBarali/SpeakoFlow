@@ -731,6 +731,7 @@ function CallHistory({
     query: null,
     meetings_only: false,
     meeting_id: null,
+    kind: "call",
   });
   const busyRef = useRef(false);
   const generationRef = useRef(0);
@@ -786,10 +787,13 @@ function CallHistory({
   }, []);
 
   useEffect(() => {
+    // Only calls: a quick ask is one question and one answer, and listing every
+    // one of them here buried the conversations this list exists to reopen.
     filterRef.current = {
       query: search || null,
       meetings_only: scope === "meetings",
       meeting_id: null,
+      kind: "call",
     };
     void load("fresh");
   }, [search, scope, load]);
