@@ -56,10 +56,12 @@
 
 ## What is SpeakoFlow?
 
-SpeakoFlow is a desktop app that gives your voice three hotkeys. One types
-what you say into whatever app you're in. One asks a question and puts the
-answer where you need it. One starts a spoken conversation with an AI that
-answers out loud.
+SpeakoFlow is a desktop app for working with your voice instead of your
+keyboard. Talk, and what you say is typed wherever your cursor is, in any app.
+Ask a question out loud, and an AI assistant answers it, using the text you
+selected or what's on your screen when you allow it. Or start a conversation
+and talk a problem through while it answers out loud. Everything starts from a
+keyboard shortcut, so you never leave the app you're working in.
 
 <table>
 <tr>
