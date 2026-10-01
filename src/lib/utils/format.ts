@@ -1,6 +1,10 @@
+import i18next from "i18next";
+
 export const formatModelSize = (sizeMb: number | null | undefined): string => {
   if (!sizeMb || !Number.isFinite(sizeMb) || sizeMb <= 0) {
-    return "Unknown size";
+    // The app's configured instance is i18next's default one (src/i18n), so
+    // this follows the UI language without dragging Tauri into this module.
+    return i18next.t("common.unknownSize");
   }
 
   if (sizeMb >= 1024) {

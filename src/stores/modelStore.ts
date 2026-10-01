@@ -184,10 +184,16 @@ export const useModelStore = create<ModelsStore>()(
             }),
           );
         } else {
-          set({ error: `Failed to load models: ${result.error}` });
+          set({
+            error: i18n.t("errors.loadModelsFailed", {
+              error: String(result.error),
+            }),
+          });
         }
       } catch (err) {
-        set({ error: `Failed to load models: ${err}` });
+        set({
+          error: i18n.t("errors.loadModelsFailed", { error: String(err) }),
+        });
       } finally {
         set({ loading: false });
       }
@@ -231,11 +237,17 @@ export const useModelStore = create<ModelsStore>()(
           });
           return true;
         } else {
-          set({ error: `Failed to switch to model: ${result.error}` });
+          set({
+            error: i18n.t("errors.switchModelFailed", {
+              error: String(result.error),
+            }),
+          });
           return false;
         }
       } catch (err) {
-        set({ error: `Failed to switch to model: ${err}` });
+        set({
+          error: i18n.t("errors.switchModelFailed", { error: String(err) }),
+        });
         return false;
       }
     },
@@ -299,11 +311,17 @@ export const useModelStore = create<ModelsStore>()(
           await get().loadModels();
           return true;
         } else {
-          set({ error: `Failed to cancel download: ${result.error}` });
+          set({
+            error: i18n.t("errors.cancelDownloadFailed", {
+              error: String(result.error),
+            }),
+          });
           return false;
         }
       } catch (err) {
-        set({ error: `Failed to cancel download: ${err}` });
+        set({
+          error: i18n.t("errors.cancelDownloadFailed", { error: String(err) }),
+        });
         return false;
       }
     },
@@ -317,11 +335,17 @@ export const useModelStore = create<ModelsStore>()(
           await get().loadCurrentModel();
           return true;
         } else {
-          set({ error: `Failed to delete model: ${result.error}` });
+          set({
+            error: i18n.t("errors.deleteModelFailed", {
+              error: String(result.error),
+            }),
+          });
           return false;
         }
       } catch (err) {
-        set({ error: `Failed to delete model: ${err}` });
+        set({
+          error: i18n.t("errors.deleteModelFailed", { error: String(err) }),
+        });
         return false;
       }
     },
@@ -502,7 +526,9 @@ export const useModelStore = create<ModelsStore>()(
               delete state.downloadingModels[modelId];
               delete state.downloadProgress[modelId];
               delete state.downloadStats[modelId];
-              state.error = `Failed to extract model: ${event.payload.error}`;
+              state.error = i18n.t("errors.extractModelFailed", {
+                error: String(event.payload.error),
+              });
               if (state.pendingSttSelection === modelId) {
                 state.pendingSttSelection = null;
               }

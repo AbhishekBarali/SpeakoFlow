@@ -9,6 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { expectedKeys, flatten } from "./i18n-plurals.mjs";
 
 const ROOT = process.cwd();
 const LOCALES = path.join(ROOT, "src", "i18n", "locales");
@@ -43,15 +44,6 @@ const KEEP_AS_IS = new Set([
   "MIT",
 ]);
 
-export function flatten(obj, prefix = "", out = {}) {
-  for (const [k, v] of Object.entries(obj)) {
-    const key = prefix ? `${prefix}.${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)) flatten(v, key, out);
-    else out[key] = v;
-  }
-  return out;
-}
-
 /** Heuristic: a value with no translatable words (pure brand/symbol/number). */
 function isUntranslatable(value) {
   if (typeof value !== "string") return true;
@@ -75,7 +67,8 @@ const en = flatten(
     fs.readFileSync(path.join(LOCALES, "en", "translation.json"), "utf8"),
   ),
 );
-const enKeys = Object.keys(en);
+/** Every English value, to spot a locale still holding reworded English. */
+const englishValues = new Set(Object.values(en));
 
 const langs = fs
   .readdirSync(LOCALES, { withFileTypes: true })
@@ -99,10 +92,15 @@ for (const lang of langs) {
       fs.readFileSync(path.join(LOCALES, lang, "translation.json"), "utf8"),
     ),
   );
-  const todo = enKeys.filter((k) => {
-    if (isUntranslatable(en[k])) return false;
+  // Locale key → English key it translates (plural groups expand per language).
+  const expected = expectedKeys(lang, en);
+  const todo = [...expected.keys()].filter((k) => {
+    const source = en[expected.get(k)];
+    if (isUntranslatable(source)) return false;
     if (!(k in flat)) return true; // missing entirely
-    return flat[k] === en[k]; // still English
+    if (flat[k] === source) return true; // still English
+    // English left behind after the source was reworded.
+    return englishValues.has(flat[k]) && !isUntranslatable(flat[k]);
   });
 
   summary.push(`${lang}\t${todo.length}`);
@@ -113,7 +111,7 @@ for (const lang of langs) {
   for (let i = 0; i < todo.length; i += CHUNK_SIZE) {
     const slice = todo.slice(i, i + CHUNK_SIZE);
     const payload = {};
-    for (const k of slice) payload[k] = en[k];
+    for (const k of slice) payload[k] = en[expected.get(k)];
     const n = Math.floor(i / CHUNK_SIZE) + 1;
     fs.writeFileSync(
       path.join(dir, `chunk-${n}.source.json`),

@@ -4,7 +4,10 @@ import { SettingContainer } from "../ui/SettingContainer";
 import { ResetButton } from "../ui/ResetButton";
 import type { SettingIcon, SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
-import { LANGUAGES } from "../../lib/constants/languages";
+import {
+  languageMatches,
+  localizedLanguages,
+} from "../../lib/constants/languages";
 
 interface LanguageSelectorProps {
   descriptionMode?: "inline" | "tooltip";
@@ -28,7 +31,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   tone,
   description,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { getSetting, updateSetting, resetSetting, isUpdating } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,6 +39,18 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selectedLanguage = getSetting("selected_language") || "auto";
+
+  // Language names in the UI language; "auto" is a mode, not a language, so it
+  // takes its own translated label.
+  const languages = useMemo(
+    () =>
+      localizedLanguages(i18n.language).map((lang) =>
+        lang.value === "auto"
+          ? { ...lang, label: t("settings.general.language.auto") }
+          : lang,
+      ),
+    [i18n.language, t],
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -62,23 +77,23 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   const availableLanguages = useMemo(() => {
     if (!supportedLanguages || supportedLanguages.length === 0)
-      return LANGUAGES;
-    return LANGUAGES.filter(
+      return languages;
+    return languages.filter(
       (lang) =>
         lang.value === "auto" || supportedLanguages.includes(lang.value),
     );
-  }, [supportedLanguages]);
+  }, [supportedLanguages, languages]);
 
   const filteredLanguages = useMemo(
     () =>
       availableLanguages.filter((language) =>
-        language.label.toLowerCase().includes(searchQuery.toLowerCase()),
+        languageMatches(language, searchQuery),
       ),
     [searchQuery, availableLanguages],
   );
 
   const selectedLanguageName =
-    LANGUAGES.find((lang) => lang.value === selectedLanguage)?.label ||
+    languages.find((lang) => lang.value === selectedLanguage)?.label ||
     t("settings.general.language.auto");
 
   const handleLanguageSelect = async (languageCode: string) => {

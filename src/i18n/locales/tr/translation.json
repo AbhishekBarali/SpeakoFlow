@@ -14,17 +14,112 @@
   },
   "tray": {
     "home": "Ana Ekran",
+    "openAssistant": "Asistanı aç",
     "checkUpdates": "Güncellemeleri Kontrol Et…",
+    "sendFeedback": "Geri bildirim gönder…",
     "copyLastTranscript": "Son transkripti kopyala",
     "unloadModel": "Modeli boşalt",
     "model": "Model",
     "quit": "Çıkış",
     "cancel": "İptal"
   },
+  "updates": {
+    "check": "Güncellemeleri kontrol et",
+    "checking": "Kontrol ediliyor…",
+    "upToDate": "En son sürümü kullanıyorsunuz",
+    "checkFailed": "Güncellemeler kontrol edilemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+    "noBuild": "Yeni sürüm bu sistem için henüz mevcut değil.",
+    "available": "{{version}} sürümü mevcut",
+    "availableShort": "Güncelleme mevcut",
+    "installNow": "Şimdi güncelle",
+    "downloading": "İndiriliyor… %{{progress}}",
+    "downloadingUnknown": "İndiriliyor…",
+    "installing": "Yükleniyor…",
+    "restart": "Şimdi yeniden başlat",
+    "readyToRestart": "Güncelleme yüklendi. Kullanmaya başlamak için SpeakoFlow'u yeniden başlatın.",
+    "installFailed": "Güncelleme yüklenemedi. Tekrar deneyebilir ya da yükleyiciyi indirip kendiniz çalıştırabilirsiniz.",
+    "downloadFailed": "İndirme tamamlanmadı. Bağlantınızı kontrol edip tekrar deneyin.",
+    "downloadInstaller": "Yükleyiciyi indir",
+    "downloadInstead": "Bunun yerine yükleyiciyi indir",
+    "downloadNewVersion": "Yeni sürümü indir",
+    "installerSaved": "Yükleyici İndirilenler klasörünüzde",
+    "openInstaller": "Yükleyiciyi çalıştır",
+    "showInFolder": "Klasörde göster",
+    "viewRelease": "GitHub'da görüntüle",
+    "hint": {
+      "windows": "SpeakoFlow kapanır, güncellemeyi yükler ve yeniden açılır. Başka bir şeye tıklamanız gerekmez.",
+      "macos": "SpeakoFlow yeni sürümle yeniden başlar. macOS ardından Mikrofon ve Erişilebilirlik izinlerini yeniden vermenizi isteyebilir.",
+      "linux": "SpeakoFlow yeni sürümle yeniden başlar. .deb kurulumu önce parolanızı sorar."
+    },
+    "modes": {
+      "portable": "Bu, kendini değiştiremeyen taşınabilir sürümdür. Yeni sürümü indirin ve Data klasörünüzü içine kopyalayın.",
+      "packageManager": "SpeakoFlow'u paket yöneticiniz yükledi, bu yüzden oradan güncelleyin; örneğin yay -Syu speakoflow-bin ile.",
+      "download": "Bu kopya kendini yerinde güncelleyemez. Yeni sürümü almak için yükleyiciyi indirip çalıştırın."
+    },
+    "pill": {
+      "available": "Güncelleme mevcut",
+      "version": "Sürüm {{version}}",
+      "progress": "Güncelleniyor… %{{progress}}",
+      "working": "Güncelleniyor…",
+      "restart": "Güncellemek için yeniden başlat",
+      "installerReady": "Yükleyici indirildi"
+    }
+  },
+  "feedback": {
+    "button": "Geri bildirim gönder",
+    "title": "Geri bildirim gönder",
+    "description": "Her mesajı kendim okuyorum, o yüzden aklınıza nasıl geliyorsa öyle yazın. SpeakoFlow'u daha iyi hâle getirmeye yardım ettiğiniz için teşekkürler.",
+    "kind": {
+      "label": "Geri bildirim türü",
+      "bug": "Hata",
+      "idea": "Fikir",
+      "question": "Soru"
+    },
+    "placeholder": {
+      "bug": "Ne oldu ve bunun yerine ne bekliyordunuz?",
+      "idea": "SpeakoFlow'u sizin için ne daha iyi yapardı?",
+      "question": "Ne öğrenmek istersiniz?"
+    },
+    "messageLabel": "Mesaj",
+    "emailLabel": "Yanıt için e-posta",
+    "emailPlaceholder": "Yanıt isterseniz e-posta adresiniz",
+    "emailInvalid": "Bu e-posta adresi doğru görünmüyor.",
+    "includeSystem": "Uygulama sürümünü ve işletim sistemini ekle",
+    "systemDetails": "Tam olarak şöyle gönderilir: {{system}}",
+    "remaining": "{{count}} kaldı",
+    "screenshots": {
+      "add": "Ekran görüntüsü ekle",
+      "pasteHint": "veya {{shortcut}} ile yapıştırın",
+      "remove": "{{index}}. ekran görüntüsünü kaldır",
+      "preview": "Ekran görüntüsü {{index}}, {{width}} × {{height}}, {{size}}",
+      "working": "Ekran görüntüsü küçültülüyor…",
+      "limit": "En fazla {{count}} ekran görüntüsü ekleyebilirsiniz.",
+      "notImage": "Bu dosya bir görüntü değil.",
+      "tooLarge": "Bu görüntü eklenemeyecek kadar büyük.",
+      "unreadable": "Bu görüntü okunamadı."
+    },
+    "send": "Gönder",
+    "sending": "Gönderiliyor…",
+    "sentTitle": "Teşekkürler, yola çıktı",
+    "sentBody": "Artık bende, yakında okuyacağım.",
+    "sentWithEmail": "Takip edilecek bir şey olursa {{email}} adresinden size dönüş yapılır.",
+    "screenshotsDropped_one": "Ekran görüntüsü saklanamadı, ancak mesajınız ulaştı.",
+    "screenshotsDropped_other": "{{count}} ekran görüntüsü saklanamadı, ancak mesajınız ulaştı.",
+    "sendAnother": "Bir tane daha gönder",
+    "errors": {
+      "generic": "Geri bildiriminiz gönderilemedi. Mesajınız burada kayıtlı, birazdan tekrar deneyin."
+    },
+    "aboutRow": {
+      "title": "Geri bildirim",
+      "description": "Bir hata bildirin, bir fikir önerin ya da bir soru sorun.",
+      "button": "Geri bildirim gönder"
+    }
+  },
   "sidebar": {
     "general": "Genel",
     "dictation": "Dikte",
     "assistant": "Asistan",
+    "meetings": "Toplantılar",
     "history": "Geçmiş",
     "about": "Hakkında",
     "debug": "Hata Ayıklama",
@@ -43,16 +138,104 @@
     "general": "Kısayollar, mikrofonunuz ve uygulamanın görünümü.",
     "dictation": "Sesinizi metne dönüştüren model ve metnin nasıl temizlendiği.",
     "assistant": "Asistanı kurun, ardından sesini, ekran görüşünü ve web aramasını ayarlayın.",
+    "meetings": "Bir görüşmeyi kaydedin, konuşmacılara göre ayrılmış olarak okuyun ve notlara dönüştürün.",
     "history": "Bu cihazda saklanan son dikteleriniz, Flow üretimleriniz ve asistan sohbetleriniz.",
     "about": "Sürüm, uygulama dili, veri konumları ve katkı sağlayanlar.",
     "debug": "Tanılama ve geliştirici araçları."
   },
   "onboarding": {
+    "flow": {
+      "progress": "Adım {{current}}/{{total}}",
+      "steps": {
+        "setup": "Kurulum",
+        "tour": "Tur",
+        "finish": "Başla"
+      }
+    },
+    "setup": {
+      "installed": "Kurulu",
+      "loadFailed": "Model listesi yüklenemedi.",
+      "retry": "Tekrar dene"
+    },
+    "tour": {
+      "features": "SpeakoFlow neler yapar",
+      "count": "{{current}}/{{total}}",
+      "skip": "Turu atla",
+      "next": "İleri",
+      "done": "Devam et",
+      "tabs": {
+        "dictate": "Dikte",
+        "ask": "Asistan",
+        "call": "Görüşme"
+      },
+      "keys": {
+        "hold": "Konuşmak için basılı tutun",
+        "tap": "Başlatmak için dokunun, durdurmak için yine dokunun",
+        "call": "Başlatmak için basın, kapatmak için yine basın"
+      },
+      "mail": {
+        "window": "Yeni ileti",
+        "to": "Kime",
+        "toValue": "Selin",
+        "subject": "Konu",
+        "subjectValue": "Cuma"
+      },
+      "dictate": {
+        "title": "Siz konuşun.\nO yazsın.",
+        "cleanup": "İstediğinizde yapay zekâ temizleme",
+        "said": "Merhaba Selin, görüşmemizi cumaya alabilir miyiz? Bütçeyi ondan önce gönderirim."
+      },
+      "ask": {
+        "title": "Ne isterseniz\nsorun.",
+        "chips": {
+          "translate": "Çevir",
+          "decline": "Yanıt yaz",
+          "explain": "Açıkla",
+          "anything": "…her şey"
+        },
+        "examples": {
+          "translate": {
+            "window": "Mesajlar",
+            "doc": "Görüşmemizi cumaya alabilir miyiz?",
+            "question": "Bunu İspanyolcaya çevir",
+            "answer": "¿Podemos pasar nuestra llamada al viernes?"
+          },
+          "decline": {
+            "window": "Posta",
+            "doc": "Merhaba, perşembe saat 3'teki planlama toplantısına katılabilir misin?",
+            "question": "Perşembe gelemeyeceğimi söyleyen kibar bir yanıt yaz",
+            "answer": "Davetin için teşekkürler! Perşembe saat 3'te katılamıyorum, ama uygunsa cuma sabahı müsaitim."
+          },
+          "explain": {
+            "window": "Tarayıcı",
+            "doc": "API 429 Too Many Requests döndürüyor.",
+            "question": "Bu ne anlama geliyor?",
+            "answer": "Hizmetin izin verdiğinden daha hızlı istek gönderiyorsunuz. Biraz bekleyin, ardından daha yavaş tekrar deneyin."
+          }
+        }
+      },
+      "call": {
+        "title": "Ya da sadece\nkonuşarak çözün.",
+        "you": "Siz",
+        "assistant": "Asistan",
+        "said": "Cuma günkü ekip toplantısı için kısa bir konuşma planlamama yardım et.",
+        "reply": "Tabii. En gurur duyduğun sonuçla başla, işe yaramasının iki nedenini anlat ve sıradaki adımla bitir."
+      }
+    },
+    "finish": {
+      "status": {
+        "ready": "Hazır",
+        "installing": "Yükleniyor…",
+        "percent": "{{percent}}%",
+        "retry": "Yeniden dene",
+        "waiting": "Bekleniyor"
+      }
+    },
     "subtitle": "Başlamak için bir transkripsiyon modeli seçin",
     "steps": {
       "progress": "Adım {{current}}/{{total}}",
       "counter": "Adım {{current}}/{{total}} · {{label}}",
-      "speechToText": "Transkripsiyon",
+      "speechToText": "Sizi duysun",
       "aiModel": "Ona bir beyin verin",
       "ready": "Hazırsınız"
     },
@@ -77,8 +260,8 @@
       "downloadStarted": "Modeliniz arka planda indiriliyor."
     },
     "aiModel": {
-      "title": "Yerel bir yapay zekâ modeli ekleyin",
-      "subtitle": "Yanıt hızına ve yeteneğe göre seçin. E4B dengeli varsayılandır; 12B daha isabetli ama daha yavaştır.",
+      "title": "Yerel yapay zekâ ekleyin (isteğe bağlı)",
+      "subtitle": "Konuşabileceğiniz bir asistan ve diktenizi temizleyen kendi modelimiz. Birini ya da ikisini birden seçin.",
       "tiers": {
         "small": {
           "description": "Her makinede çalışır. Yazdıklarınızı toparlamak için harika."
@@ -90,16 +273,16 @@
           "description": "En isabetli yanıtlar, üstelik ekranınızı görebiliyor."
         }
       },
-      "seesScreen": "Ekranınızı görür",
+      "seesScreen": "Görsel model",
       "textOnly": "Yalnızca metin",
       "recommendedForAssistant": "Asistan için önerilir",
       "download": "Modeli indir",
       "useDownloaded": "İndirilen modeli kullan",
       "skip": "Şimdilik atla",
-      "skipHint": "Bunu daha sonra Ayarlar > Asistan > Cihazımda bölümünden yapabilirsiniz.",
+      "skipHint": "Bunların ikisini de daha sonra Ayarlar'dan ekleyebilirsiniz.",
       "continue": "Devam et",
-      "downloadingHint": "Modeliniz arka planda indiriliyor — uygulamayı hemen kullanmaya başlayabilirsiniz.",
-      "downloadStarted": "Yapay zekâ modeliniz arka planda indiriliyor."
+      "downloadingHint": "Arka planda indiriliyor. Uygulamayı hemen kullanmaya başlayın.",
+      "downloadStarted": "Modeliniz arka planda indiriliyor."
     },
     "cleanup": {
       "cardTitle": "SpeakoFlow Mini",
@@ -126,7 +309,7 @@
     },
     "errors": {
       "selectModel": "Bu model seçilemedi. Lütfen tekrar deneyin.",
-      "loadModels": "Mevcut modeller yüklenemedi",
+      "loadModels": "Mevcut modeller yüklenemedi.",
       "downloadModel": "Model indirilemedi: {{error}}"
     },
     "downloadProgress": {
@@ -176,7 +359,7 @@
         "description": "Günlük sohbet için mevcut en hızlı Gemma. Karmaşık isteklerde daha yetersiz."
       },
       "gemma-4-e4b": {
-        "description": "Sohbet için önerilir: varsayılan düşünme olmadan daha güçlü bir kalite-hız dengesi."
+        "description": "Daha güçlü bir kalite-hız dengesi; varsayılan olarak düşünme modunu kullanmaz."
       },
       "gemma-4-12b": {
         "description": "İnce ayrım gerektiren sorularda daha yetenekli, ancak belirgin şekilde yavaş; güçlü bir GPU ile en iyisidir."
@@ -193,19 +376,19 @@
       },
       "medium": {
         "name": "Whisper Medium",
-        "description": "İyi doğruluk, orta hız."
+        "description": "Orta hızda iyi doğruluk."
       },
       "turbo": {
         "name": "Whisper Turbo",
-        "description": "Dengeli doğruluk ve hız."
+        "description": "Doğruluk ve hız arasında denge."
       },
       "large": {
         "name": "Whisper Large",
-        "description": "İyi doğruluk, ancak yavaş."
+        "description": "Çok doğru, ancak yavaş."
       },
       "parakeet-tdt-0.6b-v2": {
         "name": "Parakeet V2",
-        "description": "Yalnızca İngilizce. İngilizce konuşanlar için en iyi model."
+        "description": "Yalnızca İngilizce. İngilizce konuşanlar için mükemmel."
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
@@ -217,69 +400,128 @@
       },
       "moonshine-tiny-streaming-en": {
         "name": "Moonshine V2 Tiny",
-        "description": "Ultra hızlı, yalnızca İngilizce"
+        "description": "Ultra hızlı. Yalnızca İngilizce."
       },
       "moonshine-small-streaming-en": {
         "name": "Moonshine V2 Small",
-        "description": "Hızlı, yalnızca İngilizce. Hız ve doğruluk arasında iyi denge."
+        "description": "Hızlı, yalnızca İngilizce. Hız ve doğruluk arasında iyi bir denge."
       },
       "moonshine-medium-streaming-en": {
         "name": "Moonshine V2 Medium",
-        "description": "Yalnızca İngilizce. Yüksek kalite."
+        "description": "Yalnızca İngilizce. Daha yüksek kalite, biraz daha yavaş."
       },
       "breeze-asr": {
         "name": "Breeze ASR",
-        "description": "Tayvan Mandarin Çincesi için optimize edilmiş. Dil değiştirme desteği."
+        "description": "Tayvan Mandarin Çincesi için ayarlanmış, İngilizceyle karışık konuşmayı da destekler."
       },
       "sense-voice-int8": {
         "name": "SenseVoice",
-        "description": "Çok hızlı. Çince, İngilizce, Japonca, Korece, Kantonca."
+        "description": "Çok hızlı. Çince, İngilizce, Japonca, Korece ve Kantonca."
       },
       "gigaam-v3-e2e-ctc": {
         "name": "GigaAM v3",
-        "description": "Rusça konuşma tanıma. Hızlı ve doğru."
+        "description": "Yalnızca Rusça. Hızlı ve doğru."
       },
       "canary-180m-flash": {
         "name": "Canary 180M Flash",
-        "description": "Çok hızlı. İngilizce, Almanca, İspanyolca, Fransızca. Çeviri desteği."
+        "description": "Çok hızlı. İngilizce, Almanca, İspanyolca ve Fransızca; çeviri desteğiyle."
       },
       "canary-1b-v2": {
         "name": "Canary 1B v2",
-        "description": "Doğru çok dilli. 25 Avrupa dili. Çeviri desteği."
+        "description": "25 Avrupa dilinde doğru; çeviri desteğiyle."
       },
       "cohere-int8": {
         "name": "Cohere",
-        "description": "Büyük, daha yavaş, ancak çok doğru çok dilli bir model."
+        "description": "Büyük ve daha yavaş, ancak çok doğru. Birçok dil."
       }
     },
     "permissions": {
-      "title": "İzinler Gerekli",
+      "title": "İzinler gerekli",
       "description": "SpeakoFlow'nin düzgün çalışabilmesi için birkaç izne ihtiyacı var.",
       "microphone": {
-        "title": "Mikrofon Erişimi",
+        "title": "Mikrofon erişimi",
         "description": "Sesinizi transkripsiyon için alabilmek için gereklidir."
       },
       "accessibility": {
-        "title": "Erişilebilirlik Erişimi",
+        "title": "Erişilebilirlik erişimi",
         "description": "Transkribe edilen metni uygulamalarınıza yazabilmek için gereklidir.",
         "stuckHint": "Sistem Ayarları'nda zaten açık mı? Bir güncellemeden sonra macOS, bu sürümle artık eşleşmeyen bir izni tutabilir.",
         "reset": "İzni sıfırla",
         "resetDone": "Şimdi Sistem Ayarları'nda SpeakoFlow'u yeniden açın."
       },
-      "grant": "İzin Ver",
+      "grant": "İzin ver",
       "granted": "Verildi",
       "waiting": "Bekleniyor…",
       "allGranted": "Her şey hazır!",
       "errors": {
         "checkFailed": "İzinler kontrol edilemedi. Lütfen tekrar deneyin.",
-        "requestFailed": "İzin isteği başarısız oldu. Lütfen tekrar deneyin.",
+        "requestFailed": "İzin istenemedi. Lütfen tekrar deneyin.",
         "resetFailed": "İzin sıfırlanamadı. SpeakoFlow'u Erişilebilirlik listesinden kaldırıp yeniden ekleyin."
       }
+    },
+    "frame": {
+      "setup": "Kurulum",
+      "tour": "Tur",
+      "finish": "Başla"
+    },
+    "welcome": {
+      "line": "Konuşun, o yazsın. Sorun, o yanıtlasın.",
+      "start": "Başlayın",
+      "note": "Yaklaşık bir dakika sürer."
+    },
+    "speech": {
+      "title": "Ses modelinizi seçin",
+      "body": "Bu bilgisayarda çalışır. İnternetsiz de çalışır.",
+      "english": "İngilizce",
+      "languages_one": "{{count}} dil",
+      "languages_other": "{{count}} dil",
+      "tags": {
+        "english": "En hızlı",
+        "languages": "Dili algılar",
+        "small": "En küçük",
+        "accurate": "En doğru",
+        "widest": "Daha yavaş"
+      },
+      "more_one": "{{count}} model daha",
+      "more_other": "{{count}} model daha",
+      "anytime": "İstediğiniz zaman daha fazla model ekleyebilirsiniz.",
+      "download": "İndir ve devam et",
+      "continue": "Devam et",
+      "later": "Daha sonra kur",
+      "loading": "Konuşma modeliniz aranıyor"
+    },
+    "start": {
+      "ready": {
+        "title": "Şimdi deneyin"
+      },
+      "downloading": {
+        "title": "Neredeyse hazır"
+      },
+      "failed": {
+        "title": "İndirme durdu"
+      },
+      "none": {
+        "title": "Başlamak için bir ses modeli seçin"
+      },
+      "progress": {
+        "of": "{{done}} / {{total}}",
+        "failed": "Tamamlanmadı. Tekrar denensin mi?",
+        "underMinute": "Bir dakikadan az kaldı",
+        "minutes_one": "Yaklaşık {{count}} dakika kaldı",
+        "minutes_other": "Yaklaşık {{count}} dakika kaldı"
+      },
+      "try": {
+        "label": "Dikteyi deneyin",
+        "placeholder": "Sözleriniz burada görünür…",
+        "success": "İşte bu kadar. Her uygulamada çalışır."
+      },
+      "open": "SpeakoFlow'u aç",
+      "choose": "Bir ses modeli seçin"
     }
   },
   "modelSelector": {
     "custom": "Özel",
-    "active": "Aktif",
+    "active": "Kullanımda",
     "switching": "Değiştiriliyor…",
     "noModelsAvailable": "Kullanılabilir model yok",
     "verifying": "{{modelName}} doğrulanıyor…",
@@ -291,12 +533,12 @@
     "downloadingMultiple": "{{count}} model indiriliyor…",
     "downloadDetails": "İndirme ayrıntıları",
     "downloadSize": "{{downloaded}} / {{total}}",
-    "modelReady": "Model Hazır",
+    "modelReady": "Model hazır",
     "loading": "{{modelName}} yükleniyor…",
     "loadingGeneric": "Yükleniyor…",
-    "modelError": "Model Hatası",
-    "modelUnloaded": "Model Boşaltıldı",
-    "noModelDownloadRequired": "Model Yok – İndirme Gerekli",
+    "modelError": "Model hatası",
+    "modelUnloaded": "Model boşaltıldı",
+    "noModelDownloadRequired": "Model yok — indirme gerekli",
     "llmSelectModel": "Asistan modelini seç",
     "llmModelTitle": "Asistan modeli: {{model}}",
     "deleteModel": "{{modelName}} Sil",
@@ -380,8 +622,8 @@
       }
     },
     "modelSettings": {
-      "title": "{{model}} Ayarları",
-      "noSettingsNeeded": "Bu model yapılandırma gerektirmeden otomatik olarak çalışır."
+      "title": "{{model}} ayarları",
+      "noSettingsNeeded": "Bu model otomatik çalışır — yapılandırılacak bir şey yok."
     },
     "general": {
       "title": "Genel",
@@ -397,7 +639,7 @@
       },
       "shortcut": {
         "title": "Kısayollar",
-        "description": "Sesle yazma kaydını başlatmak için klavye kısayollarını yapılandırın",
+        "description": "Kaydı başlatan ve durduran klavye kısayolları.",
         "loading": "Kısayollar yükleniyor…",
         "none": "Kısayol yapılandırılmadı",
         "notFound": "Kısayol bulunamadı",
@@ -405,7 +647,7 @@
         "bindings": {
           "transcribe": {
             "name": "Dikte et",
-            "description": "Sesinizi kaydetmek ve metne dönüştürmek için klavye kısayolu."
+            "description": "Kaydı başlatmak için basın, durdurup metne yazdırmak için tekrar basın."
           },
           "transcribe_toggle": {
             "name": "Eller serbest dikte",
@@ -413,10 +655,10 @@
           },
           "cancel": {
             "name": "İptal",
-            "description": "Mevcut kaydı iptal etmek için klavye kısayolu."
+            "description": "Mevcut kaydı veya akış hâlindeki yanıtı durdurur."
           },
           "transcribe_with_post_process": {
-            "name": "Son İşlem Kısayolu",
+            "name": "Dikte et ve temizle",
             "description": "Dikte edin, ardından metin yazılmadan önce yapay zekâ onu temizler."
           },
           "assistant": {
@@ -426,25 +668,31 @@
           "assistant_vision": {
             "name": "Ekranla sor",
             "description": "Ekranınız ekli olarak sesle sorun; böylece neye baktığınızı görebilir."
+          },
+          "assistant_call": {
+            "name": "Görüşme başlat",
+            "description": "Asistanla elleriniz serbest konuşun ve yanıtlarını dinleyin. Kapatmak için yine basın."
           }
         },
         "errors": {
-          "restore": "Orijinal kısayol geri yüklenemedi",
+          "restore": "Orijinal kısayol geri yüklenemedi.",
           "set": "Kısayol ayarlanamadı: {{error}}",
           "reset": "Kısayol sıfırlanamadı."
-        }
+        },
+        "clickToChange": "Değiştirmek için tıklayın",
+        "notSet": "Ayarlanmadı"
       },
       "language": {
         "title": "Dil",
         "description": "Konuşma tanıma dili. Belirli bir dil seçmek doğruluğu artırabilir.",
-        "descriptionUnsupported": "Parakeet modeli dili otomatik algılar. Manuel seçim gerekmez.",
+        "descriptionUnsupported": "Bu model dili otomatik olarak algılar.",
         "searchPlaceholder": "Dil ara…",
         "noResults": "Dil bulunamadı",
         "auto": "Otomatik"
       },
       "pushToTalk": {
-        "label": "Bas Konuş",
-        "description": "Basılı tut, Dikte kısayolu basılı tutulduğu sürece kaydeder. Dokun ise bir basışta kaydı başlatır, sonraki basışta durdurur.",
+        "label": "Kayıt davranışı",
+        "description": "Basılı tut: bir kayıt kısayolunu basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki basış durdurur. Tüm kayıt kısayollarına uygulanır.",
         "hold": "Basılı tut",
         "tap": "Dokun"
       },
@@ -456,15 +704,15 @@
       }
     },
     "models": {
-      "title": "Transkripsiyon Modelleri",
+      "title": "Transkripsiyon modelleri",
       "description": "Modeller doğruluktan ödün vererek hız kazanır — makinenize uyanı seçin.",
       "yourModels": "İndirilen modeller",
       "availableModels": "İndirilebilir",
       "downloaded": "İndirildi",
       "available": "İndirilebilir",
       "deleteConfirm": "{{modelName}} modelini silmek istediğinizden emin misiniz? Kullanmak için tekrar indirmeniz gerekecek.",
-      "deleteActiveConfirm": "{{modelName}} aktif modelinizdir. Silmek, yeni bir model seçene kadar transkripsiyonları durduracaktır. Emin misiniz?",
-      "deleteTitle": "Modeli Sil",
+      "deleteActiveConfirm": "{{modelName}} etkin modelinizdir. Silerseniz yeni bir model seçene kadar transkripsiyon durur. Emin misiniz?",
+      "deleteTitle": "Modeli sil",
       "categories": {
         "stt": "Transkripsiyon",
         "llm": "Asistan",
@@ -481,7 +729,7 @@
         "all": "Tümü",
         "multiLanguage": "Çok dilli",
         "translation": "Çeviri",
-        "allLanguages": "Tüm Diller"
+        "allLanguages": "Tüm diller"
       },
       "noModelsMatch": "Bu filtreyle eşleşen model yok.",
       "searchPlaceholder": "Modelleri ada göre ara…",
@@ -544,7 +792,8 @@
         "removeTitle": "Listeden kaldırılsın mı?",
         "removeConfirm": "“{{modelName}}” model listenizden kaldırılsın mı?\n\nDosyanın kendisi olduğu yerde kalır:\n{{path}}",
         "missingBadge": "Dosya yok",
-        "fileMissing": "Bu modelin dosyası artık orada değil:\n{{path}}\n\nTaşınmış ya da adı değiştirilmiş olabilir veya bağlı olmayan bir sürücüde olabilir."
+        "fileMissing": "Bu modelin dosyası artık orada değil:\n{{path}}\n\nTaşınmış ya da adı değiştirilmiş olabilir veya bağlı olmayan bir sürücüde olabilir.",
+        "foldersEmptyShort": "Henüz bağlı klasör yok."
       }
     },
     "sound": {
@@ -556,17 +805,23 @@
         "loading": "Yükleniyor…"
       },
       "audioFeedback": {
-        "label": "Sesli Geri Bildirim",
-        "description": "Kayıt başladığında ve bittiğinde ses çalar"
+        "label": "Sesli geri bildirim",
+        "description": "Kayıt başladığında ve durduğunda ses çal"
       },
       "soundTheme": {
         "label": "Geri bildirim sesi",
         "description": "Dikte sırasında çalınan başlangıç/bitiş sesini seçin",
         "default": "Varsayılan",
-        "preview": "Sesi dinle (önce başlangıç, sonra bitiş çalar)"
+        "preview": "Sesi dinle (önce başlangıç, sonra bitiş çalar)",
+        "themes": {
+          "marimba": "Marimba",
+          "pop": "Pop",
+          "click": "Tık",
+          "custom": "Özel"
+        }
       },
       "outputDevice": {
-        "title": "Çıkış Cihazı",
+        "title": "Çıkış cihazı",
         "description": "Geri bildirim sesleri için ses çıkış cihazını seçin",
         "placeholder": "Çıkış cihazı seçin…",
         "loading": "Yükleniyor…"
@@ -598,8 +853,8 @@
         "seconds": "{{seconds}} saniye"
       },
       "experimentalToggle": {
-        "label": "Deneysel Özellikler",
-        "description": "Hala geliştirme aşamasında olan deneysel özellikleri etkinleştir."
+        "label": "Deneysel özellikler",
+        "description": "Geliştirme aşamasındaki özellikleri gösterir. Varsayılan olarak kapalıdır."
       },
       "lazyStreamClose": {
         "label": "Transkripsiyonlar arasında mikrofonu açık tut",
@@ -615,30 +870,30 @@
       },
       "acceleration": {
         "whisper": {
-          "title": "Whisper Hızlandırma",
+          "title": "Whisper hızlandırma",
           "description": "Otomatik, mevcutsa GPU'yu kullanır."
         },
         "ort": {
-          "title": "ONNX Hızlandırma",
+          "title": "ONNX hızlandırma",
           "description": "Parakeet, Canary ve Moonshine modelleri için. DirectML deneyseldir."
         },
         "gpuDevice": {
-          "title": "GPU Aygıtı",
+          "title": "GPU aygıtı",
           "description": "Otomatik, özel GPU'yu seçer.",
           "auto": "Otomatik"
         }
       },
       "startHidden": {
-        "label": "Gizli Başlat",
+        "label": "Gizli başlat",
         "description": "Pencereyi açmadan sistem tepsisinde başlatır."
       },
       "autostart": {
-        "label": "Başlangıçta Çalıştır",
-        "description": "Bilgisayara giriş yaptığınızda SpeakoFlow otomatik olarak başlatılır."
+        "label": "Başlangıçta çalıştır",
+        "description": "Oturum açtığınızda SpeakoFlow'u otomatik olarak açar."
       },
       "showTrayIcon": {
         "label": "Tepsi simgesini göster",
-        "description": "SpeakoFlow simgesini sistem tepsisinde göster."
+        "description": "SpeakoFlow'u sistem tepsisinde tutar."
       },
       "closeBehavior": {
         "label": "Pencereyi kapattığımda uygulamadan çık",
@@ -653,8 +908,18 @@
           "live": "Canlı"
         }
       },
+      "overlayLinger": {
+        "title": "Biten metni ekranda tut",
+        "description": "Dikteyi bitirdikten sonra Canlı kartın ne kadar süre ekranda kalacağı; böylece yazılanı okuyabilir veya kopyalayabilirsiniz. İmleci kartın üzerinde tutmak onu açık tutar.",
+        "options": {
+          "quick": "Kısa (1 saniye)",
+          "standard": "Standart (3 saniye)",
+          "long": "Daha uzun (6 saniye)",
+          "extended": "Çok daha uzun (10 saniye)"
+        }
+      },
       "overlay": {
-        "title": "Overlay Konumu",
+        "title": "Kayıt penceresi konumu",
         "description": "Kayıt kaplamasının ekranınızda nerede duracağı.",
         "options": {
           "none": "Yok",
@@ -663,7 +928,7 @@
         }
       },
       "pasteMethod": {
-        "title": "Yapıştırma Yöntemi",
+        "title": "Yapıştırma yöntemi",
         "description": "Transkribe edilen metnin etkin uygulamaya nasıl eklendiği.",
         "options": {
           "clipboard": "Pano ({{modifier}}+V)",
@@ -671,27 +936,27 @@
           "clipboardShiftInsert": "Pano (Shift+Insert)",
           "direct": "Doğrudan",
           "none": "Yok",
-          "externalScript": "Harici Betik"
+          "externalScript": "Harici betik"
         },
         "externalScriptPlaceholder": "/dosya/yolu/betik.sh"
       },
       "typingTool": {
-        "title": "Yazma Aracı",
+        "title": "Yazma aracı",
         "description": "Doğrudan yapıştırma yöntemi için kullanılan Linux aracı.",
         "options": {
-          "auto": "Auto (Önerilen)"
+          "auto": "Otomatik (önerilen)"
         }
       },
       "clipboardHandling": {
-        "title": "Pano Yönetimi",
+        "title": "Pano yönetimi",
         "description": "Transkripsiyonun yapıştırıldıktan sonra panoda kalıp kalmayacağı.",
         "options": {
-          "dontModify": "Panoyu Değiştirme",
-          "copyToClipboard": "Panoya Kopyala"
+          "dontModify": "Panoyu değiştirme",
+          "copyToClipboard": "Panoya kopyala"
         }
       },
       "autoSubmit": {
-        "title": "Otomatik Gönder",
+        "title": "Otomatik gönder",
         "description": "Metin eklendikten sonra otomatik olarak bir tuş kombinasyonu gönderir.",
         "options": {
           "off": "Kapalı",
@@ -707,7 +972,7 @@
         "descriptionUnsupported": "Çeviri {{model}} modeli tarafından desteklenmiyor."
       },
       "modelUnload": {
-        "title": "Modeli Boşalt",
+        "title": "Modeli boşalt",
         "description": "Model bu süre boyunca boşta kaldığında belleği serbest bırakır.",
         "options": {
           "never": "Asla",
@@ -721,7 +986,7 @@
         }
       },
       "customWords": {
-        "title": "Özel Kelimeler",
+        "title": "Özel kelimeler",
         "description": "SpeakoFlow'un sizin istediğiniz gibi yazması gereken adlar, ürünler ve ifadeler.",
         "info": "Örnek: SpeakoFlow “Coco row” yazıyorsa “Kokoro” ekleyin.",
         "placeholder": "Bir ad, terim veya kısa ifade ekleyin",
@@ -729,6 +994,18 @@
         "empty": "Henüz özel kelime yok.",
         "remove": "{{word}} Kaldır",
         "duplicate": "\"{{word}}\" zaten mevcut"
+      },
+      "autoLearn": {
+        "label": "Düzelttiğim kelimeleri öğren",
+        "description": "SpeakoFlow'un yanlış yazdığı bir kelimeyi düzelttiğinizde yazılışınızı hatırlar.",
+        "info": "Yalnızca az önce yazdığı alanı, yaklaşık bir dakika boyunca okur. Hiçbir şey yüklenmez ve öğrendiği her kelime burada listelenir.",
+        "unsupported": "Düzeltmelerden öğrenme şimdilik yalnızca Windows'ta kullanılabilir. Yine de yukarıdan kelimeleri elle ekleyebilirsiniz.",
+        "learnedTitle": "Düzeltmelerinizden öğrenilenler",
+        "learnedEmpty": "Henüz bir şey öğrenilmedi. Dikte ettiğiniz uygulamada yanlış duyulan bir kelimeyi düzeltin, burada görünür.",
+        "keep": "{{word}} özel kelimelerimde kalsın",
+        "remove": "{{word}} unutulsun",
+        "clearAll": "Tümünü unut",
+        "reviewHint": "Bunlar tahmin. Birini kendi özel kelimelerinize taşımak için işaretleyin ya da kaldırın. {{max}} sınırı aşıldığında en eskiler silinir."
       },
       "textReplacements": {
         "title": "Metin değiştirmeleri",
@@ -766,7 +1043,7 @@
       }
     },
     "postProcessing": {
-      "title": "Son İşlem",
+      "title": "Yapay zekâ temizleme",
       "readiness": {
         "checking": "Yapay zekâ temizleme kurulumu denetleniyor…",
         "checkFailed": "Yapay zekâ temizleme kurulumu denetlenemedi.",
@@ -798,8 +1075,8 @@
         "title": "Kısayol"
       },
       "tone": {
-        "title": "Stil ön ayarı",
-        "description": "Temizlenen diktenin nasıl bir üsluba sahip olacağını seçin. Yalnızca temizleme, metnin üslubunu bilerek değiştirmeden onu düzeltir.",
+        "title": "2 · Yazım stili",
+        "description": "Sistem prompt'unun üzerine eklenir: neyin düzeltileceğini değil, temizlenen metnin nasıl okunacağını değiştirir. “Yok” seçeneği üslubunuza dokunmaz.",
         "options": {
           "none": "Yok (yalnızca temizleme)",
           "formal": "Resmî",
@@ -822,7 +1099,7 @@
         "cancel": "İptal"
       },
       "api": {
-        "title": "API (OpenAI Uyumlu)",
+        "title": "API (OpenAI uyumlu)",
         "location": {
           "title": "Nerede çalışır",
           "description": "Temizlemeyi indirdiğiniz bir modelle gizli tutun ya da bir bulut sağlayıcısı kullanın."
@@ -840,10 +1117,11 @@
         "baseUrl": {
           "title": "Temel URL",
           "description": "Seçili sağlayıcı için API temel URL'si. Custom, Local ve Azure OpenAI için düzenlenebilir (kendi kaynağınıza ayarlayın, örn. https://your-resource.openai.azure.com/openai/v1).",
-          "placeholder": "https://api.openai.com/v1"
+          "placeholder": "https://api.openai.com/v1",
+          "managed": "Temel URL, seçilen sağlayıcı tarafından yönetilir."
         },
         "apiKey": {
-          "title": "API Anahtarı",
+          "title": "API anahtarı",
           "description": "Seçili sağlayıcı için API anahtarı.",
           "placeholder": "sk-..."
         },
@@ -855,8 +1133,8 @@
         },
         "model": {
           "title": "Model",
-          "descriptionApple": "İsteğe bağlı bir sayısal token sınırı belirleyin veya varsayılan cihaz içi ön ayarı kullanın.",
-          "descriptionCustom": "Özel uç noktanızın beklediği model tanımlayıcısını girin.",
+          "descriptionApple": "İsteğe bağlı sayısal bir uzunluk sınırı girin veya cihaz içi varsayılan ön ayarı koruyun.",
+          "descriptionCustom": "Özel sağlayıcınızın beklediği model tanımlayıcısını girin.",
           "descriptionDefault": "Seçili sağlayıcının sunduğu bir modeli seçin.",
           "placeholderApple": "Apple Intelligence",
           "placeholderWithOptions": "Model ara veya seç",
@@ -867,27 +1145,27 @@
       "prompts": {
         "title": "Prompt",
         "selectedPrompt": {
-          "title": "Seçili Prompt",
-          "description": "Transkripsiyonları iyileştirmek için bir şablon seçin veya yeni bir tane oluşturun. Yakalanan transkripte referans vermek için prompt metni içinde ${output} kullanın."
+          "title": "Prompt",
+          "description": "Temel talimat: modelin neyi düzelteceği ve neye dokunmaması gerektiği. Transkripsiyonu yapılan metniniz ayrıca gönderilir, bu yüzden yalnızca talimatları yazın."
         },
         "noPrompts": "Kullanılabilir prompt yok",
         "nonePrompt": "Yok (prompt kullanma)",
         "selectPrompt": "Prompt Seç",
-        "createNew": "Yeni Prompt Oluştur",
+        "createNew": "Yeni prompt oluştur",
         "edit": "Düzenle",
         "closeEditor": "Kapat",
-        "promptLabel": "Prompt Etiketi",
+        "promptLabel": "Prompt etiketi",
         "promptLabelPlaceholder": "Prompt adı girin",
-        "promptInstructions": "Prompt Talimatları",
-        "promptInstructionsPlaceholder": "Transkripsiyondan sonra çalıştırılacak talimatları yazın. Örnek: Aşağıdaki metnin dilbilgisini ve açıklığını iyileştir: ${output}",
+        "promptInstructions": "Prompt talimatları",
+        "promptInstructionsPlaceholder": "Transkripti temizlemek için talimatlar yazın. Örnek: Dilbilgisini ve noktalamayı düzelt, ardından metni özenli ve profesyonel bir mesaj olarak yeniden yaz.",
         "promptTip": "İpucu: Transkribe edilen metniniz modele otomatik olarak gönderilir — yalnızca talimat yazın. (<code>${output}</code> kullanan eski prompt'lar hâlâ çalışır.)",
-        "updatePrompt": "Promptu Güncelle",
-        "deletePrompt": "Promptu Sil",
+        "updatePrompt": "Prompt'u güncelle",
+        "deletePrompt": "Prompt'u sil",
         "restorePrompt": "Önerileni geri yükle",
-        "createPrompt": "Prompt Oluştur",
+        "createPrompt": "Prompt oluştur",
         "cancel": "İptal",
         "selectToEdit": "Ayrıntılarını görüntülemek ve düzenlemek için yukarıdan bir prompt seçin.",
-        "createFirst": "İlk son işlem prompt'unuzu oluşturmak için yukarıdaki “Yeni Prompt Oluştur” seçeneğine tıklayın."
+        "createFirst": "İlk temizleme prompt'unuzu oluşturmak için yukarıdaki “Yeni prompt oluştur” düğmesine tıklayın."
       }
     },
     "dictation": {
@@ -905,6 +1183,66 @@
       "catalog": {
         "title": "Modelinizi seçin",
         "description": "Her model makinenizde çalışır — doğruluktan ödün verip hız kazanın ve size uyanı seçin."
+      },
+      "cloud": {
+        "groupTitle": "Transkripsiyonun çalıştığı yer",
+        "engine": {
+          "title": "Konuşmadan metne motoru",
+          "description": "Bu makinede ya da anahtarını sizin sağladığınız barındırılan bir sağlayıcıda.",
+          "info": "Cihazımda seçeneği indirdiğiniz bir modeli çalıştırır: gizli, ücretsiz ve çevrimdışı. Bulut ise kaydınızı seçtiğiniz bir sağlayıcıya gönderir ve sağlayıcı ses dakikası başına ücretlendirir; karşılığında indirme ve GPU gerektirmeyen son teknoloji bir model elde edersiniz."
+        },
+        "bypassNotice": "Bulut transkripsiyonu açık; bu yüzden yukarıdaki model kullanılmaz ve yüklenmemiş kalır.",
+        "provider": {
+          "title": "Sağlayıcı"
+        },
+        "key": {
+          "title": "API anahtarı",
+          "stored": "Sistem anahtarlığınızda kayıtlı bir anahtar var.",
+          "missing": "Bu sağlayıcı için henüz kayıtlı anahtar yok.",
+          "placeholder": "API anahtarınızı yapıştırın",
+          "replacePlaceholder": "Kayıtlı olanın yerine geçecek yeni bir anahtar yapıştırın",
+          "save": "Kaydet",
+          "saved": "API anahtarı kaydedildi",
+          "clear": "Kaldır",
+          "getOne": "Anahtar alın"
+        },
+        "endpoint": {
+          "title": "Uç nokta",
+          "description": "OpenAI uyumlu bir transkripsiyon sunucusunun temel URL'si.",
+          "azureDescription": "Azure kaynağınızın uç noktası; Azure portalındaki Anahtarlar ve Uç Nokta bölümünde bulunur. MAI-Transcribe için Central India, Southeast Asia, East US, West US, West US 2 veya North Europe bölgesinde bir kaynak gerekir.",
+          "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
+        },
+        "model": {
+          "title": "Model",
+          "info": "Sağlayıcının sunduğu herhangi bir modeli yazın ya da listeyi yükleyin. ElevenLabs için, konuşurken yazıya dökmek üzere scribe_v2_realtime, durduktan sonra yazıya dökmek üzere scribe_v2 seçin.",
+          "load": "Modelleri yükle"
+        },
+        "streaming": {
+          "label": "Konuşurken yazıya dök",
+          "description": "Metin siz hâlâ konuşurken gelir; böylece tuşu bıraktığınızda yalnızca son birkaç kelime işlenir.",
+          "needsRealtimeModel": "Bunu kullanmak için yukarıdan gerçek zamanlı bir model seçin — mevcut model yalnızca siz durduktan sonra yazıya döker."
+        },
+        "keyterms": {
+          "label": "Özel kelimelerimi gönder",
+          "description": "Özel kelime dağarcığınızı sağlayıcıya iletir; böylece o yazılışları tercih eder."
+        },
+        "noVerbatim": {
+          "label": "Dolgu sözcüklerini kaldır",
+          "description": "\"ıı\", \"şey\", yarım kalan başlangıçları ve tekrarları atar. Söylediklerinizi kelimesi kelimesine geri almak için bunu kapatın."
+        },
+        "language": {
+          "description": "Konuştuğunuz dil. Buradaki her sağlayıcı aynı dilde yanıt verir — bunu baştan belirtmek doğruluğu artırır; Otomatik ise dili kendisinin algılamasını sağlar."
+        },
+        "translate": {
+          "supported": "{{provider}}, konuştuğunuz dil yerine İngilizce döndürebilir. Yalnızca İngilizce — hiçbir transkripsiyon API'si başka bir dile çeviri yapmaz.",
+          "unsupported": "{{provider}} konuştuğunuz dilde yazıya döker ve bir çeviri uç noktası yoktur, bu yüzden bu özellik burada çalışamaz. Cihaz içi motorda ve OpenAI, Groq ya da kendi barındırdığınız bir Whisper sunucusunda çalışır."
+        },
+        "test": {
+          "title": "Bağlantıyı test et",
+          "description": "Anahtarı, uç noktayı ve modeli kontrol etmek için bir saniyelik ses gönderir.",
+          "action": "Testi çalıştır",
+          "running": "Test ediliyor…"
+        }
       },
       "aiCleanup": {
         "groupTitle": "Yapay zekâ temizleme",
@@ -925,13 +1263,13 @@
           "recommendedTitle": "Temizleme için önerilir",
           "recommendedDescription": "SpeakoFlow Mini yalnızca bu iş için eğitildi ve bu işte çok daha büyük modelleri geride bırakıyor."
         },
-        "promptGroupTitle": "Temizleme prompt'u",
+        "promptGroupTitle": "Temizleme talimatları",
         "tunedModelNotice": "Bu model İngilizce dikte temizliği için ince ayarlandı; bu yüzden en iyi sonucu önerilen prompt ile ve stil olmadan verir.",
         "tunedModelNoticeDismiss": "Bu ipucunu gizle",
         "tunedModelNoticeRestore": "Model ipucunu göster",
         "title": "Diktemi yapay zekâ ile düzelt",
         "caption": "Deneysel — dikte ettikten sonra noktalamayı ve dolgu sözcüklerini toparlar.",
-        "info": "Noktalama işaretlerini düzeltmek, dolgu sözcüklerini kaldırmak ve isteğe bağlı olarak tonu ayarlamak için diktenizin üzerinde bir dil modeli çalıştırır. Yalnızca dikteye uygulanır ve kendi kısayoluyla çalışır. Konuşmanızın ardından kısa bir gecikme ekler; model başarısız olursa veya zaman aşımına uğrarsa ham metniniz kullanılır. Hâlâ geliştirme aşamasında."
+        "info": "Temizleme, söylediklerinizi yazılmadan önce bir yapay zekâ modeliyle yeniden düzenler. Biraz zaman alabilir; yavaş kalırsa ham sözcükleriniz kullanılır."
       },
       "spokenEmoji": {
         "title": "Sesli emoji",
@@ -960,11 +1298,11 @@
       "filters": {
         "label": "Geçmiş türü",
         "all": "Tümü",
-        "recordings": "Recordings",
+        "recordings": "Dikteler",
         "flow": "Flow",
         "assistant": "Asistan sohbetleri"
       },
-      "openFolder": "Kayıtlar Klasörünü Aç",
+      "openFolder": "Kayıtlar klasörünü aç",
       "loading": "Geçmiş yükleniyor…",
       "empty": "Burada henüz bir şey yok. Dikteleriniz, Flow üretimleriniz ve asistan sohbetleriniz burada görünecek.",
       "emptyRecordings": "Henüz dikte yok.",
@@ -986,12 +1324,13 @@
       "delete": "Kaydı sil",
       "deleteError": "Kayıt silinemedi. Lütfen tekrar deneyin.",
       "retranscribe": "Yeniden yazıya dök",
-      "retranscribeError": "Yeniden yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
+      "retranscribeError": "Yeniden yazıya dökülemedi. Lütfen tekrar deneyin.",
       "transcribing": "Yazıya döküyor…",
-      "transcriptionFailed": "Transkripsiyon başarısız oldu. Yeniden deneme simgesini kullanarak tekrar yazıya dökebilirsiniz.",
+      "transcriptionFailed": "Transkripsiyon başarısız oldu — tekrar denemek için yeniden deneme simgesini kullanın.",
       "assistantLabel": "Asistan sohbeti",
       "copyConversation": "Konuşmayı kopyala",
       "resumeConversation": "Bu konuşmaya asistanda devam et",
+      "branchConversation": "Buradan yeni bir sohbet olarak devam edin. Bu sohbet olduğu gibi korunur.",
       "showConversation": "Konuşmayı göster",
       "hideConversation": "Konuşmayı gizle",
       "roleUser": "Siz",
@@ -999,69 +1338,89 @@
       "screenshotAttached": "Görüş",
       "messageCount_one": "{{count}} mesaj",
       "messageCount_other": "{{count}} mesaj",
-      "deleteAssistantError": "Konuşma silinemedi. Lütfen tekrar deneyin."
+      "deleteAssistantError": "Konuşma silinemedi. Lütfen tekrar deneyin.",
+      "openFolderError": "Kayıtlar klasörü açılamadı."
     },
     "debug": {
       "title": "Hata Ayıklama",
       "logDirectory": {
-        "title": "Log Dizini",
-        "description": "Log dosyalarının saklandığı konum"
+        "title": "Log dizini",
+        "description": ""
       },
       "logLevel": {
-        "title": "Log Seviyesi",
-        "description": "Loglamanın ayrıntı düzeyini ayarla"
+        "title": "Log seviyesi",
+        "description": "",
+        "levels": {
+          "error": "Hata",
+          "warn": "Uyarı",
+          "info": "Bilgi",
+          "debug": "Hata ayıklama",
+          "trace": "İzleme"
+        }
       },
       "updateChecks": {
-        "label": "Güncellemeleri Kontrol Et",
-        "description": "SpeakoFlow için yeni sürümleri otomatik olarak kontrol eder"
+        "label": "Güncellemeleri otomatik kontrol et",
+        "description": "SpeakoFlow açıldığında ve her 12 saatte bir yeni sürüm arar. İstediğiniz zaman elle de kontrol edebilirsiniz."
       },
       "soundTheme": {
-        "label": "Ses Teması",
-        "description": "Kayıt başlangıç ve bitişi için sesli geri bildirim temasını seçin"
+        "label": "Ses teması",
+        "description": ""
       },
       "wordCorrectionThreshold": {
-        "title": "Kelime Düzeltme Eşiği",
+        "title": "Kelime düzeltme eşiği",
         "description": "Özel kelime düzeltmeleri için hassasiyet"
       },
       "historyLimit": {
-        "title": "Geçmiş Limiti",
-        "description": "Saklanacak en fazla kaydedilmemiş dikte ve Flow kaydı sayısı. Kaydedilen kayıtlar her zaman saklanır ve asistan sohbetleri sayılmaz.",
+        "title": "Kayıt sınırı",
+        "description": "Saklanacak en fazla yıldızsız dikte ve Flow kaydı sayısı. Yıldızlı kayıtlar her zaman saklanır, asistan sohbetleri sayılmaz. İzin verilen en düşük değer 1'dir.",
         "entries": "kayıt"
       },
       "recordingRetention": {
-        "title": "Kayıtları Otomatik Sil",
+        "title": "Kayıtları otomatik sil",
         "description": "Kaydedilmemiş kayıtların nasıl temizlendiğini seçin. Değişiklikler hemen uygulanır ve asistan sohbetlerini asla etkilemez.",
         "never": "Asla",
         "preserveLimit": "Belirli bir sayıda tut",
         "days3": "3 gün sonra",
         "weeks2": "2 hafta sonra",
         "months3": "3 ay sonra",
+        "customDays": "Belirli bir gün sayısından sonra",
+        "customDaysTitle": "Şu süre sonra sil",
+        "customDaysDescription": "Yıldızsız kayıtlar bu kadar gün eskidiğinde silinir. Yıldızlı kayıtlar her zaman saklanır.",
+        "days": "gün",
         "placeholder": "Saklama süresi seçin…",
         "savedToast": "Saklama süresi kaydedildi.",
-        "appliedToast": "Kayıt saklama süresi uygulandı"
+        "appliedToast": "Kayıt saklama süresi uygulandı",
+        "saveFailed": "Saklama ayarı kaydedilemedi.",
+        "confirmTitle_one": "Bu işlem {{count}} kaydı siler",
+        "confirmTitle_other": "Bu işlem {{count}} kaydı siler",
+        "confirmTitleUnknown": "Bu işlem kayıtları silebilir",
+        "confirmBody": "Ses ve transkript bu cihazdan kaldırılır ve geri getirilemez. Yıldızlı kayıtlar saklanır.",
+        "confirmAction_one": "{{count}} kaydı sil",
+        "confirmAction_other": "{{count}} kaydı sil",
+        "confirmActionUnknown": "Yine de uygula"
       },
       "alwaysOnMicrophone": {
-        "label": "Mikrofon Her Zaman Açık",
+        "label": "Mikrofon her zaman açık",
         "description": "İlk sözcükler asla kesilmesin diye mikrofonu hazır tutar. Biraz daha fazla pil harcar."
       },
       "clamshellMicrophone": {
-        "title": "Kapalı Kapak Mikrofonu",
+        "title": "Kapak kapalıyken mikrofon",
         "description": "Dizüstü bilgisayar kapağı kapalıyken kullanılacak mikrofon"
       },
       "postProcessingToggle": {
-        "label": "Son İşlem",
-        "description": "Transkripsiyon sonrası yapay zekâ destekli metin iyileştirmeyi etkinleştirir"
+        "label": "Yapay zekâ temizleme",
+        "description": "Transkripsiyondan sonra diktenizi yapay zekâ ile temizle"
       },
       "muteWhileRecording": {
-        "label": "Kayıt Sırasında Sessize Al",
+        "label": "Kayıt sırasında sesi kapat",
         "description": "Kayıt sırasında sistem sesini kapatır"
       },
       "appendTrailingSpace": {
-        "label": "Sonuna Boşluk Ekle",
-        "description": "Yapıştırılan transkripsiyondan sonra boşluk ekler"
+        "label": "Sona boşluk ekle",
+        "description": ""
       },
       "keyboardImplementation": {
-        "title": "Klavye Uygulaması",
+        "title": "Klavye altyapısı",
         "description": "Klavye kısayolları için kullanılacak altyapıyı seçin.",
         "bindingsReset": "Klavye kısayolları uyumsuzdu ve varsayılan ayarlara sıfırlandı"
       },
@@ -1072,10 +1431,10 @@
       },
       "pasteDelay": {
         "title": "Yapıştırma gecikmesi",
-        "description": "Yapıştırma tuşu göndermeden önce gecikme (milisaniye cinsinden). Yanlış metin yapıştırılıyorsa artırın."
+        "description": "Yapıştırmadan önce beklenecek milisaniye. Yanlış metin yapıştırılıyorsa artırın."
       },
       "recordingBuffer": {
-        "title": "Ekstra kayıt tamponu",
+        "title": "Ek kayıt tamponu",
         "description": "Tuşu bıraktıktan sonra kaydın sürdürüleceği milisaniye."
       }
     },
@@ -1083,7 +1442,7 @@
       "title": "Hakkında",
       "version": {
         "title": "Sürüm",
-        "description": "SpeakoFlow'nin mevcut sürümü"
+        "description": ""
       },
       "updates": {
         "title": "Güncellemeler",
@@ -1094,12 +1453,12 @@
         "title": "Klasörler"
       },
       "appDataDirectory": {
-        "title": "Uygulama Veri Dizini",
-        "description": "SpeakoFlow'nin verilerini sakladığı konum"
+        "title": "Uygulama veri klasörü",
+        "description": "SpeakoFlow'un modellerinizi, geçmişinizi ve ayarlarınızı sakladığı yer."
       },
       "sourceCode": {
-        "title": "Kaynak Kodu",
-        "description": "Kaynak kodunu görüntüle ve katkıda bulun",
+        "title": "Kaynak kodu",
+        "description": "",
         "button": "GitHub'da Görüntüle"
       },
       "license": {
@@ -1108,8 +1467,8 @@
         "button": "Lisansı görüntüle"
       },
       "supportDevelopment": {
-        "title": "Geliştirmeyi Destekle",
-        "description": "SpeakoFlow'yi geliştirmeye devam etmemize yardımcı olun",
+        "title": "Geliştirmeyi destekleyin",
+        "description": "SpeakoFlow'u geliştirmeye devam etmemize yardımcı olun",
         "button": "Bağış Yap"
       }
     },
@@ -1125,8 +1484,12 @@
       "brain": {
         "title": "Asistanın beyni",
         "whereLabel": "Nerede çalışır",
-        "onDevice": "Cihazımda",
-        "cloud": "Bulut sağlayıcısı",
+        "testLabel": "Bağlantıyı test et",
+        "testDescription": "Asistanın bu modele gerçekten ulaşabildiğini kontrol etmek için kısa bir soru gönderir. Cihaz içi modeller önce yüklenir, bu yüzden ilk test biraz sürebilir.",
+        "testButton": "Bağlantıyı test et",
+        "testing": "Test ediliyor…",
+        "onDevice": "Bu bilgisayarda",
+        "cloud": "Bulut",
         "downloadModel": "Modellere göz at ve indir",
         "downloadModelDescription": "Önerilen bir model seçin veya Hugging Face'te arayın.",
         "downloadModelAction": "Modellere göz at",
@@ -1147,7 +1510,7 @@
         "detailLocation": "Konum",
         "detailFormat": "Biçim",
         "detailId": "Model kimliği",
-        "switchBeforeDelete": "Bunu silmeden önce yerleşik asistanı başka bir modele geçirin.",
+        "switchBeforeDelete": "Bu model kullanımda. Silmeden önce başka bir modele geçin.",
         "deleteModelConfirm": "{{modelName}} silinsin mi? İndirilen dosyaları ve kayıtlı girdisi kaldırılacak.",
         "deleteModelFailed": "Model silinemedi.",
         "finderSectionTitle": "Daha fazla cihaz içi model",
@@ -1195,7 +1558,7 @@
         "builtinEngineExtracting": "Yerel motor kuruluyor…",
         "builtinEngineReady": "Yerel motor hazır.",
         "contextSizeLabel": "Bağlam penceresi",
-        "contextSizeDescription": "Yerel modelin bir seferde akılda tutabileceği miktar — sistem talimatları, sohbet geçmişiniz, varsa ekran görüntüsü (tek bir görüntü büyük bir bölümü yiyebilir) ve modelin yanıtı. Daha büyüğü daha fazlasını tutar, ekran görüşünü ve web aramasını güvenilir kılar, ancak daha fazla bellek kullanır. Varsayılan 8192'dir; makinenizin ayıracak RAM'i varsa 16384 iyi bir üst adımdır. Bellekten tasarruf etmek için sonradan düşürebilirsiniz.",
+        "contextSizeDescription": "Modelin sohbetin ne kadarını aynı anda okuyabileceği. Daha büyüğü daha fazlasını hatırlar, ancak daha fazla bellek kullanır ve daha yavaş yüklenir.",
         "unloadTimeoutLabel": "Şu süre sonra bellekten boşalt",
         "unloadTimeoutDescription": "Yerel model bu süre boyunca kullanılmadığında bellekten boşaltarak yer açın. Sonraki kullanımda otomatik olarak yeniden yüklenir."
       },
@@ -1206,7 +1569,7 @@
       },
       "characters": {
         "title": "Profiller",
-        "description": "Aralarında geçiş yapabileceğiniz, göreve odaklı profiller. Etkin profil asistanın adını, rolünü ve talimatlarını — ayrıca yanıtlarının uzunluğunu — belirler. Panel başlığından istediğiniz zaman değiştirin.",
+        "description": "Kendi adı, talimatları ve yanıt uzunluğu olan karakterler. Panelden istediğiniz zaman değiştirin.",
         "galleryLabel": "Profilleriniz",
         "editSection": "Profili düzenle",
         "avatarLabel": "Avatar",
@@ -1264,7 +1627,7 @@
       },
       "autoSummarize": {
         "label": "Uzun sohbetleri özetle",
-        "description": "Bir konuşma modelin bağlam penceresini aştığında, sohbet başlangıcını unutmak yerine bağlamını koruyabilmesi için eski mesajları otomatik olarak sürekli güncellenen bir özete sıkıştırır. Çalışırken hafif bir gösterge görünür."
+        "description": "Asistanın başlangıcı unutmaması için uzun sohbetleri özetler."
       },
       "responseLength": {
         "label": "Yanıt uzunluğu",
@@ -1278,7 +1641,7 @@
       },
       "vision": {
         "timing": {
-          "label": "Ne zaman yakalanacak"
+          "label": "Yakalama zamanı"
         },
         "screenRecording": {
           "description": "Ekran görüşü, macOS Ekran Kaydı iznine ihtiyaç duyar. İzni Sistem Ayarları'ndan verin, ardından etkili olması için SpeakoFlow'u yeniden başlatın.",
@@ -1327,26 +1690,84 @@
       },
       "tts": {
         "title": "Ses çıkışı",
-        "enableLabel": "Yanıtları sesli oku",
-        "enableDescription": "Asistanın yanıtlarını yüksek sesle okur.",
+        "enableLabel": "Sohbetlerde yanıtları sesli oku",
+        "enableDescription": "Canlı bir sohbetteyken yanıtları yüksek sesle okur. Hızlı metin yanıtları hiçbir zaman seslendirilmez.",
         "stopOnDictationLabel": "Dikte başlayınca konuşmayı durdur",
         "stopOnDictationDescription": "Dikte etmeye başladığınızda hâlâ çalmakta olan yanıtı durdurur.",
         "engineLabel": "Motor",
-        "engineDescription": "Kokoro bu bilgisayarda ücretsiz çalışır. Bulut motorları ilgili sağlayıcının API anahtarını kullanır. Özel seçeneği, kendi çalıştırdığınız bir konuşma sunucusuna bağlanır.",
+        "engineDescription": "Bu bilgisayardaki sesler ücretsiz ve gizlidir, internetsiz çalışır. Bulut sesleri ilgili sağlayıcının API anahtarını kullanır. Özel seçeneği, kendi çalıştırdığınız bir konuşma sunucusuna bağlanır.",
+        "sectionLocal": "Bu bilgisayarda",
+        "sectionLocalHint": "Ücretsiz ve gizli. Bu bilgisayarda çalışır, çevrimdışı da çalışır.",
+        "sectionCloud": "Bulut",
+        "sectionCloudHint": "Sağlayıcıdan bir API anahtarı gerekir. Özel, kendi çalıştırdığınız bir konuşma sunucusuna bağlanır.",
+        "readyLabel": "Kullanıma hazır",
         "kokoroSetupLabel": "Kokoro ses modeli",
         "kokoroSetupDescription": "Bir kez indirin; sonrasında sesli yanıtlar bu cihazda gizlilik içinde çalışır.",
         "kokoroDownload": "Kokoro'yu indir",
         "kokoroDownloading": "Kokoro indiriliyor",
         "kokoroReady": "Bu cihazda hazır",
         "kokoroRetry": "İndirmeyi yeniden dene",
+        "runsOnLabel": "Çalıştığı yer",
+        "runsOn": {
+          "auto": "Otomatik",
+          "gpu": "Ekran kartı",
+          "cpu": "İşlemci"
+        },
+        "runsOnStatus": {
+          "checking": "Çalıştığında ekran kartını, çalışmadığında işlemciyi kullanır.",
+          "gpu": "Ekran kartında konuşuyor.",
+          "processor": "İşlemcide konuşuyor.",
+          "gpuUnusable": "İşlemcide konuşuyor, çünkü ekran kartı bu bilgisayarda sesi çalıştıramıyor.",
+          "needsPack": "Ekran kartı bu bilgisayarda sesi çalıştıramıyor. Hızlı yanıtlar için aşağıdan işlemci sesini indirin.",
+          "cpuNeedsPack": "Aşağıdan işlemci sesini indirin. O zamana kadar Kokoro uygulamanın içinde çalışır ve bu yavaştır.",
+          "loadFailed": "İşlemci sesi bu bilgisayarda başlatılamadı, bu yüzden Kokoro şimdilik uygulamanın içinde çalışıyor.",
+          "noNativeSlow": "Ekran kartı bu bilgisayarda sesi çalıştıramıyor, bu yüzden Kokoro uygulamanın içinde yavaş çalışıyor. Bir bulut sesi daha hızlı olur.",
+          "gpuForcedUnusable": "Ekran kartı bu bilgisayarda sesi düzgün çalıştıramıyor. Çalıştığı yer ayarını Otomatik veya İşlemci yapın."
+        },
+        "kokoroNativeLabel": "İşlemci sesi",
+        "kokoroNativeDescription": "Ekran kartı yetersiz kaldığında Kokoro'nun işlemcide hızlı konuşmasını sağlar. {{size}} indirme.",
+        "kittenSizeLabel": "Kitten boyutu",
+        "kittenSizeDescription": "Üç boyutta da aynı sekiz ses var. Büyük boyutlar daha doğal ses çıkarır ama konuşmaya başlamaları daha uzun sürer, özellikle zayıf bir işlemcide.",
+        "kittenSizes": {
+          "nano": "Nano · en hızlı ({{size}})",
+          "micro": "Micro · dengeli ({{size}})",
+          "mini": "Mini · en doğal ({{size}})"
+        },
+        "packLabel": {
+          "kitten": "Kitten sesi",
+          "pocket": "Pocket TTS sesi",
+          "supertonic": "Supertonic sesi"
+        },
+        "packDescription": {
+          "kitten": "İşlemcide çalışan küçük bir ses. {{size}} indirme.",
+          "pocket": "Kyutai'nin işlemciler için yapılmış, 14 konuşmacılı doğal sesi. {{size}} indirme.",
+          "supertonic": "Supertone'un on konuşmacılı, hızlı ve net sesi. {{size}} indirme."
+        },
+        "voiceNamedFemale": "{{name}} (kadın)",
+        "voiceNamedMale": "{{name}} (erkek)",
+        "voiceNumberedFemale": "Kadın {{n}}",
+        "voiceNumberedMale": "Erkek {{n}}",
+        "packSize": "{{size}} MB",
+        "packDownload": "İndir ({{size}})",
+        "packDownloading": "İndiriliyor",
+        "packInstalling": "Kuruluyor",
+        "packCancel": "İndirmeyi iptal et",
+        "packRemove": "Kaldır",
+        "packUnsupported": "Bu sistemde kullanılamıyor",
+        "kittenSuggestLabel": "Kitten'ı deneyin",
+        "kittenSuggestDescription": "Bu bilgisayarın işlemcisi zayıf. Kitten, burada daha hızlı yanıt veren daha hafif bir ses.",
+        "kittenSuggestButton": "Kitten'ı kullan",
         "engines": {
           "kokoro": "Kokoro (yerel, ücretsiz)",
+          "kitten": "Kitten (yerel, hafif)",
+          "pocket": "Pocket TTS (yerel)",
+          "supertonic": "Supertonic (yerel)",
           "openai": "OpenAI",
+          "elevenlabs": "ElevenLabs",
           "openrouter": "OpenRouter",
           "deepgram": "Deepgram Aura",
           "cartesia": "Cartesia Sonic",
           "google": "Google Cloud TTS",
-          "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech",
           "groq": "Groq Orpheus",
           "xai": "xAI Grok Voice",
@@ -1357,18 +1778,24 @@
         "voiceLabel": "Ses",
         "voiceDescription": "Sesli yanıtlar için Kokoro sesi.",
         "dtypeLabel": "Kokoro hassasiyeti",
-        "dtypeDescription": "fp32 en yüksek kalitedir; q8 CPU'da daha hızlıdır. Bunu değiştirmek modeli yeniden yükler.",
+        "dtypeDescription": "Yalnızca uygulamanın içinde çalışan Kokoro için. fp32 en yüksek kalitedir; q8 daha küçüktür. Bunu değiştirmek modeli yeniden yükler. Ses bozuk geliyorsa Çalıştığı yer ayarını İşlemci yapın.",
         "speedLabel": "Oynatma hızı",
         "speedDescription": "1× normal hızdır.",
         "speedRange": "{{engine}}, {{min}}× ile {{max}}× arasını destekler; diğer hızlar en yakın sınıra ayarlanır.",
         "speedUnsupported": "{{engine}} her zaman doğal hızında konuşur.",
         "speedValue": "{{value}}×",
         "speedCustomLabel": "Özel oynatma hızı",
+        "volumeLabel": "Konuşma ses düzeyi",
+        "volumeDescription": "Sesli yanıtların ne kadar yüksek olduğu. Geri bildirim seslerinden ayrıdır.",
         "testLabel": "Sesi test et",
         "testDescription": "Geçerli ayarlarla kısa bir örnek çalın.",
         "testButton": "Sesi test et",
         "testing": "Test ediliyor…",
         "testOk": "Çalındı ✓",
+        "testFailed": "Kokoro örneği oluşturamadı. Tekrar deneyin ya da Çalıştığı yer ayarını İşlemci yapın.",
+        "testGpuMoved": "Ekran kartınız örneği bozdu, bu yüzden sessize alındı. Kokoro artık işlemciyi kullanıyor; duymak için yeniden test edin.",
+        "testGpuForced": "Ekran kartınız örneği bozdu, bu yüzden sessize alındı. Çalıştığı yer ayarını Otomatik veya İşlemci yapın.",
+        "testGpuSuspect": "Örnek bozuk çıktı, bu yüzden sessize alındı. Ekran kartınızı kontrol etmek için yeniden test edin.",
         "testPhrase": "Merhaba! Bu, SpeakoFlow'un ses çıkışı testidir.",
         "downloadStart": "Kokoro sesi indiriliyor…",
         "downloadProgress": "Kokoro sesi indiriliyor… %{{progress}}",
@@ -1400,7 +1827,21 @@
         "elevenVoiceLabel": "Ses ID'si",
         "elevenVoiceDescription": "ElevenLabs ses ID'si (panolarındaki Voices sekmesinden).",
         "promptLabel": "Özet Prompt'u",
-        "promptDescription": "Her yanıtın kısa sesli özetini oluşturmak için talimatlar."
+        "promptDescription": "Her yanıtın kısa sesli özetini oluşturmak için talimatlar.",
+        "kokoroVoices": {
+          "usFemale": "{{name}} (ABD, kadın)",
+          "usFemaleSoft": "{{name}} (ABD, kadın, yumuşak)",
+          "usMale": "{{name}} (ABD, erkek)",
+          "ukFemale": "{{name}} (Birleşik Krallık, kadın)",
+          "ukMale": "{{name}} (Birleşik Krallık, erkek)"
+        },
+        "dtypes": {
+          "fp32": "fp32 (en iyi kalite, WebGPU)",
+          "fp16": "fp16 (yarım hassasiyet)",
+          "q8": "q8 (8 bit, CPU'da hızlı)",
+          "q4": "q4 (4 bit, en hızlı)",
+          "q4f16": "q4f16 (4 bit karma)"
+        }
       },
       "appearance": {
         "title": "Panel görünümü",
@@ -1413,7 +1854,8 @@
         "fontSizes": {
           "small": "Küçük",
           "medium": "Orta",
-          "large": "Büyük"
+          "large": "Büyük",
+          "extraLarge": "Çok büyük"
         },
         "panelSizeLabel": "Panel boyutu",
         "panelSizeDescription": "Yüzen asistan panelinin genel boyutu.",
@@ -1422,6 +1864,22 @@
           "compact": "Kompakt",
           "standard": "Standart",
           "large": "Büyük"
+        },
+        "askDisplayLabel": "Hangi ekran",
+        "askDisplayDescription": "Asistanın açıldığı ekran. Varsayılan olarak farenizin bulunduğu ekran.",
+        "askDisplays": {
+          "cursor": "Farenin bulunduğu ekran",
+          "numbered": "Ekran {{number}} ({{width}}×{{height}}){{suffix}}",
+          "mainSuffix": " · ana"
+        },
+        "askAnchorLabel": "Açıldığı yer",
+        "askAnchorDescription": "Asistanın her seferinde açıldığı yer.",
+        "askAnchors": {
+          "center": "Ekranın ortası",
+          "top": "Üst",
+          "bottom": "Alt",
+          "left": "Sol taraf",
+          "right": "Sağ taraf"
         },
         "opacityLabel": "Panel opaklığı",
         "opacityDescription": "Yüzen panelin ne kadar opak olduğu. %100 tamamen katıdır; daha düşük değerlerde masaüstü bulanık olarak görünür."
@@ -1434,9 +1892,9 @@
     "updateAvailable": "Güncelleme mevcut: {{version}}",
     "updateAvailableShort": "Güncelleme mevcut",
     "upToDate": "Güncel",
-    "downloadUpdate": "Güncellemeyi İndir",
+    "downloadUpdate": "Güncellemeyi indir",
     "restart": "Yeniden Başlat",
-    "updateCheckingDisabled": "Güncelleme Kontrolü Devre Dışı",
+    "updateCheckingDisabled": "Güncelleme kontrolü kapalı",
     "downloading": "İndiriliyor… %{{progress}}",
     "installing": "Yükleniyor…",
     "preparing": "Hazırlanıyor…",
@@ -1447,6 +1905,181 @@
     "portableUpdateTitle": "Elle güncelleme gerekiyor",
     "portableUpdateMessage": "Taşınabilir kurulumlar otomatik olarak güncellenemez. Güncellemek için: GitHub Releases'ten en son NSIS yükleyicisini indirin, aynı klasöre kurun, ardından Data/ klasörünüzü (ayarlar, modeller, kayıtlar) eski sürümden yenisine kopyalayın.",
     "portableUpdateButton": "GitHub Releases'i aç"
+  },
+  "meetings": {
+    "newTitle": "Toplantı {{when}}",
+    "speakers": {
+      "me": "Siz",
+      "others": "Diğerleri",
+      "numbered": "Konuşmacı {{number}}"
+    },
+    "recorder": {
+      "idleTitle": "Toplantı kaydet",
+      "idleCaption": "Mikrofonunuzu ve diğer katılımcıları iki ayrı akış olarak kaydeder.",
+      "recording": "Kaydediliyor",
+      "paused": "Duraklatıldı",
+      "liveCaption": "Konuşuldukça yazıya dökülüyor.",
+      "start": "Kaydı başlat",
+      "starting": "Başlatılıyor…",
+      "stop": "Durdur",
+      "stopping": "Durduruluyor…",
+      "stoppingHint": "Transkript tamamlanıyor. Uzun bir toplantıda bu biraz sürebilir.",
+      "pause": "Duraklat",
+      "resume": "Sürdür",
+      "transcriptEmpty": "Henüz yazıya dökülen bir şey yok. İnsanlar konuştukça burada görünür."
+    },
+    "offer": {
+      "detected": "Bir görüşmedesiniz gibi görünüyor. Kaydedilsin mi?",
+      "detectedApp": "{{app}} bir görüşmede gibi görünüyor. Kaydedilsin mi?",
+      "idle": "Kayıt yapılmıyor",
+      "record": "Bu görüşmeyi kaydet",
+      "dismiss": "Bu sefer değil"
+    },
+    "autoDetect": {
+      "title": "Görüşmeleri kaydetmeyi öner",
+      "description": "Başka bir uygulama mikrofonunuzu kullanmaya başladığında bunu fark eder ve kaydetmeyi önerir. Asla kendiliğinden başlamaz. Yanlış tahmin ederse kartı kapatmanız yeterli.",
+      "unsupported": "Görüşme algılama şimdilik yalnızca Windows'ta kullanılabilir. Bu sistemde toplantıyı kendiniz başlatın."
+    },
+    "indicator": {
+      "title": "Yüzen gösterge",
+      "description": "Kaydın sürdüğünü gösteren küçük bir kapsül. Canlı transkript için üzerine tıklayın. Ekranınızı temiz tutmak için kapatın; kayıt bu durumda burada kalır ve bu sayfadan durdurursunuz.",
+      "hide": "Yüzen göstergeyi gizle",
+      "show": "Yüzen göstergeyi göster"
+    },
+    "pill": {
+      "expand": "Canlı transkripti aç",
+      "collapse": "Küçük kapsüle dön",
+      "stop": "Kaydı durdur",
+      "listening": "Dinleniyor. Söylenenler burada görünür.",
+      "micOnly": "Yalnızca mikrofonunuz kaydediliyor — diğer katılımcıların söyledikleri bu transkriptte yer almayacak."
+    },
+    "ask": {
+      "placeholder": "Bu toplantıyla ilgili her şeyi sorun…",
+      "send": "Sor",
+      "stop": "Durdur",
+      "thinking": "Transkript okunuyor…",
+      "title": "Bu toplantı hakkında sorun",
+      "empty": "Nelere karar verildiğini, hangi işin kimde olduğunu ya da gündeme gelen başka herhangi bir şeyi sorun.",
+      "clear": "Bu soruları temizle",
+      "youAsked": "Sorunuz"
+    },
+    "systemAudio": {
+      "liveTitle": "Yalnızca sizin sesiniz kaydediliyor",
+      "liveBody": "Sistem sesi yakalanamadı; bu yüzden bu toplantı konuşmanın yalnızca sizin tarafınızı içerecek, diğer katılımcıların söylediklerini içermeyecek.",
+      "unavailableTitle": "Diğer katılımcılar bu makinede kaydedilemiyor",
+      "unavailableBody": "Sistem sesi yakalama kullanılamıyor; bu yüzden şu an kaydedilecek bir toplantı yalnızca sizin sesinizi içerir.",
+      "help": "Kurulum yardımı"
+    },
+    "list": {
+      "title": "Kaydedilen toplantılar",
+      "emptyTitle": "Henüz toplantı yok",
+      "emptyHint": "Bir görüşmeden önce kaydı başlatın; SpeakoFlow transkripti kimin konuştuğuna göre ayrılmış olarak saklar.",
+      "loadMore": "Daha fazla yükle",
+      "speakers_one": "{{count}} konuşmacı",
+      "speakers_other": "{{count}} konuşmacı",
+      "hasNotes": "Notlar oluşturuldu",
+      "notesBadge": "Notlar"
+    },
+    "status": {
+      "recording": "Kaydediliyor",
+      "processing": "İşleniyor",
+      "complete": "Tamamlandı",
+      "interrupted": "Yarıda kesildi"
+    },
+    "delete": {
+      "action": "Toplantıyı sil",
+      "whileRecording": "Bu toplantıyı silmeden önce kaydı durdurun."
+    },
+    "detail": {
+      "title": "Toplantı",
+      "rename": "Toplantıyı yeniden adlandır",
+      "gone": "Bu toplantı silindi.",
+      "tabsLabel": "Toplantı görünümleri"
+    },
+    "tabs": {
+      "myNotes": "Düşüncelerim",
+      "transcript": "Transkript",
+      "summary": "Özet",
+      "ask": "Sor"
+    },
+    "myNotes": {
+      "description": "Sizin için önemli olanı yazın. Notlar oluşturulurken transkriptle birleştirilir.",
+      "placeholder": "Bu toplantıdan hatırlamak istedikleriniz…",
+      "saving": "Kaydediliyor…",
+      "saved": "Kaydedildi"
+    },
+    "transcript": {
+      "empty": "Bu toplantının transkripti yok.",
+      "loadingMore": "Transkriptin devamı yükleniyor…",
+      "renameSpeaker": "Bu konuşmacıyı yeniden adlandır",
+      "lowConfidence": "Belirsiz",
+      "lowConfidenceHelp": "Bu konuşmacı etiketi bir tahmin. Sözcükler söylendiği gibi yazıya döküldü; yalnızca kimin söylediği belirsiz."
+    },
+    "diarize": {
+      "title": "Konuşmacıları ayırt et",
+      "ready": "Diğer katılımcıları Konuşmacı 1, Konuşmacı 2 vb. olarak gruplayın.",
+      "needsModel": "Tek seferlik {{size}} MB indirme gerekir. Ardından makinenizde çalışır ve sonraki her toplantı otomatik olarak etiketlenir.",
+      "install": "İndir ve tanımla",
+      "downloading": "İndiriliyor…",
+      "identify": "Konuşmacıları tanımla",
+      "running": "Dinleniyor…",
+      "progress": "Sesler karşılaştırılıyor, {{done}}/{{total}} bölüm.",
+      "oneSpeaker": "Bu görüşmede yalnızca bir başka ses vardı, bu yüzden ayırt edilecek kimse yok.",
+      "skipped": {
+        "modelNotInstalled": "Konuşmacı modeli henüz yüklü değil.",
+        "noSystemAudio": "Bu toplantıda diğer katılımcıların kaydı yok.",
+        "audioUnreadable": "Diğer katılımcıların kaydı okunamadı. Bu, uygulama toplantının ortasında kapatıldığında olur.",
+        "tooFewSegments": "Diğer katılımcılardan karşılaştırmaya yetecek kadar konuşma yok.",
+        "alreadyDone": "Bu toplantıdaki konuşmacılar zaten tanımlandı.",
+        "modelUnusable": "Konuşmacı modeli yüklenemedi, bu yüzden kaldırıldı. Yeniden indirin."
+      }
+    },
+    "summary": {
+      "template": "Şablon",
+      "templates": {
+        "general": "Genel",
+        "standup": "Günlük toplantı",
+        "one_on_one": "Birebir görüşme",
+        "interview": "Mülakat",
+        "action_items": "Yapılacaklar"
+      },
+      "templateHints": {
+        "general": "Özet, önemli çıkarımlar, konular, kararlar ve sonraki adımlar. Varsayılan.",
+        "standup": "Kişiye göre gruplanır: neyi bitirdi, sırada ne var, onu ne engelliyor.",
+        "one_on_one": "Konular, geri bildirimler ve her kişinin üstlendikleri.",
+        "interview": "Aday hakkındaki kanıtlar, bir hüküm olmadan.",
+        "action_items": "Yalnızca görevler; sizinkiler ve diğerlerininkiler olarak ayrılır."
+      },
+      "generate": "Not oluştur",
+      "regenerate": "Yeniden oluştur",
+      "rewrite": "Farklı bir şablonla yeniden yaz",
+      "generating": "Notlar yazılıyor…",
+      "writing": "Bu toplantının notları yazılıyor. Uzun bir görüşmede bu biraz sürer.",
+      "autoCaption": "Görüşme bittiğinde yazıldı",
+      "retryCaption": "Bu toplantının notları henüz yazılmadı.",
+      "copy": "Kopyala",
+      "copied": "Kopyalandı",
+      "toggleTask": "Bu adımı tamamlandı ya da tamamlanmadı olarak işaretle",
+      "failed": "Notlar yazılamadı: {{error}}",
+      "tryAgain": "Tekrar dene",
+      "empty": "Bu toplantı için henüz not yok.",
+      "needsTranscript": "Özetlenecek bir transkript yok.",
+      "skipped_one": "Transkriptin bir bölümü özetlenemedi, bu yüzden bu notlarda bir boşluk var.",
+      "skipped_other": "Transkriptin {{count}} bölümü özetlenemedi, bu yüzden bu notlarda boşluklar var."
+    },
+    "errors": {
+      "startFailed": "Toplantı başlatılamadı: {{error}}",
+      "stopFailed": "Toplantı durdurulamadı: {{error}}",
+      "pauseFailed": "Kayıt değiştirilemedi: {{error}}",
+      "loadFailed": "Toplantılar yüklenemedi: {{error}}",
+      "transcriptFailed": "Transkript yüklenemedi: {{error}}",
+      "deleteFailed": "Toplantı silinemedi: {{error}}",
+      "renameFailed": "Toplantı yeniden adlandırılamadı: {{error}}",
+      "renameSpeakerFailed": "Konuşmacı yeniden adlandırılamadı: {{error}}",
+      "notesSaveFailed": "Notlarınız kaydedilemedi: {{error}}",
+      "copyFailed": "Notlar kopyalanamadı: {{error}}",
+      "generateFailed": "Notlar oluşturulamadı: {{error}}"
+    }
   },
   "common": {
     "loading": "Yükleniyor…",
@@ -1471,16 +2104,28 @@
     "noOptionsFound": "Seçenek bulunamadı",
     "back": "Geri",
     "showAdvanced": "Daha fazla seçenek",
-    "showLess": "Daha az göster"
+    "showLess": "Daha az göster",
+    "beta": "Beta",
+    "select": "Seçin…",
+    "search": "Ara",
+    "moreInfo": "Daha fazla bilgi",
+    "change": "Değiştir",
+    "saveFailed": "Bu değişiklik kaydedilemedi. Tekrar deneyin.",
+    "more": "Daha fazla",
+    "hideTips": "İpuçlarını gizle",
+    "showTips": "İpuçlarını göster",
+    "play": "Oynat",
+    "pause": "Duraklat",
+    "unknownSize": "Bilinmeyen boyut"
   },
   "accessibility": {
-    "permissionsRequired": "Erişilebilirlik İzinleri Gerekli",
+    "permissionsRequired": "Erişilebilirlik izinleri gerekli",
     "permissionsDescription": "SpeakoFlow, transkribe edilen metni yazabilmek için erişilebilirlik izinlerine ihtiyaç duyar.",
     "openSettings": "Sistem Ayarlarını Aç",
     "dismiss": "Yoksay"
   },
   "errors": {
-    "loadDirectory": "Dizin yüklenirken hata oluştu: {{error}}",
+    "loadDirectory": "Dizin yüklenemedi: {{error}}",
     "micPermissionDeniedTitle": "Mikrofon erişimi reddedildi",
     "micPermissionDenied": {
       "generic": "Mikrofon erişimi işletim sistemi tarafından reddedildi. Lütfen sistem ayarlarından mikrofon iznini verin.",
@@ -1493,31 +2138,43 @@
     "recordingFailed": "Kayıt başlatılamadı: {{error}}",
     "modelLoadFailed": "Model yüklenemedi: {{model}}",
     "modelLoadFailedUnknown": "bilinmeyen model",
+    "loadModelsFailed": "Modeller yüklenemedi: {{error}}",
+    "switchModelFailed": "Model değiştirilemedi: {{error}}",
+    "cancelDownloadFailed": "İndirme iptal edilemedi: {{error}}",
+    "deleteModelFailed": "Model silinemedi: {{error}}",
+    "extractModelFailed": "Model çıkarılamadı: {{error}}",
     "downloadFailedTitle": "İndirme başarısız oldu",
     "pasteFailedTitle": "Metin yapıştırılamadı",
     "pasteFailed": "Metin etkin uygulamaya yapıştırılamadı."
   },
   "appLanguage": {
-    "title": "Uygulama Dili",
+    "title": "Uygulama dili",
     "description": "SpeakoFlow arayüzünün dilini değiştirin"
   },
   "overlay": {
     "preparing": "Mikrofon hazırlanıyor…",
     "recording": "Kaydediliyor",
     "transcribing": "Transkribe ediliyor…",
-    "processing": "İşleniyor…",
+    "processing": "Temizleniyor…",
     "generating": "Flow ile yazılıyor…",
     "vision": "Ekranınıza bakılıyor…",
     "notices": {
       "flowNotConfigured": "Flow bir asistan modeline ihtiyaç duyuyor — dikte olarak yapıştırıldı",
       "flowFailed": "Flow oluşturamadı — hiçbir şey yapıştırılmadı",
+      "cloudSttFailed": "Bulut transkripsiyonu başarısız oldu — Ayarlar'da anahtarınızı ve bakiyenizi kontrol edin",
       "flowEmpty": "Etkinleştirme ifadesinden sonra bir komut söyleyin",
+      "cleanupFallback": "Yapay zekâ temizleme çalışmadı — ham metin yapıştırıldı",
+      "cleanupModelRejected": "Temizleme sağlayıcınız bu modeli reddetti — Ayarlar'da modeli kontrol edin",
       "cloudSttFellBack": "Bulut transkripsiyonu yanıt vermedi — cihazdaki model kullanıldı",
-      "cleanupFallback": "Yapay zekâ temizleme çalışmadı — ham metin yapıştırıldı"
+      "noSpeechModel": "Henüz konuşma modeli yok. Modeller sayfasından bir tane seçin"
     },
     "listening": "Dinleniyor…",
     "locked": "Eller serbest kaydediliyor — durdurmak için kısayola tekrar basın",
     "cancel": "İptal",
+    "copy": "Transkripti kopyala",
+    "transcript": "Transkript",
+    "copied": "Kopyalandı",
+    "copyFailed": "Kopyalanamadı — tekrar deneyin",
     "done": "Bitti",
     "askAssistant": "Bunu yazmak yerine asistana sor",
     "recovery": {
@@ -1525,28 +2182,139 @@
       "failed": "Yazıya dökme başarısız",
       "undo": "Geri al",
       "retry": "Tekrar dene"
+    },
+    "downloading": {
+      "title": "Konuşma modeli indiriliyor…",
+      "percent": "Konuşma modeli indiriliyor · %{{percent}}",
+      "hint": "İndirme bitince dikte çalışmaya başlar"
+    }
+  },
+  "reminders": {
+    "title": "Hatırlatıcı",
+    "due": {
+      "now": "az önce",
+      "minutesAgo": "{{count}} dk önce",
+      "hoursAgo": "{{count}} sa önce"
+    },
+    "done": "Tamam",
+    "snooze": "Ertele",
+    "snoozeFor_one": "{{count}} dakika",
+    "snoozeFor_other": "{{count}} dakika",
+    "snoozedTimes_one": "Bir kez ertelendi",
+    "snoozedTimes_other": "{{count}} kez ertelendi",
+    "later": "Şimdilik gizle — hatırlatıcı kurulu kalır",
+    "settings": {
+      "label": "Hatırlatıcılar",
+      "description": "Asistandan size bir şeyi hatırlatmasını isteyin; zamanı gelene kadar burada listelenir.",
+      "empty": "Planlanmış bir şey yok. Asistandan size bir şeyi hatırlatmasını isteyin.",
+      "waiting": "Sizi bekliyor",
+      "cancel": "Bu hatırlatıcıyı iptal et",
+      "dueAt": "Zamanı: {{when}}"
     }
   },
   "assistant": {
+    "conversation": {
+      "title": "Görüşme",
+      "newChat": "Yeni sohbet",
+      "type": "Bir mesaj yazın",
+      "backToVoice": "Sese dön",
+      "mute": "Mikrofonu kapat",
+      "unmute": "Mikrofonu aç",
+      "speakerOn": "Yanıtları sesli oku",
+      "speakerOff": "Yanıtları sesli okumayı durdur",
+      "expand": "Sohbeti aç",
+      "collapse": "Görüşme çubuğuna dön",
+      "historyOpen": "Geçmiş sohbetler",
+      "historyClose": "Bu sohbete dön",
+      "end": "Görüşmeyi bitir",
+      "send": "Gönder",
+      "stop": "Yanıtı durdur",
+      "placeholder": "Mesaj: {{name}}",
+      "dismiss": "Kapat",
+      "retry": "Tekrar dene",
+      "details": "Ayrıntılar",
+      "startHint": "Konuşmaya başlayın ya da bir mesaj yazın.",
+      "mutedHint": "Mikrofon kapalı. Yine de yazabilirsiniz.",
+      "preparingVoice": "Ses hazırlanıyor… %{{progress}}",
+      "history": {
+        "title": "Geçmiş sohbetler",
+        "hint": "Kaldığınız yerden devam etmek için birini seçin. Görüşme bağlı kalır.",
+        "empty": "Henüz kayıtlı sohbet yok.",
+        "loading": "Yükleniyor…",
+        "failed": "Sohbetleriniz yüklenemedi.",
+        "more": "Daha fazla göster",
+        "untitled": "Adsız sohbet",
+        "current": "Şu an açık",
+        "messages_one": "{{count}} mesaj",
+        "messages_other": "{{count}} mesaj"
+      },
+      "options": "Görüşme seçenekleri",
+      "pace": "Sözünüzü bitirme süresi",
+      "paceHint": "Siz duraksadıktan sonra yanıt vermeden önce ne kadar bekleneceği.",
+      "paces": {
+        "quick": "Hızlı",
+        "natural": "Doğal",
+        "patient": "Sabırlı"
+      },
+      "sensitivity": "Mikrofon hassasiyeti",
+      "sensitivityHint": "Bir sesin ne kadar kolay sizin konuşmanız sayılacağı. Arka plan gürültüsü ya da asistanın kendi sesi araya girip duruyorsa düşürün.",
+      "sensitivities": {
+        "low": "Düşük — gürültülü oda veya hoparlör",
+        "normal": "Normal",
+        "high": "Yüksek — sessiz oda veya kulaklık"
+      },
+      "phase": {
+        "off": "Görüşme sona erdi",
+        "starting": "Bağlanıyor…",
+        "listening": "Dinliyor",
+        "hearing": "Dinliyor…",
+        "transcribing": "Yazıya dökülüyor…",
+        "responding": "Düşünüyor…",
+        "speaking": "Konuşuyor",
+        "muted": "Mikrofon kapalı",
+        "error": "Görüşme kesildi"
+      },
+      "errors": {
+        "microphone": "Mikrofonunuz açılamadı. Mikrofon erişimine izin verin ve başka bir uygulama tarafından kullanılmadığını kontrol edin.",
+        "device": "Mikrofonunuzun bağlantısı kesildi. Yeniden bağlayın ve tekrar deneyin.",
+        "setup": "Sohbet başlatılamadı. Ayarlar'da mikrofonunuzu, hoparlörünüzü ve asistan modelinizi kontrol edin.",
+        "turn": "Bu yanıt tamamlanamadı. Ayrıntılara bakın ve tekrar deneyin.",
+        "playback": "Sesli yanıt oynatılamadı. Ses sağlayıcınızı ve çıkış aygıtınızı kontrol edin.",
+        "tooLong": "Bu kayıt bir dakikalık sınıra ulaştı. Daha kısa konuşarak tekrar deneyin.",
+        "history": "Bu sohbet açılamadı. Tekrar deneyin."
+      },
+      "chooseProfile": "Profili değiştir, şu anki: {{name}}",
+      "profiles": "Profiller",
+      "profileHint": "Değişiklikler bir sonraki yanıtınızda geçerli olur.",
+      "chatOnlyProfile": "Bu profil yalnızca sohbette kullanılabilir.",
+      "profileError": "Profil değiştirilemedi. Tekrar deneyin."
+    },
     "title": "Asistan",
     "character": {
       "switch": "Profili değiştir"
     },
     "empty": "Asistan kısayolunuzla sesle sorun,\nya da aşağıya yazın.",
     "inputPlaceholder": "Mesaj…",
-    "queuedUntilReady": "Sırada — bu yanıt biter bitmez gönderilecek.",
+    "bar": {
+      "placeholder": "Ne isterseniz sorun…"
+    },
     "send": "Gönder",
     "stop": "Durdur",
     "cancel": "İptal",
-    "clear": "Konuşmayı temizle",
     "copy": "Kopyala",
     "copyCode": "Kodu kopyala",
+    "insert": "Bunu yazdığınız yere ekle",
+    "insertShort": "Ekle",
+    "insertReplace": "Seçili metninizi bununla değiştir",
+    "insertReplaceShort": "Değiştir",
+    "selectionAttached_one": "{{count}} karakter seçildi",
+    "selectionAttached_other": "{{count}} karakter seçildi",
     "regenerate": "Yanıtı yeniden oluştur (eskisi Geçmiş'te kalır)",
     "summarizing": "Önceki mesajlar özetleniyor…",
     "screenAttached": "Ekran",
     "attach": {
       "file": "Bir görüntü veya dosya ekle",
-      "imageCount": "{{count}} görüntü",
+      "imageCount_one": "{{count}} görüntü",
       "imageCount_other": "{{count}} görüntü",
       "dropHint": "Eklemek için bırakın"
     },
@@ -1563,13 +2331,13 @@
       "listening": "Dinleniyor…",
       "locked": "Dinleniyor",
       "transcribing": "Transkribe ediliyor…",
-      "searching": "Web'de aranıyor...",
-      "thinking": "Düşünüyor...",
-      "speaking": "Konuşuyor..."
+      "searching": "Web'de aranıyor…",
+      "thinking": "Düşünüyor…",
+      "speaking": "Konuşuyor…"
     },
     "tool": {
       "search": "Web'de aranıyor",
-      "screen": "Ekranınıza bakılıyor",
+      "screen": "Ekranınıza bakılıyor…",
       "working": "Üzerinde çalışılıyor",
       "elapsed": "{{seconds}} sn"
     },
@@ -1602,6 +2370,12 @@
       "tts_blockedShort": "Duymak için panele dokunun",
       "tts_playback": "Ses, çıkış aygıtınızda çalınamadı. Hoparlör/çıkış ayarlarınızı kontrol edip tekrar deneyin.",
       "tts_playbackShort": "Ses oynatma başarısız",
+      "tts_gpu": "Ekran kartınız sesi bozdu, bu yüzden sessize alındı. Sonraki yanıtta bunun yerine işlemci sesi kullanılacak.",
+      "tts_gpuShort": "Ses kapatıldı: ekran kartı bozdu",
+      "tts_gpu_slow": "Ekran kartınız sesi bozdu, bu yüzden sessize alındı. Yanıtlar artık işlemcide çalışıyor; Modeller → Ses bölümünden işlemci sesini indirene kadar bu yavaştır.",
+      "tts_gpu_slowShort": "Ses kapatıldı: ekran kartı bozdu",
+      "tts_gpu_forced": "Ekran kartınız sesi bozdu, bu yüzden sessize alındı. Modeller → Ses bölümünde Çalıştığı yer ayarını Otomatik veya İşlemci yapın.",
+      "tts_gpu_forcedShort": "Ses kapatıldı: ekran kartı bozdu",
       "mic_denied": "Mikrofon erişimi engellendi. Sistem gizlilik ayarlarınızdan izin verin.",
       "mic_deniedShort": "Mikrofon erişimi engelli",
       "mic_unavailable": "Mikrofon bulunamadı. Bir tane bağlayıp tekrar deneyin.",
@@ -1613,7 +2387,9 @@
     },
     "notices": {
       "web_search_failed": "Web araması sonuç döndürmedi — onlar olmadan yanıtlanıyor.",
-      "web_search_failedShort": "Web sonucu yok"
+      "web_search_failedShort": "Web sonucu yok",
+      "queued": "Sıraya alındı — bu yanıt biter bitmez gönderilecek.",
+      "queuedShort": "Sırada"
     },
     "engineSetup": {
       "downloading": "Yerel motor hazırlanıyor (ilk çalıştırma)… %{{percent}}",
@@ -1626,25 +2402,834 @@
       "copied": "Kopyalandı"
     }
   },
+  "nav": {
+    "label": "Ana",
+    "home": "Ana Sayfa",
+    "history": "Geçmiş",
+    "assistant": "Asistan",
+    "meetings": "Toplantılar",
+    "cleanup": "Yapay zekâ temizleme",
+    "dictionary": "Sözlük",
+    "models": "Modeller",
+    "settings": "Ayarlar",
+    "status": {
+      "label": "Konuşma modeli: {{model}}, {{status}}. Konuşmadan metne ayarlarını açın.",
+      "setup": "Kurulum gerekiyor",
+      "cloud": "Bulut · {{provider}}",
+      "loading": "Yükleniyor…",
+      "error": "Yüklenemedi",
+      "ready": "Hazır",
+      "idle": "Dikte ettiğinizde yüklenir",
+      "noModel": "Konuşma modeli yok"
+    },
+    "insights": "İstatistikler"
+  },
+  "settingsDialog": {
+    "title": "Ayarlar",
+    "tabs": {
+      "general": "Genel",
+      "shortcuts": "Kısayollar",
+      "audio": "Ses",
+      "dictation": "Dikte",
+      "privacy": "Gizlilik ve veriler",
+      "advanced": "Gelişmiş",
+      "about": "Hakkında",
+      "debug": "Hata Ayıklama"
+    },
+    "general": {
+      "appearance": "Görünüm",
+      "onboarding": {
+        "title": "İlk kullanım",
+        "replay": "İlk çalıştırma kurulumu",
+        "replayInfo": "Kurulumu ve turu, yeni bir kurulumda göründüğü şekilde yeniden gözden geçirin. Mevcut modelleriniz yüklü kalır.",
+        "replayButton": "İlk kullanım rehberini yeniden göster"
+      }
+    },
+    "shortcuts": {
+      "intro": "Her kısayol tüm uygulamalarda çalışır. Yenisini kaydetmek için bir kısayola tıklayın.",
+      "dictation": "Dikte",
+      "assistant": "Asistan",
+      "cleanupOff": "Bu kısayolu kullanmak için yapay zekâ temizlemeyi açın.",
+      "cleanupOnDictation": "Dikte kısayolunuz her dikteyi zaten temizliyor, bu yüzden buna gerek yok.",
+      "openCleanup": "Yapay zekâ temizlemeyi aç",
+      "assistantOff": "Asistan kapalı, bu yüzden kısayolları hiçbir şey yapmaz.",
+      "openAssistant": "Asistanı aç"
+    },
+    "audio": {
+      "microphone": "Mikrofon",
+      "overlayHint": "Kayıt yaparken görünen küçük kapsül."
+    },
+    "dictation": {
+      "intro": "Sözlerinizin yazdığınız uygulamaya nasıl aktarıldığı.",
+      "output": "Yazma ve yapıştırma",
+      "extras": "Ekstralar"
+    },
+    "privacy": {
+      "intro": "Kayıtlar ve geçmiş yalnızca bu bilgisayarda saklanır. Kayıtların ne kadar süre tutulacağını seçin.",
+      "recordingsFolder": "Kayıtlar klasörü"
+    },
+    "advanced": {
+      "performance": "Performans"
+    },
+    "about": {
+      "appName": "SpeakoFlow",
+      "version": "Sürüm {{version}}",
+      "project": "Proje",
+      "docs": "Belgeler",
+      "openDocs": "Belgeleri aç"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Günaydın",
+      "afternoon": "İyi günler",
+      "evening": "İyi akşamlar",
+      "night": "Geç saatlere kadar çalışıyorsunuz"
+    },
+    "subtitleHold": "Herhangi bir uygulamada kısayolunuzu basılı tutun, konuşun ve bırakın. Sözleriniz imlecinizin olduğu yerde görünür.",
+    "subtitleTap": "Herhangi bir uygulamada kısayolunuza dokunun, konuşun ve yeniden dokunun. Sözleriniz imlecinizin olduğu yerde görünür.",
+    "needsModel": {
+      "title": "Dikte etmeye başlamak için bir konuşma modeli seçin.",
+      "description": "SpeakoFlow'un söylediklerinizi yazabilmesi için bir konuşmadan metne modeline ihtiyacı var.",
+      "action": "Bir model seçin"
+    },
+    "stats": {
+      "label": "Kullanımınız",
+      "none": "–",
+      "spoken": "konuşuldu",
+      "words": "kelime",
+      "wpm": "KDH",
+      "wpmHint": "Kayıtlarınızdaki dakika başına kelime sayısı, duraklamalar dahil.",
+      "saved": "kazanıldı",
+      "savedHint": "Aynı kelimeleri dakikada {{wpm}} kelime hızla yazmaya kıyasla.",
+      "empty": "Rakamlarınız ilk diktenizden sonra görünür.",
+      "streak_one": "{{count}} günlük seri",
+      "streak_other": "{{count}} günlük seri",
+      "noStreak": "Seri başlatmak için bugün dikte edin",
+      "today": "Bugün {{words}} kelime",
+      "duration": {
+        "seconds": "{{seconds}} sn",
+        "minutes": "{{minutes}} dk",
+        "hours": "{{hours}} sa",
+        "hoursMinutes": "{{hours}} sa {{minutes}} dk"
+      },
+      "wordsLabel": "Dikte edilen kelimeler",
+      "wpmLabel": "Dakika başına kelime",
+      "savedLabel": "Kazanılan zaman",
+      "streakLabel_one": "Günlük seri",
+      "streakLabel_other": "Günlük seri",
+      "streakUnit_one": "günlük seri",
+      "streakUnit_other": "günlük seri",
+      "seeInsights": "İstatistikleri gör"
+    },
+    "shortcuts": {
+      "title": "Kısayollar",
+      "edit": "Kısayolları düzenle",
+      "turnOn": "Aç",
+      "off": "Kapalı",
+      "setKey": "Kısayol ayarla",
+      "dictate": {
+        "title": "Dikte et",
+        "hold": "Basılı tutun, konuşun, bırakın. Sözleriniz imlecinizin olduğu yere yazılır.",
+        "tap": "Başlatmak için dokunun, konuşun, durdurmak için dokunun. Sözleriniz imlecinizin olduğu yere yazılır.",
+        "whatHold": "Basılı tutun, konuşun, bırakın. Sözleriniz imlecin olduğu yere yazılır.",
+        "whatTap": "Dokunun, konuşun, yeniden dokunun. Sözleriniz imlecin olduğu yere yazılır."
+      },
+      "cleanup": {
+        "title": "Dikte et ve temizle",
+        "description": "Dikte et ile aynı; ardından yapay zekâ noktalamayı, dolgu sözcüklerini ve üslubu düzeltir.",
+        "what": "Dikte edin, ardından yapay zekâ noktalamayı, dolgu sözcüklerini ve üslubu düzeltsin."
+      },
+      "ask": {
+        "title": "Asistana sor",
+        "description": "Sesli bir soru sorun ve yanıtı yüzen bir panelde alın.",
+        "what": "Sesli sorun. Yanıt yüzen bir panelde görünür."
+      },
+      "call": {
+        "title": "Görüşme başlat",
+        "description": "Sesli yanıtlarla, elleriniz serbest bir sohbet.",
+        "what": "Elleriniz serbest, karşılıklı konuşun. Kapatmak için yine basın."
+      },
+      "info": "Bunlara herhangi bir uygulamada basın. Değiştirmek için tuşlara tıklayın.",
+      "offHint": "Kapalı",
+      "mode": {
+        "hold": "Konuşmak için basılı tut",
+        "tap": "Açıp kapatmak için dokun"
+      },
+      "cancel": {
+        "title": "İptal",
+        "what": "Bir kaydı ya da sesli okunan bir yanıtı durdurun."
+      }
+    },
+    "setup": {
+      "title": "Modelleriniz",
+      "manage": "Yönet"
+    },
+    "recent": {
+      "title": "Son",
+      "viewAll": "Tümünü gör",
+      "copy": "Metni kopyala",
+      "cleaned": "Temizlendi",
+      "tryPrefix": "Deneyin: kutuya tıklayın, ardından",
+      "trySuffixHold": "tuşuna basın ve konuşurken basılı tutun.",
+      "trySuffixTap": "tuşuna basın ve konuşun. Bitirince yeniden basın.",
+      "tryPlaceholder": "Sözleriniz burada görünecek…"
+    },
+    "hero": {
+      "hold": "Herhangi bir uygulamada tuşları basılı tutun, konuşun ve bırakın.",
+      "tap": "Herhangi bir uygulamada tuşlara dokunun, konuşun ve yeniden dokunun.",
+      "holdHint": "Konuşmak için basılı tutun",
+      "tapHint": "Başlatıp durdurmak için dokunun"
+    },
+    "activity": {
+      "title": "Son 30 gün",
+      "summary_one": "{{count}} günde {{words}} kelime",
+      "summary_other": "{{count}} günde {{words}} kelime",
+      "chartLabel": "Son {{days}} günde her gün dikte edilen kelimeler: toplam {{words}}.",
+      "words_one": "{{formatted}} kelime",
+      "words_other": "{{formatted}} kelime",
+      "today": "Bugün"
+    }
+  },
+  "modelsHub": {
+    "description": "SpeakoFlow'daki her işi sizin seçtiğiniz bir model yapar. Gizlilik için bu bilgisayarda, hız için bulutta çalıştırın.",
+    "addLocal": "Model dosyası ekle",
+    "privacyNote": "Bu bilgisayardaki modeller sesinizi veya metninizi hiçbir yere göndermez. Bulut modelleri, API anahtarınızı kullanarak bunları seçtiğiniz sağlayıcıya gönderir.",
+    "inUse": "Kullanımda",
+    "needsSetup": "Kurulum gerekli",
+    "performance": "Performans",
+    "where": {
+      "device": "Bu bilgisayarda",
+      "cloud": "Bulut",
+      "cloudWith": "Bulut · {{provider}}",
+      "deviceShort": "Bu bilgisayar"
+    },
+    "status": {
+      "voiceOff": "Sesli yanıtlar kapalı",
+      "assistantOff": "Asistan kapalı",
+      "noModel": "Henüz model seçilmedi",
+      "notDownloaded": "Model indirilmedi",
+      "noKey": "API anahtarı ekleyin",
+      "noEndpoint": "Uç nokta ekleyin"
+    },
+    "voice": {
+      "kokoroModel": "Kokoro sesi"
+    },
+    "usedBy": {
+      "label": "Kullanan",
+      "dictation": "Dikte",
+      "assistant": "Asistan",
+      "meetings": "Toplantılar",
+      "cleanup": "Yapay zekâ temizleme",
+      "meetingNotes": "Toplantı notları",
+      "calls": "Görüşmeler",
+      "flow": "Flow ile oluştur",
+      "spokenReplies": "Sesli yanıtlar"
+    },
+    "slots": {
+      "stt": {
+        "name": "Konuşmadan metne",
+        "description": "Sesinizi metne dönüştürür.",
+        "whereHint": "Bu bilgisayarda çalışmak gizli ve ücretsizdir. Bulut, bir sağlayıcının API'sini ve sizin anahtarınızı kullanır.",
+        "catalogTitle": "Konuşma modelleri",
+        "catalogDescription": "Buradaki her model bu bilgisayarda çalışır. Hızlı modeller dikteye uygundur; büyük olanlar daha isabetlidir."
+      },
+      "cleanup": {
+        "name": "Yapay zekâ temizleme",
+        "description": "Sözlü düzenlemelerinizi uygular, bir yazım stili ekler ve toplantı notlarını yazar.",
+        "turnOn": "Yapay zekâ temizlemeyi aç",
+        "offNotice": "Yapay zekâ temizleme kapalı. Toplantı notları bu modeli kullanmaya devam eder.",
+        "borrowsNotice": "Temizleme modeli ayarlanmadığı için temizleme asistanınızın modelini ({{model}}) kullanıyor.",
+        "catalogTitle": "Temizleme modelleri"
+      },
+      "assistant": {
+        "name": "Asistan",
+        "description": "Sorularınızı yanıtlar, ekranınıza bakar ve görüşme yapar.",
+        "openAssistant": "Asistanı aç",
+        "offNotice": "Asistan kapalı. Flow ile oluştur ve yedek temizleme bu modeli kullanmaya devam eder.",
+        "catalogTitle": "Asistan modelleri",
+        "fallbackNote": "Kendi modelleri olmadığında yapay zekâ temizleme ve toplantı notları da bu modeli kullanır."
+      },
+      "voice": {
+        "name": "Ses",
+        "description": "Asistanın yanıtlarını sesli okur."
+      }
+    }
+  },
+  "cleanup": {
+    "description": "Dolgu sözcükleri her diktede zaten kaldırılır. Yapay zekâ temizleme daha ileri gider: sözlü düzenlemelerinizi uygular ve bir yazım stili ekler.",
+    "toggle": "Yapay zekâ temizleme",
+    "how": {
+      "plain": "Tam olarak söylediğinizi yazar.",
+      "cleaned": "Söylediğinizi yapay zekâyla temizleyerek yazar.",
+      "off": "Bu kısayolu kullanmak için yapay zekâ temizlemeyi açın.",
+      "change": "Değiştir"
+    },
+    "model": {
+      "title": "Temizleme modeli",
+      "borrows": "Asistanınızdan ödünç alındı",
+      "own": "Temizleme kısayolunu her kullandığınızda çalışır",
+      "change": "Değiştir",
+      "info": "Temizleme kısayolunu her kullandığınızda çalışır. Kendi modeli yoksa temizleme asistanınızın modelini kullanır."
+    },
+    "needsModel": {
+      "description": "Yapay zekâ temizlemenin çalışabilmesi için bir model gerekir. O zamana kadar metniniz söylediğiniz gibi yazılır.",
+      "action": "Model seçin",
+      "short": "Temizlemeye başlamak için bir model seçin."
+    },
+    "instructions": {
+      "title": "Temizleme talimatları",
+      "description": "Modele neyi düzelteceğini söyleyen temel istem. Çoğu kişi bunu hiç değiştirmez.",
+      "current": "Kullanılan"
+    },
+    "styles": {
+      "title": "Yazım stili",
+      "description": "Temizlenen metnin nasıl okunacağı. Düzeltmelerden sonra uygulanır, böylece düzeltmeler aynı kalır.",
+      "createTitle": "Yeni stil",
+      "createHint": "Metninizin nasıl bir üslupta olmasını istediğinizi anlatın.",
+      "editTitle": "Stili düzenle",
+      "editorIntro": "Stile bir ad verin ve metninizin nasıl değişmesi gerektiğini anlatın. Temizlemeden sonra uygulanır, böylece düzeltmeler aynı kalır.",
+      "inUse": "Kullanımda",
+      "editNamed": "{{name}} stilini düzenle",
+      "builtin": {
+        "none": "Hataları düzeltir, ifadelerinize dokunmaz.",
+        "professional": "İş mesajları ve e-postalar için özenli ve net.",
+        "friendly": "Bir arkadaşa yazılmış not gibi sıcak ve rahat.",
+        "concise": "Fazla sözcükleri atar, doğrudan konuya girer.",
+        "formal": "Tam cümleler ve resmî bir dil.",
+        "casual": "Serbest ve sohbet havasında."
+      },
+      "groups": {
+        "builtin": "Yerleşik",
+        "custom": "Sizinkiler"
+      },
+      "manage": "Yönet",
+      "manageTitle": "Yazım stilleriniz",
+      "noneYet": "Henüz kendi stiliniz yok.",
+      "newStyle": "Yeni stil",
+      "customHint": "Kendi stillerinizden biri. Düzeltmelerden sonra uygulanır.",
+      "preview": {
+        "youSay": "Siz söylersiniz",
+        "itTypes": "O yazar",
+        "yourInstruction": "Talimatınız"
+      },
+      "samples": {
+        "raw": "yarın saat onda buluşalım, yok aslında on birde, bir de bütçenin üstünden geçeriz",
+        "none": "Yarın saat on birde buluşalım ve bütçenin üzerinden geçelim.",
+        "professional": "Bütçeyi gözden geçirmek için yarın saat 11.00'de görüşmeyi öneriyorum.",
+        "friendly": "Yarın on birde buluşup bütçeye birlikte bakalım mı?",
+        "concise": "Yarın 11'de bütçe görüşmesi.",
+        "formal": "Bütçeyi incelemek üzere yarın saat on birde bir araya gelmemizi teklif ederim.",
+        "casual": "yarın on birde buluşup bütçeye bi bakalım"
+      },
+      "form": {
+        "name": "Ad",
+        "instruction": "Talimatlar",
+        "instructionTip": "İfadelerin nasıl değişmesi gerektiği. Temizlemeden sonra uygulanır, böylece düzeltmeler aynı kalır.",
+        "instructionPlaceholder": "Örneğin: rahat ve küçük harfle yaz, söylenen emoji adlarını emojiye çevir."
+      }
+    },
+    "hero": {
+      "title": "Dağınık söyleyin, <em>tertemiz alın.</em>",
+      "before": "onda buluşalım, yok aslında on bir olsun, bir de bütçeyi getir",
+      "after": "On birde buluşalım, bütçeyi de getir.",
+      "offHint": "Bu kısayolu kullanmak için yapay zekâ temizlemeyi açın",
+      "onHint": "Basılı tutun, konuşun, bırakın. Temizlenen metin sizin için yazılır.",
+      "onHintTap": "Dokunun, konuşun, yeniden dokunun. Temizlenen metin sizin için yazılır.",
+      "onDictationHint": "Her dikte temizlenir."
+    },
+    "shortcut": {
+      "title": "Kısayol",
+      "info": "Temizlemeye kendi kısayolunu verin ya da dikte kısayolunuzun her dikteyi temizlemesine izin verin; böylece hatırlamanız gereken tek bir tuş kombinasyonu olur.",
+      "separate": "Kendi kısayolu",
+      "dictation": "Dikteyle aynı"
+    },
+    "shortcutRow": "Kısayol"
+  },
+  "dictionary": {
+    "description": "SpeakoFlow'a kullandığınız adları ve terimleri öğretin, daha uzun metne dönüşen kısaltmalar tanımlayın.",
+    "words": {
+      "title": "Kelimeleriniz",
+      "description": "SpeakoFlow'un her zaman doğru yazması gereken adlar, jargon ve yazımlar.",
+      "placeholder": "Bir ad, terim veya yazım ekleyin…",
+      "empty": "Burada henüz bir şey yok. SpeakoFlow'un sürekli yanlış yazdığı kelimeleri ekleyin."
+    },
+    "replacements": {
+      "title": "Değiştirmeler",
+      "description": "Bir ifade söyleyin, yerine başka bir metin gelsin; örneğin “e-postam” adresinize dönüşsün."
+    },
+    "addWord": "Kelime ekle",
+    "hero": {
+      "title": "SpeakoFlow <em>sizin gibi yazar.</em>",
+      "subtitle": "Sürekli yanlış yazdığı adları ve jargonu ekleyin."
+    }
+  },
+  "assistantPage": {
+    "description": "Her uygulamadan sesle her şeyi sorun. Asistan ekranınızı görebilir, web'de arama yapabilir ve sizin için önemli olanı hatırlayabilir.",
+    "offNotice": "Asistan kapalı. Siz yeniden açana kadar kısayolları hiçbir şey yapmaz ve bellek kullanmaz.",
+    "hero": {
+      "askHold": "Basılı tutun, sorunuzu sorun, bırakın. Yanıt yüzen bir panelde görünür.",
+      "askTap": "Dokunun, sorunuzu sorun, yeniden dokunun. Yanıt yüzen bir panelde görünür.",
+      "call": "Elleriniz serbest, karşılıklı konuşun. Kapatmak için yeniden basın.",
+      "title": "Her şeyi <em>her yerden</em> sorun.",
+      "ask": "Sor",
+      "callLabel": "Görüşme",
+      "askHoldShort": "Basılı tutun, sorun, bırakın",
+      "askTapShort": "Dokunun, sorun, yeniden dokunun",
+      "callShort": "Kapatmak için yeniden basın",
+      "subtitle": "Sorunuzu sesli sorun ya da bir görüşme başlatıp konuyu konuşarak çözün."
+    },
+    "models": {
+      "title": "Arkasındaki güç",
+      "assistant": "Düşünen model",
+      "voice": "Yanıtları seslendiren"
+    },
+    "features": {
+      "title": "Neler yapabilir",
+      "vision": {
+        "title": "Ekran görüşü",
+        "description": "Ekranınızla ilgili bir şey sorduğunuzda asistanın ekranınıza bakmasına izin verin."
+      },
+      "webSearch": {
+        "title": "Web araması",
+        "description": "Güncel ve doğru yanıtlar için internette arama yapar."
+      },
+      "reminders": {
+        "title": "Hatırlatıcılar",
+        "description": "“20 dakika sonra bana hatırlat” deyin, hatırlatsın.",
+        "status": "Sesle isteyin"
+      },
+      "profiles": {
+        "title": "Profiller",
+        "description": "Asistanın aralarında geçiş yapabildiği, her birinin kendi talimatları olan kişilikler.",
+        "status": "Varsayılan"
+      },
+      "memory": {
+        "title": "Hafıza",
+        "description": "Asistanın sizinle ilgili hatırladıkları; bu bilgisayarda saklanır."
+      },
+      "behavior": {
+        "title": "Yanıtlar",
+        "description": "Yanıtların ne kadar uzun olduğu ve sohbetin ne kadarını aklında tuttuğu."
+      },
+      "appearance": {
+        "title": "Panel",
+        "description": "Yüzen panelin boyutu, metni, konumu ve opaklığı.",
+        "status": "Özelleştir"
+      }
+    },
+    "cards": {
+      "keySaved": "Anahtar kaydedildi",
+      "vision": {
+        "description": "Gördükleriniz hakkındaki soruları yanıtlaması için ekranınıza bakmasına izin verin.",
+        "timing": {
+          "immediate": "Başladığımda",
+          "onSend": "Gönderdiğimde"
+        }
+      },
+      "webSearch": {
+        "description": "Güncel ve doğru yanıtlar için internette arama yapar.",
+        "offHint": "Kapalı: yanıtlar yalnızca modelden gelir ve güncel olmayabilir.",
+        "keyFor": "{{provider}} API anahtarı",
+        "getKey": "{{site}} adresinden ücretsiz anahtar alın.",
+        "hints": {
+          "tinyfish": "Ücretsiz, kart gerekmez",
+          "serper": "Google sonuçları",
+          "brave": "Bağımsız dizin",
+          "tavily": "Yapay zekâ için tasarlandı",
+          "exa": "Nöral arama",
+          "serpapi": "Google sonuçları"
+        }
+      },
+      "reminders": {
+        "description": "Size hatırlatmasını isteyin, zamanı geldiğinde bir not açılır.",
+        "trySaying": "Şunu söylemeyi deneyin",
+        "examples": {
+          "one": "“20 dakika sonra Selin'i aramamı hatırlat”",
+          "two": "“Akşam 6'da faturayı göndermemi hatırlat”",
+          "three": "“Şuna bak ve bana yarın hatırlat”"
+        },
+        "upcoming": "Yaklaşanlar",
+        "none": "Henüz planlanmış bir şey yok.",
+        "more_one": "ve {{count}} tane daha",
+        "more_other": "ve {{count}} tane daha"
+      },
+      "memory": {
+        "title": "Hafıza",
+        "description": "Sizin için önemli olanı hatırlar; yalnızca bu bilgisayarda saklanır.",
+        "open": "Hafızayı aç",
+        "manage_one": "Hafızayı gör ve düzenle · {{count}} not",
+        "manage_other": "Hafızayı gör ve düzenle · {{count}} not",
+        "pausedHint": "Duraklatıldı: kayıtlı anılar saklanır ama kullanılmaz."
+      },
+      "profiles": {
+        "title": "Profiller",
+        "description": "Kendi adı, talimatları ve yanıt stili olan kişilikler.",
+        "edit": "Profilleri düzenle",
+        "more": "+{{count}}"
+      },
+      "replies": {
+        "title": "Yanıtlar",
+        "description": "Yanıtların ne kadar uzun olduğu ve sohbetin ne kadarını aklında tuttuğu.",
+        "lengths": {
+          "default": "Varsayılan",
+          "short": "Kısa",
+          "medium": "Orta",
+          "long": "Uzun"
+        },
+        "lengthHints": {
+          "default": "Soru ne kadar gerektiriyorsa.",
+          "short": "Bir iki cümle.",
+          "medium": "Kısa bir paragraf.",
+          "long": "Kapsamlı ve ayrıntılı."
+        },
+        "history": "Aklında tuttuğu mesajlar"
+      },
+      "panel": {
+        "title": "Yüzen panel",
+        "description": "Panelin nasıl göründüğü ve nerede açıldığı. Önizleme siz değiştirdikçe güncellenir.",
+        "positionHint": "Ekranda bir noktaya tıklayın. Şekil, panelin açılacağı şekildir: bir kenar boyunca uzun bir sütun ya da üstte veya altta geniş bir şerit. Paneli bir noktanın yakınına sürüklerseniz oraya yerleşir."
+      }
+    },
+    "groups": {
+      "personal": "Kişisel",
+      "replies": "Yanıtlar"
+    },
+    "rows": {
+      "replyLength": "Yanıt uzunluğu",
+      "reminders": {
+        "none": "Ayarlanmış yok",
+        "count_one": "{{count}} ayarlı",
+        "count_other": "{{count}} ayarlı"
+      },
+      "memory": {
+        "edit": "Hafızayı görüntüle",
+        "manage": "Yönet"
+      },
+      "profiles": {
+        "manage": "Yönet"
+      },
+      "screen": {
+        "ask": "Sorular için ekran görüşü",
+        "call": "Görüşmeler için ekran görüşü"
+      }
+    },
+    "tips": {
+      "thinksWith": "Size yanıt veren model. Kendi modelleri olmadığında yapay zekâ temizleme ve toplantı notları da bunu kullanır.",
+      "speaks": "Görüşme sırasında yanıtları sesli okur.",
+      "screenAsk": "Soru ekranınızla ilgili olduğunda ya da siz istediğinizde asistanın ekrana bakmasını sağlar. Seçili metinle ilgili sorular metinden yanıtlanır. Ekran görüntüleri yalnızca yapay zekâ sağlayıcınıza gider.",
+      "screenCall": "Görüşme sırasında siz istediğinizde ya da ekranınızdaki bir şeyden bahsettiğinizde asistanın ekrana bakmasını sağlar.",
+      "captureTiming": "Ekranı, sormaya başladığınız andaki ya da gönderdiğiniz andaki haliyle yakalar.",
+      "webSearch": "Bir soru güncel bilgi gerektirdiğinde internette arama yapar.",
+      "depth": "Basit bilgiler için Hızlı, zor sorular için Derin.",
+      "openRouterSearch": "OpenRouter'ın kendi aramasını ve OpenRouter kredilerinizi kullanır.",
+      "localSmart": "Ne zaman arama yapılacağına cihazdaki model karar verir.",
+      "reminders": "İstemeniz yeterli: “20 dakika sonra Selin'i aramamı hatırlat.” Zamanı geldiğinde bir not açılır.",
+      "memory": "Sizin için önemli olanı hatırlar. Yalnızca bu bilgisayarda saklanır.",
+      "profiles": "Kendi adı, talimatları ve yanıt stili olan kişilikler.",
+      "replyLength": "Yanıtların genellikle ne kadar uzun olduğu.",
+      "history": "Son mesajlardan kaç tanesini aklında tuttuğu.",
+      "summarize": "Uzun sohbetleri özetler, böylece başını unutmaz.",
+      "panelSize": "Ekranınızın ne kadarını kapladığı.",
+      "opacity": "Düşük değerde masaüstünüz arkadan görünür.",
+      "position": "Ekranda bir noktaya tıklayın.",
+      "display": "Panelin açıldığı ekran."
+    },
+    "memory": {
+      "aboutTip": "Her yanıtta aklında tuttuğu kısa bir özet. Siz konuştukça güncellenir, istediğiniz zaman düzenleyebilirsiniz.",
+      "aboutEmpty": "Henüz bir şey yok. Siz konuştukça burayı doldurur ya da kendiniz yazabilirsiniz.",
+      "write": "Kendim yazayım",
+      "notesTitle": "Hatırladıkları",
+      "notesTip": "Sohbetlerinizden öğrendiği bilgiler ve sizin eklediğiniz her şey. Her yanıt, uygun olanları kullanır.",
+      "notesEmpty": "Henüz bir şey yok. Sohbetlerinizden öğrenir ya da yukarıdan bir şey ekleyebilirsiniz.",
+      "showAll": "Tümünü göster ({{count}})",
+      "showFewer": "Daha az göster",
+      "detailTip": "Hafif yalnızca özeti kullanır. Ayrıntılı daha fazla not ekler ve biraz daha yavaştır.",
+      "more": "Diğer hafıza seçenekleri",
+      "learnNow": "Bu sohbetten şimdi öğren",
+      "export": "Hafızayı dışa aktar…",
+      "import": "Hafızayı içe aktar…",
+      "erase": "Hafızayı sil…",
+      "eraseTitle": "Hafıza silinsin mi?",
+      "eraseBody_one": "Bu işlem özeti ve {{count}} notu siler. Geri alınamaz.",
+      "eraseBody_other": "Bu işlem özeti ve {{count}} notun tümünü siler. Geri alınamaz.",
+      "eraseConfirm": "Sil",
+      "learnedToast": "Hafıza bu sohbetten güncellendi",
+      "exportedToast": "Hafıza dışa aktarıldı",
+      "importedToast": "Hafıza içe aktarıldı",
+      "dialogDescription": "Asistanın sizinle ilgili bildikleri. Bu bilgisayarda kalır; herhangi birini değiştirebilir veya silebilirsiniz."
+    },
+    "profiles": {
+      "new": "Yeni profil",
+      "newBlank": "Sıfırdan başla",
+      "newWithAi": "Tanımlayın, yapay zekâ yazsın",
+      "listMore": "Diğer profil seçenekleri",
+      "import": "Dosyadan içe aktar…",
+      "restoreBuiltins": "Yerleşik profilleri geri getir",
+      "restored_one": "{{count}} profil geri getirildi",
+      "restored_other": "{{count}} profil geri getirildi",
+      "restoredNone": "Tüm yerleşik profiller zaten burada",
+      "inUse": "Kullanımda",
+      "use": "Bu profili kullan",
+      "more": "Bu profil için diğer seçenekler",
+      "duplicate": "Çoğalt",
+      "export": "Dışa aktar…",
+      "exported": "Profil dışa aktarıldı",
+      "restoreDefault": "Orijinali geri yükle",
+      "delete": "Profili sil…",
+      "deleteTitle": "{{name}} silinsin mi?",
+      "deleteBody": "Bu işlem geri alınamaz.",
+      "addPicture": "Resim ekle",
+      "changePicture": "Resmi değiştir",
+      "removePicture": "Resmi kaldır",
+      "roleLabel": "Açıklama",
+      "roleTip": "Adın altında gösterilen birkaç sözcük.",
+      "rolePlaceholder": "Örneğin: kısa ve doğrudan yanıtlar",
+      "instructionsLabel": "Talimatlar",
+      "instructionsTip": "Bu profilin nasıl düşündüğü ve konuştuğu. Her mesajla birlikte gönderilir.",
+      "lengthLabel": "Yanıt uzunluğu",
+      "lengthTip": "Varsayılan, Asistan sayfasındaki Yanıt uzunluğu ayarını izler.",
+      "lengths": {
+        "inherit": "Varsayılan",
+        "short": "Kısa",
+        "medium": "Orta",
+        "long": "Uzun"
+      },
+      "greetingLabel": "Karşılama",
+      "greetingTip": "İsteğe bağlı. Yeni bir sohbet başladığında gösterilir.",
+      "greetingPlaceholder": "Merhaba! Bugün ne üzerinde çalışıyoruz?",
+      "aiTitle": "Yeni bir profil tanımlayın",
+      "aiBody": "Nasıl olması gerektiğini söyleyin veya yazın. Adını ve talimatlarını asistan yazar.",
+      "aiCreate": "Profil oluştur"
+    },
+    "panel": {
+      "where": "Açıldığı yer",
+      "text": "Metin boyutu",
+      "size": "Panel boyutu",
+      "opacity": "Opaklık",
+      "screen": "Hangi ekran"
+    }
+  },
+  "meetingsPage": {
+    "transcript": "Transkript",
+    "notes": "Notlar",
+    "hero": {
+      "title": "Her görüşme <em>yazıya dökülür.</em>",
+      "subtitle": "Konuşmacılara göre ayrılır, bitince notlar hazır olur."
+    },
+    "transcribedBy": "Yazıya döken",
+    "notesBy": "Notları yazan",
+    "transcribedByTip": "Transkripti yazar. Bu, dikteyle aynı olan Konuşmadan metne modelinizdir.",
+    "notesByTip": "Notları ve başlığı yazar, bir toplantıyla ilgili soruları yanıtlar. Bu, Asistan modelinizdir."
+  },
+  "historyPage": {
+    "today": "Bugün",
+    "yesterday": "Dün",
+    "storage": "Depolama",
+    "cleaned": "Temizlendi",
+    "showOriginal": "Orijinali göster",
+    "showSaid": "Söylediğinizi göster",
+    "hideOriginal": "Orijinali gizle",
+    "playRecording": "Kaydı oynat",
+    "hideRecording": "Oynatıcıyı kapat",
+    "audioMissing": "Bu kaydın ses dosyası artık mevcut değil.",
+    "failed": "Transkripsiyon başarısız oldu",
+    "retry": "Tekrar dene",
+    "dismissed": "Bu transkripsiyon iptal edildi.",
+    "recover": "Kurtar",
+    "recoverTitle": "Yeniden yazıya dök ve sakla",
+    "recoverError": "Bu transkripsiyon kurtarılamadı. Tekrar deneyin.",
+    "more": "Diğer işlemler",
+    "chat": {
+      "continue": "Devam et",
+      "continueTitle": "Bu sohbeti asistanda aç",
+      "showMessages": "Mesajları göster",
+      "hideMessages": "Mesajları gizle",
+      "assistantOff": "Bu sohbete devam etmek için asistanı açın."
+    }
+  },
+  "pickers": {
+    "browse": "Modelleri yönet",
+    "download": "Daha fazla model indir",
+    "choose": "Model seçin",
+    "switchFailed": "Model değiştirilemedi. Tekrar deneyin.",
+    "borrowsAssistant": "Asistanın modeli kullanılıyor: {{model}}",
+    "needsKey": "API anahtarı gerekli",
+    "groups": {
+      "device": "Bu bilgisayarda",
+      "cloud": "Bulut",
+      "setup": "Henüz kurulmadı"
+    },
+    "label": {
+      "assistant": "Asistan modeli",
+      "cleanup": "Yapay zekâ temizleme modeli",
+      "stt": "Konuşmadan metne modeli",
+      "voice": "Ses"
+    },
+    "needsSetup": "Kurulum gerekli",
+    "finishSetup": "Kurulumu tamamla",
+    "setup": {
+      "title": "{{provider}} kurulumu",
+      "bodyKey": "API anahtarınızı yapıştırın, ardından bir model seçin.",
+      "bodyServer": "Sunucunuzun adresini girin, ardından bir model seçin.",
+      "bodyBoth": "Uç noktayı ve API anahtarınızı girin, ardından bir model seçin.",
+      "endpoint": "Uç nokta URL'si",
+      "apiKey": "API anahtarı",
+      "apiKeyOptional": "API anahtarı (isteğe bağlı)",
+      "keyPlaceholder": "Anahtarınızı yapıştırın",
+      "getKey": "{{site}} adresinden anahtar alın",
+      "model": "Model",
+      "modelPlaceholder": "Bir model seçin veya yazın",
+      "loadModels": "Modelleri yükle",
+      "noModels": "Model bulunamadı. Bunun yerine model adını yazın.",
+      "typeInstead": "Bunun yerine ad yazın",
+      "pickFromList": "Listeden seçin",
+      "use": "Kaydet ve kullan",
+      "done": "Artık {{provider}} kullanılıyor"
+    },
+    "voiceSetup": {
+      "bodyKey": "API anahtarınızı yapıştırın, ardından bir ses seçin.",
+      "bodyEndpoint": "Uç noktayı ve API anahtarınızı girin, ardından bir ses seçin.",
+      "voice": "Ses",
+      "voicePlaceholder": "Bir ses seçin",
+      "loadVoices": "Sesleri yükle",
+      "noVoices": "Ses bulunamadı. Bunun yerine bir ses kimliği yapıştırın.",
+      "model": "Model (isteğe bağlı)"
+    }
+  },
+  "catalog": {
+    "recommended": "Önerilen",
+    "searchHuggingFace": "Hugging Face'te ara",
+    "useFor": {
+      "button": "Şunun için kullan",
+      "label": "{{model}} modelini şunun için kullan…",
+      "assistant": "Asistan",
+      "cleanup": "Yapay zekâ temizleme",
+      "cleanupOnly": "Yalnızca temizleme için yapıldı; sohbet edemez."
+    },
+    "inUse": {
+      "assistant": "Asistan",
+      "cleanup": "Yapay zekâ temizleme"
+    },
+    "use": "Kullan",
+    "useNamed": "{{model}} modelini {{job}} için kullan",
+    "useForJob": "{{job}} için kullan",
+    "inUseShort": "Kullanımda",
+    "more": "Diğer",
+    "moreFor": "{{model}} için diğer işlemler",
+    "showDetails": "Dosya ayrıntılarını göster",
+    "hideDetails": "Dosya ayrıntılarını gizle",
+    "removeFromList": "Listeden kaldır",
+    "nowUsing": "{{job}} için artık {{model}} kullanılıyor.",
+    "yoursInfo": "İndirdiğiniz veya diskinizden eklediğiniz modeller. Her biri iki işi de yapabilir; ⋯ menüsü bir modeli diğer iş için devreye alır."
+  },
+  "models": {
+    "runsOn": "Çalıştığı yer",
+    "options": "Seçenekler",
+    "downloadTitle": "Model indir",
+    "cleanupOff": "Yapay zekâ temizleme kapalı. Toplantı notları bu modeli kullanmaya devam eder.",
+    "assistantOff": "Asistan kapalı. Flow ile oluştur ve temizleme bu modeli kullanmaya devam eder.",
+    "usedBy": "Kullanan: {{features}}."
+  },
+  "shortcutEditor": {
+    "change": "{{name}} kısayolunu değiştir",
+    "reset": "{{name}} kısayolunu varsayılana sıfırla"
+  },
+  "memoryManager": {
+    "status": {
+      "on": "Açık: yanıtlarda kullanılır ve sohbetlerden öğrenir",
+      "off": "Kapalı: hiçbir şey kullanılmaz veya öğrenilmez"
+    },
+    "incognitoHint": "Bu sohbet kullanılmaz ve bundan öğrenilmez",
+    "editNote": "Notu düzenle",
+    "source": {
+      "learned": "Öğrenilen",
+      "added": "Sizin eklediğiniz"
+    },
+    "filterLabel": "Notları göster",
+    "filters": {
+      "all": "Tümü",
+      "learned": "Öğrenilen {{count}}",
+      "added": "Benim {{count}}"
+    },
+    "search": "Notlarda ara",
+    "noMatches": "Eşleşen not yok.",
+    "detailHints": {
+      "light": "Her yanıta yalnızca Hakkınızda özeti eklenir. En hızlısı.",
+      "balanced": "Özet ve soruya uyan birkaç not.",
+      "detailed": "Özet ve daha fazla ilgili not. En zengini, biraz daha yavaş."
+    },
+    "learnNow": "Bu sohbetten öğren",
+    "tips": {
+      "enable": "Asistanın sizinle ilgili bir hafıza kullanmasını ve öğrenmesini sağlar. Varsayılan olarak kapalı.",
+      "incognito": "Bu sohbet ne kullanılır ne de bundan öğrenilir.",
+      "aboutYou": "Hafıza açıkken her yanıta eklenen kısa bir özet."
+    }
+  },
+  "providerGrid": {
+    "showAll": "{{count}} sağlayıcının tümünü göster",
+    "showFewer": "Daha az göster"
+  },
   "voiceEngines": {
+    "kokoro": "En iyi kalite",
+    "kitten": "En hafif",
+    "pocket": "14 ses",
+    "supertonic": "Hızlı ve net",
     "openai": "GPT sesleri",
+    "elevenlabs": "En doğal",
+    "openrouter": "Çok sayıda ses",
     "deepgram": "Hızlı, düşük maliyet",
     "cartesia": "En düşük gecikme",
     "google": "Chirp 3 HD sesleri",
+    "azure": "Nöral sesler",
     "groq": "Orpheus sesleri",
     "xai": "Grok sesleri",
     "mistral": "Voxtral sesleri",
     "inworld": "Etkileyici sesler",
     "custom": "Kendi sunucunuz",
     "names": {
+      "kokoro": "Kokoro",
+      "kitten": "Kitten",
+      "pocket": "Pocket TTS",
+      "supertonic": "Supertonic",
+      "openai": "OpenAI",
+      "elevenlabs": "ElevenLabs",
+      "openrouter": "OpenRouter",
       "deepgram": "Deepgram",
       "cartesia": "Cartesia",
       "google": "Google Cloud",
+      "azure": "Azure Speech",
       "groq": "Groq",
       "xai": "xAI",
       "mistral": "Mistral",
       "inworld": "Inworld",
       "custom": "Özel"
     }
+  },
+  "insights": {
+    "description": "Zaman içindeki dikteleriniz, bu bilgisayarda sayılır.",
+    "empty": "İstatistikleriniz ilk diktenizden sonra görünür.",
+    "dictations": "Dikteler",
+    "today": "Bugün {{words}} kelime",
+    "pages_one": "Yaklaşık {{count}} sayfa",
+    "pages_other": "Yaklaşık {{count}} sayfa",
+    "fasterThanTyping": "Klavyeyle yazmaktan {{times}}× daha hızlı",
+    "streak_one": "{{count}} günlük seri",
+    "streak_other": "{{count}} günlük seri",
+    "longest_one": "En uzun: {{count}} gün",
+    "longest_other": "En uzun: {{count}} gün",
+    "gridLabel_one": "Son altı ayda {{count}} günde {{words}} kelime",
+    "gridLabel_other": "Son altı ayda {{count}} günde {{words}} kelime",
+    "gridSummary_one": "Son 6 ayda {{count}} günde {{words}} kelime",
+    "gridSummary_other": "Son 6 ayda {{count}} günde {{words}} kelime",
+    "dayWords_one": "{{formatted}} kelime",
+    "dayWords_other": "{{formatted}} kelime",
+    "dayNone": "Dikte yok",
+    "less": "Az",
+    "more": "Çok",
+    "busiest": "En yoğun gün",
+    "best": "En iyi gün",
+    "typical": "Tipik gün",
+    "typicalSub": "Dikte ettiğiniz günlerde"
   }
 }

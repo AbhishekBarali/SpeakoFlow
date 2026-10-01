@@ -5,6 +5,12 @@
  * A chunk pair is `.i18n-work/<lang>/chunk-N.source.json` (English source) and
  * `.i18n-work/<lang>/chunk-N.<lang>.json` (translation, same keys/order).
  *
+ * The written file follows the English key order, with plural groups expanded
+ * to the language's own categories (see i18n-plurals.mjs). Keys that have no
+ * translation and are not translatable (brand names, URLs, sample values) are
+ * copied from English so every locale carries the complete key set; keys that
+ * no longer exist in English are dropped.
+ *
  * Usage:
  *   node scripts/i18n-merge.mjs --check          # validate only, write nothing
  *   node scripts/i18n-merge.mjs --apply          # validate then write locales
@@ -12,6 +18,12 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import {
+  expectedKeys,
+  flatten,
+  placeholdersMatch,
+  rebuild,
+} from "./i18n-plurals.mjs";
 
 const ROOT = process.cwd();
 const LOCALES = path.join(ROOT, "src", "i18n", "locales");
@@ -20,33 +32,6 @@ const WORK = path.join(ROOT, process.env.I18N_WORK ?? ".i18n-work");
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const onlyLangs = args.filter((a) => !a.startsWith("--"));
-
-function flatten(obj, prefix = "", out = {}) {
-  for (const [k, v] of Object.entries(obj)) {
-    const key = prefix ? `${prefix}.${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)) flatten(v, key, out);
-    else out[key] = v;
-  }
-  return out;
-}
-
-function placeholders(s) {
-  return (s.match(/\{\{[^}]+\}\}/g) || []).sort();
-}
-
-/** Rebuild a nested object following the exact key order of `template`. */
-function rebuild(template, flat, prefix = "") {
-  const out = {};
-  for (const [k, v] of Object.entries(template)) {
-    const key = prefix ? `${prefix}.${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)) {
-      out[k] = rebuild(v, flat, key);
-    } else if (key in flat) {
-      out[k] = flat[key];
-    }
-  }
-  return out;
-}
 
 const enRaw = JSON.parse(
   fs.readFileSync(path.join(LOCALES, "en", "translation.json"), "utf8"),
@@ -70,6 +55,7 @@ for (const lang of langs) {
   );
   const localePath = path.join(LOCALES, lang, "translation.json");
   const localeFlat = flatten(JSON.parse(fs.readFileSync(localePath, "utf8")));
+  const expected = expectedKeys(lang, en);
 
   const problems = [];
   let applied = 0;
@@ -112,13 +98,15 @@ for (const lang of langs) {
 
     for (const k of srcKeys) {
       const v = translated[k];
-      if (typeof v !== "string" || !v.trim()) continue;
-      const sp = placeholders(source[k]).join("|");
-      const tp = placeholders(v).join("|");
-      if (sp !== tp) {
-        problems.push(
-          `chunk-${n}: placeholder mismatch on ${k} (${sp} → ${tp})`,
-        );
+      if (typeof v !== "string" || !v.trim()) {
+        if (k in translated) {
+          problems.push(`chunk-${n}: empty translation for ${k}`);
+          hardFail = true;
+        }
+        continue;
+      }
+      if (!placeholdersMatch(k, source[k], v)) {
+        problems.push(`chunk-${n}: placeholder mismatch on ${k}`);
         hardFail = true;
         continue;
       }
@@ -132,8 +120,17 @@ for (const lang of langs) {
       `${missingChunks}/${manifest.chunks} chunk files not produced yet`,
     );
 
+  // Complete the key set: anything still absent keeps its English value.
+  let filled = 0;
+  for (const [key, sourceKey] of expected) {
+    if (!(key in localeFlat)) {
+      localeFlat[key] = en[sourceKey];
+      filled++;
+    }
+  }
+
   if (apply && !problems.length) {
-    const rebuilt = rebuild(enRaw, localeFlat);
+    const rebuilt = rebuild(lang, enRaw, localeFlat);
     fs.writeFileSync(
       localePath,
       JSON.stringify(rebuilt, null, 2) + "\n",
@@ -142,7 +139,7 @@ for (const lang of langs) {
   }
 
   lines.push(
-    `${lang}: todo=${manifest.total} applied=${applied}${
+    `${lang}: todo=${manifest.total} applied=${applied} english-filled=${filled}${
       problems.length ? ` PROBLEMS:\n    - ${problems.join("\n    - ")}` : " OK"
     }`,
   );

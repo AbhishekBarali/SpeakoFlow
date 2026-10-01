@@ -107,3 +107,70 @@ export const LANGUAGES: Language[] = [
   { value: "jw", label: "Javanese" },
   { value: "su", label: "Sundanese" },
 ];
+
+/**
+ * Whisper's codes that are not the BCP 47 tag `Intl.DisplayNames` expects.
+ * Whisper still says `jw` for Javanese, which ISO 639 replaced with `jv`.
+ */
+const DISPLAY_CODE: Readonly<Record<string, string>> = { jw: "jv" };
+
+const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
+
+function displayNamesFor(uiLanguage: string): Intl.DisplayNames | null {
+  if (!displayNamesCache.has(uiLanguage)) {
+    let display: Intl.DisplayNames | null = null;
+    try {
+      display = new Intl.DisplayNames([uiLanguage], {
+        type: "language",
+        fallback: "none",
+      });
+    } catch {
+      display = null;
+    }
+    displayNamesCache.set(uiLanguage, display);
+  }
+  return displayNamesCache.get(uiLanguage) ?? null;
+}
+
+/**
+ * A spoken-language name in the UI language. The labels above are English, so
+ * every other locale used to show "German", "Japanese", … in the language
+ * pickers. `Intl.DisplayNames` is in every web view the app ships on; a code it
+ * does not know falls back to the English label. `auto` has no language name
+ * and is resolved by the caller through its translation key.
+ */
+export function languageLabel(code: string, uiLanguage: string): string {
+  const english = LANGUAGES.find((lang) => lang.value === code)?.label ?? code;
+  if (code === "auto" || uiLanguage.toLowerCase().startsWith("en")) {
+    return english;
+  }
+  try {
+    const name = displayNamesFor(uiLanguage)?.of(DISPLAY_CODE[code] ?? code);
+    if (!name) return english;
+    // Many locales write language names in lowercase ("allemand"); a picker
+    // entry starts a line, so it takes a capital where the script has one.
+    return name.charAt(0).toLocaleUpperCase(uiLanguage) + name.slice(1);
+  } catch {
+    return english;
+  }
+}
+
+/** Every language, labelled in the UI language (`auto` keeps its English label). */
+export function localizedLanguages(uiLanguage: string): Language[] {
+  return LANGUAGES.map((lang) => ({
+    value: lang.value,
+    label: languageLabel(lang.value, uiLanguage),
+  }));
+}
+
+/**
+ * Search match for a language picker: the localized name, and the English one
+ * too, so typing "German" still finds "Deutsch".
+ */
+export function languageMatches(lang: Language, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (lang.label.toLowerCase().includes(q)) return true;
+  const english = LANGUAGES.find((l) => l.value === lang.value)?.label ?? "";
+  return english.toLowerCase().includes(q);
+}

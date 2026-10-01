@@ -14,17 +14,113 @@
   },
   "tray": {
     "home": "בית",
+    "openAssistant": "פתח את העוזר",
     "checkUpdates": "בדוק עדכונים…",
+    "sendFeedback": "שלח משוב…",
     "copyLastTranscript": "העתק את התמלול האחרון",
     "unloadModel": "פרוק מודל",
     "model": "מודל",
     "quit": "יציאה",
     "cancel": "ביטול"
   },
+  "updates": {
+    "check": "בדוק עדכונים",
+    "checking": "בודק…",
+    "upToDate": "הגרסה שלך היא העדכנית ביותר",
+    "checkFailed": "לא ניתן היה לבדוק עדכונים. בדוק את החיבור ונסה שוב.",
+    "noBuild": "הגרסה החדשה עדיין לא זמינה למערכת הזו.",
+    "available": "גרסה {{version}} זמינה",
+    "availableShort": "יש עדכון זמין",
+    "installNow": "עדכן עכשיו",
+    "downloading": "מוריד… {{progress}}%",
+    "downloadingUnknown": "מוריד…",
+    "installing": "מתקין…",
+    "restart": "הפעל מחדש עכשיו",
+    "readyToRestart": "העדכון הותקן. הפעל מחדש את SpeakoFlow כדי להתחיל להשתמש בו.",
+    "installFailed": "העדכון לא הותקן. אפשר לנסות שוב, או להוריד את המתקין ולהריץ אותו בעצמך.",
+    "downloadFailed": "ההורדה לא הושלמה. בדוק את החיבור ונסה שוב.",
+    "downloadInstaller": "הורד מתקין",
+    "downloadInstead": "הורד מתקין במקום זאת",
+    "downloadNewVersion": "הורד את הגרסה החדשה",
+    "installerSaved": "המתקין נמצא בתיקיית ההורדות שלך",
+    "openInstaller": "הרץ מתקין",
+    "showInFolder": "הצג בתיקייה",
+    "viewRelease": "הצג ב-GitHub",
+    "hint": {
+      "windows": "SpeakoFlow ייסגר, יתקין את העדכון ויפתח שוב. אין צורך ללחוץ על שום דבר נוסף.",
+      "macos": "SpeakoFlow יופעל מחדש בגרסה החדשה. ייתכן ש-macOS יבקש ממך לאשר שוב גישה למיקרופון ולנגישות.",
+      "linux": "SpeakoFlow יופעל מחדש בגרסה החדשה. התקנת .deb תבקש קודם את הסיסמה שלך."
+    },
+    "modes": {
+      "portable": "זו הגרסה הניידת, שלא יכולה להחליף את עצמה. הורד את הגרסה החדשה והעתק אליה את תיקיית Data שלך.",
+      "packageManager": "SpeakoFlow הותקן דרך מנהל החבילות שלך, אז עדכן אותו שם, למשל עם yay -Syu speakoflow-bin.",
+      "download": "העותק הזה לא יכול לעדכן את עצמו במקום. הורד את המתקין והרץ אותו כדי לקבל את הגרסה החדשה."
+    },
+    "pill": {
+      "available": "יש עדכון זמין",
+      "version": "גרסה {{version}}",
+      "progress": "מעדכן… {{progress}}%",
+      "working": "מעדכן…",
+      "restart": "הפעל מחדש כדי לעדכן",
+      "installerReady": "המתקין הורד"
+    }
+  },
+  "feedback": {
+    "button": "שלח משוב",
+    "title": "שלח משוב",
+    "description": "אני קורא כל הודעה בעצמי, אז כתוב את זה איך שזה יוצא. תודה שאתה עוזר לשפר את SpeakoFlow.",
+    "kind": {
+      "label": "סוג המשוב",
+      "bug": "באג",
+      "idea": "רעיון",
+      "question": "שאלה"
+    },
+    "placeholder": {
+      "bug": "מה קרה, ומה ציפית שיקרה במקום?",
+      "idea": "מה יהפוך את SpeakoFlow לטוב יותר בשבילך?",
+      "question": "מה היית רוצה לדעת?"
+    },
+    "messageLabel": "הודעה",
+    "emailLabel": "אימייל לתשובה",
+    "emailPlaceholder": "אימייל, אם תרצה לקבל תשובה",
+    "emailInvalid": "כתובת האימייל הזו לא נראית תקינה.",
+    "includeSystem": "כלול את גרסת האפליקציה ומערכת ההפעלה",
+    "systemDetails": "יישלח בדיוק כך: {{system}}",
+    "remaining": "נותרו {{count}}",
+    "screenshots": {
+      "add": "הוסף צילום מסך",
+      "pasteHint": "או הדבק עם {{shortcut}}",
+      "remove": "הסר את צילום המסך {{index}}",
+      "preview": "צילום מסך {{index}}, {{width}} × {{height}}, {{size}}",
+      "working": "מקטין את צילום המסך…",
+      "limit": "אפשר לצרף עד {{count}} צילומי מסך.",
+      "notImage": "הקובץ הזה אינו תמונה.",
+      "tooLarge": "התמונה הזו גדולה מדי לצירוף.",
+      "unreadable": "לא ניתן היה לקרוא את התמונה הזו."
+    },
+    "send": "שלח",
+    "sending": "שולח…",
+    "sentTitle": "תודה, זה בדרך",
+    "sentBody": "זה אצלי עכשיו, ואקרא את זה בקרוב.",
+    "sentWithEmail": "אם יהיה משהו להמשיך בו, תקבל תשובה בכתובת {{email}}.",
+    "screenshotsDropped_one": "לא ניתן היה לשמור את צילום המסך, אבל ההודעה שלך הגיעה.",
+    "screenshotsDropped_two": "לא ניתן היה לשמור שני צילומי מסך, אבל ההודעה שלך הגיעה.",
+    "screenshotsDropped_other": "לא ניתן היה לשמור {{count}} צילומי מסך, אבל ההודעה שלך הגיעה.",
+    "sendAnother": "שלח עוד אחד",
+    "errors": {
+      "generic": "לא ניתן היה לשלוח את המשוב שלך. ההודעה שמורה כאן, אז נסה שוב בעוד רגע."
+    },
+    "aboutRow": {
+      "title": "משוב",
+      "description": "דווח על באג, הצע רעיון או שאל שאלה.",
+      "button": "שלח משוב"
+    }
+  },
   "sidebar": {
     "general": "כללי",
     "dictation": "הכתבה",
     "assistant": "עוזר",
+    "meetings": "פגישות",
     "history": "היסטוריה",
     "about": "אודות",
     "debug": "ניפוי שגיאות",
@@ -43,16 +139,104 @@
     "general": "קיצורי מקשים, המיקרופון שלך ואיך האפליקציה נראית.",
     "dictation": "המודל שהופך את הקול שלך לטקסט, ואיך הטקסט עובר ניקוי.",
     "assistant": "הגדר את העוזר, ואז כוונן את הקול שלו, את ראיית המסך ואת החיפוש באינטרנט.",
+    "meetings": "הקלט שיחה, קרא אותה מחולקת לפי דוברים, והפוך אותה לסיכום.",
     "history": "ההכתבות האחרונות שלך, היצירות של Flow והשיחות עם העוזר, שמורות במכשיר הזה.",
     "about": "גרסה, שפת האפליקציה, מיקומי נתונים וקרדיטים.",
     "debug": "אבחון וכלי פיתוח."
   },
   "onboarding": {
+    "flow": {
+      "progress": "שלב {{current}} מתוך {{total}}",
+      "steps": {
+        "setup": "הגדרה",
+        "tour": "סיור",
+        "finish": "התחלה"
+      }
+    },
+    "setup": {
+      "installed": "מותקן",
+      "loadFailed": "לא ניתן היה לטעון את רשימת המודלים.",
+      "retry": "נסה שוב"
+    },
+    "tour": {
+      "features": "מה SpeakoFlow עושה",
+      "count": "{{current}} מתוך {{total}}",
+      "skip": "דלג על הסיור",
+      "next": "הבא",
+      "done": "המשך",
+      "tabs": {
+        "dictate": "הכתבה",
+        "ask": "עוזר",
+        "call": "שיחה"
+      },
+      "keys": {
+        "hold": "החזק כדי לדבר",
+        "tap": "הקש כדי להתחיל, הקש כדי לעצור",
+        "call": "לחץ כדי להתחיל, ושוב כדי לנתק"
+      },
+      "mail": {
+        "window": "הודעה חדשה",
+        "to": "אל",
+        "toValue": "שרה",
+        "subject": "נושא",
+        "subjectValue": "יום שישי"
+      },
+      "dictate": {
+        "title": "דבר.\nזה מקליד.",
+        "cleanup": "ניקוי AI, כשאתה רוצה",
+        "said": "היי שרה, אפשר להעביר את השיחה שלנו ליום שישי? אשלח את התקציב לפני כן."
+      },
+      "ask": {
+        "title": "בקש\nכל דבר.",
+        "chips": {
+          "translate": "תרגם",
+          "decline": "כתוב תשובה",
+          "explain": "הסבר",
+          "anything": "…כל דבר"
+        },
+        "examples": {
+          "translate": {
+            "window": "הודעות",
+            "doc": "אפשר להעביר את השיחה שלנו ליום שישי?",
+            "question": "תרגם את זה לספרדית",
+            "answer": "¿Podemos pasar nuestra llamada al viernes?"
+          },
+          "decline": {
+            "window": "דואר",
+            "doc": "היי, אתה פנוי להצטרף לסקירת התכנון ביום חמישי ב-15:00?",
+            "question": "כתוב תשובה מנומסת שאני לא יכול ביום חמישי",
+            "answer": "תודה על ההזמנה! לא אוכל להגיע ביום חמישי ב-15:00, אבל אני פנוי ביום שישי בבוקר אם זה מתאים."
+          },
+          "explain": {
+            "window": "דפדפן",
+            "doc": "ה-API מחזיר 429 Too Many Requests.",
+            "question": "מה זה אומר?",
+            "answer": "אתה שולח בקשות מהר יותר ממה שהשירות מאפשר. חכה רגע, ואז נסה שוב לאט יותר."
+          }
+        }
+      },
+      "call": {
+        "title": "או פשוט\nתדבר על זה.",
+        "you": "אתה",
+        "assistant": "העוזר",
+        "said": "עזור לי לתכנן הרצאה קצרה לישיבת הצוות של יום שישי.",
+        "reply": "בטח. פתח בתוצאה אחת שאתה הכי גאה בה, תן שתי סיבות לכך שהיא הצליחה, וסיים במה שבא הלאה."
+      }
+    },
+    "finish": {
+      "status": {
+        "ready": "מוכן",
+        "installing": "מתקין…",
+        "percent": "{{percent}}%",
+        "retry": "נסה שוב",
+        "waiting": "ממתין"
+      }
+    },
     "subtitle": "כדי להתחיל, בחר מודל תמלול",
     "steps": {
       "progress": "שלב {{current}} מתוך {{total}}",
       "counter": "שלב {{current}} מתוך {{total}} · {{label}}",
-      "speechToText": "תמלול",
+      "speechToText": "שמיעה",
       "aiModel": "תן לו מוח",
       "ready": "הכול מוכן"
     },
@@ -77,8 +261,8 @@
       "downloadStarted": "מוריד את המודל שלך ברקע."
     },
     "aiModel": {
-      "title": "הוסף מודל בינה מלאכותית מקומי",
-      "subtitle": "בחר לפי מהירות התגובה והיכולת. E4B הוא ברירת המחדל המאוזנת; 12B חד יותר אבל אטי יותר.",
+      "title": "הוסף AI מקומי (אופציונלי)",
+      "subtitle": "עוזר לשיחה, וגם המודל שלנו שמנקה את ההכתבה שלך. אפשר לבחור אחד מהם, או את שניהם.",
       "tiers": {
         "small": {
           "description": "פועל בכל מחשב. מצוין לסידור הכתיבה שלך."
@@ -90,16 +274,16 @@
           "description": "התשובות החדות ביותר, והוא גם רואה את המסך שלך."
         }
       },
-      "seesScreen": "רואה את המסך שלך",
+      "seesScreen": "מודל ראייה",
       "textOnly": "טקסט בלבד",
       "recommendedForAssistant": "מומלץ לעוזר",
       "download": "הורד מודל",
       "useDownloaded": "השתמש במודל שהורדת",
       "skip": "דלג לעת עתה",
-      "skipHint": "אפשר לעשות את זה מאוחר יותר בהגדרות > עוזר > במכשיר שלי.",
+      "skipHint": "אפשר להוסיף כל אחד מהם מאוחר יותר בהגדרות.",
       "continue": "המשך",
-      "downloadingHint": "המודל שלך יורד ברקע — ניתן להתחיל להשתמש באפליקציה מיד.",
-      "downloadStarted": "מוריד את מודל הבינה המלאכותית שלך ברקע."
+      "downloadingHint": "ההורדה מתבצעת ברקע. אפשר להתחיל להשתמש באפליקציה מיד.",
+      "downloadStarted": "מוריד את המודל שלך ברקע."
     },
     "cleanup": {
       "cardTitle": "SpeakoFlow Mini",
@@ -126,8 +310,8 @@
     },
     "errors": {
       "selectModel": "לא ניתן היה לבחור את המודל הזה. נסה שוב.",
-      "loadModels": "טעינת המודלים הזמינים נכשלה",
-      "downloadModel": "הורדת המודל נכשלה: {{error}}"
+      "loadModels": "לא ניתן היה לטעון את המודלים הזמינים.",
+      "downloadModel": "לא ניתן היה להוריד את המודל: {{error}}"
     },
     "downloadProgress": {
       "sizeOf": "{{downloaded}} מתוך {{total}} · {{percentage}}%"
@@ -176,7 +360,7 @@
         "description": "ה-Gemma העכשווי המהיר ביותר לשיחה יומיומית. פחות מוצלח בבקשות מורכבות."
       },
       "gemma-4-e4b": {
-        "description": "מומלץ לשיחה: איזון טוב יותר בין איכות למהירות, בלי חשיבה כברירת מחדל."
+        "description": "איזון חזק יותר בין איכות למהירות, ובלי חשיבה כברירת מחדל."
       },
       "gemma-4-12b": {
         "description": "מתמודד טוב יותר עם שאלות מורכבות, אבל איטי בצורה מורגשת ועובד הכי טוב עם GPU חזק."
@@ -193,19 +377,19 @@
       },
       "medium": {
         "name": "Whisper Medium",
-        "description": "דיוק טוב, מהירות בינונית"
+        "description": "דיוק טוב במהירות בינונית."
       },
       "turbo": {
         "name": "Whisper Turbo",
-        "description": "איזון טוב בין דיוק למהירות."
+        "description": "איזון בין דיוק למהירות."
       },
       "large": {
         "name": "Whisper Large",
-        "description": "דיוק טוב, אבל איטי."
+        "description": "מדויק מאוד, אבל איטי."
       },
       "parakeet-tdt-0.6b-v2": {
         "name": "Parakeet V2",
-        "description": "אנגלית בלבד. המודל הטוב ביותר לדוברי אנגלית."
+        "description": "אנגלית בלבד. מצוין לדוברי אנגלית."
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
@@ -217,7 +401,7 @@
       },
       "moonshine-tiny-streaming-en": {
         "name": "Moonshine V2 Tiny",
-        "description": "מהיר במיוחד, אנגלית בלבד"
+        "description": "מהיר במיוחד. אנגלית בלבד."
       },
       "moonshine-small-streaming-en": {
         "name": "Moonshine V2 Small",
@@ -225,11 +409,11 @@
       },
       "moonshine-medium-streaming-en": {
         "name": "Moonshine V2 Medium",
-        "description": "אנגלית בלבד. איכות גבוהה."
+        "description": "אנגלית בלבד. איכות גבוהה יותר, מעט איטי יותר."
       },
       "breeze-asr": {
         "name": "Breeze ASR",
-        "description": "מותאם למנדרינית טאיוואנית. תמיכה במעבר בין שפות."
+        "description": "מותאם למנדרינית טאיוואנית, עם מעבר לאנגלית באמצע משפט."
       },
       "sense-voice-int8": {
         "name": "SenseVoice",
@@ -237,19 +421,19 @@
       },
       "gigaam-v3-e2e-ctc": {
         "name": "GigaAM v3",
-        "description": "זיהוי דיבור ברוסית. מהיר ומדויק."
+        "description": "רוסית בלבד. מהיר ומדויק."
       },
       "canary-180m-flash": {
         "name": "Canary 180M Flash",
-        "description": "מהיר מאוד. אנגלית, גרמנית, ספרדית וצרפתית. תומך בתרגום."
+        "description": "מהיר מאוד. אנגלית, גרמנית, ספרדית וצרפתית, עם תרגום."
       },
       "canary-1b-v2": {
         "name": "Canary 1B v2",
-        "description": "רב-לשוני ומדויק. 25 שפות אירופיות. תומך בתרגום."
+        "description": "מדויק ב־25 שפות אירופיות, עם תרגום."
       },
       "cohere-int8": {
         "name": "Cohere",
-        "description": "מודל גדול, איטי יותר, אך מדויק מאוד ורב-לשוני."
+        "description": "גדול ואיטי יותר, אבל מדויק מאוד. שפות רבות."
       }
     },
     "permissions": {
@@ -271,15 +455,77 @@
       "waiting": "ממתין…",
       "allGranted": "הכול מוכן!",
       "errors": {
-        "checkFailed": "בדיקת ההרשאות נכשלה. נסה שוב.",
-        "requestFailed": "בקשת ההרשאה נכשלה. נסה שוב.",
+        "checkFailed": "לא ניתן היה לבדוק את ההרשאות. נסה שוב.",
+        "requestFailed": "לא ניתן היה לבקש את ההרשאה. נסה שוב.",
         "resetFailed": "לא ניתן לאפס את ההרשאה. הסר את SpeakoFlow מרשימת הנגישות והוסף אותו מחדש."
       }
+    },
+    "frame": {
+      "setup": "הגדרה",
+      "tour": "סיור",
+      "finish": "התחלה"
+    },
+    "welcome": {
+      "line": "דבר, וזה מקליד. שאל, וזה עונה.",
+      "start": "בוא נתחיל",
+      "note": "לוקח בערך דקה."
+    },
+    "speech": {
+      "title": "בחר את מודל הקול שלך",
+      "body": "רץ על המחשב הזה. עובד גם בלי אינטרנט.",
+      "english": "אנגלית",
+      "languages_one": "שפה אחת",
+      "languages_two": "{{count}} שפות",
+      "languages_other": "{{count}} שפות",
+      "tags": {
+        "english": "הכי מהיר",
+        "languages": "מזהה את השפה",
+        "small": "הכי קטן",
+        "accurate": "הכי מדויק",
+        "widest": "איטי יותר"
+      },
+      "more_one": "עוד מודל אחד",
+      "more_two": "עוד {{count}} מודלים",
+      "more_other": "עוד {{count}} מודלים",
+      "anytime": "אפשר להוסיף עוד מודלים בכל עת.",
+      "download": "הורד והמשך",
+      "continue": "המשך",
+      "later": "הגדר מאוחר יותר",
+      "loading": "מחפש את מודל הדיבור שלך"
+    },
+    "start": {
+      "ready": {
+        "title": "נסה את זה עכשיו"
+      },
+      "downloading": {
+        "title": "כמעט מוכן"
+      },
+      "failed": {
+        "title": "ההורדה נעצרה"
+      },
+      "none": {
+        "title": "בחר מודל קול כדי להתחיל"
+      },
+      "progress": {
+        "of": "{{done}} מתוך {{total}}",
+        "failed": "זה לא הושלם. לנסות שוב?",
+        "underMinute": "נותרה פחות מדקה",
+        "minutes_one": "נותרה בערך דקה",
+        "minutes_two": "נותרו בערך {{count}} דקות",
+        "minutes_other": "נותרו בערך {{count}} דקות"
+      },
+      "try": {
+        "label": "נסה הכתבה",
+        "placeholder": "המילים שלך יופיעו כאן…",
+        "success": "זהו. זה עובד בכל אפליקציה."
+      },
+      "open": "פתח את SpeakoFlow",
+      "choose": "בחר מודל קול"
     }
   },
   "modelSelector": {
     "custom": "מותאם אישית",
-    "active": "פעיל",
+    "active": "בשימוש",
     "switching": "מחליף…",
     "noModelsAvailable": "אין מודלים זמינים",
     "verifying": "מאמת את {{modelName}}…",
@@ -296,7 +542,7 @@
     "loadingGeneric": "טוען…",
     "modelError": "שגיאת מודל",
     "modelUnloaded": "המודל נפרק",
-    "noModelDownloadRequired": "אין מודל, נדרשת הורדה",
+    "noModelDownloadRequired": "אין מודל — נדרשת הורדה",
     "llmSelectModel": "בחר מודל עוזר",
     "llmModelTitle": "מודל העוזר: {{model}}",
     "deleteModel": "מחק את {{modelName}}",
@@ -380,8 +626,8 @@
       }
     },
     "modelSettings": {
-      "title": "הגדרות עבור {{model}}",
-      "noSettingsNeeded": "המודל הזה עובד אוטומטית ולא דורש הגדרה נוספת."
+      "title": "הגדרות {{model}}",
+      "noSettingsNeeded": "המודל הזה עובד אוטומטית — אין מה להגדיר."
     },
     "general": {
       "title": "כללי",
@@ -397,7 +643,7 @@
       },
       "shortcut": {
         "title": "קיצורי מקשים",
-        "description": "הגדר קיצורי מקשים כדי להפעיל הקלטה ותמלול דיבור",
+        "description": "קיצורי המקשים שמתחילים ועוצרים הקלטה.",
         "loading": "טוען קיצורי מקשים…",
         "none": "לא הוגדרו קיצורי מקשים",
         "notFound": "קיצור הדרך לא נמצא",
@@ -405,7 +651,7 @@
         "bindings": {
           "transcribe": {
             "name": "הכתבה",
-            "description": "קיצור המקלדת להקלטה ולתמלול הקול שלך."
+            "description": "לחץ כדי להתחיל להקליט, ולחץ שוב כדי לעצור ולהקליד את הטקסט."
           },
           "transcribe_toggle": {
             "name": "הכתבה ללא ידיים",
@@ -413,10 +659,10 @@
           },
           "cancel": {
             "name": "ביטול",
-            "description": "קיצור המקלדת לביטול ההקלטה הנוכחית."
+            "description": "עוצר את ההקלטה הנוכחית או תשובה שנכתבת כעת."
           },
           "transcribe_with_post_process": {
-            "name": "קיצור לעיבוד משלים",
+            "name": "הכתבה וניקוי",
             "description": "הכתב, ואז נקה את הטקסט עם AI לפני שהוא מוקלד."
           },
           "assistant": {
@@ -426,25 +672,31 @@
           "assistant_vision": {
             "name": "שאל עם המסך",
             "description": "שאל בקול כשהמסך שלך מצורף, כדי שהעוזר יראה במה אתה מסתכל."
+          },
+          "assistant_call": {
+            "name": "התחל שיחה",
+            "description": "דבר עם העוזר בלי ידיים ושמע את התשובות שלו. לחץ שוב כדי לנתק."
           }
         },
         "errors": {
-          "restore": "שחזור קיצור הדרך המקורי נכשל",
-          "set": "הגדרת קיצור הדרך נכשלה: {{error}}",
+          "restore": "לא ניתן היה לשחזר את קיצור המקשים המקורי.",
+          "set": "לא ניתן היה להגדיר את קיצור המקשים: {{error}}",
           "reset": "איפוס קיצור המקשים נכשל."
-        }
+        },
+        "clickToChange": "לחץ כדי לשנות",
+        "notSet": "לא מוגדר"
       },
       "language": {
         "title": "שפה",
         "description": "השפה לזיהוי דיבור. בחירת שפה מסוימת יכולה לשפר את הדיוק.",
-        "descriptionUnsupported": "מודל Parakeet מזהה את השפה אוטומטית. אין צורך בבחירה ידנית.",
+        "descriptionUnsupported": "המודל הזה מזהה את השפה אוטומטית.",
         "searchPlaceholder": "חפש שפות…",
         "noResults": "לא נמצאו שפות",
         "auto": "אוטומטי"
       },
       "pushToTalk": {
-        "label": "לחץ כדי לדבר",
-        "description": "החזקה מקליטה כל עוד קיצור ההכתבה לחוץ. הקשה מתחילה הקלטה בלחיצה אחת ועוצרת אותה בלחיצה הבאה.",
+        "label": "אופן ההקלטה",
+        "description": "החזקה: ההקלטה פועלת כל עוד אתה מחזיק קיצור הקלטה. הקשה: לחיצה אחת מתחילה, הלחיצה הבאה עוצרת. חל על כל קיצורי ההקלטה.",
         "hold": "החזקה",
         "tap": "הקשה"
       },
@@ -461,9 +713,9 @@
       "yourModels": "מודלים שהורדו",
       "availableModels": "זמינים להורדה",
       "downloaded": "הורד",
-      "available": "זמין להורדה",
-      "deleteConfirm": "האם למחוק את {{modelName}}? יהיה צורך להוריד אותו שוב כדי להשתמש בו.",
-      "deleteActiveConfirm": "{{modelName}} הוא המודל הפעיל שלך כרגע. מחיקה שלו תעצור את התמלול עד שתבחר מודל חדש. להמשיך?",
+      "available": "זמינים להורדה",
+      "deleteConfirm": "למחוק את {{modelName}}? יהיה צורך להוריד אותו שוב כדי להשתמש בו.",
+      "deleteActiveConfirm": "{{modelName}} הוא המודל הפעיל שלך. מחיקתו תעצור את התמלולים עד שתבחר מודל חדש. להמשיך?",
       "deleteTitle": "מחיקת מודל",
       "categories": {
         "stt": "תמלול",
@@ -500,6 +752,7 @@
         "popularTitle": "מודלי GGUF פופולריים",
         "resultsTitle": "תוצאות חיפוש",
         "resultCount_one": "{{count}} מודל",
+        "resultCount_two": "{{count}} מודלים",
         "resultCount_other": "{{count}} מודלים",
         "searching": "מחפש ב-Hugging Face…",
         "searchError": "החיפוש נכשל. בדוק את החיבור שלך ונסה שוב.",
@@ -529,8 +782,10 @@
         "linkFolderHint": "נסרקת אוטומטית, כולל תיקיות משנה. אפשר לקשר כמה תיקיות שתרצה.",
         "fileFilter": "קובצי מודל",
         "filesAdded_one": "נוסף {{count}} מודל.",
+        "filesAdded_two": "נוספו {{count}} מודלים.",
         "filesAdded_other": "נוספו {{count}} מודלים.",
         "folderAdded_one": "התיקייה קושרה. נמצא {{count}} מודל.",
+        "folderAdded_two": "התיקייה קושרה. נמצאו {{count}} מודלים.",
         "folderAdded_other": "התיקייה קושרה. נמצאו {{count}} מודלים.",
         "folderRemoved": "קישור התיקייה בוטל. לא נגענו בקבצים שלך.",
         "foldersTitle": "תיקיות מקושרות",
@@ -539,12 +794,14 @@
         "rescan": "סרוק מחדש",
         "rescanning": "סורק מחדש…",
         "rescanDone_one": "נמצא {{count}} מודל מקומי.",
+        "rescanDone_two": "נמצאו {{count}} מודלים מקומיים.",
         "rescanDone_other": "נמצאו {{count}} מודלים מקומיים.",
         "footnote": "התיקיות המקושרות נסרקות מחדש בכל הפעלה של SpeakoFlow, כך שמודלים שתוסיף אליהן בהמשך יופיעו מעצמם. ביטול קישור לתיקייה או הסרת מודל מסירים אותם רק מהרשימה הזאת — הקבצים שלך נשארים במקומם.",
         "removeTitle": "להסיר מהרשימה?",
         "removeConfirm": "להסיר את ״{{modelName}}״ מרשימת המודלים שלך?\n\nהקובץ עצמו נשאר במקומו:\n{{path}}",
         "missingBadge": "הקובץ חסר",
-        "fileMissing": "הקובץ של המודל הזה לא נמצא יותר:\n{{path}}\n\nייתכן שהוא הועבר או ששמו שונה, או שהוא נמצא בכונן שאינו מחובר."
+        "fileMissing": "הקובץ של המודל הזה לא נמצא יותר:\n{{path}}\n\nייתכן שהוא הועבר או ששמו שונה, או שהוא נמצא בכונן שאינו מחובר.",
+        "foldersEmptyShort": "עדיין לא קושרו תיקיות."
       }
     },
     "sound": {
@@ -557,13 +814,19 @@
       },
       "audioFeedback": {
         "label": "משוב קולי",
-        "description": "נגן צליל כשההקלטה מתחילה ומסתיימת"
+        "description": "השמע צליל כשההקלטה מתחילה ומסתיימת"
       },
       "soundTheme": {
         "label": "צליל משוב",
         "description": "בחר את צליל ההתחלה והסיום שמתנגן במהלך ההכתבה",
         "default": "ברירת מחדל",
-        "preview": "השמע דוגמה (מנגן התחלה ואז סיום)"
+        "preview": "השמע דוגמה (מנגן התחלה ואז סיום)",
+        "themes": {
+          "marimba": "מרימבה",
+          "pop": "פופ",
+          "click": "קליק",
+          "custom": "מותאם אישית"
+        }
       },
       "outputDevice": {
         "title": "התקן פלט",
@@ -599,7 +862,7 @@
       },
       "experimentalToggle": {
         "label": "תכונות ניסיוניות",
-        "description": "הפעל תכונות ניסיוניות שעדיין נמצאות בפיתוח."
+        "description": "הצג תכונות שנמצאות בפיתוח. כבוי כברירת מחדל."
       },
       "lazyStreamClose": {
         "label": "השאר את המיקרופון פתוח בין תמלולים",
@@ -630,15 +893,15 @@
       },
       "startHidden": {
         "label": "התחל מוסתר",
-        "description": "הפעל לתוך מגש המערכת בלי לפתוח את החלון."
+        "description": "הפעל אל מגש המערכת בלי לפתוח את החלון."
       },
       "autostart": {
         "label": "הפעל עם עליית המערכת",
-        "description": "הפעל את SpeakoFlow אוטומטית כשאתה מתחבר למחשב."
+        "description": "פתח את SpeakoFlow אוטומטית כשאתה מתחבר."
       },
       "showTrayIcon": {
-        "label": "הצג אייקון במגש",
-        "description": "הצג את האייקון של SpeakoFlow במגש המערכת."
+        "label": "הצג סמל במגש",
+        "description": "השאר את SpeakoFlow במגש המערכת."
       },
       "closeBehavior": {
         "label": "צא מהאפליקציה כשאני סוגר את החלון",
@@ -653,8 +916,18 @@
           "live": "חי"
         }
       },
+      "overlayLinger": {
+        "title": "השאר את הטקסט הסופי על המסך",
+        "description": "כמה זמן הכרטיס החי נשאר מוצג אחרי שסיימת להכתיב, כדי שתוכל לקרוא או להעתיק את מה שהוקלד. ריחוף מעל הכרטיס משאיר אותו פתוח.",
+        "options": {
+          "quick": "לרגע (שנייה אחת)",
+          "standard": "רגיל (3 שניות)",
+          "long": "ארוך יותר (6 שניות)",
+          "extended": "הרבה יותר (10 שניות)"
+        }
+      },
       "overlay": {
-        "title": "מיקום שכבת המשוב",
+        "title": "מיקום שכבת ההקלטה",
         "description": "איפה שכבת המשוב של ההקלטה ממוקמת על המסך שלך.",
         "options": {
           "none": "ללא",
@@ -683,7 +956,7 @@
         }
       },
       "clipboardHandling": {
-        "title": "התנהגות הלוח",
+        "title": "טיפול בלוח",
         "description": "האם התמלול נשאר בלוח שלך אחרי ההדבקה.",
         "options": {
           "dontModify": "אל תשנה את הלוח",
@@ -707,7 +980,7 @@
         "descriptionUnsupported": "המודל {{model}} לא תומך בתרגום."
       },
       "modelUnload": {
-        "title": "פרוק מודל",
+        "title": "פריקת מודל",
         "description": "שחרר זיכרון כשהמודל לא היה בשימוש למשך הזמן הזה.",
         "options": {
           "never": "אף פעם",
@@ -730,6 +1003,18 @@
         "remove": "הסר את {{word}}",
         "duplicate": "\"{{word}}\" כבר קיימת"
       },
+      "autoLearn": {
+        "label": "למד מילים שאני מתקן",
+        "description": "זוכר את האיות שלך כשאתה מתקן מילה ש-SpeakoFlow טעה בה.",
+        "info": "הוא קורא רק את השדה שבו הוא הקליד זה עתה, למשך כדקה. שום דבר לא מועלה, וכל מילה שהוא לומד מופיעה כאן.",
+        "unsupported": "למידה מתיקונים זמינה בינתיים רק ב-Windows. עדיין אפשר להוסיף מילים ידנית למעלה.",
+        "learnedTitle": "נלמד מהתיקונים שלך",
+        "learnedEmpty": "עדיין לא נלמד כלום. תקן מילה שנשמעה לא נכון באפליקציה שהכתבת אליה, והיא תופיע כאן.",
+        "keep": "שמור את {{word}} במילים המותאמות שלי",
+        "remove": "שכח את {{word}}",
+        "clearAll": "שכח הכול",
+        "reviewHint": "אלה ניחושים. סמן אחד כדי להעביר אותו למילים המותאמות שלך, או הסר אותו. מעבר ל-{{max}}, הישנים ביותר נמחקים."
+      },
       "textReplacements": {
         "title": "החלפות טקסט",
         "description": "החלף ביטוי בתמלול שלך בטקסט שאתה משתמש בו לעיתים קרובות. לדוגמה: ״האימייל שלי״ הופך ל״alex@example.com״.",
@@ -744,7 +1029,7 @@
         "replaceLabel": "הכנס את הטקסט הזה",
         "replacePlaceholder": "alex@example.com",
         "advanced": "אפשרויות מתקדמות",
-        "regex": "Regex",
+        "regex": "ביטוי רגולרי",
         "trimBefore": "קצץ לפני",
         "trimAfter": "קצץ אחרי",
         "enabledLabel": "פעיל",
@@ -759,14 +1044,14 @@
         "capitalization": {
           "label": "אותיות רישיות",
           "none": "ללא",
-          "uppercase": "UPPERCASE",
-          "lowercase": "lowercase",
-          "capitalize": "Capitalize"
+          "uppercase": "אותיות גדולות",
+          "lowercase": "אותיות קטנות",
+          "capitalize": "אות ראשונה גדולה"
         }
       }
     },
     "postProcessing": {
-      "title": "עיבוד משלים",
+      "title": "ניקוי AI",
       "readiness": {
         "checking": "בודק את הגדרת ניקוי ה-AI…",
         "checkFailed": "לא ניתן היה לבדוק את הגדרת ניקוי ה-AI.",
@@ -798,8 +1083,8 @@
         "title": "קיצור מקשים"
       },
       "tone": {
-        "title": "סגנון מוכן",
-        "description": "בחר איך ההכתבה המנוקה תישמע. ״ניקוי בלבד״ מתקן את הטקסט בלי לשנות את הסגנון שלו בכוונה.",
+        "title": "2 · סגנון כתיבה",
+        "description": "מתווסף מעל פרומפט המערכת: הוא משנה איך הטקסט המנוקה נקרא, לא מה מתוקן. ״ללא״ משאיר את הקול שלך כפי שהוא.",
         "options": {
           "none": "ללא (ניקוי בלבד)",
           "formal": "רשמי",
@@ -840,7 +1125,8 @@
         "baseUrl": {
           "title": "כתובת בסיס",
           "description": "כתובת ה-API הבסיסית עבור הספק הנבחר. ניתנת לעריכה עבור Custom, Local ו-Azure OpenAI (הגדר אותה למשאב שלך, לדוגמה https://your-resource.openai.azure.com/openai/v1).",
-          "placeholder": "https://api.openai.com/v1"
+          "placeholder": "https://api.openai.com/v1",
+          "managed": "כתובת הבסיס מנוהלת על ידי הספק הנבחר."
         },
         "apiKey": {
           "title": "מפתח API",
@@ -855,8 +1141,8 @@
         },
         "model": {
           "title": "מודל",
-          "descriptionApple": "ספק מגבלת טוקנים מספרית אופציונלית או השאר את ברירת המחדל שעל המכשיר.",
-          "descriptionCustom": "ספק את מזהה המודל שה-endpoint המותאם שלך מצפה לו.",
+          "descriptionApple": "הזן מגבלת אורך מספרית אופציונלית, או השאר את הגדרת ברירת המחדל שבמכשיר.",
+          "descriptionCustom": "הזן את מזהה המודל שהספק המותאם שלך מצפה לו.",
           "descriptionDefault": "בחר מודל שהספק הנבחר חושף.",
           "placeholderApple": "Apple Intelligence",
           "placeholderWithOptions": "חפש או בחר מודל",
@@ -867,8 +1153,8 @@
       "prompts": {
         "title": "פרומפט",
         "selectedPrompt": {
-          "title": "פרומפט נבחר",
-          "description": "בחר תבנית לשיפור התמלול או צור חדשה. השתמש ב-${output} בתוך טקסט הפרומפט כדי להפנות לתמלול שנקלט."
+          "title": "פרומפט",
+          "description": "ההוראה הבסיסית: מה המודל מתקן, ומה עליו להשאיר כמו שהוא. הטקסט המתומלל שלך נשלח בנפרד, אז פשוט כתוב הוראות."
         },
         "noPrompts": "אין פרומפטים זמינים",
         "nonePrompt": "ללא (בלי פרומפט)",
@@ -878,8 +1164,8 @@
         "closeEditor": "סגור",
         "promptLabel": "שם הפרומפט",
         "promptLabelPlaceholder": "הזן שם לפרומפט",
-        "promptInstructions": "הוראות לפרומפט",
-        "promptInstructionsPlaceholder": "כתוב את ההוראות שירוצו אחרי התמלול. לדוגמה: שפר דקדוק ובהירות עבור הטקסט הבא: ${output}",
+        "promptInstructions": "הוראות הפרומפט",
+        "promptInstructionsPlaceholder": "כתוב הוראות לניקוי התמלול. לדוגמה: תקן דקדוק ופיסוק, ואז נסח מחדש כהודעה מלוטשת ומקצועית.",
         "promptTip": "טיפ: הטקסט המתומלל שלך נשלח למודל אוטומטית — פשוט כתוב הוראות. (פרומפטים ותיקים שמשתמשים ב-<code>${output}</code> עדיין עובדים.)",
         "updatePrompt": "עדכן פרומפט",
         "deletePrompt": "מחק פרומפט",
@@ -887,7 +1173,7 @@
         "createPrompt": "צור פרומפט",
         "cancel": "ביטול",
         "selectToEdit": "בחר פרומפט למעלה כדי לצפות בפרטים שלו ולערוך אותם.",
-        "createFirst": "לחץ על 'צור פרומפט חדש' למעלה כדי ליצור את פרומפט העיבוד הראשון שלך."
+        "createFirst": "לחץ על ״צור פרומפט חדש״ למעלה כדי ליצור את פרומפט הניקוי הראשון שלך."
       }
     },
     "dictation": {
@@ -905,6 +1191,66 @@
       "catalog": {
         "title": "בחר את המודל שלך",
         "description": "כל המודלים פועלים במכשיר שלך — התפשר על דיוק לטובת מהירות ובחר את זה שמתאים לך."
+      },
+      "cloud": {
+        "groupTitle": "איפה התמלול רץ",
+        "engine": {
+          "title": "מנוע דיבור לטקסט",
+          "description": "במחשב הזה, או אצל ספק מתארח שאתה מביא אליו מפתח.",
+          "info": "״במכשיר שלי״ מריץ מודל שהורדת: פרטי, חינמי ועובד בלי אינטרנט. ״ענן״ שולח את ההקלטה שלך לספק שאתה בוחר, שגובה ממך תשלום לפי דקת שמע, ובתמורה מקבלים מודל מתקדם בלי הורדה ובלי GPU."
+        },
+        "bypassNotice": "תמלול בענן מופעל, ולכן המודל שלמעלה לא בשימוש ונשאר לא טעון.",
+        "provider": {
+          "title": "ספק"
+        },
+        "key": {
+          "title": "מפתח API",
+          "stored": "מפתח שמור במחזיק המפתחות של המערכת.",
+          "missing": "עדיין לא נשמר מפתח עבור הספק הזה.",
+          "placeholder": "הדבק את מפתח ה-API שלך",
+          "replacePlaceholder": "הדבק מפתח חדש כדי להחליף את השמור",
+          "save": "שמור",
+          "saved": "מפתח ה-API נשמר",
+          "clear": "הסר",
+          "getOne": "קבל מפתח"
+        },
+        "endpoint": {
+          "title": "נקודת קצה",
+          "description": "כתובת הבסיס של שרת תמלול תואם OpenAI.",
+          "azureDescription": "נקודת הקצה של משאב ה-Azure שלך, מתוך Keys and Endpoint בפורטל Azure. MAI-Transcribe דורש משאב באזור Central India, Southeast Asia, East US, West US, West US 2 או North Europe.",
+          "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
+        },
+        "model": {
+          "title": "מודל",
+          "info": "הקלד כל מודל שהספק מציע, או טען את הרשימה. ב-ElevenLabs, בחר scribe_v2_realtime כדי לתמלל תוך כדי דיבור ו-scribe_v2 כדי לתמלל אחרי שאתה מפסיק.",
+          "load": "טען מודלים"
+        },
+        "streaming": {
+          "label": "תמלל תוך כדי דיבור",
+          "description": "הטקסט מגיע בזמן שאתה עדיין מדבר, כך ששחרור המקש רק משלים את המילים האחרונות.",
+          "needsRealtimeModel": "בחר מודל בזמן אמת למעלה כדי להשתמש בזה — המודל הנוכחי מתמלל רק אחרי שאתה מפסיק."
+        },
+        "keyterms": {
+          "label": "שלח את המילים המותאמות שלי",
+          "description": "מעביר את אוצר המילים המותאם שלך לספק כדי שיעדיף את האיותים האלה."
+        },
+        "noVerbatim": {
+          "label": "הסר מילות מילוי",
+          "description": "משמיט ״אממ״, ״אה״, התחלות שגויות וחזרות. כבה את זה כדי לקבל בדיוק את מה שאמרת, מילה במילה."
+        },
+        "language": {
+          "description": "השפה שבה אתה מדבר. כל ספק כאן עונה באותה שפה — ציון השפה מראש משפר את הדיוק, ו״אוטומטי״ נותן לו לזהות אותה בעצמו."
+        },
+        "translate": {
+          "supported": "{{provider}} יכול להחזיר אנגלית במקום השפה שבה דיברת. רק אנגלית — אף API לתמלול לא מתרגם לשפה אחרת.",
+          "unsupported": "{{provider}} מתמלל בשפה שבה אתה מדבר ואין לו נקודת קצה לתרגום, כך שזה לא יכול לפעול כאן. זה עובד במנוע שבמכשיר, וב-OpenAI, ב-Groq או בשרת Whisper באירוח עצמי."
+        },
+        "test": {
+          "title": "בדוק חיבור",
+          "description": "שולח שנייה אחת של שמע כדי לבדוק את המפתח, נקודת הקצה והמודל.",
+          "action": "הרץ בדיקה",
+          "running": "בודק…"
+        }
       },
       "aiCleanup": {
         "groupTitle": "ניקוי AI",
@@ -925,13 +1271,13 @@
           "recommendedTitle": "מומלץ לניקוי",
           "recommendedDescription": "SpeakoFlow Mini אומן למשימה הזאת בלבד, והוא טוב בה יותר ממודלים גדולים בהרבה."
         },
-        "promptGroupTitle": "פרומפט הניקוי",
+        "promptGroupTitle": "הוראות ניקוי",
         "tunedModelNotice": "המודל הזה עבר כיוונון עדין לניקוי הכתבה באנגלית, ולכן הוא עובד הכי טוב עם הפרומפט המומלץ ובלי סגנון.",
         "tunedModelNoticeDismiss": "הסתר את הטיפ",
         "tunedModelNoticeRestore": "הצג את טיפ המודל",
         "title": "שפר את ההכתבה שלי בעזרת AI",
         "caption": "ניסיוני — מסדר פיסוק ומילות מילוי אחרי שאתה מכתיב.",
-        "info": "מריץ מודל שפה על ההכתבה שלך כדי לתקן פיסוק, להסיר מילות מילוי ובאופן אופציונלי גם להתאים את הטון. חל על הכתבה בלבד, בקיצור מקשים נפרד. זה מוסיף השהיה קצרה אחרי שאתה מדבר; אם המודל נכשל או חורג מהזמן, נעשה שימוש בטקסט הגולמי שלך. עדיין בפיתוח."
+        "info": "הניקוי מנסח מחדש את מה שאמרת בעזרת מודל AI לפני שהטקסט מוקלד. זה עשוי לקחת רגע, ואם זה איטי נעשה שימוש במילים הגולמיות שלך."
       },
       "spokenEmoji": {
         "title": "אמוג׳י בקול",
@@ -943,7 +1289,7 @@
         "enableDescription": "התחל הכתבה בביטוי ההפעלה כדי שה-AI יכתוב עבורך את התוצאה — ״Hey Flow, write a polite email asking to reschedule״ מדביק את האימייל המוכן.",
         "phraseLabel": "ביטוי ההפעלה",
         "phraseDescription": "Flow מופעל רק כשהכתבה מתחילה בביטוי הזה. בכל מקום אחר, אותן מילים מודבקות כהכתבה רגילה. משתמש במודל של העוזר שלך; השאר ריק כדי לחזור ל״Hey Flow״.",
-        "phrasePlaceholder": "Hey Flow",
+        "phrasePlaceholder": "היי Flow",
         "screenLabel": "אפשר גישה למסך",
         "screenDescription": "אפשר ל-Flow לצלם את המסך פעם אחת כשפקודה מתייחסת בבירור למסך שלך, למשל ״look at this email and draft a reply״. המודל מחליט אם זה נחוץ. הגדרה נפרדת מהגישה למסך של העוזר."
       },
@@ -960,7 +1306,7 @@
       "filters": {
         "label": "סוג ההיסטוריה",
         "all": "הכול",
-        "recordings": "Recordings",
+        "recordings": "הכתבות",
         "flow": "Flow",
         "assistant": "שיחות עם העוזר"
       },
@@ -984,48 +1330,58 @@
       "save": "שמור תמלול",
       "unsave": "הסר משמורים",
       "delete": "מחק רשומה",
-      "deleteError": "מחיקת הרשומה נכשלה. נסה שוב.",
+      "deleteError": "לא ניתן היה למחוק את הרשומה. נסה שוב.",
       "retranscribe": "תמלל מחדש",
-      "retranscribeError": "תמלול מחדש נכשל. נסה שוב.",
+      "retranscribeError": "לא ניתן היה לתמלל מחדש. נסה שוב.",
       "transcribing": "מתמלל…",
-      "transcriptionFailed": "התמלול נכשל. אפשר לתמלל מחדש באמצעות אייקון הניסיון החוזר.",
+      "transcriptionFailed": "התמלול נכשל — השתמש בסמל הניסיון החוזר כדי לנסות שוב.",
       "assistantLabel": "שיחה עם העוזר",
       "copyConversation": "העתק את השיחה",
       "resumeConversation": "המשך את השיחה הזו בעוזר",
+      "branchConversation": "המשך מכאן כשיחה חדשה. השיחה הזו תישאר ללא שינוי.",
       "showConversation": "הצג את השיחה",
       "hideConversation": "הסתר את השיחה",
       "roleUser": "אתה",
       "roleAssistant": "העוזר",
       "screenshotAttached": "ראייה",
       "messageCount_one": "{{count}} הודעה",
+      "messageCount_two": "{{count}} הודעות",
       "messageCount_other": "{{count}} הודעות",
-      "deleteAssistantError": "לא ניתן היה למחוק את השיחה. נסה שוב."
+      "deleteAssistantError": "לא ניתן היה למחוק את השיחה. נסה שוב.",
+      "openFolderError": "לא ניתן היה לפתוח את תיקיית ההקלטות."
     },
     "debug": {
       "title": "ניפוי שגיאות",
       "logDirectory": {
         "title": "תיקיית לוגים",
-        "description": "המיקום שבו נשמרים קבצי הלוג"
+        "description": ""
       },
       "logLevel": {
         "title": "רמת לוג",
-        "description": "הגדר את רמת הפירוט של הלוגים"
+        "description": "",
+        "levels": {
+          "error": "שגיאה",
+          "warn": "אזהרה",
+          "info": "מידע",
+          "debug": "ניפוי שגיאות",
+          "trace": "מעקב"
+        }
       },
       "updateChecks": {
-        "label": "בדוק עדכונים",
-        "description": "בדוק אוטומטית אם קיימות גרסאות חדשות של SpeakoFlow"
+        "label": "בדוק עדכונים אוטומטית",
+        "description": "מחפש גרסה חדשה כש־SpeakoFlow מופעל וכל 12 שעות. תמיד אפשר לבדוק ידנית."
       },
       "soundTheme": {
         "label": "ערכת צלילים",
-        "description": "בחר ערכת צלילים להתחלה ולסיום ההקלטה"
+        "description": ""
       },
       "wordCorrectionThreshold": {
         "title": "סף תיקון מילים",
         "description": "רגישות לתיקוני מילים מותאמות אישית"
       },
       "historyLimit": {
-        "title": "מגבלת היסטוריה",
-        "description": "המספר המרבי של הקלטות הכתבה והקלטות Flow שאינן שמורות שיישמרו. הקלטות שמורות נשמרות תמיד, ושיחות עם העוזר אינן נספרות.",
+        "title": "מגבלת הקלטות",
+        "description": "המספר המרבי של הקלטות הכתבה ו־Flow שלא סומנו בכוכב שיישמרו. הקלטות שסומנו בכוכב נשמרות תמיד, ושיחות עם העוזר אינן נספרות. הערך המינימלי המותר הוא 1.",
         "entries": "הקלטות"
       },
       "recordingRetention": {
@@ -1036,21 +1392,35 @@
         "days3": "אחרי 3 ימים",
         "weeks2": "אחרי שבועיים",
         "months3": "אחרי 3 חודשים",
+        "customDays": "אחרי מספר ימים קבוע",
+        "customDaysTitle": "מחק אחרי",
+        "customDaysDescription": "הקלטות שלא סומנו בכוכב נמחקות כשהן מגיעות לגיל הזה בימים. הקלטות שסומנו בכוכב תמיד נשמרות.",
+        "days": "ימים",
         "placeholder": "בחר משך שמירה…",
         "savedToast": "משך השמירה נשמר.",
-        "appliedToast": "משך שמירת ההקלטות הוחל"
+        "appliedToast": "משך שמירת ההקלטות הוחל",
+        "saveFailed": "לא ניתן היה לשמור את הגדרת השמירה.",
+        "confirmTitle_one": "פעולה זו תמחק הקלטה אחת",
+        "confirmTitle_two": "פעולה זו תמחק {{count}} הקלטות",
+        "confirmTitle_other": "פעולה זו תמחק {{count}} הקלטות",
+        "confirmTitleUnknown": "פעולה זו עשויה למחוק הקלטות",
+        "confirmBody": "השמע והתמלול יוסרו מהמכשיר הזה ולא ניתן יהיה לשחזר אותם. הקלטות שסומנו בכוכב נשמרות.",
+        "confirmAction_one": "מחק הקלטה אחת",
+        "confirmAction_two": "מחק {{count}} הקלטות",
+        "confirmAction_other": "מחק {{count}} הקלטות",
+        "confirmActionUnknown": "החל בכל זאת"
       },
       "alwaysOnMicrophone": {
         "label": "מיקרופון תמיד פעיל",
         "description": "השאר את המיקרופון חם כדי שהמילים הראשונות לא ייחתכו. צורך קצת יותר סוללה."
       },
       "clamshellMicrophone": {
-        "title": "מיקרופון במצב clamshell",
+        "title": "מיקרופון במצב מכסה סגור",
         "description": "המיקרופון שישמש כשהמחשב הנייד סגור"
       },
       "postProcessingToggle": {
-        "label": "עיבוד משלים",
-        "description": "הפעל שיפור טקסט מבוסס AI אחרי התמלול"
+        "label": "ניקוי AI",
+        "description": "נקה את ההכתבה שלך בעזרת AI אחרי התמלול"
       },
       "muteWhileRecording": {
         "label": "השתק בזמן הקלטה",
@@ -1058,7 +1428,7 @@
       },
       "appendTrailingSpace": {
         "label": "הוסף רווח בסוף",
-        "description": "הוסף רווח אחרי התמלול המודבק"
+        "description": ""
       },
       "keyboardImplementation": {
         "title": "מימוש מקלדת",
@@ -1072,10 +1442,10 @@
       },
       "pasteDelay": {
         "title": "השהיית הדבקה",
-        "description": "השהיה לפני שליחת צירוף ההדבקה (במילישניות). הגדל אם טקסט שגוי מודבק."
+        "description": "מספר אלפיות השנייה להמתנה לפני ההדבקה. הגדל אם מודבק טקסט שגוי."
       },
       "recordingBuffer": {
-        "title": "באפר הקלטה נוסף",
+        "title": "חוצץ הקלטה נוסף",
         "description": "מספר המילישניות להמשך הקלטה אחרי שחרור המקש."
       }
     },
@@ -1083,7 +1453,7 @@
       "title": "אודות",
       "version": {
         "title": "גרסה",
-        "description": "הגרסה הנוכחית של SpeakoFlow"
+        "description": ""
       },
       "updates": {
         "title": "עדכונים",
@@ -1094,12 +1464,12 @@
         "title": "תיקיות"
       },
       "appDataDirectory": {
-        "title": "תיקיית נתוני אפליקציה",
-        "description": "המיקום שבו SpeakoFlow שומר את הנתונים שלו"
+        "title": "תיקיית נתוני האפליקציה",
+        "description": "המקום שבו SpeakoFlow שומר את המודלים, ההיסטוריה וההגדרות שלך."
       },
       "sourceCode": {
         "title": "קוד מקור",
-        "description": "צפה בקוד המקור ותרום",
+        "description": "",
         "button": "צפה ב-GitHub"
       },
       "license": {
@@ -1125,8 +1495,12 @@
       "brain": {
         "title": "המוח של העוזר",
         "whereLabel": "איפה זה רץ",
-        "onDevice": "במכשיר שלי",
-        "cloud": "ספק ענן",
+        "testLabel": "בדוק חיבור",
+        "testDescription": "שולח שאלה קצרה אחת כדי לבדוק שהעוזר באמת מגיע למודל הזה. מודלים במכשיר נטענים קודם, כך שהבדיקה הראשונה עשויה לקחת זמן.",
+        "testButton": "בדוק חיבור",
+        "testing": "בודק…",
+        "onDevice": "במחשב הזה",
+        "cloud": "ענן",
         "downloadModel": "עיין והורד מודלים",
         "downloadModelDescription": "בחר מודל מומלץ או חפש ב-Hugging Face.",
         "downloadModelAction": "עיין במודלים",
@@ -1147,7 +1521,7 @@
         "detailLocation": "מיקום",
         "detailFormat": "פורמט",
         "detailId": "מזהה המודל",
-        "switchBeforeDelete": "העבר את העוזר המובנה למודל אחר לפני מחיקת המודל הזה.",
+        "switchBeforeDelete": "המודל הזה בשימוש. עבור למודל אחר לפני שתמחק אותו.",
         "deleteModelConfirm": "למחוק את {{modelName}}? הקבצים שהורדו והרשומה השמורה יוסרו.",
         "deleteModelFailed": "לא ניתן היה למחוק את המודל.",
         "finderSectionTitle": "עוד מודלים שפועלים במכשיר",
@@ -1195,7 +1569,7 @@
         "builtinEngineExtracting": "מתקין את המנוע המקומי…",
         "builtinEngineReady": "המנוע המקומי מוכן.",
         "contextSizeLabel": "חלון הקשר",
-        "contextSizeDescription": "כמה המודל המקומי יכול להחזיק בראש בו-זמנית — הוראות המערכת, היסטוריית השיחה שלך, כל צילום מסך (תמונה אחת יכולה לתפוס חלק גדול) והתשובה שלו. חלון גדול יותר מחזיק יותר ושומר על ראיית המסך והחיפוש באינטרנט אמינים, אבל צורך יותר זיכרון. ברירת המחדל היא 8192; 16384 היא שדרוג טוב אם יש למחשב שלך מספיק זיכרון פנוי. אפשר להקטין אותו מאוחר יותר כדי לחסוך בזיכרון.",
+        "contextSizeDescription": "כמה מהשיחה המודל יכול לקרוא בבת אחת. גודל רב יותר זוכר יותר, אבל צורך יותר זיכרון ונטען לאט יותר.",
         "unloadTimeoutLabel": "פרוק מהזיכרון אחרי",
         "unloadTimeoutDescription": "פנה זיכרון על ידי פריקת המודל המקומי אחרי שלא היה בשימוש למשך הזמן הזה. הוא נטען מחדש אוטומטית בשימוש הבא."
       },
@@ -1206,7 +1580,7 @@
       },
       "characters": {
         "title": "פרופילים",
-        "description": "פרופילים ממוקדי משימה שאפשר להחליף ביניהם. הפרופיל הפעיל קובע את השם, התפקיד וההוראות של העוזר — וגם את אורך התשובות שלו. אפשר להחליף בכל עת מכותרת החלונית.",
+        "description": "פרסונות עם שם, הוראות ואורך תשובה משלהן. אפשר להחליף ביניהן בכל עת מהחלונית.",
         "galleryLabel": "הפרופילים שלך",
         "editSection": "ערוך פרופיל",
         "avatarLabel": "אווטאר",
@@ -1264,7 +1638,7 @@
       },
       "autoSummarize": {
         "label": "סכם שיחות ארוכות",
-        "description": "כששיחה גדלה מעבר לחלון ההקשר של המודל, הודעות ותיקות יצטמצמו אוטומטית לסיכום מתגלגל, כך שהשיחה תשמור על ההקשר שלה במקום לשכוח את ההתחלה. חיווי עדין מוצג בזמן שזה קורה."
+        "description": "מתמצת שיחות ארוכות כדי שהעוזר לא ישכח את ההתחלה."
       },
       "responseLength": {
         "label": "אורך התשובה",
@@ -1278,7 +1652,7 @@
       },
       "vision": {
         "timing": {
-          "label": "מתי לצלם"
+          "label": "תזמון הצילום"
         },
         "screenRecording": {
           "description": "ראיית מסך דורשת את הרשאת הקלטת המסך של macOS. תן אותה בהגדרות המערכת, ואז הפעל מחדש את SpeakoFlow כדי שהשינוי ייכנס לתוקף.",
@@ -1327,26 +1701,84 @@
       },
       "tts": {
         "title": "פלט קולי",
-        "enableLabel": "הקרא את התשובות בקול",
-        "enableDescription": "הקרא בקול את התשובות של העוזר.",
+        "enableLabel": "הקרא תשובות בקול במהלך שיחות",
+        "enableDescription": "מקריא את התשובות בקול בזמן שיחה חיה. תשובות טקסט מהירות אף פעם לא מוקראות.",
         "stopOnDictationLabel": "עצור את הדיבור כשההכתבה מתחילה",
         "stopOnDictationDescription": "עצור כל תשובה שעדיין מתנגנת כשאתה מתחיל להכתיב.",
         "engineLabel": "מנוע",
-        "engineDescription": "Kokoro פועל במחשב הזה בחינם. מנועי ענן משתמשים במפתח API של הספק שלהם. מותאם אישית מתחבר לשרת דיבור שאתה מפעיל בעצמך.",
+        "engineDescription": "קולות במחשב הזה הם חינמיים ופרטיים, ועובדים בלי אינטרנט. קולות ענן משתמשים במפתח API של אותו ספק. מותאם אישית מתחבר לשרת דיבור שאתה מפעיל בעצמך.",
+        "sectionLocal": "במחשב הזה",
+        "sectionLocalHint": "חינמי ופרטי. רץ על המחשב הזה ועובד בלי אינטרנט.",
+        "sectionCloud": "ענן",
+        "sectionCloudHint": "דורש מפתח API מהספק. ״מותאם אישית״ מתחבר לשרת דיבור שאתה מריץ בעצמך.",
+        "readyLabel": "מוכן לשימוש",
         "kokoroSetupLabel": "מודל הקול Kokoro",
         "kokoroSetupDescription": "הורד אותו פעם אחת, ומשם התשובות המדוברות פועלות באופן פרטי במכשיר הזה.",
         "kokoroDownload": "הורד את Kokoro",
         "kokoroDownloading": "מוריד את Kokoro",
         "kokoroReady": "מוכן במכשיר הזה",
         "kokoroRetry": "נסה להוריד שוב",
+        "runsOnLabel": "רץ על",
+        "runsOn": {
+          "auto": "אוטומטי",
+          "gpu": "כרטיס גרפי",
+          "cpu": "מעבד"
+        },
+        "runsOnStatus": {
+          "checking": "משתמש בכרטיס הגרפי כשהוא עובד, ובמעבד כשלא.",
+          "gpu": "הקול מופק בכרטיס הגרפי.",
+          "processor": "הקול מופק במעבד.",
+          "gpuUnusable": "הקול מופק במעבד, כי הכרטיס הגרפי לא יכול להריץ את הקול במחשב הזה.",
+          "needsPack": "הכרטיס הגרפי לא יכול להריץ את הקול במחשב הזה. הורד את קול המעבד למטה כדי לקבל תשובות מהירות.",
+          "cpuNeedsPack": "הורד את קול המעבד למטה. עד אז Kokoro רץ בתוך האפליקציה, וזה איטי.",
+          "loadFailed": "קול המעבד לא הצליח לפעול במחשב הזה, ולכן בינתיים Kokoro רץ בתוך האפליקציה.",
+          "noNativeSlow": "הכרטיס הגרפי לא יכול להריץ את הקול במחשב הזה, ולכן Kokoro רץ לאט בתוך האפליקציה. קול בענן יהיה מהיר יותר.",
+          "gpuForcedUnusable": "הכרטיס הגרפי לא מריץ את הקול כראוי במחשב הזה. הגדר את ״רץ על״ ל״אוטומטי״ או ל״מעבד״."
+        },
+        "kokoroNativeLabel": "קול מעבד",
+        "kokoroNativeDescription": "מאפשר ל-Kokoro לדבר מהר על המעבד כשהכרטיס הגרפי לא יכול. הורדה של {{size}}.",
+        "kittenSizeLabel": "גודל Kitten",
+        "kittenSizeDescription": "בכל שלושת הגדלים יש אותם שמונה קולות. גדלים גדולים יותר נשמעים טבעיים יותר, אבל לוקח להם יותר זמן להתחיל לדבר, במיוחד על מעבד חלש.",
+        "kittenSizes": {
+          "nano": "Nano · הכי מהיר ({{size}})",
+          "micro": "Micro · מאוזן ({{size}})",
+          "mini": "Mini · הכי טבעי ({{size}})"
+        },
+        "packLabel": {
+          "kitten": "קול Kitten",
+          "pocket": "קול Pocket TTS",
+          "supertonic": "קול Supertonic"
+        },
+        "packDescription": {
+          "kitten": "קול קטן שרץ על המעבד. הורדה של {{size}}.",
+          "pocket": "הקול הטבעי של Kyutai, שנבנה למעבדים, עם 14 דוברים. הורדה של {{size}}.",
+          "supertonic": "הקול המהיר והברור של Supertone, עם עשרה דוברים. הורדה של {{size}}."
+        },
+        "voiceNamedFemale": "{{name}} (נשי)",
+        "voiceNamedMale": "{{name}} (גברי)",
+        "voiceNumberedFemale": "קול נשי {{n}}",
+        "voiceNumberedMale": "קול גברי {{n}}",
+        "packSize": "{{size}} MB",
+        "packDownload": "הורד ({{size}})",
+        "packDownloading": "מוריד",
+        "packInstalling": "מגדיר",
+        "packCancel": "בטל הורדה",
+        "packRemove": "הסר",
+        "packUnsupported": "לא זמין במערכת הזו",
+        "kittenSuggestLabel": "נסה את Kitten",
+        "kittenSuggestDescription": "במחשב הזה יש מעבד חלש. Kitten הוא קול קל יותר שעונה כאן מהר יותר.",
+        "kittenSuggestButton": "השתמש ב-Kitten",
         "engines": {
           "kokoro": "Kokoro (מקומי, חינם)",
+          "kitten": "Kitten (מקומי, קל)",
+          "pocket": "Pocket TTS (מקומי)",
+          "supertonic": "Supertonic (מקומי)",
           "openai": "OpenAI",
+          "elevenlabs": "ElevenLabs",
           "openrouter": "OpenRouter",
           "deepgram": "Deepgram Aura",
           "cartesia": "Cartesia Sonic",
           "google": "Google Cloud TTS",
-          "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech",
           "groq": "Groq Orpheus",
           "xai": "xAI Grok Voice",
@@ -1357,18 +1789,24 @@
         "voiceLabel": "קול",
         "voiceDescription": "הקול של Kokoro לתשובות המדוברות.",
         "dtypeLabel": "דיוק חישובי של Kokoro",
-        "dtypeDescription": "fp32 הוא האיכות הגבוהה ביותר; q8 מהיר יותר על ה-CPU. שינוי כאן טוען את המודל מחדש.",
+        "dtypeDescription": "רק עבור Kokoro שרץ בתוך האפליקציה. fp32 הוא האיכות הגבוהה ביותר; q8 קטן יותר. שינוי כאן טוען את המודל מחדש. אם הקול נשמע משובש, הגדר את ״רץ על״ ל״מעבד״.",
         "speedLabel": "מהירות ההשמעה",
         "speedDescription": "1× היא המהירות הרגילה.",
         "speedRange": "{{engine}} תומך במהירויות {{min}}× עד {{max}}×; מהירויות אחרות מותאמות לגבול הקרוב ביותר.",
         "speedUnsupported": "{{engine}} מדבר תמיד במהירות הטבעית שלו.",
         "speedValue": "{{value}}×",
         "speedCustomLabel": "מהירות השמעה מותאמת אישית",
+        "volumeLabel": "עוצמת הקול של העוזר",
+        "volumeDescription": "כמה חזק התשובות המוקראות. נפרד מצלילי המשוב.",
         "testLabel": "בדוק את הקול",
         "testDescription": "השמע דוגמה קצרה עם ההגדרות הנוכחיות.",
         "testButton": "בדוק את הקול",
         "testing": "בודק…",
         "testOk": "הושמע ✓",
+        "testFailed": "Kokoro לא הצליח ליצור את הדוגמה. נסה שוב, או הגדר את ״רץ על״ ל״מעבד״.",
+        "testGpuMoved": "הכרטיס הגרפי שלך שיבש את הדוגמה, ולכן היא הושתקה. Kokoro משתמש עכשיו במעבד, אז בדוק שוב כדי לשמוע אותה.",
+        "testGpuForced": "הכרטיס הגרפי שלך שיבש את הדוגמה, ולכן היא הושתקה. הגדר את ״רץ על״ ל״אוטומטי״ או ל״מעבד״.",
+        "testGpuSuspect": "הדוגמה יצאה משובשת, ולכן היא הושתקה. בדוק שוב כדי לבחון את הכרטיס הגרפי שלך.",
         "testPhrase": "שלום! זו בדיקה של הפלט הקולי של SpeakoFlow.",
         "downloadStart": "מוריד את הקול של Kokoro…",
         "downloadProgress": "מוריד את הקול של Kokoro… {{progress}}%",
@@ -1400,7 +1838,21 @@
         "elevenVoiceLabel": "מזהה הקול",
         "elevenVoiceDescription": "מזהה הקול ב-ElevenLabs (מלשונית Voices בלוח הבקרה שלהם).",
         "promptLabel": "פרומפט הסיכום",
-        "promptDescription": "הוראות ליצירת הסיכום המדובר הקצר של כל תשובה."
+        "promptDescription": "הוראות ליצירת הסיכום המדובר הקצר של כל תשובה.",
+        "kokoroVoices": {
+          "usFemale": "{{name}} (אמריקאי, נשי)",
+          "usFemaleSoft": "{{name}} (אמריקאי, נשי, רך)",
+          "usMale": "{{name}} (אמריקאי, גברי)",
+          "ukFemale": "{{name}} (בריטי, נשי)",
+          "ukMale": "{{name}} (בריטי, גברי)"
+        },
+        "dtypes": {
+          "fp32": "fp32 (האיכות הטובה ביותר, WebGPU)",
+          "fp16": "fp16 (חצי דיוק)",
+          "q8": "q8 (8 סיביות, מהיר על CPU)",
+          "q4": "q4 (4 סיביות, הכי מהיר)",
+          "q4f16": "q4f16 (4 סיביות, מעורב)"
+        }
       },
       "appearance": {
         "title": "מראה החלונית",
@@ -1413,7 +1865,8 @@
         "fontSizes": {
           "small": "קטן",
           "medium": "בינוני",
-          "large": "גדול"
+          "large": "גדול",
+          "extraLarge": "גדול מאוד"
         },
         "panelSizeLabel": "גודל החלונית",
         "panelSizeDescription": "הגודל הכללי של חלונית העוזר הצפה.",
@@ -1422,6 +1875,22 @@
           "compact": "קומפקטי",
           "standard": "רגיל",
           "large": "גדול"
+        },
+        "askDisplayLabel": "באיזה מסך",
+        "askDisplayDescription": "המסך שבו העוזר נפתח. כברירת מחדל, המסך שבו נמצא העכבר שלך.",
+        "askDisplays": {
+          "cursor": "המסך שבו נמצא העכבר",
+          "numbered": "מסך {{number}} ({{width}}×{{height}}){{suffix}}",
+          "mainSuffix": " · ראשי"
+        },
+        "askAnchorLabel": "איפה הוא נפתח",
+        "askAnchorDescription": "איפה העוזר נפתח, בכל פעם.",
+        "askAnchors": {
+          "center": "מרכז המסך",
+          "top": "למעלה",
+          "bottom": "למטה",
+          "left": "צד שמאל",
+          "right": "צד ימין"
         },
         "opacityLabel": "אטימות החלונית",
         "opacityDescription": "כמה אטומה החלונית הצפה. 100% אטום לחלוטין; ערכים נמוכים יותר מאפשרים לשולחן העבודה להיראות מטושטש דרכה."
@@ -1448,6 +1917,183 @@
     "portableUpdateMessage": "התקנות ניידות אינן מתעדכנות אוטומטית. כדי לעדכן, הורד את מתקין ה-NSIS האחרון מ-GitHub Releases, התקן לאותה תיקייה, ואז העתק את תיקיית Data/ (הגדרות, מודלים, הקלטות) מהגרסה הישנה לחדשה.",
     "portableUpdateButton": "פתח את GitHub Releases"
   },
+  "meetings": {
+    "newTitle": "פגישה {{when}}",
+    "speakers": {
+      "me": "אתה",
+      "others": "אחרים",
+      "numbered": "דובר {{number}}"
+    },
+    "recorder": {
+      "idleTitle": "הקלט פגישה",
+      "idleCaption": "מקליט את המיקרופון שלך ואת שאר המשתתפים כשני ערוצים נפרדים.",
+      "recording": "מקליט",
+      "paused": "מושהה",
+      "liveCaption": "מתמלל בזמן שאנשים מדברים.",
+      "start": "התחל הקלטה",
+      "starting": "מתחיל…",
+      "stop": "עצור",
+      "stopping": "עוצר…",
+      "stoppingHint": "משלים את התמלול. בפגישה ארוכה זה עשוי לקחת רגע.",
+      "pause": "השהה",
+      "resume": "המשך",
+      "transcriptEmpty": "עדיין לא תומלל כלום. הטקסט יופיע כאן כשאנשים ידברו."
+    },
+    "offer": {
+      "detected": "נראה שאתה בשיחה. להקליט אותה?",
+      "detectedApp": "נראה ש-{{app}} בשיחה. להקליט אותה?",
+      "idle": "לא מקליט",
+      "record": "הקלט את השיחה הזו",
+      "dismiss": "לא הפעם"
+    },
+    "autoDetect": {
+      "title": "הצע להקליט שיחות",
+      "description": "מזהה כשאפליקציה אחרת מתחילה להשתמש במיקרופון שלך ומציע להקליט. הוא אף פעם לא מתחיל מעצמו. אם הוא טועה, פשוט סגור את הכרטיס.",
+      "unsupported": "זיהוי שיחות זמין בינתיים רק ב-Windows. במערכת הזו, התחל פגישה בעצמך."
+    },
+    "indicator": {
+      "title": "מחוון צף",
+      "description": "גלולה קטנה שמראה שההקלטה פועלת. לחץ עליה כדי לראות את התמלול החי. כבה אותה כדי להשאיר את המסך נקי; ההקלטה תישאר אז כאן, ותעצור אותה מהדף הזה.",
+      "hide": "הסתר את המחוון הצף",
+      "show": "הצג את המחוון הצף"
+    },
+    "pill": {
+      "expand": "פתח את התמלול החי",
+      "collapse": "חזרה לגלולה הקטנה",
+      "stop": "עצור הקלטה",
+      "listening": "מאזין. מה שאנשים אומרים יופיע כאן.",
+      "micOnly": "רק המיקרופון שלך מוקלט — שום דבר ממה ששאר המשתתפים אומרים לא ייכנס לתמלול הזה."
+    },
+    "ask": {
+      "placeholder": "שאל כל דבר על הפגישה הזו…",
+      "send": "שאל",
+      "stop": "עצור",
+      "thinking": "קורא את התמלול…",
+      "title": "שאל על הפגישה הזו",
+      "empty": "שאל מה הוחלט, מי אחראי על מה, או כל דבר אחר שעלה.",
+      "clear": "נקה את השאלות האלה",
+      "youAsked": "שאלת"
+    },
+    "systemAudio": {
+      "liveTitle": "רק הקול שלך מוקלט",
+      "liveBody": "לא ניתן היה להקליט את שמע המערכת, ולכן הפגישה הזו תכיל רק את הצד שלך בשיחה ולא את מה ששאר המשתתפים אמרו.",
+      "unavailableTitle": "לא ניתן להקליט את שאר המשתתפים במחשב הזה",
+      "unavailableBody": "הקלטת שמע המערכת לא זמינה, ולכן פגישה שתוקלט עכשיו תכיל רק את הקול שלך.",
+      "help": "עזרה בהגדרה"
+    },
+    "list": {
+      "title": "פגישות מוקלטות",
+      "emptyTitle": "עדיין אין פגישות",
+      "emptyHint": "התחל להקליט לפני שיחה, ו-SpeakoFlow ישמור את התמלול, מחולק לפי מי שדיבר.",
+      "loadMore": "טען עוד",
+      "speakers_one": "דובר אחד",
+      "speakers_two": "{{count}} דוברים",
+      "speakers_other": "{{count}} דוברים",
+      "hasNotes": "נוצר סיכום",
+      "notesBadge": "סיכום"
+    },
+    "status": {
+      "recording": "מקליט",
+      "processing": "מעבד",
+      "complete": "הושלם",
+      "interrupted": "הופסק"
+    },
+    "delete": {
+      "action": "מחק פגישה",
+      "whileRecording": "עצור את ההקלטה לפני מחיקת הפגישה הזו."
+    },
+    "detail": {
+      "title": "פגישה",
+      "rename": "שנה שם לפגישה",
+      "gone": "הפגישה הזו נמחקה.",
+      "tabsLabel": "תצוגות הפגישה"
+    },
+    "tabs": {
+      "myNotes": "המחשבות שלי",
+      "transcript": "תמלול",
+      "summary": "סיכום",
+      "ask": "שאל"
+    },
+    "myNotes": {
+      "description": "כתוב את מה שחשוב לך. זה ישולב עם התמלול כשהסיכום ייווצר.",
+      "placeholder": "מה שאתה רוצה לזכור מהפגישה הזו…",
+      "saving": "שומר…",
+      "saved": "נשמר"
+    },
+    "transcript": {
+      "empty": "לפגישה הזו אין תמלול.",
+      "loadingMore": "טוען עוד מהתמלול…",
+      "renameSpeaker": "שנה את שם הדובר",
+      "lowConfidence": "לא ודאי",
+      "lowConfidenceHelp": "תווית הדובר הזו היא ניחוש. המילים תומללו כפי שנאמרו; רק זהות הדובר לא ודאית."
+    },
+    "diarize": {
+      "title": "הבחן בין הדוברים",
+      "ready": "קבץ את שאר המשתתפים לדובר 1, דובר 2 וכן הלאה.",
+      "needsModel": "דורש הורדה חד-פעמית של {{size}} MB. אחר כך הוא רץ במחשב שלך, וכל פגישה בהמשך מתויגת אוטומטית.",
+      "install": "הורד וזהה",
+      "downloading": "מוריד…",
+      "identify": "זהה דוברים",
+      "running": "מאזין…",
+      "progress": "משווה קולות, {{done}} מתוך {{total}} קטעים.",
+      "oneSpeaker": "בשיחה הזו היה רק עוד קול אחד, כך שאין בין מי להבחין.",
+      "skipped": {
+        "modelNotInstalled": "מודל הדוברים עדיין לא מותקן.",
+        "noSystemAudio": "בפגישה הזו אין הקלטה של שאר המשתתפים.",
+        "audioUnreadable": "לא ניתן היה לקרוא את ההקלטה של שאר המשתתפים. זה קורה כשהאפליקציה נסגרה באמצע הפגישה.",
+        "tooFewSegments": "אין מספיק דיבור של שאר המשתתפים כדי להשוות.",
+        "alreadyDone": "הדוברים בפגישה הזו כבר זוהו.",
+        "modelUnusable": "לא ניתן היה לטעון את מודל הדוברים, ולכן הוא הוסר. הורד אותו שוב."
+      }
+    },
+    "summary": {
+      "template": "תבנית",
+      "templates": {
+        "general": "כללי",
+        "standup": "סטנדאפ",
+        "one_on_one": "אחד על אחד",
+        "interview": "ראיון",
+        "action_items": "משימות לביצוע"
+      },
+      "templateHints": {
+        "general": "סיכום, תובנות עיקריות, נושאים, החלטות וצעדים הבאים. ברירת המחדל.",
+        "standup": "מקובץ לפי אדם: מה הוא סיים, מה הבא בתור, ומה חוסם אותו.",
+        "one_on_one": "נושאים, משוב, ומה כל אחד התחייב לעשות.",
+        "interview": "ממצאים על המועמד, בלי הכרעה.",
+        "action_items": "רק המשימות, מחולקות לשלך ולשל כל השאר."
+      },
+      "generate": "צור סיכום",
+      "regenerate": "צור מחדש",
+      "rewrite": "כתוב מחדש עם תבנית אחרת",
+      "generating": "כותב סיכום…",
+      "writing": "כותב את הסיכום לפגישה הזו. בשיחה ארוכה זה לוקח רגע.",
+      "autoCaption": "נכתב כשהשיחה הסתיימה",
+      "retryCaption": "הסיכום לפגישה הזו עדיין לא נכתב.",
+      "copy": "העתק",
+      "copied": "הועתק",
+      "toggleTask": "סמן את הצעד הבא הזה כבוצע או כלא בוצע",
+      "failed": "לא ניתן היה לכתוב את הסיכום: {{error}}",
+      "tryAgain": "נסה שוב",
+      "empty": "עדיין אין סיכום לפגישה הזו.",
+      "needsTranscript": "אין תמלול לסכם.",
+      "skipped_one": "לא ניתן היה לסכם חלק אחד מהתמלול, ולכן יש פער בסיכום הזה.",
+      "skipped_two": "לא ניתן היה לסכם {{count}} חלקים מהתמלול, ולכן יש פערים בסיכום הזה.",
+      "skipped_other": "לא ניתן היה לסכם {{count}} חלקים מהתמלול, ולכן יש פערים בסיכום הזה."
+    },
+    "errors": {
+      "startFailed": "לא ניתן היה להתחיל את הפגישה: {{error}}",
+      "stopFailed": "לא ניתן היה לעצור את הפגישה: {{error}}",
+      "pauseFailed": "לא ניתן היה לשנות את מצב ההקלטה: {{error}}",
+      "loadFailed": "לא ניתן היה לטעון את הפגישות: {{error}}",
+      "transcriptFailed": "לא ניתן היה לטעון את התמלול: {{error}}",
+      "deleteFailed": "לא ניתן היה למחוק את הפגישה: {{error}}",
+      "renameFailed": "לא ניתן היה לשנות את שם הפגישה: {{error}}",
+      "renameSpeakerFailed": "לא ניתן היה לשנות את שם הדובר: {{error}}",
+      "notesSaveFailed": "לא ניתן היה לשמור את ההערות שלך: {{error}}",
+      "copyFailed": "לא ניתן היה להעתיק את הסיכום: {{error}}",
+      "generateFailed": "לא ניתן היה ליצור סיכום: {{error}}"
+    }
+  },
   "common": {
     "loading": "טוען…",
     "save": "שמור",
@@ -1471,7 +2117,19 @@
     "noOptionsFound": "לא נמצאו אפשרויות",
     "back": "חזרה",
     "showAdvanced": "אפשרויות נוספות",
-    "showLess": "הצג פחות"
+    "showLess": "הצג פחות",
+    "beta": "בטא",
+    "select": "בחר…",
+    "search": "חיפוש",
+    "moreInfo": "מידע נוסף",
+    "change": "שנה",
+    "saveFailed": "לא ניתן היה לשמור את השינוי. נסה שוב.",
+    "more": "עוד",
+    "hideTips": "הסתר טיפים",
+    "showTips": "הצג טיפים",
+    "play": "נגן",
+    "pause": "השהה",
+    "unknownSize": "גודל לא ידוע"
   },
   "accessibility": {
     "permissionsRequired": "נדרשות הרשאות נגישות",
@@ -1480,7 +2138,7 @@
     "dismiss": "סגור"
   },
   "errors": {
-    "loadDirectory": "שגיאה בטעינת תיקייה: {{error}}",
+    "loadDirectory": "לא ניתן היה לטעון את התיקייה: {{error}}",
     "micPermissionDeniedTitle": "הגישה למיקרופון נדחתה",
     "micPermissionDenied": {
       "generic": "מערכת ההפעלה חסמה את הגישה למיקרופון. תן הרשאת מיקרופון בהגדרות המערכת.",
@@ -1490,12 +2148,17 @@
     },
     "noInputDeviceTitle": "לא נמצא מיקרופון",
     "noInputDevice": "לא זוהה התקן קלט שמע. חבר מיקרופון או אוזנייה ונסה שוב.",
-    "recordingFailed": "הפעלת ההקלטה נכשלה: {{error}}",
-    "modelLoadFailed": "טעינת המודל נכשלה: {{model}}",
+    "recordingFailed": "לא ניתן היה להתחיל להקליט: {{error}}",
+    "modelLoadFailed": "לא ניתן היה לטעון את המודל: {{model}}",
     "modelLoadFailedUnknown": "מודל לא ידוע",
+    "loadModelsFailed": "לא ניתן לטעון את המודלים: {{error}}",
+    "switchModelFailed": "לא ניתן להחליף מודל: {{error}}",
+    "cancelDownloadFailed": "לא ניתן לבטל את ההורדה: {{error}}",
+    "deleteModelFailed": "לא ניתן למחוק את המודל: {{error}}",
+    "extractModelFailed": "לא ניתן לחלץ את המודל: {{error}}",
     "downloadFailedTitle": "ההורדה נכשלה",
-    "pasteFailedTitle": "ההדבקה נכשלה",
-    "pasteFailed": "לא ניתן היה להדביק את הטקסט ביישום הפעיל."
+    "pasteFailedTitle": "לא ניתן היה להדביק את הטקסט",
+    "pasteFailed": "לא ניתן היה להדביק את הטקסט באפליקציה הפעילה."
   },
   "appLanguage": {
     "title": "שפת האפליקציה",
@@ -1505,19 +2168,26 @@
     "preparing": "מכין את המיקרופון…",
     "recording": "מקליט",
     "transcribing": "מתמלל…",
-    "processing": "מעבד…",
+    "processing": "מנקה…",
     "generating": "כותב עם Flow…",
     "vision": "מסתכל על המסך שלך…",
     "notices": {
       "flowNotConfigured": "Flow דורש מודל עוזר — הודבק כהכתבה",
       "flowFailed": "Flow לא הצליח ליצור — שום דבר לא הודבק",
+      "cloudSttFailed": "התמלול בענן נכשל — בדוק את המפתח והקרדיט שלך בהגדרות",
       "flowEmpty": "אמור פקודה אחרי ביטוי ההפעלה",
+      "cleanupFallback": "ניקוי AI לא רץ — הודבק הטקסט הגולמי",
+      "cleanupModelRejected": "ספק הניקוי דחה את המודל הזה — בדוק את המודל בהגדרות",
       "cloudSttFellBack": "התמלול בענן לא הגיב — נעשה שימוש במודל שבמכשיר",
-      "cleanupFallback": "ניקוי AI לא רץ — הודבק הטקסט הגולמי"
+      "noSpeechModel": "עדיין אין מודל דיבור. בחר אחד בדף המודלים"
     },
     "listening": "מקשיב…",
     "locked": "מקליט ללא ידיים — לחץ שוב על קיצור המקשים כדי לעצור",
     "cancel": "ביטול",
+    "copy": "העתק את התמלול",
+    "transcript": "תמלול",
+    "copied": "הועתק",
+    "copyFailed": "ההעתקה נכשלה — נסה שוב",
     "done": "סיום",
     "askAssistant": "שאל את העוזר במקום להקליד את זה",
     "recovery": {
@@ -1525,28 +2195,144 @@
       "failed": "התמלול נכשל",
       "undo": "ביטול",
       "retry": "נסה שוב"
+    },
+    "downloading": {
+      "title": "מודל הדיבור בהורדה…",
+      "percent": "מודל הדיבור בהורדה · {{percent}}%",
+      "hint": "ההכתבה תתחיל לעבוד כשזה יסתיים"
+    }
+  },
+  "reminders": {
+    "title": "תזכורת",
+    "due": {
+      "now": "עכשיו",
+      "minutesAgo": "לפני {{count}} דק׳",
+      "hoursAgo": "לפני {{count}} שע׳"
+    },
+    "done": "בוצע",
+    "snooze": "נודניק",
+    "snoozeFor_one": "דקה אחת",
+    "snoozeFor_two": "{{count}} דקות",
+    "snoozeFor_other": "{{count}} דקות",
+    "snoozedTimes_one": "נדחה פעם אחת",
+    "snoozedTimes_two": "נדחה פעמיים",
+    "snoozedTimes_other": "נדחה {{count}} פעמים",
+    "later": "הסתר לעת עתה — התזכורת נשארת פעילה",
+    "settings": {
+      "label": "תזכורות",
+      "description": "בקש מהעוזר להזכיר לך משהו; זה יופיע כאן עד שיגיע הזמן.",
+      "empty": "אין שום דבר מתוזמן. בקש מהעוזר להזכיר לך משהו.",
+      "waiting": "ממתין לך",
+      "cancel": "בטל את התזכורת הזו",
+      "dueAt": "מועד: {{when}}"
     }
   },
   "assistant": {
+    "conversation": {
+      "title": "שיחה",
+      "newChat": "צ׳אט חדש",
+      "type": "הקלד הודעה",
+      "backToVoice": "חזרה לקול",
+      "mute": "השתק מיקרופון",
+      "unmute": "בטל השתקת מיקרופון",
+      "speakerOn": "הקרא תשובות בקול",
+      "speakerOff": "הפסק להקריא תשובות",
+      "expand": "פתח את השיחה",
+      "collapse": "חזרה לסרגל השיחה",
+      "historyOpen": "שיחות קודמות",
+      "historyClose": "חזרה לשיחה הזו",
+      "end": "סיים שיחה",
+      "send": "שלח",
+      "stop": "עצור את התשובה",
+      "placeholder": "הודעה ל-{{name}}",
+      "dismiss": "סגור",
+      "retry": "נסה שוב",
+      "details": "פרטים",
+      "startHint": "התחל לדבר, או הקלד הודעה.",
+      "mutedHint": "המיקרופון כבוי. עדיין אפשר להקליד.",
+      "preparingVoice": "מכין את הקול… {{progress}}%",
+      "history": {
+        "title": "שיחות קודמות",
+        "hint": "בחר שיחה כדי להמשיך מאיפה שהפסקת. השיחה הקולית נשארת מחוברת.",
+        "empty": "עדיין אין שיחות שמורות.",
+        "loading": "טוען…",
+        "failed": "לא ניתן היה לטעון את השיחות שלך.",
+        "more": "הצג עוד",
+        "untitled": "שיחה ללא שם",
+        "current": "פתוחה עכשיו",
+        "messages_one": "הודעה אחת",
+        "messages_two": "{{count}} הודעות",
+        "messages_other": "{{count}} הודעות"
+      },
+      "options": "אפשרויות שיחה",
+      "pace": "זמן לסיים לדבר",
+      "paceHint": "כמה זמן לחכות אחרי שאתה עוצר לפני שעונים.",
+      "paces": {
+        "quick": "מהיר",
+        "natural": "טבעי",
+        "patient": "סבלני"
+      },
+      "sensitivity": "רגישות המיקרופון",
+      "sensitivityHint": "באיזו קלות צליל נחשב כדיבור שלך. הנמך אותה אם רעש רקע או הקול של העוזר עצמו ממשיכים להפריע.",
+      "sensitivities": {
+        "low": "נמוכה — חדר רועש או רמקולים",
+        "normal": "רגילה",
+        "high": "גבוהה — חדר שקט או אוזניות"
+      },
+      "phase": {
+        "off": "השיחה הסתיימה",
+        "starting": "מתחבר…",
+        "listening": "מאזין",
+        "hearing": "מאזין…",
+        "transcribing": "מתמלל…",
+        "responding": "חושב…",
+        "speaking": "מדבר",
+        "muted": "המיקרופון כבוי",
+        "error": "השיחה נקטעה"
+      },
+      "errors": {
+        "microphone": "לא ניתן היה לפתוח את המיקרופון שלך. אפשר גישה למיקרופון ובדוק שאפליקציה אחרת לא משתמשת בו.",
+        "device": "המיקרופון שלך התנתק. חבר אותו מחדש ונסה שוב.",
+        "setup": "לא ניתן היה להתחיל את השיחה. בדוק את המיקרופון, הרמקול ומודל העוזר בהגדרות.",
+        "turn": "התשובה הזו לא הושלמה. בדוק את הפרטים ונסה שוב.",
+        "playback": "לא ניתן היה להשמיע את התשובה הקולית. בדוק את ספק הקול ואת התקן הפלט.",
+        "tooLong": "ההקלטה הגיעה למגבלה של דקה אחת. נסה שוב עם תור קצר יותר.",
+        "history": "לא ניתן היה לפתוח את השיחה הזו. נסה שוב."
+      },
+      "chooseProfile": "החלף פרופיל, כרגע {{name}}",
+      "profiles": "פרופילים",
+      "profileHint": "השינויים יחולו על התשובה הבאה שלך.",
+      "chatOnlyProfile": "הפרופיל הזה זמין רק בצ׳אט.",
+      "profileError": "לא ניתן היה להחליף פרופיל. נסה שוב."
+    },
     "title": "עוזר",
     "character": {
       "switch": "החלף פרופיל"
     },
     "empty": "שאל בקול בעזרת קיצור העוזר,\nאו הקלד למטה.",
     "inputPlaceholder": "הודעה…",
-    "queuedUntilReady": "בתור — יישלח ברגע שהתשובה הזאת תסתיים.",
+    "bar": {
+      "placeholder": "שאל כל דבר…"
+    },
     "send": "שלח",
     "stop": "עצור",
     "cancel": "ביטול",
-    "clear": "נקה את השיחה",
     "copy": "העתק",
     "copyCode": "העתק את הקוד",
+    "insert": "הכנס את זה במקום שבו הקלדת",
+    "insertShort": "הכנס",
+    "insertReplace": "החלף את הטקסט שבחרת בזה",
+    "insertReplaceShort": "החלף",
+    "selectionAttached_one": "נבחר תו אחד",
+    "selectionAttached_two": "נבחרו {{count}} תווים",
+    "selectionAttached_other": "נבחרו {{count}} תווים",
     "regenerate": "צור תשובה מחדש (הקודמת נשמרת בהיסטוריה)",
     "summarizing": "מסכם הודעות קודמות…",
     "screenAttached": "מסך",
     "attach": {
       "file": "צרף תמונה או קובץ",
-      "imageCount": "{{count}} תמונה",
+      "imageCount_one": "{{count}} תמונה",
+      "imageCount_two": "{{count}} תמונות",
       "imageCount_other": "{{count}} תמונות",
       "dropHint": "שחרר כדי לצרף"
     },
@@ -1563,13 +2349,13 @@
       "listening": "מקשיב…",
       "locked": "מקשיב",
       "transcribing": "מתמלל…",
-      "searching": "מחפש באינטרנט...",
-      "thinking": "חושב...",
-      "speaking": "מדבר..."
+      "searching": "מחפש באינטרנט…",
+      "thinking": "חושב…",
+      "speaking": "מדבר…"
     },
     "tool": {
       "search": "מחפש באינטרנט",
-      "screen": "מסתכל על המסך שלך",
+      "screen": "מסתכל על המסך שלך…",
       "working": "עובד על זה",
       "elapsed": "{{seconds}} שנ'"
     },
@@ -1602,6 +2388,12 @@
       "tts_blockedShort": "הקש על החלונית כדי לשמוע",
       "tts_playback": "לא ניתן היה להשמיע את הקול בהתקן הפלט שלך. בדוק את הגדרות הרמקולים/הפלט, ואז נסה שוב.",
       "tts_playbackShort": "השמעת הקול נכשלה",
+      "tts_gpu": "הכרטיס הגרפי שלך שיבש את הקול, ולכן הוא הושתק. התשובה הבאה תשתמש בקול המעבד במקום.",
+      "tts_gpuShort": "הקול הושתק: הכרטיס הגרפי שיבש אותו",
+      "tts_gpu_slow": "הכרטיס הגרפי שלך שיבש את הקול, ולכן הוא הושתק. התשובות רצות עכשיו על המעבד, וזה איטי עד שתוריד את קול המעבד במודלים ← קול.",
+      "tts_gpu_slowShort": "הקול הושתק: הכרטיס הגרפי שיבש אותו",
+      "tts_gpu_forced": "הכרטיס הגרפי שלך שיבש את הקול, ולכן הוא הושתק. הגדר את ״רץ על״ ל״אוטומטי״ או ל״מעבד״ במודלים ← קול.",
+      "tts_gpu_forcedShort": "הקול הושתק: הכרטיס הגרפי שיבש אותו",
       "mic_denied": "הגישה למיקרופון חסומה. אשר אותה בהגדרות הפרטיות של המערכת.",
       "mic_deniedShort": "הגישה למיקרופון חסומה",
       "mic_unavailable": "לא נמצא מיקרופון. חבר מיקרופון ונסה שוב.",
@@ -1613,7 +2405,9 @@
     },
     "notices": {
       "web_search_failed": "החיפוש באינטרנט לא החזיר תוצאות — עונה בלעדיהן.",
-      "web_search_failedShort": "אין תוצאות מהאינטרנט"
+      "web_search_failedShort": "אין תוצאות מהאינטרנט",
+      "queued": "בתור — יישלח ברגע שהתשובה הזו תסתיים.",
+      "queuedShort": "בתור"
     },
     "engineSetup": {
       "downloading": "מגדיר את המנוע המקומי (הפעלה ראשונה)… {{percent}}%",
@@ -1626,25 +2420,850 @@
       "copied": "הועתק"
     }
   },
+  "nav": {
+    "label": "ראשי",
+    "home": "בית",
+    "history": "היסטוריה",
+    "assistant": "עוזר",
+    "meetings": "פגישות",
+    "cleanup": "ניקוי AI",
+    "dictionary": "מילון",
+    "models": "מודלים",
+    "settings": "הגדרות",
+    "status": {
+      "label": "מודל דיבור: {{model}}, {{status}}. פתח את הגדרות הדיבור לטקסט.",
+      "setup": "דורש הגדרה",
+      "cloud": "ענן · {{provider}}",
+      "loading": "טוען…",
+      "error": "הטעינה נכשלה",
+      "ready": "מוכן",
+      "idle": "נטען כשאתה מכתיב",
+      "noModel": "אין מודל דיבור"
+    },
+    "insights": "תובנות"
+  },
+  "settingsDialog": {
+    "title": "הגדרות",
+    "tabs": {
+      "general": "כללי",
+      "shortcuts": "קיצורי מקשים",
+      "audio": "שמע",
+      "dictation": "הכתבה",
+      "privacy": "פרטיות ונתונים",
+      "advanced": "מתקדם",
+      "about": "אודות",
+      "debug": "ניפוי שגיאות"
+    },
+    "general": {
+      "appearance": "מראה",
+      "onboarding": {
+        "title": "היכרות",
+        "replay": "הגדרה ראשונית",
+        "replayInfo": "עבור שוב על ההגדרה והסיור, כמו שהם מוצגים בהתקנה חדשה. המודלים שכבר יש לך יישארו מותקנים.",
+        "replayButton": "הצג שוב את ההיכרות"
+      }
+    },
+    "shortcuts": {
+      "intro": "כל קיצור מקשים עובד בכל אפליקציה. לחץ על קיצור כדי להקליט חדש.",
+      "dictation": "הכתבה",
+      "assistant": "עוזר",
+      "cleanupOff": "הפעל את ניקוי ה-AI כדי לקבל את קיצור המקשים הזה.",
+      "cleanupOnDictation": "קיצור ההכתבה שלך מנקה כל הכתבה, כך שאין צורך בקיצור הזה.",
+      "openCleanup": "פתח את ניקוי ה-AI",
+      "assistantOff": "העוזר כבוי, ולכן קיצורי המקשים שלו לא עושים כלום.",
+      "openAssistant": "פתח את העוזר"
+    },
+    "audio": {
+      "microphone": "מיקרופון",
+      "overlayHint": "הגלולה הקטנה שמוצגת בזמן ההקלטה."
+    },
+    "dictation": {
+      "intro": "איך המילים שלך נכנסות לאפליקציה שבה אתה מקליד.",
+      "output": "הקלדה והדבקה",
+      "extras": "תוספות"
+    },
+    "privacy": {
+      "intro": "ההקלטות וההיסטוריה נשמרות רק במחשב הזה. בחר כמה זמן לשמור הקלטות.",
+      "recordingsFolder": "תיקיית ההקלטות"
+    },
+    "advanced": {
+      "performance": "ביצועים"
+    },
+    "about": {
+      "appName": "SpeakoFlow",
+      "version": "גרסה {{version}}",
+      "project": "פרויקט",
+      "docs": "תיעוד",
+      "openDocs": "פתח את התיעוד"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "בוקר טוב",
+      "afternoon": "צהריים טובים",
+      "evening": "ערב טוב",
+      "night": "עובד עד מאוחר"
+    },
+    "subtitleHold": "החזק את קיצור המקשים בכל אפליקציה, דבר ושחרר. המילים שלך יופיעו איפה שהסמן נמצא.",
+    "subtitleTap": "הקש על קיצור המקשים בכל אפליקציה, דבר והקש שוב. המילים שלך יופיעו איפה שהסמן נמצא.",
+    "needsModel": {
+      "title": "בחר מודל דיבור כדי להתחיל להכתיב.",
+      "description": "SpeakoFlow צריך מודל דיבור לטקסט לפני שהוא יכול להקליד את מה שאתה אומר.",
+      "action": "בחר מודל"
+    },
+    "stats": {
+      "label": "השימוש שלך",
+      "none": "–",
+      "spoken": "דיבור",
+      "words": "מילים",
+      "wpm": "מ׳/דקה",
+      "wpmHint": "מילים לדקה בכל ההקלטות שלך, כולל הפסקות.",
+      "saved": "נחסך",
+      "savedHint": "בהשוואה להקלדת אותן מילים בקצב של {{wpm}} מילים לדקה.",
+      "empty": "המספרים שלך יופיעו אחרי ההכתבה הראשונה.",
+      "streak_one": "רצף של יום אחד",
+      "streak_two": "רצף של יומיים",
+      "streak_other": "רצף של {{count}} ימים",
+      "noStreak": "הכתב היום כדי להתחיל רצף",
+      "today": "{{words}} מילים היום",
+      "duration": {
+        "seconds": "{{seconds}} שנ׳",
+        "minutes": "{{minutes}} דק׳",
+        "hours": "{{hours}} שע׳",
+        "hoursMinutes": "{{hours}} שע׳ {{minutes}} דק׳"
+      },
+      "wordsLabel": "מילים שהוכתבו",
+      "wpmLabel": "מילים לדקה",
+      "savedLabel": "זמן שנחסך",
+      "streakLabel_one": "רצף ימים",
+      "streakLabel_two": "רצף ימים",
+      "streakLabel_other": "רצף ימים",
+      "streakUnit_one": "יום ברצף",
+      "streakUnit_two": "ימים ברצף",
+      "streakUnit_other": "ימים ברצף",
+      "seeInsights": "הצג תובנות"
+    },
+    "shortcuts": {
+      "title": "קיצורי מקשים",
+      "edit": "ערוך קיצורי מקשים",
+      "turnOn": "הפעל",
+      "off": "כבוי",
+      "setKey": "הגדר קיצור מקשים",
+      "dictate": {
+        "title": "הכתבה",
+        "hold": "החזק, דבר ושחרר. המילים שלך מוקלדות איפה שהסמן נמצא.",
+        "tap": "הקש כדי להתחיל, דבר, והקש כדי לעצור. המילים שלך מוקלדות איפה שהסמן נמצא.",
+        "whatHold": "החזק, דבר ושחרר. המילים מוקלדות איפה שהסמן נמצא.",
+        "whatTap": "הקש, דבר והקש שוב. המילים מוקלדות איפה שהסמן נמצא."
+      },
+      "cleanup": {
+        "title": "הכתבה וניקוי",
+        "description": "כמו הכתבה, ואז AI מתקן פיסוק, מילות מילוי וסגנון.",
+        "what": "הכתב, ואז AI מתקן פיסוק, מילות מילוי וסגנון."
+      },
+      "ask": {
+        "title": "שאל את העוזר",
+        "description": "שאל שאלה בקול וקבל את התשובה בחלונית צפה.",
+        "what": "שאל בקול. התשובה תופיע בחלונית צפה."
+      },
+      "call": {
+        "title": "התחל שיחה",
+        "description": "שיחה בלי ידיים עם תשובות קוליות.",
+        "what": "שיחה הלוך ושוב, בלי ידיים. לחץ שוב כדי לנתק."
+      },
+      "info": "לחץ עליהם בכל אפליקציה. לחץ על המקשים כדי לשנות אותם.",
+      "offHint": "כבוי",
+      "mode": {
+        "hold": "החזק כדי לדבר",
+        "tap": "הקש להפעלה וכיבוי"
+      },
+      "cancel": {
+        "title": "ביטול",
+        "what": "עצור הקלטה, או תשובה שמוקראת בקול."
+      }
+    },
+    "setup": {
+      "title": "המודלים שלך",
+      "manage": "נהל"
+    },
+    "recent": {
+      "title": "אחרונים",
+      "viewAll": "הצג הכול",
+      "copy": "העתק טקסט",
+      "cleaned": "נוקה",
+      "tryPrefix": "נסה את זה: לחץ בתוך התיבה, ואז לחץ על",
+      "trySuffixHold": "והחזק בזמן שאתה מדבר.",
+      "trySuffixTap": "ודבר. לחץ שוב כשתסיים.",
+      "tryPlaceholder": "המילים שלך יופיעו כאן…"
+    },
+    "hero": {
+      "hold": "החזק את המקשים בכל אפליקציה, דבר ושחרר.",
+      "tap": "הקש על המקשים בכל אפליקציה, דבר והקש שוב.",
+      "holdHint": "החזק כדי לדבר",
+      "tapHint": "הקש כדי להתחיל ולעצור"
+    },
+    "activity": {
+      "title": "30 הימים האחרונים",
+      "summary_one": "{{words}} מילים ביום אחד",
+      "summary_two": "{{words}} מילים ביומיים",
+      "summary_other": "{{words}} מילים ב-{{count}} ימים",
+      "chartLabel": "מילים שהוכתבו בכל יום ב-{{days}} הימים האחרונים: {{words}} בסך הכול.",
+      "words_one": "{{formatted}} מילה",
+      "words_two": "{{formatted}} מילים",
+      "words_other": "{{formatted}} מילים",
+      "today": "היום"
+    }
+  },
+  "modelsHub": {
+    "description": "כל משימה ב-SpeakoFlow מבוצעת על ידי מודל שאתה בוחר. הרץ אותו במחשב הזה לפרטיות, או בענן למהירות.",
+    "addLocal": "הוסף קובץ מודל",
+    "privacyNote": "מודלים במחשב הזה לא שולחים את הקול או הטקסט שלך לשום מקום. מודלי ענן שולחים אותם לספק שבחרת, באמצעות מפתח ה-API שלך.",
+    "inUse": "בשימוש",
+    "needsSetup": "דורש הגדרה",
+    "performance": "ביצועים",
+    "where": {
+      "device": "במחשב הזה",
+      "cloud": "ענן",
+      "cloudWith": "ענן · {{provider}}",
+      "deviceShort": "המחשב הזה"
+    },
+    "status": {
+      "voiceOff": "התשובות המדוברות כבויות",
+      "assistantOff": "העוזר כבוי",
+      "noModel": "עדיין לא נבחר מודל",
+      "notDownloaded": "המודל לא הורד",
+      "noKey": "הוסף מפתח API",
+      "noEndpoint": "הוסף נקודת קצה"
+    },
+    "voice": {
+      "kokoroModel": "קול Kokoro"
+    },
+    "usedBy": {
+      "label": "בשימוש על ידי",
+      "dictation": "הכתבה",
+      "assistant": "עוזר",
+      "meetings": "פגישות",
+      "cleanup": "ניקוי AI",
+      "meetingNotes": "סיכומי פגישות",
+      "calls": "שיחות",
+      "flow": "יצירה עם Flow",
+      "spokenReplies": "תשובות מדוברות"
+    },
+    "slots": {
+      "stt": {
+        "name": "תמלול",
+        "description": "הופך את הקול שלך לטקסט.",
+        "whereHint": "במחשב הזה זה פרטי וחינמי. בענן משתמשים ב-API של ספק ובמפתח שלך.",
+        "catalogTitle": "מודלי דיבור",
+        "catalogDescription": "כל המודלים כאן פועלים במחשב הזה. מודלים מהירים מתאימים להכתבה; גדולים יותר מדויקים יותר."
+      },
+      "cleanup": {
+        "name": "ניקוי AI",
+        "description": "מבצע את העריכות שאתה אומר בקול, מחיל סגנון כתיבה וכותב סיכומי פגישות.",
+        "turnOn": "הפעל ניקוי AI",
+        "offNotice": "ניקוי AI כבוי. סיכומי פגישות עדיין משתמשים במודל הזה.",
+        "borrowsNotice": "לא הוגדר מודל ניקוי, ולכן הניקוי משתמש במודל של העוזר שלך ({{model}}).",
+        "catalogTitle": "מודלי ניקוי"
+      },
+      "assistant": {
+        "name": "עוזר",
+        "description": "עונה על השאלות שלך, מסתכל על המסך שלך ומנהל שיחות.",
+        "openAssistant": "פתח את העוזר",
+        "offNotice": "העוזר כבוי. יצירה עם Flow וגיבוי הניקוי עדיין משתמשים במודל הזה.",
+        "catalogTitle": "מודלים לעוזר",
+        "fallbackNote": "ניקוי AI וסיכומי פגישות משתמשים גם הם במודל הזה כשאין להם מודל משלהם."
+      },
+      "voice": {
+        "name": "קול",
+        "description": "מקריא בקול את התשובות של העוזר."
+      }
+    }
+  },
+  "cleanup": {
+    "description": "מילות מילוי כבר מוסרות בכל הכתבה. ניקוי AI הולך רחוק יותר: הוא מבצע את העריכות שאתה אומר בקול ומחיל סגנון כתיבה.",
+    "toggle": "ניקוי AI",
+    "how": {
+      "plain": "מקליד בדיוק את מה שאמרת.",
+      "cleaned": "מקליד את מה שאמרת, אחרי ניקוי AI.",
+      "off": "הפעל ניקוי AI כדי לקבל את קיצור המקשים הזה.",
+      "change": "שנה"
+    },
+    "model": {
+      "title": "מודל הניקוי",
+      "borrows": "מושאל מהעוזר שלך",
+      "own": "פועל בכל פעם שאתה משתמש בקיצור הניקוי",
+      "change": "שנה",
+      "info": "פועל בכל פעם שאתה משתמש בקיצור הניקוי. כשאין לו מודל משלו, הניקוי משתמש במודל של העוזר שלך."
+    },
+    "needsModel": {
+      "description": "ניקוי AI צריך מודל כדי לפעול. עד אז, הטקסט שלך מוקלד בדיוק כפי שאמרת אותו.",
+      "action": "בחר מודל",
+      "short": "בחר מודל כדי להתחיל בניקוי."
+    },
+    "instructions": {
+      "title": "הוראות ניקוי",
+      "description": "פרומפט הבסיס שאומר למודל מה לתקן. רוב האנשים אף פעם לא משנים אותו.",
+      "current": "בשימוש"
+    },
+    "styles": {
+      "title": "סגנון כתיבה",
+      "description": "איך הטקסט המנוקה צריך להישמע. מוחל אחרי התיקונים, כך שהתיקונים נשארים זהים.",
+      "createTitle": "סגנון חדש",
+      "createHint": "תאר איך אתה רוצה שהטקסט שלך יישמע.",
+      "editTitle": "ערוך סגנון",
+      "editorIntro": "תן לסגנון שם ותאר איך הטקסט שלך צריך להשתנות. הוא מוחל אחרי הניקוי, כך שהתיקונים נשארים זהים.",
+      "inUse": "בשימוש",
+      "editNamed": "ערוך את {{name}}",
+      "builtin": {
+        "none": "מתקן טעויות ומשאיר את הניסוח שלך כמו שהוא.",
+        "professional": "מלוטש וברור, להודעות עבודה ולאימייל.",
+        "friendly": "חם ורגוע, כמו פתק לחבר.",
+        "concise": "מקצץ מילים מיותרות ועובר לעניין.",
+        "formal": "משפטים שלמים ומשלב רשמי.",
+        "casual": "משוחרר ושיחתי."
+      },
+      "groups": {
+        "builtin": "מובנים",
+        "custom": "שלך"
+      },
+      "manage": "נהל",
+      "manageTitle": "סגנונות הכתיבה שלך",
+      "noneYet": "עדיין אין לך סגנונות משלך.",
+      "newStyle": "סגנון חדש",
+      "customHint": "אחד מהסגנונות שלך. הוא מוחל אחרי התיקונים.",
+      "preview": {
+        "youSay": "אתה אומר",
+        "itTypes": "הוא מקליד",
+        "yourInstruction": "ההוראה שלך"
+      },
+      "samples": {
+        "raw": "כדאי שניפגש מחר בעשר, בעצם לא, באחת עשרה, ונעבור על התקציב",
+        "none": "כדאי שניפגש מחר באחת עשרה ונעבור על התקציב.",
+        "professional": "אני מציע שניפגש מחר בשעה 11:00 כדי לסקור את התקציב.",
+        "friendly": "מה דעתך שניפגש מחר באחת עשרה ונעבור ביחד על התקציב?",
+        "concise": "פגישה מחר ב-11 לסקירת התקציב.",
+        "formal": "הריני להציע שניפגש מחר בשעה אחת עשרה לשם סקירת התקציב.",
+        "casual": "יאללה ניפגש מחר באחת עשרה ונעבור על התקציב"
+      },
+      "form": {
+        "name": "שם",
+        "instruction": "הוראות",
+        "instructionTip": "איך הניסוח צריך להשתנות. מוחל אחרי הניקוי, כך שהתיקונים נשארים זהים.",
+        "instructionPlaceholder": "לדוגמה: שמור על טון יומיומי, והפוך שמות של אימוג׳י שנאמרו בקול לאימוג׳י."
+      }
+    },
+    "hero": {
+      "title": "תגיד את זה מבולגן. תקבל את זה <em>נקי.</em>",
+      "before": "בוא ניפגש בעשר, בעצם לא, תעשה את זה אחת עשרה, ותביא את התקציב",
+      "after": "בוא ניפגש באחת עשרה ותביא את התקציב.",
+      "offHint": "הפעל ניקוי AI כדי להשתמש בקיצור המקשים הזה",
+      "onHint": "החזק, דבר, שחרר. הטקסט המנוקה מוקלד בשבילך.",
+      "onHintTap": "הקש, דבר, הקש שוב. הטקסט המנוקה מוקלד בשבילך.",
+      "onDictationHint": "כל הכתבה עוברת ניקוי."
+    },
+    "shortcut": {
+      "title": "קיצור מקשים",
+      "info": "תן לניקוי קיצור מקשים משלו, או תן לקיצור ההכתבה לנקות כל הכתבה, כך שיש רק צירוף מקשים אחד לזכור.",
+      "separate": "קיצור משלו",
+      "dictation": "זהה להכתבה"
+    },
+    "shortcutRow": "קיצור מקשים"
+  },
+  "dictionary": {
+    "description": "למד את SpeakoFlow את השמות והמונחים שאתה משתמש בהם, והגדר קיצורים שמתרחבים לטקסט ארוך יותר.",
+    "words": {
+      "title": "המילים שלך",
+      "description": "שמות, ז׳רגון ואיותים ש-SpeakoFlow צריך תמיד לכתוב נכון.",
+      "placeholder": "הוסף שם, מונח או איות…",
+      "empty": "עדיין אין כאן כלום. הוסף את המילים ש-SpeakoFlow ממשיך לטעות בהן."
+    },
+    "replacements": {
+      "title": "החלפות",
+      "description": "אמור ביטוי וקבל טקסט אחר, למשל ״האימייל שלי״ שהופך לכתובת שלך."
+    },
+    "addWord": "הוסף מילה",
+    "hero": {
+      "title": "SpeakoFlow מאיית <em>בדיוק כמוך.</em>",
+      "subtitle": "הוסף שמות וז׳רגון שהוא ממשיך לטעות בהם."
+    }
+  },
+  "assistantPage": {
+    "description": "שאל כל דבר בקול, מכל אפליקציה. העוזר יכול לראות את המסך שלך, לחפש באינטרנט ולזכור את מה שחשוב לך.",
+    "offNotice": "העוזר כבוי. קיצורי המקשים שלו לא עושים כלום והוא לא משתמש בזיכרון עד שתפעיל אותו שוב.",
+    "hero": {
+      "askHold": "החזק, שאל את השאלה שלך, שחרר. התשובה מופיעה בחלונית צפה.",
+      "askTap": "הקש, שאל את השאלה שלך, הקש שוב. התשובה מופיעה בחלונית צפה.",
+      "call": "שוחח הלוך ושוב בלי ידיים. לחץ שוב כדי לנתק.",
+      "title": "שאל כל דבר, <em>מכל מקום.</em>",
+      "ask": "שאל",
+      "callLabel": "שיחה",
+      "askHoldShort": "החזק, שאל, שחרר",
+      "askTapShort": "הקש, שאל, הקש שוב",
+      "callShort": "לחץ שוב כדי לנתק",
+      "subtitle": "שאל שאלה בקול, או התחל שיחה ודבר על זה."
+    },
+    "models": {
+      "title": "מופעל על ידי",
+      "assistant": "חושב עם",
+      "voice": "מקריא תשובות"
+    },
+    "features": {
+      "title": "מה הוא יודע לעשות",
+      "vision": {
+        "title": "ראיית מסך",
+        "description": "אפשר לעוזר להסתכל על המסך שלך כשאתה שואל עליו."
+      },
+      "webSearch": {
+        "title": "חיפוש באינטרנט",
+        "description": "מחפש מידע ברשת כדי לתת תשובות עדכניות ועובדתיות."
+      },
+      "reminders": {
+        "title": "תזכורות",
+        "description": "אמור ״תזכיר לי בעוד 20 דקות״ והוא יזכיר.",
+        "status": "בקש בקול"
+      },
+      "profiles": {
+        "title": "פרופילים",
+        "description": "דמויות שהעוזר יכול לעבור ביניהן, לכל אחת הוראות משלה.",
+        "status": "ברירת מחדל"
+      },
+      "memory": {
+        "title": "זיכרון",
+        "description": "מה שהעוזר זוכר עליך, שמור במחשב הזה."
+      },
+      "behavior": {
+        "title": "תשובות",
+        "description": "כמה ארוכות התשובות וכמה מהשיחה הוא זוכר."
+      },
+      "appearance": {
+        "title": "חלונית",
+        "description": "גודל, טקסט, מיקום ואטימות של החלונית הצפה.",
+        "status": "התאמה אישית"
+      }
+    },
+    "cards": {
+      "keySaved": "המפתח נשמר",
+      "vision": {
+        "description": "אפשר לו להסתכל על המסך שלך כדי לענות על שאלות לגבי מה שאתה רואה.",
+        "timing": {
+          "immediate": "כשאני מתחיל",
+          "onSend": "כשאני שולח"
+        }
+      },
+      "webSearch": {
+        "description": "מחפש מידע ברשת כדי לתת תשובות עדכניות ועובדתיות.",
+        "offHint": "כבוי: התשובות מגיעות מהמודל בלבד, ועשויות להיות לא עדכניות.",
+        "keyFor": "מפתח API של {{provider}}",
+        "getKey": "קבל מפתח חינמי ב-{{site}}.",
+        "hints": {
+          "tinyfish": "חינם, בלי כרטיס אשראי",
+          "serper": "תוצאות Google",
+          "brave": "אינדקס עצמאי",
+          "tavily": "נבנה עבור AI",
+          "exa": "חיפוש נוירוני",
+          "serpapi": "תוצאות Google"
+        }
+      },
+      "reminders": {
+        "description": "בקש ממנו להזכיר לך, ופתק יקפוץ כשיגיע הזמן.",
+        "trySaying": "נסה לומר",
+        "examples": {
+          "one": "״תזכיר לי להתקשר לדני בעוד 20 דקות״",
+          "two": "״בשש בערב, תזכיר לי לשלוח את החשבונית״",
+          "three": "״תסתכל על זה ותזכיר לי מחר״"
+        },
+        "upcoming": "בקרוב",
+        "none": "עדיין לא נקבע כלום.",
+        "more_one": "ועוד אחת",
+        "more_two": "ועוד שתיים",
+        "more_other": "ועוד {{count}}"
+      },
+      "memory": {
+        "title": "זיכרון",
+        "description": "זוכר את מה שחשוב לך, ושומר את זה רק במחשב הזה.",
+        "open": "פתח את הזיכרון",
+        "manage_one": "הצג וערוך את הזיכרון · הערה אחת",
+        "manage_two": "הצג וערוך את הזיכרון · שתי הערות",
+        "manage_other": "הצג וערוך את הזיכרון · {{count}} הערות",
+        "pausedHint": "מושהה: הזיכרונות השמורים נשמרים אבל לא נעשה בהם שימוש."
+      },
+      "profiles": {
+        "title": "פרופילים",
+        "description": "דמויות עם שם, הוראות וסגנון תשובה משלהן.",
+        "edit": "ערוך פרופילים",
+        "more": "+{{count}}"
+      },
+      "replies": {
+        "title": "תשובות",
+        "description": "כמה ארוכות התשובות, וכמה מהשיחה הוא זוכר.",
+        "lengths": {
+          "default": "ברירת מחדל",
+          "short": "קצר",
+          "medium": "בינוני",
+          "long": "ארוך"
+        },
+        "lengthHints": {
+          "default": "כמה שהשאלה דורשת.",
+          "short": "משפט או שניים.",
+          "medium": "פסקה קצרה.",
+          "long": "מעמיק ומפורט."
+        },
+        "history": "הודעות שהוא זוכר"
+      },
+      "panel": {
+        "title": "חלונית צפה",
+        "description": "איך החלונית נראית ואיפה היא נפתחת. התצוגה המקדימה מתעדכנת בזמן שאתה משנה.",
+        "positionHint": "לחץ על נקודה במסך. הצורה היא הצורה שבה החלונית נפתחת: עמודה גבוהה לאורך צד, או רצועה רחבה לאורך החלק העליון או התחתון. גרור את החלונית קרוב לנקודה והיא תיצמד אליה."
+      }
+    },
+    "groups": {
+      "personal": "אישי",
+      "replies": "תשובות"
+    },
+    "rows": {
+      "replyLength": "אורך התשובה",
+      "reminders": {
+        "none": "אין תזכורות",
+        "count_one": "תזכורת אחת",
+        "count_two": "שתי תזכורות",
+        "count_other": "{{count}} תזכורות"
+      },
+      "memory": {
+        "edit": "הצג את הזיכרון",
+        "manage": "נהל"
+      },
+      "profiles": {
+        "manage": "נהל"
+      },
+      "screen": {
+        "ask": "ראיית מסך לשאלות",
+        "call": "ראיית מסך לשיחות"
+      }
+    },
+    "tips": {
+      "thinksWith": "המודל שעונה לך. ניקוי AI וסיכומי פגישות משתמשים בו גם כשאין להם מודל משלהם.",
+      "speaks": "מקריא תשובות בקול במהלך שיחה.",
+      "screenAsk": "מאפשר לעוזר להסתכל כששאלה עוסקת במסך שלך, או כשאתה מבקש ממנו. שאלות על טקסט שנבחר נענות מתוך הטקסט. צילומי מסך נשלחים רק לספק ה-AI שלך.",
+      "screenCall": "מאפשר לעוזר להסתכל במהלך שיחה כשאתה מבקש ממנו, או כשאתה מדבר על משהו שמופיע במסך שלך.",
+      "captureTiming": "צלם את המסך כפי שהיה כשהתחלת לשאול, או כששלחת.",
+      "webSearch": "מחפש מידע ברשת כששאלה דורשת עובדות עדכניות.",
+      "depth": "״מהיר״ לעובדות פשוטות, ״מעמיק״ לשאלות קשות.",
+      "openRouterSearch": "משתמש בחיפוש של OpenRouter עצמו ובקרדיטים שלך ב-OpenRouter.",
+      "localSmart": "נותן למודל שבמכשיר להחליט מתי לחפש.",
+      "reminders": "פשוט תבקש: ״תזכיר לי להתקשר לדני בעוד 20 דקות.״ פתק יקפוץ כשיגיע הזמן.",
+      "memory": "זוכר את מה שחשוב לך. שמור רק במחשב הזה.",
+      "profiles": "דמויות עם שם, הוראות וסגנון תשובה משלהן.",
+      "replyLength": "כמה ארוכות התשובות בדרך כלל.",
+      "history": "כמה הודעות אחרונות הוא זוכר.",
+      "summarize": "מתמצת שיחות ארוכות כדי שלא ישכח את ההתחלה.",
+      "panelSize": "כמה מהמסך שלך היא תופסת.",
+      "opacity": "ערך נמוך יותר מאפשר לשולחן העבודה להיראות דרכה.",
+      "position": "לחץ על נקודה במסך.",
+      "display": "המסך שבו החלונית נפתחת."
+    },
+    "memory": {
+      "aboutTip": "סיכום קצר שהוא זוכר בכל תשובה. הוא מתעדכן תוך כדי שיחה, ואפשר לערוך אותו בכל עת.",
+      "aboutEmpty": "עדיין אין כלום. הוא ימלא את זה תוך כדי שיחה, או שתוכל לכתוב את זה בעצמך.",
+      "write": "כתוב את זה",
+      "notesTitle": "דברים שהוא זוכר",
+      "notesTip": "עובדות שהוא למד מהשיחות שלך, וגם כל מה שתוסיף. כל תשובה משתמשת באלה שמתאימות.",
+      "notesEmpty": "עדיין אין כלום. הוא לומד מהשיחות שלך, או שתוכל להוסיף משהו למעלה.",
+      "showAll": "הצג את כל ה-{{count}}",
+      "showFewer": "הצג פחות",
+      "detailTip": "״קל״ משתמש רק בסיכום. ״מפורט״ מוסיף עוד הערות והוא קצת איטי יותר.",
+      "more": "עוד אפשרויות זיכרון",
+      "learnNow": "למד מהשיחה הזו עכשיו",
+      "export": "ייצא זיכרון…",
+      "import": "ייבא זיכרון…",
+      "erase": "מחק זיכרון…",
+      "eraseTitle": "למחוק את הזיכרון?",
+      "eraseBody_one": "פעולה זו מוחקת את הסיכום ואת ההערה היחידה. לא ניתן לבטל אותה.",
+      "eraseBody_two": "פעולה זו מוחקת את הסיכום ואת שתי ההערות. לא ניתן לבטל אותה.",
+      "eraseBody_other": "פעולה זו מוחקת את הסיכום ואת כל {{count}} ההערות. לא ניתן לבטל אותה.",
+      "eraseConfirm": "מחק",
+      "learnedToast": "הזיכרון עודכן מהשיחה הזו",
+      "exportedToast": "הזיכרון יוצא",
+      "importedToast": "הזיכרון יובא",
+      "dialogDescription": "מה שהעוזר יודע עליך. זה נשאר במחשב הזה, ואפשר לשנות או למחוק כל חלק מזה."
+    },
+    "profiles": {
+      "new": "פרופיל חדש",
+      "newBlank": "התחל מאפס",
+      "newWithAi": "תאר אותו ותן ל-AI לכתוב אותו",
+      "listMore": "עוד אפשרויות פרופיל",
+      "import": "ייבא מקובץ…",
+      "restoreBuiltins": "החזר את הפרופילים המובנים",
+      "restored_one": "פרופיל אחד הוחזר",
+      "restored_two": "שני פרופילים הוחזרו",
+      "restored_other": "{{count}} פרופילים הוחזרו",
+      "restoredNone": "כל הפרופילים המובנים כבר כאן",
+      "inUse": "בשימוש",
+      "use": "השתמש בפרופיל הזה",
+      "more": "עוד אפשרויות לפרופיל הזה",
+      "duplicate": "שכפל",
+      "export": "ייצוא…",
+      "exported": "הפרופיל יוצא",
+      "restoreDefault": "שחזר למקור",
+      "delete": "מחק פרופיל…",
+      "deleteTitle": "למחוק את {{name}}?",
+      "deleteBody": "לא ניתן לבטל את הפעולה.",
+      "addPicture": "הוסף תמונה",
+      "changePicture": "החלף תמונה",
+      "removePicture": "הסר תמונה",
+      "roleLabel": "תיאור",
+      "roleTip": "כמה מילים שמוצגות מתחת לשם.",
+      "rolePlaceholder": "לדוגמה: תשובות קצרות וישירות",
+      "instructionsLabel": "הוראות",
+      "instructionsTip": "איך הפרופיל הזה חושב ומדבר. נשלח עם כל הודעה.",
+      "lengthLabel": "אורך התשובה",
+      "lengthTip": "״ברירת מחדל״ עוקב אחרי אורך התשובה שבדף העוזר.",
+      "lengths": {
+        "inherit": "ברירת מחדל",
+        "short": "קצר",
+        "medium": "בינוני",
+        "long": "ארוך"
+      },
+      "greetingLabel": "ברכה",
+      "greetingTip": "אופציונלי. מוצגת כשמתחילה שיחה חדשה.",
+      "greetingPlaceholder": "היי! על מה אנחנו עובדים?",
+      "aiTitle": "תאר פרופיל חדש",
+      "aiBody": "אמור או הקלד איך הוא צריך להיות. העוזר יכתוב את השם וההוראות שלו.",
+      "aiCreate": "צור פרופיל"
+    },
+    "panel": {
+      "where": "איפה היא נפתחת",
+      "text": "גודל טקסט",
+      "size": "גודל החלונית",
+      "opacity": "אטימות",
+      "screen": "איזה מסך"
+    }
+  },
+  "meetingsPage": {
+    "transcript": "תמלול",
+    "notes": "סיכום",
+    "hero": {
+      "title": "כל שיחה, <em>בכתב.</em>",
+      "subtitle": "מחולק לפי דובר, עם סיכום בסופה."
+    },
+    "transcribedBy": "תומלל על ידי",
+    "notesBy": "סוכם על ידי",
+    "transcribedByTip": "כותב את התמלול. זה מודל התמלול שלך, אותו מודל שההכתבה משתמשת בו.",
+    "notesByTip": "כותב את הסיכום ואת הכותרת, ועונה על שאלות לגבי פגישה. זה מודל העוזר שלך."
+  },
+  "historyPage": {
+    "today": "היום",
+    "yesterday": "אתמול",
+    "storage": "אחסון",
+    "cleaned": "נוקה",
+    "showOriginal": "הצג את המקור",
+    "showSaid": "הצג את מה שאמרת",
+    "hideOriginal": "הסתר את המקור",
+    "playRecording": "נגן הקלטה",
+    "hideRecording": "סגור את הנגן",
+    "audioMissing": "קובץ השמע של ההקלטה הזו כבר לא זמין.",
+    "failed": "התמלול נכשל",
+    "retry": "נסה שוב",
+    "dismissed": "התמלול הזה בוטל.",
+    "recover": "שחזר",
+    "recoverTitle": "תמלל אותו מחדש ושמור אותו",
+    "recoverError": "לא ניתן היה לשחזר את התמלול הזה. נסה שוב.",
+    "more": "עוד פעולות",
+    "chat": {
+      "continue": "המשך",
+      "continueTitle": "פתח את השיחה הזו בעוזר",
+      "showMessages": "הצג הודעות",
+      "hideMessages": "הסתר הודעות",
+      "assistantOff": "הפעל את העוזר כדי להמשיך את השיחה הזו."
+    }
+  },
+  "pickers": {
+    "browse": "נהל מודלים",
+    "download": "הורד מודלים נוספים",
+    "choose": "בחר מודל",
+    "switchFailed": "לא ניתן היה להחליף מודל. נסה שוב.",
+    "borrowsAssistant": "משתמש ב-{{model}} של העוזר",
+    "needsKey": "דורש מפתח API",
+    "groups": {
+      "device": "במחשב הזה",
+      "cloud": "ענן",
+      "setup": "עדיין לא הוגדר"
+    },
+    "label": {
+      "assistant": "מודל העוזר",
+      "cleanup": "מודל ניקוי AI",
+      "stt": "מודל תמלול",
+      "voice": "קול"
+    },
+    "needsSetup": "דורש הגדרה",
+    "finishSetup": "סיים את ההגדרה",
+    "setup": {
+      "title": "הגדר את {{provider}}",
+      "bodyKey": "הדבק את מפתח ה-API שלך, ואז בחר מודל.",
+      "bodyServer": "הזן את כתובת השרת שלך, ואז בחר מודל.",
+      "bodyBoth": "הזן את נקודת הקצה ואת מפתח ה-API שלך, ואז בחר מודל.",
+      "endpoint": "כתובת URL של נקודת הקצה",
+      "apiKey": "מפתח API",
+      "apiKeyOptional": "מפתח API (אופציונלי)",
+      "keyPlaceholder": "הדבק את המפתח שלך",
+      "getKey": "קבל מפתח ב-{{site}}",
+      "model": "מודל",
+      "modelPlaceholder": "בחר או הקלד מודל",
+      "loadModels": "טען מודלים",
+      "noModels": "לא נמצאו מודלים. הקלד את שם המודל במקום.",
+      "typeInstead": "הקלד שם במקום",
+      "pickFromList": "בחר מהרשימה",
+      "use": "שמור והשתמש",
+      "done": "עכשיו בשימוש: {{provider}}"
+    },
+    "voiceSetup": {
+      "bodyKey": "הדבק את מפתח ה-API שלך, ואז בחר קול.",
+      "bodyEndpoint": "הזן את נקודת הקצה ואת מפתח ה-API שלך, ואז בחר קול.",
+      "voice": "קול",
+      "voicePlaceholder": "בחר קול",
+      "loadVoices": "טען קולות",
+      "noVoices": "לא נמצאו קולות. הדבק מזהה קול במקום.",
+      "model": "מודל (אופציונלי)"
+    }
+  },
+  "catalog": {
+    "recommended": "מומלץ",
+    "searchHuggingFace": "חפש ב-Hugging Face",
+    "useFor": {
+      "button": "השתמש עבור",
+      "label": "השתמש ב-{{model}} עבור…",
+      "assistant": "עוזר",
+      "cleanup": "ניקוי AI",
+      "cleanupOnly": "נועד לניקוי בלבד; הוא לא יכול לנהל שיחה."
+    },
+    "inUse": {
+      "assistant": "עוזר",
+      "cleanup": "ניקוי AI"
+    },
+    "use": "השתמש",
+    "useNamed": "השתמש ב-{{model}} עבור {{job}}",
+    "useForJob": "השתמש עבור {{job}}",
+    "inUseShort": "בשימוש",
+    "more": "עוד",
+    "moreFor": "עוד פעולות עבור {{model}}",
+    "showDetails": "הצג פרטי קובץ",
+    "hideDetails": "הסתר פרטי קובץ",
+    "removeFromList": "הסר מהרשימה",
+    "nowUsing": "עכשיו {{model}} משמש עבור {{job}}.",
+    "yoursInfo": "מודלים שהורדת או הוספת מהדיסק שלך. כל אחד מהם יכול לבצע כל אחת מהמשימות; תפריט ⋯ מעביר מודל למשימה האחרת."
+  },
+  "models": {
+    "runsOn": "פועל על",
+    "options": "אפשרויות",
+    "downloadTitle": "הורד מודלים",
+    "cleanupOff": "ניקוי AI כבוי. סיכומי פגישות עדיין משתמשים במודל הזה.",
+    "assistantOff": "העוזר כבוי. יצירה עם Flow והניקוי עדיין משתמשים במודל הזה.",
+    "usedBy": "בשימוש על ידי: {{features}}."
+  },
+  "shortcutEditor": {
+    "change": "שנה את קיצור המקשים של {{name}}",
+    "reset": "אפס את {{name}} לברירת המחדל"
+  },
+  "memoryManager": {
+    "status": {
+      "on": "מופעל: משמש בתשובות ולומד מהשיחות",
+      "off": "כבוי: לא נעשה שימוש בזיכרון ולא נלמד דבר"
+    },
+    "incognitoHint": "השיחה הזו לא משמשת ולא נלמדת",
+    "editNote": "ערוך הערה",
+    "source": {
+      "learned": "נלמד",
+      "added": "נוסף על ידך"
+    },
+    "filterLabel": "הצג הערות",
+    "filters": {
+      "all": "הכול",
+      "learned": "נלמדו {{count}}",
+      "added": "שלי {{count}}"
+    },
+    "search": "חפש בהערות",
+    "noMatches": "אין הערות תואמות.",
+    "detailHints": {
+      "light": "רק הסיכום ״עליך״ נכלל בכל תשובה. הכי מהיר.",
+      "balanced": "הסיכום ועוד כמה הערות שמתאימות לשאלה.",
+      "detailed": "הסיכום ועוד הערות רלוונטיות. העשיר ביותר, קצת איטי יותר."
+    },
+    "learnNow": "למד מהשיחה הזו",
+    "tips": {
+      "enable": "מאפשר לעוזר להשתמש בזיכרון עליך וללמוד אותו. כבוי כברירת מחדל.",
+      "incognito": "השיחה הזו לא משמשת ולא נלמדת.",
+      "aboutYou": "סיכום קצר שנכלל בכל תשובה כשהזיכרון מופעל."
+    }
+  },
+  "providerGrid": {
+    "showAll": "הצג את כל {{count}} הספקים",
+    "showFewer": "הצג פחות"
+  },
   "voiceEngines": {
+    "kokoro": "האיכות הטובה ביותר",
+    "kitten": "הקל ביותר",
+    "pocket": "14 קולות",
+    "supertonic": "מהיר וברור",
     "openai": "קולות GPT",
+    "elevenlabs": "הטבעי ביותר",
+    "openrouter": "קולות רבים",
     "deepgram": "מהיר וזול",
     "cartesia": "השהיה מינימלית",
     "google": "קולות Chirp 3 HD",
+    "azure": "קולות נוירוניים",
     "groq": "קולות Orpheus",
     "xai": "קולות Grok",
     "mistral": "קולות Voxtral",
     "inworld": "קולות אקספרסיביים",
     "custom": "השרת שלך",
     "names": {
+      "kokoro": "Kokoro",
+      "kitten": "Kitten",
+      "pocket": "Pocket TTS",
+      "supertonic": "Supertonic",
+      "openai": "OpenAI",
+      "elevenlabs": "ElevenLabs",
+      "openrouter": "OpenRouter",
       "deepgram": "Deepgram",
       "cartesia": "Cartesia",
       "google": "Google Cloud",
+      "azure": "Azure Speech",
       "groq": "Groq",
       "xai": "xAI",
       "mistral": "Mistral",
       "inworld": "Inworld",
       "custom": "מותאם אישית"
     }
+  },
+  "insights": {
+    "description": "ההכתבה שלך לאורך זמן, נספרת במחשב הזה.",
+    "empty": "התובנות שלך יופיעו אחרי ההכתבה הראשונה שלך.",
+    "dictations": "הכתבות",
+    "today": "{{words}} מילים היום",
+    "pages_one": "בערך עמוד אחד",
+    "pages_two": "בערך שני עמודים",
+    "pages_other": "בערך {{count}} עמודים",
+    "fasterThanTyping": "מהיר פי {{times}} מהקלדה",
+    "streak_one": "רצף של יום אחד",
+    "streak_two": "רצף של יומיים",
+    "streak_other": "רצף של {{count}} ימים",
+    "longest_one": "הארוך ביותר: יום אחד",
+    "longest_two": "הארוך ביותר: יומיים",
+    "longest_other": "הארוך ביותר: {{count}} ימים",
+    "gridLabel_one": "{{words}} מילים ביום אחד בששת החודשים האחרונים",
+    "gridLabel_two": "{{words}} מילים ביומיים בששת החודשים האחרונים",
+    "gridLabel_other": "{{words}} מילים ב-{{count}} ימים בששת החודשים האחרונים",
+    "gridSummary_one": "{{words}} מילים ביום אחד ב-6 החודשים האחרונים",
+    "gridSummary_two": "{{words}} מילים ביומיים ב-6 החודשים האחרונים",
+    "gridSummary_other": "{{words}} מילים ב-{{count}} ימים ב-6 החודשים האחרונים",
+    "dayWords_one": "{{formatted}} מילה",
+    "dayWords_two": "{{formatted}} מילים",
+    "dayWords_other": "{{formatted}} מילים",
+    "dayNone": "אין הכתבה",
+    "less": "פחות",
+    "more": "יותר",
+    "busiest": "היום העמוס ביותר",
+    "best": "היום הטוב ביותר",
+    "typical": "יום טיפוסי",
+    "typicalSub": "בימים שבהם אתה מכתיב"
   }
 }

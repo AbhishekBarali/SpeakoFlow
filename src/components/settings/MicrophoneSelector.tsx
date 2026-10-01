@@ -41,7 +41,9 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = React.memo(
 
     const microphoneOptions = audioDevices.map((device) => ({
       value: device.name,
-      label: device.name,
+      // The backend names the system-default entry "Default"; that name is
+      // also the stored value, so only the label is translated.
+      label: device.name === "Default" ? t("common.default") : device.name,
     }));
 
     return (

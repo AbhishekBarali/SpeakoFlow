@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Input } from "../../ui/Input";
 
 interface BaseUrlFieldProps {
@@ -11,6 +12,7 @@ interface BaseUrlFieldProps {
 
 export const BaseUrlField: React.FC<BaseUrlFieldProps> = React.memo(
   ({ value, onBlur, disabled, placeholder, className = "" }) => {
+    const { t } = useTranslation();
     const [localValue, setLocalValue] = useState(value);
 
     // Sync with prop changes
@@ -19,7 +21,7 @@ export const BaseUrlField: React.FC<BaseUrlFieldProps> = React.memo(
     }, [value]);
 
     const disabledMessage = disabled
-      ? "Base URL is managed by the selected provider."
+      ? t("settings.postProcessing.api.baseUrl.managed")
       : undefined;
 
     return (

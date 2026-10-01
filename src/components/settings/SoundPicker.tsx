@@ -25,14 +25,17 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
 
   const options: DropdownOption[] = [
     { value: "dictation", label: t("settings.sound.soundTheme.default") },
-    { value: "marimba", label: "Marimba" },
-    { value: "pop", label: "Pop" },
-    { value: "click", label: "Click" },
+    { value: "marimba", label: t("settings.sound.soundTheme.themes.marimba") },
+    { value: "pop", label: t("settings.sound.soundTheme.themes.pop") },
+    { value: "click", label: t("settings.sound.soundTheme.themes.click") },
   ];
 
   // Only add Custom option if both custom sound files exist
   if (customSounds.start && customSounds.stop) {
-    options.push({ value: "custom", label: "Custom" });
+    options.push({
+      value: "custom",
+      label: t("settings.sound.soundTheme.themes.custom"),
+    });
   }
 
   const handlePlayBothSounds = async () => {

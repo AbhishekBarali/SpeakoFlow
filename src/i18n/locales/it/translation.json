@@ -14,17 +14,113 @@
   },
   "tray": {
     "home": "Home",
+    "openAssistant": "Apri l'assistente",
     "checkUpdates": "Verifica aggiornamenti…",
+    "sendFeedback": "Invia feedback…",
     "copyLastTranscript": "Copia l'ultima trascrizione",
-    "unloadModel": "Rilascia modello",
+    "unloadModel": "Rilascia il modello",
     "model": "Modello",
     "quit": "Esci",
     "cancel": "Annulla"
+  },
+  "updates": {
+    "check": "Verifica aggiornamenti",
+    "checking": "Verifica in corso…",
+    "upToDate": "Hai già l'ultima versione",
+    "checkFailed": "Impossibile verificare gli aggiornamenti. Controlla la connessione e riprova.",
+    "noBuild": "La nuova versione non è ancora disponibile per questo sistema.",
+    "available": "È disponibile la versione {{version}}",
+    "availableShort": "Aggiornamento disponibile",
+    "installNow": "Aggiorna ora",
+    "downloading": "Download in corso… {{progress}}%",
+    "downloadingUnknown": "Download in corso…",
+    "installing": "Installazione in corso…",
+    "restart": "Riavvia ora",
+    "readyToRestart": "L'aggiornamento è installato. Riavvia SpeakoFlow per iniziare a usarlo.",
+    "installFailed": "L'aggiornamento non è stato installato. Puoi riprovare, oppure scaricare il programma di installazione ed eseguirlo tu.",
+    "downloadFailed": "Il download non è stato completato. Controlla la connessione e riprova.",
+    "downloadInstaller": "Scarica il programma di installazione",
+    "downloadInstead": "Scarica invece il programma di installazione",
+    "downloadNewVersion": "Scarica la nuova versione",
+    "installerSaved": "Il programma di installazione è nella cartella Download",
+    "openInstaller": "Esegui il programma di installazione",
+    "showInFolder": "Mostra nella cartella",
+    "viewRelease": "Vedi su GitHub",
+    "hint": {
+      "windows": "SpeakoFlow si chiude, installa l'aggiornamento e si riapre. Non devi fare altro.",
+      "macos": "SpeakoFlow si riavvia con la nuova versione. In seguito macOS potrebbe chiederti di consentire di nuovo Microfono e Accessibilità.",
+      "linux": "SpeakoFlow si riavvia con la nuova versione. Un'installazione .deb chiede prima la tua password."
+    },
+    "modes": {
+      "portable": "Questa è la versione portatile, che non può sostituirsi da sola. Scarica la nuova versione e copiaci dentro la tua cartella Data.",
+      "packageManager": "SpeakoFlow è stato installato dal tuo gestore di pacchetti, quindi aggiornalo da lì, per esempio con yay -Syu speakoflow-bin.",
+      "download": "Questa copia non può aggiornarsi da sola. Scarica il programma di installazione ed eseguilo per ottenere la nuova versione."
+    },
+    "pill": {
+      "available": "Aggiornamento disponibile",
+      "version": "Versione {{version}}",
+      "progress": "Aggiornamento… {{progress}}%",
+      "working": "Aggiornamento…",
+      "restart": "Riavvia per aggiornare",
+      "installerReady": "Programma di installazione scaricato"
+    }
+  },
+  "feedback": {
+    "button": "Invia feedback",
+    "title": "Invia feedback",
+    "description": "Leggo personalmente ogni messaggio, quindi scrivi come ti viene. Grazie per aiutare a migliorare SpeakoFlow.",
+    "kind": {
+      "label": "Tipo di feedback",
+      "bug": "Bug",
+      "idea": "Idea",
+      "question": "Domanda"
+    },
+    "placeholder": {
+      "bug": "Cosa è successo e cosa ti aspettavi invece?",
+      "idea": "Cosa renderebbe SpeakoFlow migliore per te?",
+      "question": "Cosa vorresti sapere?"
+    },
+    "messageLabel": "Messaggio",
+    "emailLabel": "Email per la risposta",
+    "emailPlaceholder": "Email, se vuoi una risposta",
+    "emailInvalid": "Questo indirizzo email non sembra corretto.",
+    "includeSystem": "Includi versione dell'app e sistema operativo",
+    "systemDetails": "Inviato esattamente così: {{system}}",
+    "remaining": "{{count}} rimanenti",
+    "screenshots": {
+      "add": "Aggiungi screenshot",
+      "pasteHint": "oppure incolla con {{shortcut}}",
+      "remove": "Rimuovi lo screenshot {{index}}",
+      "preview": "Screenshot {{index}}, {{width}} × {{height}}, {{size}}",
+      "working": "Riduzione dello screenshot…",
+      "limit": "Puoi allegare fino a {{count}} screenshot.",
+      "notImage": "Questo file non è un'immagine.",
+      "tooLarge": "Questa immagine è troppo grande da allegare.",
+      "unreadable": "Impossibile leggere questa immagine."
+    },
+    "send": "Invia",
+    "sending": "Invio in corso…",
+    "sentTitle": "Grazie, è in arrivo",
+    "sentBody": "Ora ce l'ho io e lo leggerò presto.",
+    "sentWithEmail": "Se c'è qualcosa da approfondire, riceverai una risposta a {{email}}.",
+    "screenshotsDropped_one": "Non è stato possibile salvare lo screenshot, ma il tuo messaggio è arrivato.",
+    "screenshotsDropped_many": "Non è stato possibile salvare {{count}} screenshot, ma il tuo messaggio è arrivato.",
+    "screenshotsDropped_other": "Non è stato possibile salvare {{count}} screenshot, ma il tuo messaggio è arrivato.",
+    "sendAnother": "Inviane un altro",
+    "errors": {
+      "generic": "Impossibile inviare il tuo feedback. Il messaggio resta salvato qui, quindi riprova tra un momento."
+    },
+    "aboutRow": {
+      "title": "Feedback",
+      "description": "Segnala un bug, proponi un'idea o fai una domanda.",
+      "button": "Invia feedback"
+    }
   },
   "sidebar": {
     "general": "Generale",
     "dictation": "Dettatura",
     "assistant": "Assistente",
+    "meetings": "Riunioni",
     "history": "Cronologia",
     "about": "Informazioni",
     "debug": "Debug",
@@ -43,16 +139,104 @@
     "general": "Scorciatoie, microfono e aspetto dell'app.",
     "dictation": "Il modello che trasforma la tua voce in testo e come viene ripulito.",
     "assistant": "Configura l'assistente, poi regola voce, visione dello schermo e ricerca web.",
+    "meetings": "Registra una chiamata, rileggila divisa per interlocutore e trasformala in appunti.",
     "history": "Le tue dettature recenti, le generazioni con Flow e le chat con l'assistente, conservate su questo dispositivo.",
     "about": "Versione, lingua dell'app, percorsi dei dati e riconoscimenti.",
     "debug": "Diagnostica e strumenti per sviluppatori."
   },
   "onboarding": {
+    "flow": {
+      "progress": "Passaggio {{current}} di {{total}}",
+      "steps": {
+        "setup": "Configura",
+        "tour": "Tour",
+        "finish": "Inizia"
+      }
+    },
+    "setup": {
+      "installed": "Installato",
+      "loadFailed": "Impossibile caricare l'elenco dei modelli.",
+      "retry": "Riprova"
+    },
+    "tour": {
+      "features": "Cosa fa SpeakoFlow",
+      "count": "{{current}} di {{total}}",
+      "skip": "Salta il tour",
+      "next": "Avanti",
+      "done": "Continua",
+      "tabs": {
+        "dictate": "Dettatura",
+        "ask": "Assistente",
+        "call": "Chiamata"
+      },
+      "keys": {
+        "hold": "Tieni premuto per parlare",
+        "tap": "Tocca per iniziare, tocca per fermare",
+        "call": "Premi per iniziare, di nuovo per riagganciare"
+      },
+      "mail": {
+        "window": "Nuovo messaggio",
+        "to": "A",
+        "toValue": "Sara",
+        "subject": "Oggetto",
+        "subjectValue": "Venerdì"
+      },
+      "dictate": {
+        "title": "Parla.\nScrive lui.",
+        "cleanup": "Pulizia IA, quando la vuoi",
+        "said": "Ciao Sara, possiamo spostare la nostra chiamata a venerdì? Ti mando il budget prima."
+      },
+      "ask": {
+        "title": "Chiedi\nqualsiasi cosa.",
+        "chips": {
+          "translate": "Traduci",
+          "decline": "Scrivi una risposta",
+          "explain": "Spiega",
+          "anything": "…qualsiasi cosa"
+        },
+        "examples": {
+          "translate": {
+            "window": "Messaggi",
+            "doc": "Possiamo spostare la nostra chiamata a venerdì?",
+            "question": "Traducilo in spagnolo",
+            "answer": "¿Podemos pasar nuestra llamada al viernes?"
+          },
+          "decline": {
+            "window": "Posta",
+            "doc": "Ciao, sei libero per la revisione della pianificazione giovedì alle 15?",
+            "question": "Scrivi una risposta cortese dicendo che giovedì non posso",
+            "answer": "Grazie per l'invito! Giovedì alle 15 non riesco, ma venerdì mattina sono libero, se va bene."
+          },
+          "explain": {
+            "window": "Browser",
+            "doc": "L'API restituisce 429 Too Many Requests.",
+            "question": "Cosa significa?",
+            "answer": "Stai inviando richieste più velocemente di quanto il servizio consenta. Aspetta un momento, poi riprova più lentamente."
+          }
+        }
+      },
+      "call": {
+        "title": "Oppure\nparlane e basta.",
+        "you": "Tu",
+        "assistant": "Assistente",
+        "said": "Aiutami a preparare un breve intervento per la riunione di team di venerdì.",
+        "reply": "Certo. Apri con il risultato di cui vai più fiero, spiega due motivi per cui ha funzionato e chiudi con i prossimi passi."
+      }
+    },
+    "finish": {
+      "status": {
+        "ready": "Pronto",
+        "installing": "Installazione…",
+        "percent": "{{percent}}%",
+        "retry": "Riprova",
+        "waiting": "In attesa"
+      }
+    },
     "subtitle": "Per cominciare, scegli un modello di riconoscimento vocale",
     "steps": {
       "progress": "Passaggio {{current}} di {{total}}",
       "counter": "Passaggio {{current}} di {{total}} · {{label}}",
-      "speechToText": "Trascrizione",
+      "speechToText": "Ascolto",
       "aiModel": "Dagli un cervello",
       "ready": "Tutto pronto"
     },
@@ -77,8 +261,8 @@
       "downloadStarted": "Download del tuo modello in background."
     },
     "aiModel": {
-      "title": "Aggiungi un modello IA locale",
-      "subtitle": "Scegli in base a velocità di risposta e capacità. E4B è l'opzione bilanciata predefinita; 12B è più preciso ma più lento.",
+      "title": "Aggiungi l'IA locale (facoltativo)",
+      "subtitle": "Un assistente con cui parlare, più il nostro modello che ripulisce la tua dettatura. Scegline uno o entrambi.",
       "tiers": {
         "small": {
           "description": "Funziona su qualsiasi computer. Ottimo per sistemare i tuoi testi."
@@ -90,16 +274,16 @@
           "description": "Le risposte più precise, e può vedere il tuo schermo."
         }
       },
-      "seesScreen": "Vede il tuo schermo",
+      "seesScreen": "Modello con visione",
       "textOnly": "Solo testo",
       "recommendedForAssistant": "Consigliato per l'assistente",
       "download": "Scarica modello",
       "useDownloaded": "Usa il modello scaricato",
       "skip": "Salta per ora",
-      "skipHint": "Puoi farlo più tardi in Impostazioni > Assistente > Sul mio dispositivo.",
+      "skipHint": "Puoi aggiungerli in qualsiasi momento nelle Impostazioni.",
       "continue": "Continua",
-      "downloadingHint": "Il tuo modello si sta scaricando in background: puoi iniziare subito a usare l'app.",
-      "downloadStarted": "Download del tuo modello IA in background."
+      "downloadingHint": "Si scarica in background. Puoi iniziare subito a usare l'app.",
+      "downloadStarted": "Download del tuo modello in background."
     },
     "cleanup": {
       "cardTitle": "SpeakoFlow Mini",
@@ -126,8 +310,8 @@
     },
     "errors": {
       "selectModel": "Impossibile selezionare quel modello. Riprova.",
-      "loadModels": "Errore di caricamento dei modelli disponibili",
-      "downloadModel": "Errore nel download del modello: {{error}}"
+      "loadModels": "Impossibile caricare i modelli disponibili.",
+      "downloadModel": "Impossibile scaricare il modello: {{error}}"
     },
     "downloadProgress": {
       "sizeOf": "{{downloaded}} di {{total}} · {{percentage}}%"
@@ -176,7 +360,7 @@
         "description": "Il Gemma attuale più rapido per la conversazione quotidiana. Meno capace con richieste complesse."
       },
       "gemma-4-e4b": {
-        "description": "Consigliato per la conversazione: un equilibrio migliore tra qualità e velocità, senza ragionamento attivo per impostazione predefinita."
+        "description": "Un equilibrio migliore tra qualità e velocità, senza ragionamento attivo per impostazione predefinita."
       },
       "gemma-4-12b": {
         "description": "Più capace con domande sfumate, ma sensibilmente più lento e ideale con una GPU potente."
@@ -193,19 +377,19 @@
       },
       "medium": {
         "name": "Whisper Medium",
-        "description": "Buona accuratezza, velocità nella media"
+        "description": "Buona accuratezza, velocità media."
       },
       "turbo": {
         "name": "Whisper Turbo",
-        "description": "Bilanciato fra accuratezza e velocità."
+        "description": "Un equilibrio tra accuratezza e velocità."
       },
       "large": {
         "name": "Whisper Large",
-        "description": "Buona accuratezza, ma lento."
+        "description": "Molto accurato, ma lento."
       },
       "parakeet-tdt-0.6b-v2": {
         "name": "Parakeet V2",
-        "description": "Solo inglese. Il miglior modello per chi parla inglese."
+        "description": "Solo inglese. Eccellente per chi parla inglese."
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
@@ -217,56 +401,56 @@
       },
       "moonshine-tiny-streaming-en": {
         "name": "Moonshine V2 Tiny",
-        "description": "Ultra-veloce, solo inglese"
+        "description": "Velocissimo. Solo inglese."
       },
       "moonshine-small-streaming-en": {
         "name": "Moonshine V2 Small",
-        "description": "Veloce, solo inglese. Buon equilibrio tra velocità e precisione."
+        "description": "Veloce, solo inglese. Un buon equilibrio tra velocità e accuratezza."
       },
       "moonshine-medium-streaming-en": {
         "name": "Moonshine V2 Medium",
-        "description": "Solo inglese. Alta qualità."
+        "description": "Solo inglese. Qualità più alta, un po' più lento."
       },
       "breeze-asr": {
         "name": "Breeze ASR",
-        "description": "Ottimizzato per il mandarino taiwanese. Supporto per il code-switching."
+        "description": "Ottimizzato per il mandarino taiwanese, con passaggi all'inglese nella stessa frase."
       },
       "sense-voice-int8": {
         "name": "SenseVoice",
-        "description": "Molto veloce. Cinese, inglese, giapponese, coreano, cantonese."
+        "description": "Molto veloce. Cinese, inglese, giapponese, coreano e cantonese."
       },
       "gigaam-v3-e2e-ctc": {
         "name": "GigaAM v3",
-        "description": "Riconoscimento vocale in russo. Veloce e preciso."
+        "description": "Solo russo. Veloce e accurato."
       },
       "canary-180m-flash": {
         "name": "Canary 180M Flash",
-        "description": "Molto veloce. Inglese, tedesco, spagnolo, francese. Supporta la traduzione."
+        "description": "Molto veloce. Inglese, tedesco, spagnolo e francese, con traduzione."
       },
       "canary-1b-v2": {
         "name": "Canary 1B v2",
-        "description": "Multilingue accurato. 25 lingue europee. Supporta la traduzione."
+        "description": "Accurato in 25 lingue europee, con traduzione."
       },
       "cohere-int8": {
         "name": "Cohere",
-        "description": "Un modello grande, più lento, ma molto accurato e multilingue."
+        "description": "Grande e più lento, ma molto accurato. Molte lingue."
       }
     },
     "permissions": {
-      "title": "Permessi Richiesti",
+      "title": "Permessi richiesti",
       "description": "SpeakoFlow ha bisogno di alcuni permessi per funzionare correttamente.",
       "microphone": {
-        "title": "Accesso al Microfono",
+        "title": "Accesso al microfono",
         "description": "Necessario per sentire la tua voce per la trascrizione."
       },
       "accessibility": {
-        "title": "Accesso all'Accessibilità",
+        "title": "Accesso all'accessibilità",
         "description": "Necessario per digitare il testo trascritto nelle tue applicazioni.",
         "stuckHint": "Già attivato in Impostazioni di Sistema? Dopo un aggiornamento, macOS può mantenere un permesso che non corrisponde più a questa versione.",
         "reset": "Reimposta permesso",
         "resetDone": "Ora riattiva SpeakoFlow in Impostazioni di Sistema."
       },
-      "grant": "Concedi Permesso",
+      "grant": "Concedi il permesso",
       "granted": "Concesso",
       "waiting": "In attesa…",
       "allGranted": "Tutto pronto!",
@@ -275,11 +459,73 @@
         "requestFailed": "Impossibile richiedere il permesso. Riprova.",
         "resetFailed": "Impossibile reimpostare il permesso. Rimuovi SpeakoFlow dall'elenco Accessibilità e aggiungilo di nuovo."
       }
+    },
+    "frame": {
+      "setup": "Configura",
+      "tour": "Tour",
+      "finish": "Inizia"
+    },
+    "welcome": {
+      "line": "Parli, e scrive. Chiedi, e risponde.",
+      "start": "Inizia",
+      "note": "Ci vuole circa un minuto."
+    },
+    "speech": {
+      "title": "Scegli il tuo modello vocale",
+      "body": "Funziona su questo computer. Anche offline.",
+      "english": "Inglese",
+      "languages_one": "{{count}} lingua",
+      "languages_many": "{{count}} lingue",
+      "languages_other": "{{count}} lingue",
+      "tags": {
+        "english": "Il più veloce",
+        "languages": "Rileva la lingua",
+        "small": "Il più piccolo",
+        "accurate": "Il più preciso",
+        "widest": "Più lento"
+      },
+      "more_one": "{{count}} altro modello",
+      "more_many": "{{count}} altri modelli",
+      "more_other": "{{count}} altri modelli",
+      "anytime": "Puoi aggiungere altri modelli in qualsiasi momento.",
+      "download": "Scarica e continua",
+      "continue": "Continua",
+      "later": "Configura più tardi",
+      "loading": "Ricerca del tuo modello vocale"
+    },
+    "start": {
+      "ready": {
+        "title": "Provalo ora"
+      },
+      "downloading": {
+        "title": "Quasi pronto"
+      },
+      "failed": {
+        "title": "Il download si è interrotto"
+      },
+      "none": {
+        "title": "Scegli un modello vocale per iniziare"
+      },
+      "progress": {
+        "of": "{{done}} di {{total}}",
+        "failed": "Non è stato completato. Riprovi?",
+        "underMinute": "Manca meno di un minuto",
+        "minutes_one": "Manca circa {{count}} minuto",
+        "minutes_many": "Mancano circa {{count}} minuti",
+        "minutes_other": "Mancano circa {{count}} minuti"
+      },
+      "try": {
+        "label": "Prova la dettatura",
+        "placeholder": "Le tue parole appaiono qui…",
+        "success": "Ecco fatto. Funziona in qualsiasi app."
+      },
+      "open": "Apri SpeakoFlow",
+      "choose": "Scegli un modello vocale"
     }
   },
   "modelSelector": {
     "custom": "Personalizzato",
-    "active": "Attivo",
+    "active": "In uso",
     "switching": "Cambio…",
     "noModelsAvailable": "Nessun modello disponibile",
     "verifying": "Verifica di {{modelName}}…",
@@ -291,12 +537,12 @@
     "downloadingMultiple": "Download di {{count}} modelli…",
     "downloadDetails": "Dettagli del download",
     "downloadSize": "{{downloaded}} di {{total}}",
-    "modelReady": "Modello Pronto",
+    "modelReady": "Modello pronto",
     "loading": "Caricamento di {{modelName}}…",
     "loadingGeneric": "Caricamento…",
-    "modelError": "Errore del Modello",
-    "modelUnloaded": "Modello Disattivato",
-    "noModelDownloadRequired": "Nessun Modello - Download Richiesto",
+    "modelError": "Errore del modello",
+    "modelUnloaded": "Modello rilasciato",
+    "noModelDownloadRequired": "Nessun modello — download richiesto",
     "llmSelectModel": "Seleziona il modello dell'assistente",
     "llmModelTitle": "Modello dell'assistente: {{model}}",
     "deleteModel": "Elimina {{modelName}}",
@@ -381,7 +627,7 @@
     },
     "modelSettings": {
       "title": "Impostazioni di {{model}}",
-      "noSettingsNeeded": "Questo modello funziona automaticamente senza bisogno di configurazione."
+      "noSettingsNeeded": "Questo modello funziona automaticamente: non c'è nulla da configurare."
     },
     "general": {
       "title": "Generale",
@@ -397,7 +643,7 @@
       },
       "shortcut": {
         "title": "Scorciatoie",
-        "description": "Configura le scorciatoie per attivare la trascrizione vocale",
+        "description": "Le scorciatoie da tastiera che avviano e fermano la registrazione.",
         "loading": "Caricamento delle scorciatoie…",
         "none": "Nessuna scorciatoia configurata",
         "notFound": "Scorciatoia non trovata",
@@ -405,7 +651,7 @@
         "bindings": {
           "transcribe": {
             "name": "Dettatura",
-            "description": "La scorciatoia da tastiera per registrare e trascrivere la tua voce."
+            "description": "Premi per iniziare a registrare, premi di nuovo per fermarti e far scrivere il testo."
           },
           "transcribe_toggle": {
             "name": "Dettatura a mani libere",
@@ -413,10 +659,10 @@
           },
           "cancel": {
             "name": "Annulla",
-            "description": "La scorciatoia da tastiera per annullare la registrazione in corso."
+            "description": "Ferma la registrazione in corso o una risposta in arrivo."
           },
           "transcribe_with_post_process": {
-            "name": "Tasto di post-elaborazione",
+            "name": "Detta e ripulisci",
             "description": "Detta, poi ripulisci il testo con l'IA prima che venga scritto."
           },
           "assistant": {
@@ -426,25 +672,31 @@
           "assistant_vision": {
             "name": "Chiedi con lo schermo",
             "description": "Chiedi a voce allegando il tuo schermo, così può vedere ciò che stai guardando."
+          },
+          "assistant_call": {
+            "name": "Avvia una chiamata",
+            "description": "Parla con l'assistente a mani libere e ascolta le sue risposte. Premi di nuovo per riagganciare."
           }
         },
         "errors": {
-          "restore": "Errore nel ripristino della scorciatoia originale",
-          "set": "Errore nella configurazione della scorciatoia: {{error}}",
+          "restore": "Impossibile ripristinare la scorciatoia originale.",
+          "set": "Impossibile impostare la scorciatoia: {{error}}",
           "reset": "Impossibile ripristinare la scorciatoia."
-        }
+        },
+        "clickToChange": "Fai clic per cambiare",
+        "notSet": "Non impostata"
       },
       "language": {
         "title": "Lingua",
         "description": "Lingua per il riconoscimento vocale. Scegliere una lingua specifica può migliorare l'accuratezza.",
-        "descriptionUnsupported": "Il modello Parakeet sceglie automaticamente la lingua. Non serve scegliere manualmente.",
+        "descriptionUnsupported": "Questo modello rileva la lingua automaticamente.",
         "searchPlaceholder": "Cerca lingue…",
         "noResults": "Nessuna lingua trovata",
-        "auto": "Auto"
+        "auto": "Automatico"
       },
       "pushToTalk": {
-        "label": "Premi per Parlare",
-        "description": "Con «Tieni premuto» registri finché la scorciatoia di dettatura resta premuta. Con «Tocca» la registrazione parte a una pressione e si ferma alla successiva.",
+        "label": "Modalità di registrazione",
+        "description": "Tieni premuto: registri finché tieni premuta una scorciatoia di registrazione. Tocca: una pressione avvia, la successiva ferma. Vale per tutte le scorciatoie di registrazione.",
         "hold": "Tieni premuto",
         "tap": "Tocca"
       },
@@ -456,14 +708,14 @@
       }
     },
     "models": {
-      "title": "Modelli di Trascrizione",
+      "title": "Modelli di trascrizione",
       "description": "I modelli scambiano accuratezza per velocità: scegline uno adatto al tuo computer.",
       "yourModels": "Modelli scaricati",
-      "availableModels": "Disponibili per il Download",
+      "availableModels": "Disponibili per il download",
       "downloaded": "Scaricati",
-      "available": "Disponibili per il Download",
-      "deleteConfirm": "Sei sicuro di voler eliminare {{modelName}}? Dovrai scaricarlo di nuovo per usarlo.",
-      "deleteActiveConfirm": "{{modelName}} è il tuo modello attivo. Eliminarlo interromperà le trascrizioni fino a quando non selezionerai un nuovo modello. Sei sicuro?",
+      "available": "Disponibili per il download",
+      "deleteConfirm": "Vuoi davvero eliminare {{modelName}}? Per usarlo dovrai scaricarlo di nuovo.",
+      "deleteActiveConfirm": "{{modelName}} è il tuo modello attivo. Eliminarlo interromperà le trascrizioni finché non ne sceglierai un altro. Vuoi procedere?",
       "deleteTitle": "Elimina modello",
       "categories": {
         "stt": "Trascrizione",
@@ -500,6 +752,7 @@
         "popularTitle": "Modelli GGUF popolari",
         "resultsTitle": "Risultati della ricerca",
         "resultCount_one": "{{count}} modello",
+        "resultCount_many": "{{count}} modelli",
         "resultCount_other": "{{count}} modelli",
         "searching": "Ricerca su Hugging Face…",
         "searchError": "Ricerca non riuscita. Controlla la connessione e riprova.",
@@ -529,8 +782,10 @@
         "linkFolderHint": "Viene analizzata automaticamente, sottocartelle incluse. Collega tutte le cartelle che vuoi.",
         "fileFilter": "File di modello",
         "filesAdded_one": "Aggiunto {{count}} modello.",
+        "filesAdded_many": "Aggiunti {{count}} modelli.",
         "filesAdded_other": "Aggiunti {{count}} modelli.",
         "folderAdded_one": "Cartella collegata. Trovato {{count}} modello.",
+        "folderAdded_many": "Cartella collegata. Trovati {{count}} modelli.",
         "folderAdded_other": "Cartella collegata. Trovati {{count}} modelli.",
         "folderRemoved": "Cartella scollegata. I tuoi file non sono stati toccati.",
         "foldersTitle": "Cartelle collegate",
@@ -539,12 +794,14 @@
         "rescan": "Analizza di nuovo",
         "rescanning": "Nuova analisi…",
         "rescanDone_one": "Trovato {{count}} modello locale.",
+        "rescanDone_many": "Trovati {{count}} modelli locali.",
         "rescanDone_other": "Trovati {{count}} modelli locali.",
         "footnote": "Le cartelle collegate vengono analizzate di nuovo all'avvio di SpeakoFlow, così i modelli che ci aggiungi più tardi compaiono da soli. Scollegare una cartella o rimuovere un modello lo toglie solo da questo elenco: i tuoi file restano dove sono.",
         "removeTitle": "Rimuovere dall'elenco?",
         "removeConfirm": "Vuoi rimuovere «{{modelName}}» dal tuo elenco di modelli?\n\nIl file resta dov'è:\n{{path}}",
         "missingBadge": "File mancante",
-        "fileMissing": "Il file di questo modello non c'è più:\n{{path}}\n\nPotrebbe essere stato spostato o rinominato, oppure trovarsi su un'unità non collegata."
+        "fileMissing": "Il file di questo modello non c'è più:\n{{path}}\n\nPotrebbe essere stato spostato o rinominato, oppure trovarsi su un'unità non collegata.",
+        "foldersEmptyShort": "Nessuna cartella collegata."
       }
     },
     "sound": {
@@ -556,17 +813,23 @@
         "loading": "Caricamento…"
       },
       "audioFeedback": {
-        "label": "Feedback Audio",
+        "label": "Feedback audio",
         "description": "Riproduci un suono quando la registrazione inizia e finisce"
       },
       "soundTheme": {
         "label": "Suono di feedback",
         "description": "Scegli il segnale di inizio/fine riprodotto durante la dettatura",
         "default": "Predefinito",
-        "preview": "Ascolta il suono (prima inizio, poi fine)"
+        "preview": "Ascolta il suono (prima inizio, poi fine)",
+        "themes": {
+          "marimba": "Marimba",
+          "pop": "Pop",
+          "click": "Clic",
+          "custom": "Personalizzato"
+        }
       },
       "outputDevice": {
-        "title": "Dispositivo di Output",
+        "title": "Dispositivo di uscita",
         "description": "Scegli il dispositivo di output per il feedback audio",
         "placeholder": "Scegli dispositivo di output…",
         "loading": "Caricamento…"
@@ -598,8 +861,8 @@
         "seconds": "{{seconds}} secondi"
       },
       "experimentalToggle": {
-        "label": "Funzionalità Sperimentali",
-        "description": "Abilita le funzionalità sperimentali ancora in fase di sviluppo."
+        "label": "Funzionalità sperimentali",
+        "description": "Mostra le funzionalità ancora in sviluppo. Disattivato per impostazione predefinita."
       },
       "lazyStreamClose": {
         "label": "Mantieni il microfono aperto tra le trascrizioni",
@@ -625,20 +888,20 @@
         "gpuDevice": {
           "title": "Dispositivo GPU",
           "description": "Auto sceglie la GPU dedicata.",
-          "auto": "Auto"
+          "auto": "Automatico"
         }
       },
       "startHidden": {
-        "label": "Avvia in Background",
-        "description": "Avvia l'applicazione in background senza aprire la finestra."
+        "label": "Avvia nascosto",
+        "description": "Avvia nella barra di sistema senza aprire la finestra."
       },
       "autostart": {
-        "label": "Avvia all'Accensione",
-        "description": "Avvia SpeakoFlow automaticamente quando accedi al computer."
+        "label": "Avvia all'accensione",
+        "description": "Apri SpeakoFlow automaticamente quando accedi."
       },
       "showTrayIcon": {
         "label": "Mostra icona nella barra di sistema",
-        "description": "Mostra l'icona di SpeakoFlow nella barra di sistema."
+        "description": "Tieni SpeakoFlow nella barra di sistema."
       },
       "closeBehavior": {
         "label": "Esci quando chiudo la finestra",
@@ -653,8 +916,18 @@
           "live": "In tempo reale"
         }
       },
+      "overlayLinger": {
+        "title": "Mantieni il testo finito sullo schermo",
+        "description": "Per quanto tempo la scheda In tempo reale resta visibile dopo che hai finito di dettare, così puoi leggere o copiare ciò che è stato scritto. Passando il mouse sulla scheda, resta aperta.",
+        "options": {
+          "quick": "Brevemente (1 secondo)",
+          "standard": "Standard (3 secondi)",
+          "long": "Più a lungo (6 secondi)",
+          "extended": "Molto più a lungo (10 secondi)"
+        }
+      },
       "overlay": {
-        "title": "Posizione della Sovrimpressione",
+        "title": "Posizione della sovrimpressione",
         "description": "Dove si trova l'overlay di registrazione sullo schermo.",
         "options": {
           "none": "Nessuna",
@@ -663,7 +936,7 @@
         }
       },
       "pasteMethod": {
-        "title": "Metodo di Incolla",
+        "title": "Metodo di incolla",
         "description": "Come viene inserito il testo trascritto nell'app attiva.",
         "options": {
           "clipboard": "Appunti ({{modifier}}+V)",
@@ -679,15 +952,15 @@
         "title": "Strumento di digitazione",
         "description": "Strumento Linux usato per il metodo di incolla Diretto.",
         "options": {
-          "auto": "Auto (Consigliato)"
+          "auto": "Automatico (consigliato)"
         }
       },
       "clipboardHandling": {
-        "title": "Gestione Appunti",
+        "title": "Gestione degli appunti",
         "description": "Se la trascrizione resta negli appunti dopo aver incollato.",
         "options": {
-          "dontModify": "Non Modificare gli Appunti",
-          "copyToClipboard": "Copia negli Appunti"
+          "dontModify": "Non modificare gli appunti",
+          "copyToClipboard": "Copia negli appunti"
         }
       },
       "autoSubmit": {
@@ -707,7 +980,7 @@
         "descriptionUnsupported": "La traduzione non è supportata dal modello {{model}}."
       },
       "modelUnload": {
-        "title": "Disattiva Model",
+        "title": "Rilascia il modello",
         "description": "Libera la memoria quando il modello è inattivo per questo tempo.",
         "options": {
           "never": "Mai",
@@ -729,6 +1002,18 @@
         "empty": "Nessuna parola personalizzata.",
         "remove": "Rimuovi {{word}}",
         "duplicate": "\"{{word}}\" esiste già"
+      },
+      "autoLearn": {
+        "label": "Impara le parole che correggo",
+        "description": "Ricorda la tua ortografia quando correggi una parola che SpeakoFlow ha sbagliato.",
+        "info": "Legge solo il campo in cui ha appena scritto, per circa un minuto. Non viene caricato nulla e ogni parola che impara è elencata qui.",
+        "unsupported": "L'apprendimento dalle correzioni per ora è disponibile solo su Windows. Puoi comunque aggiungere parole a mano qui sopra.",
+        "learnedTitle": "Imparate dalle tue correzioni",
+        "learnedEmpty": "Ancora nulla di imparato. Correggi una parola capita male nell'app in cui hai dettato e comparirà qui.",
+        "keep": "Mantieni {{word}} nelle mie parole personalizzate",
+        "remove": "Dimentica {{word}}",
+        "clearAll": "Dimentica tutto",
+        "reviewHint": "Sono ipotesi. Selezionane una per spostarla tra le tue parole personalizzate, oppure rimuovila. Oltre {{max}} vengono eliminate le più vecchie."
       },
       "textReplacements": {
         "title": "Sostituzioni di testo",
@@ -766,7 +1051,7 @@
       }
     },
     "postProcessing": {
-      "title": "Post-Elaborazione",
+      "title": "Pulizia IA",
       "readiness": {
         "checking": "Verifica della configurazione della pulizia IA…",
         "checkFailed": "Impossibile verificare la configurazione della pulizia IA.",
@@ -798,8 +1083,8 @@
         "title": "Scorciatoia"
       },
       "tone": {
-        "title": "Preset di stile",
-        "description": "Scegli come deve suonare la dettatura ripulita. «Solo pulizia» sistema il testo senza cambiare deliberatamente il tuo modo di esprimerti.",
+        "title": "2 · Stile di scrittura",
+        "description": "Si aggiunge al prompt di sistema: cambia il modo in cui si legge il testo ripulito, non cosa viene corretto. «Nessuno» lascia intatto il tuo modo di esprimerti.",
         "options": {
           "none": "Nessuno (solo pulizia)",
           "formal": "Formale",
@@ -822,7 +1107,7 @@
         "cancel": "Annulla"
       },
       "api": {
-        "title": "API (Compatibile con OpenAI)",
+        "title": "API (compatibile con OpenAI)",
         "location": {
           "title": "Dove viene eseguita",
           "description": "Esegui la pulizia in privato con un modello scaricato oppure usa un provider cloud."
@@ -840,7 +1125,8 @@
         "baseUrl": {
           "title": "URL Base",
           "description": "URL di base dell'API per il provider selezionato. Modificabile per Custom, Local e Azure OpenAI (impostalo sulla tua risorsa, ad esempio https://your-resource.openai.azure.com/openai/v1).",
-          "placeholder": "https://api.openai.com/v1"
+          "placeholder": "https://api.openai.com/v1",
+          "managed": "L'URL di base è gestito dal provider selezionato."
         },
         "apiKey": {
           "title": "Chiave API",
@@ -855,8 +1141,8 @@
         },
         "model": {
           "title": "Modello",
-          "descriptionApple": "Fornisci un limite numerico facoltativo per i token o mantieni l'impostazione predefinita sul dispositivo.",
-          "descriptionCustom": "Fornisci l'identificatore del modello previsto dal tuo endpoint personalizzato.",
+          "descriptionApple": "Indica un limite di lunghezza numerico facoltativo o mantieni il preset predefinito sul dispositivo.",
+          "descriptionCustom": "Indica l'identificatore del modello richiesto dal tuo provider personalizzato.",
           "descriptionDefault": "Scegli un modello reso disponibile dal provider selezionato.",
           "placeholderApple": "Apple Intelligence",
           "placeholderWithOptions": "Cerca o scegli un modello",
@@ -867,8 +1153,8 @@
       "prompts": {
         "title": "Prompt",
         "selectedPrompt": {
-          "title": "Prompt Selezionato",
-          "description": "Seleziona un template per migliorare le trascrizioni o creane uno nuovo. Usa ${output} nel prompt per fare riferimento alla trascrizione."
+          "title": "Prompt",
+          "description": "L'istruzione di base: cosa corregge il modello e cosa deve lasciare invariato. Il testo trascritto viene inviato a parte, quindi scrivi solo le istruzioni."
         },
         "noPrompts": "Nessun prompt disponibile",
         "nonePrompt": "Nessuno (senza prompt)",
@@ -876,18 +1162,18 @@
         "createNew": "Crea un nuovo prompt",
         "edit": "Modifica",
         "closeEditor": "Chiudi",
-        "promptLabel": "Etichetta del Prompt",
+        "promptLabel": "Nome del prompt",
         "promptLabelPlaceholder": "Inserisci il nome del prompt",
-        "promptInstructions": "Istruzioni del Prompt",
-        "promptInstructionsPlaceholder": "Scrivi le istruzioni da eseguire dopo la trascrizione. Esempio: Migliora la grammatica e la chiarezza per il seguente testo: ${output}",
+        "promptInstructions": "Istruzioni del prompt",
+        "promptInstructionsPlaceholder": "Scrivi le istruzioni per ripulire la trascrizione. Esempio: correggi grammatica e punteggiatura, poi riscrivi il testo come un messaggio curato e professionale.",
         "promptTip": "Suggerimento: il tuo testo trascritto viene inviato automaticamente al modello — scrivi solo le istruzioni. (I prompt più vecchi che usano <code>${output}</code> continuano a funzionare.)",
-        "updatePrompt": "Aggiorna Prompt",
-        "deletePrompt": "Elimina Prompt",
+        "updatePrompt": "Aggiorna prompt",
+        "deletePrompt": "Elimina prompt",
         "restorePrompt": "Ripristina il consigliato",
-        "createPrompt": "Crea Prompt",
+        "createPrompt": "Crea prompt",
         "cancel": "Annulla",
         "selectToEdit": "Scegli un prompt qui sopra per visualizzare o modificare i dettagli.",
-        "createFirst": "Clicca 'Crea un nuovo prompt' qui sopra per creare il tuo primo prompt di post-elaborazione."
+        "createFirst": "Fai clic su «Crea un nuovo prompt» qui sopra per creare il tuo primo prompt di pulizia."
       }
     },
     "dictation": {
@@ -905,6 +1191,66 @@
       "catalog": {
         "title": "Scegli il tuo modello",
         "description": "Tutti i modelli funzionano sul tuo computer: bilancia accuratezza e velocità e scegli quello giusto per te."
+      },
+      "cloud": {
+        "groupTitle": "Dove avviene la trascrizione",
+        "engine": {
+          "title": "Motore di trascrizione",
+          "description": "Su questo computer, oppure un provider online per cui hai una chiave.",
+          "info": "Sul mio dispositivo usa un modello che hai scaricato: privato, gratuito e offline. Cloud invia la tua registrazione a un provider a tua scelta, che la fattura al minuto di audio, in cambio di un modello all'avanguardia senza download e senza GPU."
+        },
+        "bypassNotice": "La trascrizione cloud è attiva, quindi il modello qui sopra non viene usato e resta scaricato dalla memoria.",
+        "provider": {
+          "title": "Provider"
+        },
+        "key": {
+          "title": "Chiave API",
+          "stored": "Una chiave è salvata nel portachiavi di sistema.",
+          "missing": "Nessuna chiave ancora salvata per questo provider.",
+          "placeholder": "Incolla la tua chiave API",
+          "replacePlaceholder": "Incolla una nuova chiave per sostituire quella salvata",
+          "save": "Salva",
+          "saved": "Chiave API salvata",
+          "clear": "Rimuovi",
+          "getOne": "Ottieni una chiave"
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "description": "URL di base di un server di trascrizione compatibile con OpenAI.",
+          "azureDescription": "L'endpoint della tua risorsa Azure, da Chiavi ed endpoint nel portale di Azure. MAI-Transcribe richiede una risorsa in Central India, Southeast Asia, East US, West US, West US 2 o North Europe.",
+          "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
+        },
+        "model": {
+          "title": "Modello",
+          "info": "Scrivi qualsiasi modello offerto dal provider, oppure carica l'elenco. Per ElevenLabs, scegli scribe_v2_realtime per trascrivere mentre parli e scribe_v2 per trascrivere quando ti fermi.",
+          "load": "Carica modelli"
+        },
+        "streaming": {
+          "label": "Trascrivi mentre parlo",
+          "description": "Il testo arriva mentre stai ancora parlando, così al rilascio del tasto restano da inviare solo le ultime parole.",
+          "needsRealtimeModel": "Per usarlo scegli qui sopra un modello in tempo reale: quello attuale trascrive solo dopo che ti fermi."
+        },
+        "keyterms": {
+          "label": "Invia le mie parole personalizzate",
+          "description": "Passa il tuo vocabolario personalizzato al provider, così privilegia quelle grafie."
+        },
+        "noVerbatim": {
+          "label": "Rimuovi le parole di riempimento",
+          "description": "Elimina «ehm», «uhm», false partenze e ripetizioni. Disattivalo per ottenere esattamente ciò che hai detto, parola per parola."
+        },
+        "language": {
+          "description": "La lingua che parli. Ogni provider qui risponde nella stessa lingua: indicarla in anticipo migliora la precisione, e Automatico lascia che la rilevi da solo."
+        },
+        "translate": {
+          "supported": "{{provider}} può restituire l'inglese invece della lingua che hai parlato. Solo l'inglese: nessuna API di trascrizione traduce in un'altra lingua.",
+          "unsupported": "{{provider}} trascrive nella lingua che parli e non ha un endpoint di traduzione, quindi qui non può funzionare. Funziona con il motore sul dispositivo e con OpenAI, Groq o un server Whisper self-hosted."
+        },
+        "test": {
+          "title": "Verifica connessione",
+          "description": "Invia un secondo di audio per verificare chiave, endpoint e modello.",
+          "action": "Esegui il test",
+          "running": "Test in corso…"
+        }
       },
       "aiCleanup": {
         "groupTitle": "Pulizia IA",
@@ -925,13 +1271,13 @@
           "recommendedTitle": "Consigliato per la pulizia",
           "recommendedDescription": "SpeakoFlow Mini è addestrato solo per questo compito e qui batte modelli molto più grandi."
         },
-        "promptGroupTitle": "Prompt di pulizia",
+        "promptGroupTitle": "Istruzioni di pulizia",
         "tunedModelNotice": "Questo modello è ottimizzato per la pulizia della dettatura in inglese, quindi rende al meglio con il prompt consigliato e senza stile.",
         "tunedModelNoticeDismiss": "Nascondi il suggerimento",
         "tunedModelNoticeRestore": "Mostra il suggerimento sul modello",
         "title": "Sistema la mia dettatura con l'IA",
         "caption": "Sperimentale — sistema punteggiatura e parole di riempimento dopo la dettatura.",
-        "info": "Esegue un modello linguistico sulla tua dettatura per correggere la punteggiatura, rimuovere le parole di riempimento e, facoltativamente, regolare il tono. Vale solo per la dettatura, con una scorciatoia dedicata. Aggiunge un breve ritardo dopo che hai parlato; se il modello fallisce o va in timeout, viene usato il testo grezzo. Ancora in sviluppo."
+        "info": "La pulizia riscrive ciò che hai detto con un modello IA prima che venga digitato. Può richiedere qualche istante e, se è lenta, usa le tue parole così come le hai dette."
       },
       "spokenEmoji": {
         "title": "Emoji pronunciati",
@@ -943,7 +1289,7 @@
         "enableDescription": "Inizia una dettatura con la frase di attivazione per far scrivere il risultato all'IA: «Hey Flow, scrivi un'email cortese per chiedere di spostare l'appuntamento» incolla l'email già pronta.",
         "phraseLabel": "Frase di attivazione",
         "phraseDescription": "Flow si attiva solo quando una dettatura inizia con questa frase. In qualsiasi altro punto, le stesse parole vengono incollate come normale dettatura. Usa il modello del tuo assistente; lascia vuoto per tornare a «Hey Flow».",
-        "phrasePlaceholder": "Hey Flow",
+        "phrasePlaceholder": "Ehi Flow",
         "screenLabel": "Consenti l'accesso allo schermo",
         "screenDescription": "Permetti a Flow di acquisire una schermata quando un comando si riferisce chiaramente al tuo schermo, ad esempio «guarda questa email e scrivi una risposta». Il modello decide se serve. È separato dall'accesso allo schermo dell'assistente."
       },
@@ -960,7 +1306,7 @@
       "filters": {
         "label": "Tipo di cronologia",
         "all": "Tutto",
-        "recordings": "Recordings",
+        "recordings": "Dettature",
         "flow": "Flow",
         "assistant": "Chat con l'assistente"
       },
@@ -984,64 +1330,88 @@
       "save": "Salva la trascrizione",
       "unsave": "Rimuovi dai salvataggi",
       "delete": "Elimina elemento",
-      "deleteError": "Errore nell'eliminazione dell'elemento. Riprova.",
+      "deleteError": "Impossibile eliminare l'elemento. Riprova.",
       "retranscribe": "Ri-trascrivere",
-      "retranscribeError": "Impossibile ri-trascrivere. Riprova.",
+      "retranscribeError": "Impossibile ritrascrivere. Riprova.",
       "transcribing": "Trascrizione in corso…",
-      "transcriptionFailed": "Trascrizione fallita. Puoi ri-trascrivere usando l'icona di ripetizione.",
+      "transcriptionFailed": "Trascrizione non riuscita: usa l'icona di ripetizione per riprovare.",
       "assistantLabel": "Chat con l'assistente",
       "copyConversation": "Copia la conversazione",
       "resumeConversation": "Continua questa conversazione nell'assistente",
+      "branchConversation": "Continua da qui in una nuova conversazione. Questa resta invariata.",
       "showConversation": "Mostra la conversazione",
       "hideConversation": "Nascondi la conversazione",
       "roleUser": "Tu",
       "roleAssistant": "Assistente",
       "screenshotAttached": "Visione",
       "messageCount_one": "{{count}} messaggio",
+      "messageCount_many": "{{count}} messaggi",
       "messageCount_other": "{{count}} messaggi",
-      "deleteAssistantError": "Impossibile eliminare la conversazione. Riprova."
+      "deleteAssistantError": "Impossibile eliminare la conversazione. Riprova.",
+      "openFolderError": "Impossibile aprire la cartella delle registrazioni."
     },
     "debug": {
       "title": "Debug",
       "logDirectory": {
-        "title": "Cartella dei Log",
-        "description": "Cartella dove vengono salvati i file di log"
+        "title": "Cartella dei log",
+        "description": ""
       },
       "logLevel": {
-        "title": "Livello di Log",
-        "description": "Scegli il livello di dettaglio dei log"
+        "title": "Livello di log",
+        "description": "",
+        "levels": {
+          "error": "Errore",
+          "warn": "Avviso",
+          "info": "Info",
+          "debug": "Debug",
+          "trace": "Trace"
+        }
       },
       "updateChecks": {
-        "label": "Controlla aggiornamenti",
-        "description": "Controlla automaticamente la disponibilità di nuove versioni di SpeakoFlow"
+        "label": "Controlla automaticamente gli aggiornamenti",
+        "description": "Cerca una nuova versione all'avvio di SpeakoFlow e ogni 12 ore. Puoi sempre controllare a mano."
       },
       "soundTheme": {
-        "label": "Tema Sonoro",
-        "description": "Scegli un tema sonoro per il feedback di inizio e fine registrazione"
+        "label": "Tema sonoro",
+        "description": ""
       },
       "wordCorrectionThreshold": {
-        "title": "Soglia di Correzione Parole",
+        "title": "Soglia di correzione delle parole",
         "description": "Sensibilità per la correzione delle parole personalizzate"
       },
       "historyLimit": {
-        "title": "Limite della Cronologia",
-        "description": "Numero massimo di registrazioni di dettatura e di Flow non salvate da conservare. Le registrazioni salvate vengono sempre conservate e le chat con l'assistente non vengono conteggiate.",
+        "title": "Limite di registrazioni",
+        "description": "Numero massimo di registrazioni di dettatura e di Flow senza stella da conservare. Le registrazioni con la stella vengono sempre conservate e le chat con l'assistente non vengono conteggiate. Il valore minimo consentito è 1.",
         "entries": "registrazioni"
       },
       "recordingRetention": {
-        "title": "Eliminazione Automatica Registrazioni",
+        "title": "Eliminazione automatica delle registrazioni",
         "description": "Scegli come vengono eliminate le registrazioni non salvate. Le modifiche si applicano subito e non riguardano mai le chat con l'assistente.",
         "never": "Mai",
         "preserveLimit": "Conserva un numero fisso",
         "days3": "Dopo 3 giorni",
         "weeks2": "Dopo 2 settimane",
         "months3": "Dopo 3 mesi",
+        "customDays": "Dopo un numero di giorni stabilito",
+        "customDaysTitle": "Elimina dopo",
+        "customDaysDescription": "Le registrazioni non salvate vengono eliminate quando raggiungono questa età in giorni. Le registrazioni salvate vengono sempre conservate.",
+        "days": "giorni",
         "placeholder": "Seleziona periodo di conservazione…",
         "savedToast": "Conservazione salvata.",
-        "appliedToast": "Conservazione delle registrazioni applicata"
+        "appliedToast": "Conservazione delle registrazioni applicata",
+        "saveFailed": "Impossibile salvare l'impostazione di conservazione.",
+        "confirmTitle_one": "Verrà eliminata {{count}} registrazione",
+        "confirmTitle_many": "Verranno eliminate {{count}} registrazioni",
+        "confirmTitle_other": "Verranno eliminate {{count}} registrazioni",
+        "confirmTitleUnknown": "Potrebbero essere eliminate delle registrazioni",
+        "confirmBody": "L'audio e la trascrizione vengono rimossi da questo dispositivo e non possono essere recuperati. Le registrazioni salvate vengono conservate.",
+        "confirmAction_one": "Elimina {{count}} registrazione",
+        "confirmAction_many": "Elimina {{count}} registrazioni",
+        "confirmAction_other": "Elimina {{count}} registrazioni",
+        "confirmActionUnknown": "Applica comunque"
       },
       "alwaysOnMicrophone": {
-        "label": "Microfono Sempre Attivo",
+        "label": "Microfono sempre attivo",
         "description": "Tieni il microfono pronto così le prime parole non vengono mai tagliate. Consuma un po' più di batteria."
       },
       "clamshellMicrophone": {
@@ -1049,19 +1419,19 @@
         "description": "Microfono da usare quando il portatile è chiuso"
       },
       "postProcessingToggle": {
-        "label": "Post-Elaborazione",
-        "description": "Abilita il miglioramento della trascrizione con IA"
+        "label": "Pulizia IA",
+        "description": "Ripulisci la tua dettatura con l'IA dopo la trascrizione"
       },
       "muteWhileRecording": {
         "label": "Silenzia durante la registrazione",
         "description": "Silenzia l'audio di sistema durante la registrazione"
       },
       "appendTrailingSpace": {
-        "label": "Aggiungi Spazio Finale",
-        "description": "Aggiungi uno spazio dopo la trascrizione incollata"
+        "label": "Aggiungi uno spazio finale",
+        "description": ""
       },
       "keyboardImplementation": {
-        "title": "Implementazione tastiera",
+        "title": "Implementazione della tastiera",
         "description": "Scegli il backend per le scorciatoie da tastiera.",
         "bindingsReset": "Le scorciatoie da tastiera erano incompatibili e sono state ripristinate ai valori predefiniti"
       },
@@ -1071,8 +1441,8 @@
         "settings": "Impostazioni:"
       },
       "pasteDelay": {
-        "title": "Ritardo incolla",
-        "description": "Ritardo prima dell'invio del tasto incolla (in millisecondi). Aumentare se viene incollato il testo sbagliato."
+        "title": "Ritardo di incolla",
+        "description": "Millisecondi di attesa prima di incollare. Aumentalo se viene incollato il testo sbagliato."
       },
       "recordingBuffer": {
         "title": "Buffer di registrazione extra",
@@ -1083,7 +1453,7 @@
       "title": "Informazioni",
       "version": {
         "title": "Versione",
-        "description": "Versione attuale di SpeakoFlow"
+        "description": ""
       },
       "updates": {
         "title": "Aggiornamenti",
@@ -1094,12 +1464,12 @@
         "title": "Cartelle"
       },
       "appDataDirectory": {
-        "title": "Cartella Dati App",
-        "description": "Cartella in cui SpeakoFlow salva i dati"
+        "title": "Cartella dei dati dell'app",
+        "description": "Dove SpeakoFlow conserva i tuoi modelli, la cronologia e le impostazioni."
       },
       "sourceCode": {
-        "title": "Codice Sorgente",
-        "description": "Vedi e contribuisci al codice sorgente",
+        "title": "Codice sorgente",
+        "description": "",
         "button": "Vedi su GitHub"
       },
       "license": {
@@ -1108,8 +1478,8 @@
         "button": "Visualizza la licenza"
       },
       "supportDevelopment": {
-        "title": "Supporta lo Sviluppo",
-        "description": "Aiutaci a sviluppare SpeakoFlow",
+        "title": "Supporta lo sviluppo",
+        "description": "Aiutaci a continuare a sviluppare SpeakoFlow",
         "button": "Dona"
       }
     },
@@ -1125,8 +1495,12 @@
       "brain": {
         "title": "Cervello dell'assistente",
         "whereLabel": "Dove viene eseguito",
-        "onDevice": "Sul mio dispositivo",
-        "cloud": "Provider cloud",
+        "testLabel": "Verifica connessione",
+        "testDescription": "Invia una breve domanda per verificare che l'assistente riesca davvero a raggiungere questo modello. I modelli sul dispositivo vengono prima caricati, quindi il primo test può richiedere un po' di tempo.",
+        "testButton": "Verifica connessione",
+        "testing": "Test in corso…",
+        "onDevice": "Su questo computer",
+        "cloud": "Cloud",
         "downloadModel": "Sfoglia e scarica modelli",
         "downloadModelDescription": "Scegli un modello consigliato o cerca su Hugging Face.",
         "downloadModelAction": "Sfoglia i modelli",
@@ -1147,7 +1521,7 @@
         "detailLocation": "Posizione",
         "detailFormat": "Formato",
         "detailId": "ID modello",
-        "switchBeforeDelete": "Passa l'assistente integrato a un altro modello prima di eliminare questo.",
+        "switchBeforeDelete": "Questo modello è in uso. Passa a un altro prima di eliminarlo.",
         "deleteModelConfirm": "Eliminare {{modelName}}? I file scaricati e la voce salvata verranno rimossi.",
         "deleteModelFailed": "Impossibile eliminare il modello.",
         "finderSectionTitle": "Altri modelli sul dispositivo",
@@ -1195,7 +1569,7 @@
         "builtinEngineExtracting": "Installazione del motore locale…",
         "builtinEngineReady": "Motore locale pronto.",
         "contextSizeLabel": "Finestra di contesto",
-        "contextSizeDescription": "Quanto il modello locale può tenere a mente contemporaneamente: le istruzioni di sistema, la cronologia della chat, eventuali schermate (una sola immagine può occuparne una buona parte) e la sua risposta. Un valore più grande contiene di più e rende affidabili la visione dello schermo e la ricerca web, ma consuma più memoria. Il valore predefinito è 8192; 16384 è un buon passo avanti se il tuo computer ha RAM da dedicarci. Puoi ridurlo in seguito per risparmiare memoria.",
+        "contextSizeDescription": "Quanta parte della conversazione il modello può leggere in una volta. Un valore più grande ricorda di più, ma usa più memoria e si carica più lentamente.",
         "unloadTimeoutLabel": "Rilascia dalla memoria dopo",
         "unloadTimeoutDescription": "Libera memoria rilasciando il modello locale dopo questo tempo di inattività. Viene ricaricato automaticamente al prossimo utilizzo."
       },
@@ -1206,7 +1580,7 @@
       },
       "characters": {
         "title": "Profili",
-        "description": "Profili pensati per attività specifiche, tra cui puoi passare liberamente. Il profilo attivo definisce nome, ruolo e istruzioni dell'assistente — e la lunghezza delle sue risposte. Cambialo quando vuoi dall'intestazione del pannello.",
+        "description": "Personaggi con nome, istruzioni e lunghezza delle risposte propri. Puoi cambiarli quando vuoi dal pannello.",
         "galleryLabel": "I tuoi profili",
         "editSection": "Modifica profilo",
         "avatarLabel": "Avatar",
@@ -1264,7 +1638,7 @@
       },
       "autoSummarize": {
         "label": "Riassumi le chat lunghe",
-        "description": "Quando una conversazione supera la finestra di contesto del modello, condensa automaticamente i messaggi più vecchi in un riassunto progressivo, così la chat mantiene il contesto invece di dimenticare l'inizio. Durante l'operazione compare un indicatore discreto."
+        "description": "Condensa le chat lunghe così l'assistente non dimentica l'inizio."
       },
       "responseLength": {
         "label": "Lunghezza della risposta",
@@ -1278,7 +1652,7 @@
       },
       "vision": {
         "timing": {
-          "label": "Quando acquisire"
+          "label": "Momento dell'acquisizione"
         },
         "screenRecording": {
           "description": "La visione dello schermo richiede l'autorizzazione Registrazione schermo di macOS. Concedila in Impostazioni di Sistema, poi riavvia SpeakoFlow perché abbia effetto.",
@@ -1327,26 +1701,84 @@
       },
       "tts": {
         "title": "Uscita vocale",
-        "enableLabel": "Leggi le risposte ad alta voce",
-        "enableDescription": "Legge ad alta voce le risposte dell'assistente.",
+        "enableLabel": "Leggi le risposte durante le conversazioni",
+        "enableDescription": "Legge ad alta voce le risposte mentre sei in una conversazione dal vivo. Le risposte rapide scritte non vengono mai lette.",
         "stopOnDictationLabel": "Interrompi la voce quando inizia la dettatura",
         "stopOnDictationDescription": "Interrompe qualsiasi risposta ancora in riproduzione quando inizi a dettare.",
         "engineLabel": "Motore",
-        "engineDescription": "Kokoro funziona gratis su questo PC. I motori cloud usano una chiave API del rispettivo fornitore. Personalizzato si collega a un server vocale che gestisci tu.",
+        "engineDescription": "Le voci su questo computer sono gratuite e private, e funzionano senza internet. Le voci cloud usano una chiave API del rispettivo provider. Personalizzato si collega a un server vocale che gestisci tu.",
+        "sectionLocal": "Su questo computer",
+        "sectionLocalHint": "Gratuito e privato. Funziona su questo computer, anche offline.",
+        "sectionCloud": "Cloud",
+        "sectionCloudHint": "Serve una chiave API del provider. Personalizzato si collega a un server vocale che gestisci tu.",
+        "readyLabel": "Pronto all'uso",
         "kokoroSetupLabel": "Modello vocale Kokoro",
         "kokoroSetupDescription": "Scaricalo una volta, poi le risposte parlate funzionano in privato su questo dispositivo.",
         "kokoroDownload": "Scarica Kokoro",
         "kokoroDownloading": "Download di Kokoro",
         "kokoroReady": "Pronto su questo dispositivo",
         "kokoroRetry": "Riprova il download",
+        "runsOnLabel": "Esegui su",
+        "runsOn": {
+          "auto": "Automatico",
+          "gpu": "Scheda grafica",
+          "cpu": "Processore"
+        },
+        "runsOnStatus": {
+          "checking": "Usa la scheda grafica quando funziona e il processore quando non funziona.",
+          "gpu": "La voce usa la scheda grafica.",
+          "processor": "La voce usa il processore.",
+          "gpuUnusable": "La voce usa il processore, perché su questo computer la scheda grafica non riesce a eseguirla.",
+          "needsPack": "Su questo computer la scheda grafica non riesce a eseguire la voce. Scarica qui sotto la voce per processore per avere risposte rapide.",
+          "cpuNeedsPack": "Scarica qui sotto la voce per processore. Fino ad allora Kokoro funziona dentro l'app, ed è lento.",
+          "loadFailed": "La voce per processore non si è avviata su questo computer, quindi per ora Kokoro funziona dentro l'app.",
+          "noNativeSlow": "Su questo computer la scheda grafica non riesce a eseguire la voce, quindi Kokoro funziona lentamente dentro l'app. Una voce cloud sarebbe più veloce.",
+          "gpuForcedUnusable": "Su questo computer la scheda grafica non riesce a eseguire correttamente la voce. Imposta Esegui su su Automatico o Processore."
+        },
+        "kokoroNativeLabel": "Voce per processore",
+        "kokoroNativeDescription": "Permette a Kokoro di parlare velocemente sul processore quando la scheda grafica non ci riesce. Download da {{size}}.",
+        "kittenSizeLabel": "Dimensione di Kitten",
+        "kittenSizeDescription": "Tutte e tre le dimensioni hanno le stesse otto voci. Quelle più grandi suonano più naturali, ma impiegano più tempo a iniziare a parlare, soprattutto su un processore poco potente.",
+        "kittenSizes": {
+          "nano": "Nano · la più veloce ({{size}})",
+          "micro": "Micro · bilanciata ({{size}})",
+          "mini": "Mini · la più naturale ({{size}})"
+        },
+        "packLabel": {
+          "kitten": "Voce Kitten",
+          "pocket": "Voce Pocket TTS",
+          "supertonic": "Voce Supertonic"
+        },
+        "packDescription": {
+          "kitten": "Una voce leggera che funziona sul processore. Download da {{size}}.",
+          "pocket": "La voce dal suono naturale di Kyutai, pensata per i processori, con 14 speaker. Download da {{size}}.",
+          "supertonic": "La voce rapida e chiara di Supertone, con dieci speaker. Download da {{size}}."
+        },
+        "voiceNamedFemale": "{{name}} (femminile)",
+        "voiceNamedMale": "{{name}} (maschile)",
+        "voiceNumberedFemale": "Femminile {{n}}",
+        "voiceNumberedMale": "Maschile {{n}}",
+        "packSize": "{{size}} MB",
+        "packDownload": "Scarica ({{size}})",
+        "packDownloading": "Download in corso",
+        "packInstalling": "Configurazione",
+        "packCancel": "Annulla download",
+        "packRemove": "Rimuovi",
+        "packUnsupported": "Non disponibile su questo sistema",
+        "kittenSuggestLabel": "Prova Kitten",
+        "kittenSuggestDescription": "Questo computer ha un processore poco potente. Kitten è una voce più leggera che qui risponde più velocemente.",
+        "kittenSuggestButton": "Usa Kitten",
         "engines": {
           "kokoro": "Kokoro (locale, gratuito)",
+          "kitten": "Kitten (locale, leggera)",
+          "pocket": "Pocket TTS (locale)",
+          "supertonic": "Supertonic (locale)",
           "openai": "OpenAI",
+          "elevenlabs": "ElevenLabs",
           "openrouter": "OpenRouter",
           "deepgram": "Deepgram Aura",
           "cartesia": "Cartesia Sonic",
           "google": "Google Cloud TTS",
-          "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech",
           "groq": "Groq Orpheus",
           "xai": "xAI Grok Voice",
@@ -1357,18 +1789,24 @@
         "voiceLabel": "Voce",
         "voiceDescription": "Voce Kokoro per le risposte parlate.",
         "dtypeLabel": "Precisione di Kokoro",
-        "dtypeDescription": "fp32 offre la qualità migliore; q8 è più veloce su CPU. Modificarlo ricarica il modello.",
+        "dtypeDescription": "Solo per Kokoro eseguito all'interno dell'app. fp32 offre la qualità più alta; q8 è più leggero. Modificarlo ricarica il modello. Se la voce suona distorta, imposta «Esegui su» su «Processore».",
         "speedLabel": "Velocità di riproduzione",
         "speedDescription": "1× è la velocità normale.",
         "speedRange": "{{engine}} supporta da {{min}}× a {{max}}×; le altre velocità usano il limite più vicino.",
         "speedUnsupported": "{{engine}} parla sempre alla sua velocità naturale.",
         "speedValue": "{{value}}×",
         "speedCustomLabel": "Velocità di riproduzione personalizzata",
+        "volumeLabel": "Volume della voce",
+        "volumeDescription": "Il volume delle risposte vocali. Separato dai suoni di feedback.",
         "testLabel": "Prova la voce",
         "testDescription": "Riproduce un breve campione con le impostazioni attuali.",
         "testButton": "Prova la voce",
         "testing": "Prova in corso…",
         "testOk": "Riprodotto ✓",
+        "testFailed": "Kokoro non è riuscito a generare l'esempio. Riprova, oppure imposta Esegui su su Processore.",
+        "testGpuMoved": "La tua scheda grafica ha distorto l'esempio, quindi è stato silenziato. Ora Kokoro usa il processore: fai di nuovo il test per ascoltarlo.",
+        "testGpuForced": "La tua scheda grafica ha distorto l'esempio, quindi è stato silenziato. Imposta Esegui su su Automatico o Processore.",
+        "testGpuSuspect": "L'esempio è uscito distorto, quindi è stato silenziato. Fai di nuovo il test per controllare la scheda grafica.",
         "testPhrase": "Ciao! Questa è una prova dell'uscita vocale di SpeakoFlow.",
         "downloadStart": "Download della voce Kokoro…",
         "downloadProgress": "Download della voce Kokoro… {{progress}}%",
@@ -1400,7 +1838,21 @@
         "elevenVoiceLabel": "ID della voce",
         "elevenVoiceDescription": "ID della voce ElevenLabs (dalla scheda Voices della loro dashboard).",
         "promptLabel": "Prompt di riepilogo",
-        "promptDescription": "Istruzioni per generare il breve riepilogo parlato di ogni risposta."
+        "promptDescription": "Istruzioni per generare il breve riepilogo parlato di ogni risposta.",
+        "kokoroVoices": {
+          "usFemale": "{{name}} (femminile, USA)",
+          "usFemaleSoft": "{{name}} (femminile, USA, morbida)",
+          "usMale": "{{name}} (maschile, USA)",
+          "ukFemale": "{{name}} (femminile, Regno Unito)",
+          "ukMale": "{{name}} (maschile, Regno Unito)"
+        },
+        "dtypes": {
+          "fp32": "fp32 (qualità migliore, WebGPU)",
+          "fp16": "fp16 (mezza precisione)",
+          "q8": "q8 (8 bit, veloce su CPU)",
+          "q4": "q4 (4 bit, il più veloce)",
+          "q4f16": "q4f16 (4 bit misto)"
+        }
       },
       "appearance": {
         "title": "Aspetto del pannello",
@@ -1413,7 +1865,8 @@
         "fontSizes": {
           "small": "Piccolo",
           "medium": "Medio",
-          "large": "Grande"
+          "large": "Grande",
+          "extraLarge": "Molto grande"
         },
         "panelSizeLabel": "Dimensione del pannello",
         "panelSizeDescription": "Dimensione complessiva del pannello flottante dell'assistente.",
@@ -1422,6 +1875,22 @@
           "compact": "Compatto",
           "standard": "Standard",
           "large": "Grande"
+        },
+        "askDisplayLabel": "Quale schermo",
+        "askDisplayDescription": "Lo schermo su cui si apre l'assistente. Per impostazione predefinita, quello in cui si trova il mouse.",
+        "askDisplays": {
+          "cursor": "Lo schermo in cui si trova il mouse",
+          "numbered": "Schermo {{number}} ({{width}}×{{height}}){{suffix}}",
+          "mainSuffix": " · principale"
+        },
+        "askAnchorLabel": "Dove si apre",
+        "askAnchorDescription": "Dove si apre l'assistente, ogni volta.",
+        "askAnchors": {
+          "center": "Al centro dello schermo",
+          "top": "In alto",
+          "bottom": "In basso",
+          "left": "Lato sinistro",
+          "right": "Lato destro"
         },
         "opacityLabel": "Opacità del pannello",
         "opacityDescription": "Quanto è opaco il pannello flottante. 100% è completamente pieno; con valori più bassi il desktop traspare sfocato."
@@ -1434,9 +1903,9 @@
     "updateAvailable": "Aggiornamento disponibile: {{version}}",
     "updateAvailableShort": "Aggiornamento disponibile",
     "upToDate": "Aggiornato",
-    "downloadUpdate": "Scarica Aggiornamento",
+    "downloadUpdate": "Scarica l'aggiornamento",
     "restart": "Riavvia",
-    "updateCheckingDisabled": "Controllo Aggiornamenti Disabilitato",
+    "updateCheckingDisabled": "Controllo degli aggiornamenti disattivato",
     "downloading": "Download… {{progress}}%",
     "installing": "Installazione…",
     "preparing": "Preparazione…",
@@ -1447,6 +1916,183 @@
     "portableUpdateTitle": "Aggiornamento manuale necessario",
     "portableUpdateMessage": "Le installazioni portatili non possono essere aggiornate automaticamente. Per aggiornare: scarica l'ultima versione del programma di installazione NSIS da GitHub Releases, installala nella stessa cartella, quindi copia la cartella Data/ (impostazioni, modelli, registrazioni) dalla vecchia versione a quella nuova..",
     "portableUpdateButton": "Apri i rilasci su GitHub"
+  },
+  "meetings": {
+    "newTitle": "Riunione {{when}}",
+    "speakers": {
+      "me": "Tu",
+      "others": "Altri",
+      "numbered": "Interlocutore {{number}}"
+    },
+    "recorder": {
+      "idleTitle": "Registra una riunione",
+      "idleCaption": "Acquisisce il tuo microfono e gli altri partecipanti come due flussi separati.",
+      "recording": "Registrazione",
+      "paused": "In pausa",
+      "liveCaption": "Trascrizione mentre le persone parlano.",
+      "start": "Avvia registrazione",
+      "starting": "Avvio…",
+      "stop": "Ferma",
+      "stopping": "Arresto…",
+      "stoppingHint": "Completamento della trascrizione. In una riunione lunga può volerci un momento.",
+      "pause": "Pausa",
+      "resume": "Riprendi",
+      "transcriptEmpty": "Ancora nulla di trascritto. Il testo compare qui mentre le persone parlano."
+    },
+    "offer": {
+      "detected": "Sembra che tu sia in una chiamata. Vuoi registrarla?",
+      "detectedApp": "Sembra che {{app}} sia in una chiamata. Vuoi registrarla?",
+      "idle": "Non in registrazione",
+      "record": "Registra questa chiamata",
+      "dismiss": "Non questa volta"
+    },
+    "autoDetect": {
+      "title": "Proponi di registrare le chiamate",
+      "description": "Si accorge quando un'altra app inizia a usare il microfono e propone di registrare. Non parte mai da solo. Se sbaglia, chiudi semplicemente la scheda.",
+      "unsupported": "Il rilevamento delle chiamate per ora è disponibile solo su Windows. Su questo sistema, avvia tu la riunione."
+    },
+    "indicator": {
+      "title": "Indicatore mobile",
+      "description": "Una piccola pillola che mostra che la registrazione è in corso. Fai clic per la trascrizione in tempo reale. Disattivalo per tenere libero lo schermo; la registrazione resta allora qui e la fermi da questa pagina.",
+      "hide": "Nascondi l'indicatore mobile",
+      "show": "Mostra l'indicatore mobile"
+    },
+    "pill": {
+      "expand": "Apri la trascrizione in tempo reale",
+      "collapse": "Torna alla pillola compatta",
+      "stop": "Ferma la registrazione",
+      "listening": "In ascolto. Ciò che dicono le persone appare qui.",
+      "micOnly": "Viene acquisito solo il tuo microfono: in questa trascrizione non ci sarà nulla di ciò che dicono gli altri partecipanti."
+    },
+    "ask": {
+      "placeholder": "Chiedi qualsiasi cosa su questa riunione…",
+      "send": "Chiedi",
+      "stop": "Ferma",
+      "thinking": "Lettura della trascrizione…",
+      "title": "Chiedi su questa riunione",
+      "empty": "Chiedi cosa è stato deciso, chi si occupa di cosa o qualsiasi altra cosa sia emersa.",
+      "clear": "Cancella queste domande",
+      "youAsked": "Hai chiesto"
+    },
+    "systemAudio": {
+      "liveTitle": "Viene registrata solo la tua voce",
+      "liveBody": "Non è stato possibile acquisire l'audio di sistema, quindi questa riunione conterrà solo la tua parte della conversazione e nulla di ciò che hanno detto gli altri partecipanti.",
+      "unavailableTitle": "Su questo computer non è possibile registrare gli altri partecipanti",
+      "unavailableBody": "L'acquisizione dell'audio di sistema non è disponibile, quindi una riunione registrata ora conterrebbe solo la tua voce.",
+      "help": "Aiuto alla configurazione"
+    },
+    "list": {
+      "title": "Riunioni registrate",
+      "emptyTitle": "Ancora nessuna riunione",
+      "emptyHint": "Avvia la registrazione prima di una chiamata e SpeakoFlow conserva la trascrizione, divisa per chi stava parlando.",
+      "loadMore": "Carica altre",
+      "speakers_one": "{{count}} interlocutore",
+      "speakers_many": "{{count}} interlocutori",
+      "speakers_other": "{{count}} interlocutori",
+      "hasNotes": "Appunti generati",
+      "notesBadge": "Appunti"
+    },
+    "status": {
+      "recording": "In registrazione",
+      "processing": "Elaborazione",
+      "complete": "Completata",
+      "interrupted": "Interrotta"
+    },
+    "delete": {
+      "action": "Elimina riunione",
+      "whileRecording": "Ferma la registrazione prima di eliminare questa riunione."
+    },
+    "detail": {
+      "title": "Riunione",
+      "rename": "Rinomina riunione",
+      "gone": "Questa riunione è stata eliminata.",
+      "tabsLabel": "Viste della riunione"
+    },
+    "tabs": {
+      "myNotes": "I miei pensieri",
+      "transcript": "Trascrizione",
+      "summary": "Riepilogo",
+      "ask": "Chiedi"
+    },
+    "myNotes": {
+      "description": "Scrivi ciò che conta per te. Viene unito alla trascrizione quando si generano gli appunti.",
+      "placeholder": "Cosa vuoi ricordare di questa riunione…",
+      "saving": "Salvataggio…",
+      "saved": "Salvato"
+    },
+    "transcript": {
+      "empty": "Questa riunione non ha una trascrizione.",
+      "loadingMore": "Caricamento di altra trascrizione…",
+      "renameSpeaker": "Rinomina questo interlocutore",
+      "lowConfidence": "Incerto",
+      "lowConfidenceHelp": "Questa etichetta dell'interlocutore è un'ipotesi. Le parole sono trascritte come sono state dette; è incerto solo chi le ha pronunciate."
+    },
+    "diarize": {
+      "title": "Distingui gli interlocutori",
+      "ready": "Raggruppa gli altri partecipanti in Interlocutore 1, Interlocutore 2 e così via.",
+      "needsModel": "Richiede un download unico di {{size}} MB. Poi funziona sul tuo computer e ogni riunione successiva viene etichettata automaticamente.",
+      "install": "Scarica e identifica",
+      "downloading": "Download in corso…",
+      "identify": "Identifica gli interlocutori",
+      "running": "Ascolto in corso…",
+      "progress": "Confronto delle voci, {{done}} di {{total}} passaggi.",
+      "oneSpeaker": "In questa chiamata c'era solo un'altra voce, quindi non c'è nessuno da distinguere.",
+      "skipped": {
+        "modelNotInstalled": "Il modello degli interlocutori non è ancora installato.",
+        "noSystemAudio": "Questa riunione non ha una registrazione degli altri partecipanti.",
+        "audioUnreadable": "Non è stato possibile leggere la registrazione degli altri partecipanti. Succede quando l'app è stata chiusa durante la riunione.",
+        "tooFewSegments": "Non c'è abbastanza parlato degli altri partecipanti da confrontare.",
+        "alreadyDone": "Gli interlocutori di questa riunione sono già stati identificati.",
+        "modelUnusable": "Non è stato possibile caricare il modello degli interlocutori, quindi è stato rimosso. Scaricalo di nuovo."
+      }
+    },
+    "summary": {
+      "template": "Modello",
+      "templates": {
+        "general": "Generale",
+        "standup": "Standup",
+        "one_on_one": "Incontro individuale",
+        "interview": "Colloquio",
+        "action_items": "Attività da svolgere"
+      },
+      "templateHints": {
+        "general": "Riepilogo, punti chiave, argomenti, decisioni e prossimi passi. L'opzione predefinita.",
+        "standup": "Raggruppato per persona: cosa ha finito, cosa farà dopo, cosa la blocca.",
+        "one_on_one": "Argomenti, feedback e gli impegni presi da ciascuno.",
+        "interview": "Elementi concreti sul candidato, senza giudizio finale.",
+        "action_items": "Solo le attività, divise tra le tue e quelle degli altri."
+      },
+      "generate": "Genera appunti",
+      "regenerate": "Rigenera",
+      "rewrite": "Riscrivi con un altro modello",
+      "generating": "Scrittura degli appunti…",
+      "writing": "Sto scrivendo gli appunti di questa riunione. In una chiamata lunga ci vuole un momento.",
+      "autoCaption": "Scritti al termine della chiamata",
+      "retryCaption": "Gli appunti di questa riunione non sono ancora stati scritti.",
+      "copy": "Copia",
+      "copied": "Copiato",
+      "toggleTask": "Segna questo passo come fatto o da fare",
+      "failed": "Impossibile scrivere gli appunti: {{error}}",
+      "tryAgain": "Riprova",
+      "empty": "Ancora nessun appunto per questa riunione.",
+      "needsTranscript": "Non c'è nessuna trascrizione da riassumere.",
+      "skipped_one": "Una parte della trascrizione non è stata riassunta, quindi in questi appunti c'è una lacuna.",
+      "skipped_many": "{{count}} parti della trascrizione non sono state riassunte, quindi in questi appunti ci sono delle lacune.",
+      "skipped_other": "{{count}} parti della trascrizione non sono state riassunte, quindi in questi appunti ci sono delle lacune."
+    },
+    "errors": {
+      "startFailed": "Impossibile avviare la riunione: {{error}}",
+      "stopFailed": "Impossibile fermare la riunione: {{error}}",
+      "pauseFailed": "Impossibile modificare la registrazione: {{error}}",
+      "loadFailed": "Impossibile caricare le riunioni: {{error}}",
+      "transcriptFailed": "Impossibile caricare la trascrizione: {{error}}",
+      "deleteFailed": "Impossibile eliminare la riunione: {{error}}",
+      "renameFailed": "Impossibile rinominare la riunione: {{error}}",
+      "renameSpeakerFailed": "Impossibile rinominare l'interlocutore: {{error}}",
+      "notesSaveFailed": "Impossibile salvare i tuoi appunti: {{error}}",
+      "copyFailed": "Impossibile copiare gli appunti: {{error}}",
+      "generateFailed": "Impossibile generare gli appunti: {{error}}"
+    }
   },
   "common": {
     "loading": "Caricamento…",
@@ -1471,16 +2117,28 @@
     "noOptionsFound": "Nessuna opzione trovata",
     "back": "Indietro",
     "showAdvanced": "Altre opzioni",
-    "showLess": "Mostra meno"
+    "showLess": "Mostra meno",
+    "beta": "Beta",
+    "select": "Seleziona…",
+    "search": "Cerca",
+    "moreInfo": "Altre informazioni",
+    "change": "Cambia",
+    "saveFailed": "Impossibile salvare la modifica. Riprova.",
+    "more": "Altro",
+    "hideTips": "Nascondi suggerimenti",
+    "showTips": "Mostra suggerimenti",
+    "play": "Riproduci",
+    "pause": "Pausa",
+    "unknownSize": "Dimensione sconosciuta"
   },
   "accessibility": {
-    "permissionsRequired": "Richiesti Permessi di Accessibilità",
+    "permissionsRequired": "Permessi di accessibilità richiesti",
     "permissionsDescription": "SpeakoFlow ha bisogno dei permessi di accessibilità per digitare il testo trascritto.",
     "openSettings": "Apri Impostazioni di Sistema",
     "dismiss": "Ignora"
   },
   "errors": {
-    "loadDirectory": "Errore di caricamento cartella: {{error}}",
+    "loadDirectory": "Impossibile caricare la cartella: {{error}}",
     "micPermissionDeniedTitle": "Accesso al microfono negato",
     "micPermissionDenied": {
       "generic": "L'accesso al microfono è stato negato dal sistema operativo. Concedi l'autorizzazione al microfono nelle impostazioni di sistema.",
@@ -1493,31 +2151,43 @@
     "recordingFailed": "Impossibile avviare la registrazione: {{error}}",
     "modelLoadFailed": "Impossibile caricare il modello: {{model}}",
     "modelLoadFailedUnknown": "modello sconosciuto",
+    "loadModelsFailed": "Impossibile caricare i modelli: {{error}}",
+    "switchModelFailed": "Impossibile cambiare modello: {{error}}",
+    "cancelDownloadFailed": "Impossibile annullare il download: {{error}}",
+    "deleteModelFailed": "Impossibile eliminare il modello: {{error}}",
+    "extractModelFailed": "Impossibile estrarre il modello: {{error}}",
     "downloadFailedTitle": "Download non riuscito",
     "pasteFailedTitle": "Impossibile incollare il testo",
-    "pasteFailed": "Non è stato possibile incollare il testo nell'applicazione attiva."
+    "pasteFailed": "Non è stato possibile incollare il testo nell'app attiva."
   },
   "appLanguage": {
-    "title": "Lingua Applicazione",
+    "title": "Lingua dell'app",
     "description": "Cambia la lingua dell'interfaccia di SpeakoFlow"
   },
   "overlay": {
     "preparing": "Preparazione del microfono…",
     "recording": "Registrazione",
     "transcribing": "Trascrizione…",
-    "processing": "Elaborazione…",
+    "processing": "Pulizia in corso…",
     "generating": "Scrittura con Flow…",
     "vision": "Lettura dello schermo…",
     "notices": {
       "flowNotConfigured": "Flow richiede un modello per l'assistente — incollato come dettatura",
       "flowFailed": "Flow non è riuscito a generare — non è stato incollato nulla",
+      "cloudSttFailed": "Trascrizione cloud non riuscita: controlla la chiave e il credito nelle Impostazioni",
       "flowEmpty": "Pronuncia un comando dopo la frase di attivazione",
+      "cleanupFallback": "La pulizia IA non è stata eseguita — incollato il testo grezzo",
+      "cleanupModelRejected": "Il tuo provider di pulizia ha rifiutato quel modello: controlla il modello nelle Impostazioni",
       "cloudSttFellBack": "La trascrizione cloud non ha risposto — usato il modello sul dispositivo",
-      "cleanupFallback": "La pulizia IA non è stata eseguita — incollato il testo grezzo"
+      "noSpeechModel": "Ancora nessun modello vocale. Scegline uno nella pagina Modelli"
     },
     "listening": "In ascolto…",
     "locked": "Registrazione a mani libere — premi di nuovo la scorciatoia per fermarti",
     "cancel": "Annulla",
+    "copy": "Copia la trascrizione",
+    "transcript": "Trascrizione",
+    "copied": "Copiato",
+    "copyFailed": "Impossibile copiare: riprova",
     "done": "Fatto",
     "askAssistant": "Chiedi all'assistente invece di digitare questo testo",
     "recovery": {
@@ -1525,28 +2195,144 @@
       "failed": "Trascrizione non riuscita",
       "undo": "Annulla",
       "retry": "Riprova"
+    },
+    "downloading": {
+      "title": "Download del modello vocale…",
+      "percent": "Download del modello vocale · {{percent}}%",
+      "hint": "La dettatura funzionerà al termine"
+    }
+  },
+  "reminders": {
+    "title": "Promemoria",
+    "due": {
+      "now": "proprio ora",
+      "minutesAgo": "{{count}} min fa",
+      "hoursAgo": "{{count}} h fa"
+    },
+    "done": "Fatto",
+    "snooze": "Posticipa",
+    "snoozeFor_one": "{{count}} minuto",
+    "snoozeFor_many": "{{count}} minuti",
+    "snoozeFor_other": "{{count}} minuti",
+    "snoozedTimes_one": "Posticipato una volta",
+    "snoozedTimes_many": "Posticipato {{count}}×",
+    "snoozedTimes_other": "Posticipato {{count}}×",
+    "later": "Nascondi per ora: il promemoria resta attivo",
+    "settings": {
+      "label": "Promemoria",
+      "description": "Chiedi all'assistente di ricordarti qualcosa; resta elencato qui fino alla scadenza.",
+      "empty": "Nulla in programma. Chiedi all'assistente di ricordarti qualcosa.",
+      "waiting": "Ti aspetta",
+      "cancel": "Annulla questo promemoria",
+      "dueAt": "Scade {{when}}"
     }
   },
   "assistant": {
+    "conversation": {
+      "title": "Chiamata",
+      "newChat": "Nuova chat",
+      "type": "Scrivi un messaggio",
+      "backToVoice": "Torna alla voce",
+      "mute": "Disattiva il microfono",
+      "unmute": "Riattiva il microfono",
+      "speakerOn": "Leggi le risposte ad alta voce",
+      "speakerOff": "Smetti di leggere le risposte ad alta voce",
+      "expand": "Apri la conversazione",
+      "collapse": "Torna alla barra della chiamata",
+      "historyOpen": "Conversazioni precedenti",
+      "historyClose": "Torna a questa conversazione",
+      "end": "Termina chiamata",
+      "send": "Invia",
+      "stop": "Ferma la risposta",
+      "placeholder": "Scrivi a {{name}}",
+      "dismiss": "Chiudi",
+      "retry": "Riprova",
+      "details": "Dettagli",
+      "startHint": "Inizia a parlare o scrivi un messaggio.",
+      "mutedHint": "Microfono disattivato. Puoi comunque scrivere.",
+      "preparingVoice": "Preparazione della voce… {{progress}}%",
+      "history": {
+        "title": "Conversazioni precedenti",
+        "hint": "Scegline una per riprendere da dove avevi lasciato. La chiamata resta collegata.",
+        "empty": "Ancora nessuna conversazione salvata.",
+        "loading": "Caricamento…",
+        "failed": "Impossibile caricare le tue conversazioni.",
+        "more": "Mostra altre",
+        "untitled": "Conversazione senza titolo",
+        "current": "Aperta ora",
+        "messages_one": "{{count}} messaggio",
+        "messages_many": "{{count}} messaggi",
+        "messages_other": "{{count}} messaggi"
+      },
+      "options": "Opzioni della chiamata",
+      "pace": "Tempo per finire di parlare",
+      "paceHint": "Quanto aspettare dopo una tua pausa prima di rispondere.",
+      "paces": {
+        "quick": "Rapido",
+        "natural": "Naturale",
+        "patient": "Paziente"
+      },
+      "sensitivity": "Sensibilità del microfono",
+      "sensitivityHint": "Con quanta facilità un suono viene considerato come se stessi parlando. Abbassala se il rumore di fondo o la voce stessa dell'assistente continuano a interrompere.",
+      "sensitivities": {
+        "low": "Bassa: stanza rumorosa o altoparlanti",
+        "normal": "Normale",
+        "high": "Alta: stanza silenziosa o cuffie"
+      },
+      "phase": {
+        "off": "Chiamata terminata",
+        "starting": "Connessione…",
+        "listening": "In ascolto",
+        "hearing": "In ascolto…",
+        "transcribing": "Trascrizione…",
+        "responding": "Sto pensando…",
+        "speaking": "Sta parlando",
+        "muted": "Microfono disattivato",
+        "error": "Chiamata interrotta"
+      },
+      "errors": {
+        "microphone": "Impossibile aprire il microfono. Consenti l'accesso al microfono e verifica che non sia usato da un'altra app.",
+        "device": "Il microfono si è scollegato. Ricollegalo, poi riprova.",
+        "setup": "Impossibile avviare la conversazione. Controlla microfono, altoparlante e modello dell'assistente nelle Impostazioni.",
+        "turn": "Questa risposta non è stata completata. Controlla i dettagli, poi riprova.",
+        "playback": "Impossibile riprodurre la risposta vocale. Controlla il provider della voce e il dispositivo di output.",
+        "tooLong": "La registrazione ha raggiunto il limite di un minuto. Riprova con un intervento più breve.",
+        "history": "Impossibile aprire quella conversazione. Riprova."
+      },
+      "chooseProfile": "Cambia profilo, attualmente {{name}}",
+      "profiles": "Profili",
+      "profileHint": "Le modifiche si applicano alla prossima risposta.",
+      "chatOnlyProfile": "Questo profilo è disponibile solo in chat.",
+      "profileError": "Impossibile cambiare profilo. Riprova."
+    },
     "title": "Assistente",
     "character": {
       "switch": "Cambia profilo"
     },
     "empty": "Chiedi a voce con la scorciatoia dell'assistente,\noppure scrivi qui sotto.",
     "inputPlaceholder": "Messaggio…",
-    "queuedUntilReady": "In coda — verrà inviato appena questa risposta finisce.",
+    "bar": {
+      "placeholder": "Chiedi qualsiasi cosa…"
+    },
     "send": "Invia",
     "stop": "Ferma",
     "cancel": "Annulla",
-    "clear": "Cancella la conversazione",
     "copy": "Copia",
     "copyCode": "Copia il codice",
+    "insert": "Inserisci dove stavi scrivendo",
+    "insertShort": "Inserisci",
+    "insertReplace": "Sostituisci il testo selezionato con questo",
+    "insertReplaceShort": "Sostituisci",
+    "selectionAttached_one": "{{count}} carattere selezionato",
+    "selectionAttached_many": "{{count}} caratteri selezionati",
+    "selectionAttached_other": "{{count}} caratteri selezionati",
     "regenerate": "Rigenera la risposta (quella precedente resta nella Cronologia)",
     "summarizing": "Riassunto dei messaggi precedenti…",
     "screenAttached": "Schermo",
     "attach": {
       "file": "Allega un'immagine o un file",
-      "imageCount": "{{count}} immagine",
+      "imageCount_one": "{{count}} immagine",
+      "imageCount_many": "{{count}} immagini",
       "imageCount_other": "{{count}} immagini",
       "dropHint": "Rilascia per allegare"
     },
@@ -1563,13 +2349,13 @@
       "listening": "In ascolto…",
       "locked": "In ascolto",
       "transcribing": "Trascrizione…",
-      "searching": "Ricerca sul web...",
-      "thinking": "Sto pensando...",
-      "speaking": "Sto parlando..."
+      "searching": "Ricerca sul web…",
+      "thinking": "Sto pensando…",
+      "speaking": "Sto parlando…"
     },
     "tool": {
       "search": "Ricerca sul web",
-      "screen": "Lettura dello schermo",
+      "screen": "Sto guardando lo schermo…",
       "working": "Elaborazione in corso",
       "elapsed": "{{seconds}} s"
     },
@@ -1602,6 +2388,12 @@
       "tts_blockedShort": "Tocca il pannello per ascoltare",
       "tts_playback": "Impossibile riprodurre la voce sul tuo dispositivo di output. Controlla le impostazioni degli altoparlanti o dell'output, poi riprova.",
       "tts_playbackShort": "Riproduzione vocale non riuscita",
+      "tts_gpu": "La tua scheda grafica ha distorto la voce, quindi è stata silenziata. La prossima risposta userà invece la voce per processore.",
+      "tts_gpuShort": "Voce silenziata: distorta dalla scheda grafica",
+      "tts_gpu_slow": "La tua scheda grafica ha distorto la voce, quindi è stata silenziata. Ora le risposte usano il processore, che resta lento finché non scarichi la voce per processore in Modelli → Voce.",
+      "tts_gpu_slowShort": "Voce silenziata: distorta dalla scheda grafica",
+      "tts_gpu_forced": "La tua scheda grafica ha distorto la voce, quindi è stata silenziata. Imposta Esegui su su Automatico o Processore in Modelli → Voce.",
+      "tts_gpu_forcedShort": "Voce silenziata: distorta dalla scheda grafica",
       "mic_denied": "L'accesso al microfono è bloccato. Consentilo nelle impostazioni sulla privacy del sistema.",
       "mic_deniedShort": "Accesso al microfono bloccato",
       "mic_unavailable": "Nessun microfono trovato. Collegane uno e riprova.",
@@ -1613,7 +2405,9 @@
     },
     "notices": {
       "web_search_failed": "La ricerca web non ha restituito risultati — risposta senza di essi.",
-      "web_search_failedShort": "Nessun risultato dal web"
+      "web_search_failedShort": "Nessun risultato dal web",
+      "queued": "In coda: verrà inviato appena finisce questa risposta.",
+      "queuedShort": "In coda"
     },
     "engineSetup": {
       "downloading": "Configurazione del motore locale (primo avvio)… {{percent}}%",
@@ -1626,25 +2420,850 @@
       "copied": "Copiato"
     }
   },
+  "nav": {
+    "label": "Principale",
+    "home": "Home",
+    "history": "Cronologia",
+    "assistant": "Assistente",
+    "meetings": "Riunioni",
+    "cleanup": "Pulizia IA",
+    "dictionary": "Dizionario",
+    "models": "Modelli",
+    "settings": "Impostazioni",
+    "status": {
+      "label": "Modello vocale: {{model}}, {{status}}. Apri le impostazioni di trascrizione.",
+      "setup": "Da configurare",
+      "cloud": "Cloud · {{provider}}",
+      "loading": "Caricamento…",
+      "error": "Caricamento non riuscito",
+      "ready": "Pronto",
+      "idle": "Si carica quando detti",
+      "noModel": "Nessun modello vocale"
+    },
+    "insights": "Statistiche"
+  },
+  "settingsDialog": {
+    "title": "Impostazioni",
+    "tabs": {
+      "general": "Generali",
+      "shortcuts": "Scorciatoie",
+      "audio": "Audio",
+      "dictation": "Dettatura",
+      "privacy": "Privacy e dati",
+      "advanced": "Avanzate",
+      "about": "Informazioni",
+      "debug": "Debug"
+    },
+    "general": {
+      "appearance": "Aspetto",
+      "onboarding": {
+        "title": "Primi passi",
+        "replay": "Configurazione iniziale",
+        "replayInfo": "Ripercorri la configurazione e il tour, come li vede una nuova installazione. I modelli che hai già restano installati.",
+        "replayButton": "Mostra di nuovo i primi passi"
+      }
+    },
+    "shortcuts": {
+      "intro": "Ogni scorciatoia funziona in qualsiasi app. Fai clic su una scorciatoia per registrarne una nuova.",
+      "dictation": "Dettatura",
+      "assistant": "Assistente",
+      "cleanupOff": "Attiva la pulizia IA per avere questa scorciatoia.",
+      "cleanupOnDictation": "La tua scorciatoia di dettatura ripulisce ogni dettatura, quindi questa non serve.",
+      "openCleanup": "Apri Pulizia IA",
+      "assistantOff": "L'assistente è disattivato, quindi le sue scorciatoie non fanno nulla.",
+      "openAssistant": "Apri Assistente"
+    },
+    "audio": {
+      "microphone": "Microfono",
+      "overlayHint": "La piccola pillola visibile mentre registri."
+    },
+    "dictation": {
+      "intro": "Come le tue parole arrivano nell'app in cui stai scrivendo.",
+      "output": "Digitazione e incolla",
+      "extras": "Extra"
+    },
+    "privacy": {
+      "intro": "Registrazioni e cronologia sono salvate solo su questo computer. Scegli per quanto tempo conservare le registrazioni.",
+      "recordingsFolder": "Cartella delle registrazioni"
+    },
+    "advanced": {
+      "performance": "Prestazioni"
+    },
+    "about": {
+      "appName": "SpeakoFlow",
+      "version": "Versione {{version}}",
+      "project": "Progetto",
+      "docs": "Documentazione",
+      "openDocs": "Apri la documentazione"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Buongiorno",
+      "afternoon": "Buon pomeriggio",
+      "evening": "Buonasera",
+      "night": "Si lavora fino a tardi"
+    },
+    "subtitleHold": "Tieni premuta la scorciatoia in qualsiasi app, parla e rilascia. Le tue parole appaiono dove si trova il cursore.",
+    "subtitleTap": "Tocca la scorciatoia in qualsiasi app, parla e toccala di nuovo. Le tue parole appaiono dove si trova il cursore.",
+    "needsModel": {
+      "title": "Scegli un modello vocale per iniziare a dettare.",
+      "description": "SpeakoFlow ha bisogno di un modello di trascrizione prima di poter scrivere ciò che dici.",
+      "action": "Scegli un modello"
+    },
+    "stats": {
+      "label": "Il tuo utilizzo",
+      "none": "–",
+      "spoken": "parlato",
+      "words": "parole",
+      "wpm": "PAM",
+      "wpmHint": "Parole al minuto nelle tue registrazioni, pause comprese.",
+      "saved": "risparmiato",
+      "savedHint": "Rispetto a digitare le stesse parole a {{wpm}} parole al minuto.",
+      "empty": "I tuoi numeri compaiono dopo la prima dettatura.",
+      "streak_one": "{{count}} giorno di fila",
+      "streak_many": "{{count}} giorni di fila",
+      "streak_other": "{{count}} giorni di fila",
+      "noStreak": "Detta oggi per iniziare una serie",
+      "today": "{{words}} parole oggi",
+      "duration": {
+        "seconds": "{{seconds}} s",
+        "minutes": "{{minutes}} min",
+        "hours": "{{hours}} h",
+        "hoursMinutes": "{{hours}} h {{minutes}} min"
+      },
+      "wordsLabel": "Parole dettate",
+      "wpmLabel": "Parole al minuto",
+      "savedLabel": "Tempo risparmiato",
+      "streakLabel_one": "Giorno di fila",
+      "streakLabel_many": "Giorni di fila",
+      "streakLabel_other": "Giorni di fila",
+      "streakUnit_one": "giorno di fila",
+      "streakUnit_many": "giorni di fila",
+      "streakUnit_other": "giorni di fila",
+      "seeInsights": "Vedi le statistiche"
+    },
+    "shortcuts": {
+      "title": "Scorciatoie",
+      "edit": "Modifica scorciatoie",
+      "turnOn": "Attiva",
+      "off": "Disattivata",
+      "setKey": "Imposta una scorciatoia",
+      "dictate": {
+        "title": "Detta",
+        "hold": "Tieni premuto, parla, rilascia. Le tue parole vengono scritte dove si trova il cursore.",
+        "tap": "Tocca per iniziare, parla, tocca per fermare. Le tue parole vengono scritte dove si trova il cursore.",
+        "whatHold": "Tieni premuto, parla, rilascia. Le parole compaiono dove si trova il cursore.",
+        "whatTap": "Tocca, parla, tocca di nuovo. Le parole compaiono dove si trova il cursore."
+      },
+      "cleanup": {
+        "title": "Detta e ripulisci",
+        "description": "Come Detta, poi l'IA sistema punteggiatura, parole di riempimento e stile.",
+        "what": "Detta, poi l'IA sistema punteggiatura, intercalari e stile."
+      },
+      "ask": {
+        "title": "Chiedi all'assistente",
+        "description": "Fai una domanda a voce e ricevi la risposta in un pannello flottante.",
+        "what": "Chiedi a voce. La risposta compare in un pannello flottante."
+      },
+      "call": {
+        "title": "Avvia una chiamata",
+        "description": "Una conversazione a mani libere con risposte vocali.",
+        "what": "Parla e ascolta, a mani libere. Premi di nuovo per riattaccare."
+      },
+      "info": "Premili in qualsiasi app. Fai clic sui tasti per cambiarli.",
+      "offHint": "Disattivata",
+      "mode": {
+        "hold": "Tieni premuto per parlare",
+        "tap": "Tocca per avviare e fermare"
+      },
+      "cancel": {
+        "title": "Annulla",
+        "what": "Ferma una registrazione o una risposta letta ad alta voce."
+      }
+    },
+    "setup": {
+      "title": "I tuoi modelli",
+      "manage": "Gestisci"
+    },
+    "recent": {
+      "title": "Recenti",
+      "viewAll": "Vedi tutto",
+      "copy": "Copia testo",
+      "cleaned": "Ripulito",
+      "tryPrefix": "Prova: fai clic nel riquadro, poi premi",
+      "trySuffixHold": "e tienilo premuto mentre parli.",
+      "trySuffixTap": "e parla. Premilo di nuovo quando hai finito.",
+      "tryPlaceholder": "Le tue parole appariranno qui…"
+    },
+    "hero": {
+      "hold": "Tieni premuti i tasti in qualsiasi app, parla e rilascia.",
+      "tap": "Tocca i tasti in qualsiasi app, parla e tocca di nuovo.",
+      "holdHint": "Tieni premuto per parlare",
+      "tapHint": "Tocca per avviare e fermare"
+    },
+    "activity": {
+      "title": "Ultimi 30 giorni",
+      "summary_one": "{{words}} parole in {{count}} giorno",
+      "summary_many": "{{words}} parole in {{count}} di giorni",
+      "summary_other": "{{words}} parole in {{count}} giorni",
+      "chartLabel": "Parole dettate ogni giorno negli ultimi {{days}} giorni: {{words}} in totale.",
+      "words_one": "{{formatted}} parola",
+      "words_many": "{{formatted}} di parole",
+      "words_other": "{{formatted}} parole",
+      "today": "Oggi"
+    }
+  },
+  "modelsHub": {
+    "description": "Ogni attività in SpeakoFlow è svolta da un modello che scegli tu. Eseguilo su questo computer per la privacy, o nel cloud per la velocità.",
+    "addLocal": "Aggiungi un file di modello",
+    "privacyNote": "I modelli su questo computer non inviano mai la tua voce o il tuo testo da nessuna parte. I modelli cloud li inviano al provider che hai scelto, usando la tua chiave API.",
+    "inUse": "In uso",
+    "needsSetup": "Da configurare",
+    "performance": "Prestazioni",
+    "where": {
+      "device": "Su questo computer",
+      "cloud": "Cloud",
+      "cloudWith": "Cloud · {{provider}}",
+      "deviceShort": "Questo computer"
+    },
+    "status": {
+      "voiceOff": "Le risposte vocali sono disattivate",
+      "assistantOff": "L'assistente è disattivato",
+      "noModel": "Nessun modello scelto",
+      "notDownloaded": "Modello non scaricato",
+      "noKey": "Aggiungi una chiave API",
+      "noEndpoint": "Aggiungi un endpoint"
+    },
+    "voice": {
+      "kokoroModel": "Voce Kokoro"
+    },
+    "usedBy": {
+      "label": "Usato da",
+      "dictation": "Dettatura",
+      "assistant": "Assistente",
+      "meetings": "Riunioni",
+      "cleanup": "Pulizia IA",
+      "meetingNotes": "Note delle riunioni",
+      "calls": "Chiamate",
+      "flow": "Genera con Flow",
+      "spokenReplies": "Risposte vocali"
+    },
+    "slots": {
+      "stt": {
+        "name": "Riconoscimento vocale",
+        "description": "Trasforma la tua voce in testo.",
+        "whereHint": "Su questo computer è privato e gratuito. Il cloud usa l'API di un provider e la tua chiave.",
+        "catalogTitle": "Modelli vocali",
+        "catalogDescription": "Tutti i modelli qui funzionano su questo computer. Quelli più veloci sono adatti alla dettatura; quelli più grandi sono più accurati."
+      },
+      "cleanup": {
+        "name": "Pulizia IA",
+        "description": "Segue le modifiche che detti, applica uno stile di scrittura e scrive le note delle riunioni.",
+        "turnOn": "Attiva la pulizia IA",
+        "offNotice": "La pulizia IA è disattivata. Le note delle riunioni usano comunque questo modello.",
+        "borrowsNotice": "Nessun modello di pulizia impostato, quindi la pulizia usa il modello del tuo assistente ({{model}}).",
+        "catalogTitle": "Modelli di pulizia"
+      },
+      "assistant": {
+        "name": "Assistente",
+        "description": "Risponde alle tue domande, guarda il tuo schermo e sostiene chiamate.",
+        "openAssistant": "Apri l'assistente",
+        "offNotice": "L'assistente è disattivato. Genera con Flow e la pulizia di riserva usano comunque questo modello.",
+        "catalogTitle": "Modelli per l'assistente",
+        "fallbackNote": "Anche la pulizia IA e le note delle riunioni usano questo modello quando non ne hanno uno proprio."
+      },
+      "voice": {
+        "name": "Voce",
+        "description": "Legge ad alta voce le risposte dell'assistente."
+      }
+    }
+  },
+  "cleanup": {
+    "description": "Gli intercalari vengono già rimossi in ogni dettatura. La pulizia IA va oltre: segue le modifiche che detti e applica uno stile di scrittura.",
+    "toggle": "Pulizia IA",
+    "how": {
+      "plain": "Scrive esattamente quello che hai detto.",
+      "cleaned": "Scrive quello che hai detto, ripulito dall'IA.",
+      "off": "Attiva la pulizia IA per avere questa scorciatoia.",
+      "change": "Cambia"
+    },
+    "model": {
+      "title": "Modello di pulizia",
+      "borrows": "Preso in prestito dall'assistente",
+      "own": "Viene eseguito ogni volta che usi la scorciatoia di pulizia",
+      "change": "Cambia",
+      "info": "Viene eseguito ogni volta che usi la scorciatoia di pulizia. Se non ha un modello proprio, la pulizia usa quello del tuo assistente."
+    },
+    "needsModel": {
+      "description": "La pulizia IA ha bisogno di un modello per funzionare. Fino ad allora, il testo viene scritto così come l'hai detto.",
+      "action": "Scegli un modello",
+      "short": "Scegli un modello per iniziare la pulizia."
+    },
+    "instructions": {
+      "title": "Istruzioni di pulizia",
+      "description": "Il prompt di base che dice al modello cosa correggere. La maggior parte delle persone non lo cambia mai.",
+      "current": "In uso"
+    },
+    "styles": {
+      "title": "Stile di scrittura",
+      "description": "Come deve suonare il testo ripulito. Viene applicato dopo le correzioni, che quindi restano invariate.",
+      "createTitle": "Nuovo stile",
+      "createHint": "Descrivi come vuoi che suoni il tuo testo.",
+      "editTitle": "Modifica stile",
+      "editorIntro": "Dai un nome allo stile e descrivi come deve cambiare il tuo testo. Viene applicato dopo la pulizia, quindi le correzioni restano invariate.",
+      "inUse": "In uso",
+      "editNamed": "Modifica {{name}}",
+      "builtin": {
+        "none": "Corregge gli errori e lascia intatte le tue parole.",
+        "professional": "Curato e chiaro, per messaggi di lavoro ed email.",
+        "friendly": "Caldo e rilassato, come un messaggio a un amico.",
+        "concise": "Taglia le parole superflue e va al punto.",
+        "formal": "Frasi complete e registro formale.",
+        "casual": "Sciolto e colloquiale."
+      },
+      "groups": {
+        "builtin": "Integrati",
+        "custom": "I tuoi"
+      },
+      "manage": "Gestisci",
+      "manageTitle": "I tuoi stili di scrittura",
+      "noneYet": "Non hai ancora stili personali.",
+      "newStyle": "Nuovo stile",
+      "customHint": "Uno dei tuoi stili. Viene applicato dopo le correzioni.",
+      "preview": {
+        "youSay": "Tu dici",
+        "itTypes": "Viene scritto",
+        "yourInstruction": "La tua istruzione"
+      },
+      "samples": {
+        "raw": "dovremmo vederci domani alle dieci, anzi no, alle undici, e rivedere il budget",
+        "none": "Dovremmo vederci domani alle undici e rivedere il budget.",
+        "professional": "Propongo di incontrarci domani alle 11:00 per esaminare il budget.",
+        "friendly": "Che ne dici se ci vediamo domani alle undici e guardiamo insieme il budget?",
+        "concise": "Incontro domani alle 11 per rivedere il budget.",
+        "formal": "Propongo di incontrarci domani alle ore undici per esaminare il budget.",
+        "casual": "vediamoci domani alle undici e diamo un'occhiata al budget"
+      },
+      "form": {
+        "name": "Nome",
+        "instruction": "Istruzioni",
+        "instructionTip": "Come devono cambiare le parole. Viene applicato dopo la pulizia, quindi le correzioni restano invariate.",
+        "instructionPlaceholder": "Per esempio: tieni un tono informale, tutto in minuscolo, e trasforma i nomi delle emoji pronunciati in emoji."
+      }
+    },
+    "hero": {
+      "title": "Dillo come viene. Ottienilo <em>pulito.</em>",
+      "before": "vediamoci alle dieci, anzi no, facciamo alle undici, e porta il budget",
+      "after": "Vediamoci alle undici e porta il budget.",
+      "offHint": "Attiva la pulizia IA per usare questa scorciatoia",
+      "onHint": "Tieni premuto, parla, rilascia. Il testo ripulito viene scritto per te.",
+      "onHintTap": "Tocca, parla, tocca di nuovo. Il testo ripulito viene scritto per te.",
+      "onDictationHint": "Ogni dettatura viene ripulita."
+    },
+    "shortcut": {
+      "title": "Scorciatoia",
+      "info": "Dai alla pulizia una scorciatoia propria, oppure lascia che la scorciatoia di dettatura ripulisca ogni dettatura, così hai un'unica combinazione di tasti da ricordare.",
+      "separate": "Scorciatoia propria",
+      "dictation": "Uguale alla dettatura"
+    },
+    "shortcutRow": "Scorciatoia"
+  },
+  "dictionary": {
+    "description": "Insegna a SpeakoFlow i nomi e i termini che usi e imposta abbreviazioni che si espandono in testi più lunghi.",
+    "words": {
+      "title": "Le tue parole",
+      "description": "Nomi, termini tecnici e grafie che SpeakoFlow deve sempre riconoscere correttamente.",
+      "placeholder": "Aggiungi un nome, un termine o una grafia…",
+      "empty": "Ancora niente qui. Aggiungi le parole che SpeakoFlow continua a sbagliare."
+    },
+    "replacements": {
+      "title": "Sostituzioni",
+      "description": "Pronuncia una frase e ottieni un testo diverso, per esempio «la mia email» che diventa il tuo indirizzo."
+    },
+    "addWord": "Aggiungi parola",
+    "hero": {
+      "title": "SpeakoFlow scrive <em>come scrivi tu.</em>",
+      "subtitle": "Aggiungi i nomi e i termini tecnici che continua a sbagliare."
+    }
+  },
+  "assistantPage": {
+    "description": "Chiedi qualsiasi cosa a voce, da qualsiasi app. L'assistente può vedere il tuo schermo, cercare sul web e ricordare ciò che conta per te.",
+    "offNotice": "L'assistente è disattivato. Le sue scorciatoie non fanno nulla e non usa la memoria finché non lo riattivi.",
+    "hero": {
+      "askHold": "Tieni premuto, fai la tua domanda, rilascia. La risposta compare in un pannello flottante.",
+      "askTap": "Tocca, fai la tua domanda, tocca di nuovo. La risposta compare in un pannello flottante.",
+      "call": "Parla e ascolta, a mani libere. Premi di nuovo per riattaccare.",
+      "title": "Chiedi qualsiasi cosa, <em>ovunque.</em>",
+      "ask": "Chiedi",
+      "callLabel": "Chiamata",
+      "askHoldShort": "Tieni premuto, chiedi, rilascia",
+      "askTapShort": "Tocca, chiedi, tocca di nuovo",
+      "callShort": "Premi di nuovo per riattaccare",
+      "subtitle": "Fai una domanda a voce, oppure avvia una chiamata e parlane insieme."
+    },
+    "models": {
+      "title": "Alimentato da",
+      "assistant": "Ragiona con",
+      "voice": "Risponde a voce con"
+    },
+    "features": {
+      "title": "Cosa sa fare",
+      "vision": {
+        "title": "Visione dello schermo",
+        "description": "Consenti all'assistente di guardare il tuo schermo quando gli fai domande su ciò che c'è."
+      },
+      "webSearch": {
+        "title": "Ricerca web",
+        "description": "Cerca online per risposte aggiornate e basate sui fatti."
+      },
+      "reminders": {
+        "title": "Promemoria",
+        "description": "Di' «ricordamelo tra 20 minuti» e lo farà.",
+        "status": "Chiedi a voce"
+      },
+      "profiles": {
+        "title": "Profili",
+        "description": "Personalità tra cui l'assistente può passare, ognuna con le proprie istruzioni.",
+        "status": "Predefinito"
+      },
+      "memory": {
+        "title": "Memoria",
+        "description": "Ciò che l'assistente ricorda di te, conservato su questo computer."
+      },
+      "behavior": {
+        "title": "Risposte",
+        "description": "Quanto sono lunghe le risposte e quanta parte della chat tiene a mente."
+      },
+      "appearance": {
+        "title": "Pannello",
+        "description": "Dimensione, testo, posizione e opacità del pannello flottante.",
+        "status": "Personalizza"
+      }
+    },
+    "cards": {
+      "keySaved": "Chiave salvata",
+      "vision": {
+        "description": "Lascialo guardare il tuo schermo per rispondere a domande su ciò che vedi.",
+        "timing": {
+          "immediate": "Quando inizio",
+          "onSend": "Quando invio"
+        }
+      },
+      "webSearch": {
+        "description": "Cerca online per risposte aggiornate e basate sui fatti.",
+        "offHint": "Disattivata: le risposte vengono solo dal modello e potrebbero non essere aggiornate.",
+        "keyFor": "Chiave API di {{provider}}",
+        "getKey": "Ottieni una chiave gratuita su {{site}}.",
+        "hints": {
+          "tinyfish": "Gratis, senza carta",
+          "serper": "Risultati di Google",
+          "brave": "Indice indipendente",
+          "tavily": "Pensato per l'IA",
+          "exa": "Ricerca neurale",
+          "serpapi": "Risultati di Google"
+        }
+      },
+      "reminders": {
+        "description": "Chiedigli di ricordarti qualcosa e, al momento giusto, comparirà una nota.",
+        "trySaying": "Prova a dire",
+        "examples": {
+          "one": "«Ricordami di chiamare Sara tra 20 minuti»",
+          "two": "«Alle 18, ricordami di inviare la fattura»",
+          "three": "«Guarda questo e ricordamelo domani»"
+        },
+        "upcoming": "In arrivo",
+        "none": "Ancora nulla in programma.",
+        "more_one": "e altri {{count}}",
+        "more_many": "e altri {{count}}",
+        "more_other": "e altri {{count}}"
+      },
+      "memory": {
+        "title": "Memoria",
+        "description": "Ricorda ciò che conta per te, conservato solo su questo computer.",
+        "open": "Apri la memoria",
+        "manage_one": "Vedi e modifica la memoria · {{count}} nota",
+        "manage_many": "Vedi e modifica la memoria · {{count}} di note",
+        "manage_other": "Vedi e modifica la memoria · {{count}} note",
+        "pausedHint": "In pausa: i ricordi salvati vengono conservati ma non usati."
+      },
+      "profiles": {
+        "title": "Profili",
+        "description": "Personalità con nome, istruzioni e stile di risposta propri.",
+        "edit": "Modifica profili",
+        "more": "+{{count}}"
+      },
+      "replies": {
+        "title": "Risposte",
+        "description": "Quanto sono lunghe le risposte e quanta parte della chat tiene a mente.",
+        "lengths": {
+          "default": "Predefinita",
+          "short": "Breve",
+          "medium": "Media",
+          "long": "Lunga"
+        },
+        "lengthHints": {
+          "default": "Quanto serve alla domanda.",
+          "short": "Una o due frasi.",
+          "medium": "Un breve paragrafo.",
+          "long": "Completa e dettagliata."
+        },
+        "history": "Messaggi che tiene a mente"
+      },
+      "panel": {
+        "title": "Pannello flottante",
+        "description": "Come appare il pannello e dove si apre. L'anteprima si aggiorna mentre lo modifichi.",
+        "positionHint": "Fai clic su un punto dello schermo. La forma è quella con cui si apre: una colonna alta lungo un lato o una striscia larga in alto o in basso. Trascina il pannello vicino a un punto e ci si aggancia."
+      }
+    },
+    "groups": {
+      "personal": "Personale",
+      "replies": "Risposte"
+    },
+    "rows": {
+      "replyLength": "Lunghezza delle risposte",
+      "reminders": {
+        "none": "Nessuno impostato",
+        "count_one": "{{count}} impostato",
+        "count_many": "{{count}} impostati",
+        "count_other": "{{count}} impostati"
+      },
+      "memory": {
+        "edit": "Vedi la memoria",
+        "manage": "Gestisci"
+      },
+      "profiles": {
+        "manage": "Gestisci"
+      },
+      "screen": {
+        "ask": "Visione dello schermo per le domande",
+        "call": "Visione dello schermo per le chiamate"
+      }
+    },
+    "tips": {
+      "thinksWith": "Il modello che ti risponde. Anche la pulizia IA e le note delle riunioni lo usano quando non ne hanno uno proprio.",
+      "speaks": "Legge le risposte ad alta voce durante una chiamata.",
+      "screenAsk": "Consente all'assistente di guardare quando una domanda riguarda il tuo schermo o quando glielo chiedi. Alle domande sul testo selezionato risponde partendo dal testo. Gli screenshot vanno solo al tuo provider IA.",
+      "screenCall": "Consente all'assistente di guardare durante una chiamata quando glielo chiedi o quando parli di qualcosa sul tuo schermo.",
+      "captureTiming": "Cattura lo schermo com'era quando hai iniziato a chiedere, oppure al momento dell'invio.",
+      "webSearch": "Cerca online quando una domanda richiede informazioni aggiornate.",
+      "depth": "Rapida per i fatti semplici, Approfondita per le domande difficili.",
+      "openRouterSearch": "Usa la ricerca di OpenRouter e i tuoi crediti OpenRouter.",
+      "localSmart": "Lascia decidere al modello sul dispositivo quando cercare.",
+      "reminders": "Basta chiedere: «Ricordami di chiamare Sara tra 20 minuti». Al momento giusto comparirà una nota.",
+      "memory": "Ricorda ciò che conta per te. Conservato solo su questo computer.",
+      "profiles": "Personalità con nome, istruzioni e stile di risposta propri.",
+      "replyLength": "Quanto sono lunghe di solito le risposte.",
+      "history": "Quanti messaggi recenti tiene a mente.",
+      "summarize": "Riassume le chat lunghe per non dimenticarne l'inizio.",
+      "panelSize": "Quanta parte dello schermo occupa.",
+      "opacity": "Con valori più bassi il desktop traspare.",
+      "position": "Fai clic su un punto dello schermo.",
+      "display": "Lo schermo su cui si apre il pannello."
+    },
+    "memory": {
+      "aboutTip": "Un breve riassunto che tiene a mente in ogni risposta. Si aggiorna mentre parli e puoi modificarlo quando vuoi.",
+      "aboutEmpty": "Ancora niente. Lo compila mentre parli, oppure puoi scriverlo tu.",
+      "write": "Scrivilo",
+      "notesTitle": "Cose che ricorda",
+      "notesTip": "Fatti raccolti dalle tue chat, più tutto ciò che aggiungi tu. Ogni risposta usa quelli pertinenti.",
+      "notesEmpty": "Ancora niente. Impara dalle tue chat, oppure aggiungi qualcosa qui sopra.",
+      "showAll": "Mostra tutte ({{count}})",
+      "showFewer": "Mostra meno",
+      "detailTip": "Leggera usa solo il riassunto. Dettagliata aggiunge altre note ed è un po' più lenta.",
+      "more": "Altre opzioni della memoria",
+      "learnNow": "Impara ora da questa chat",
+      "export": "Esporta la memoria…",
+      "import": "Importa la memoria…",
+      "erase": "Cancella la memoria…",
+      "eraseTitle": "Cancellare la memoria?",
+      "eraseBody_one": "Verranno eliminati il riassunto e {{count}} nota. L'operazione non può essere annullata.",
+      "eraseBody_many": "Verranno eliminati il riassunto e tutte le {{count}} di note. L'operazione non può essere annullata.",
+      "eraseBody_other": "Verranno eliminati il riassunto e tutte le {{count}} note. L'operazione non può essere annullata.",
+      "eraseConfirm": "Cancella",
+      "learnedToast": "Memoria aggiornata da questa chat",
+      "exportedToast": "Memoria esportata",
+      "importedToast": "Memoria importata",
+      "dialogDescription": "Ciò che l'assistente sa di te. Resta su questo computer e puoi modificarlo o cancellarlo in qualsiasi momento."
+    },
+    "profiles": {
+      "new": "Nuovo profilo",
+      "newBlank": "Parti da zero",
+      "newWithAi": "Descrivilo e lascia che lo scriva l'IA",
+      "listMore": "Altre opzioni dei profili",
+      "import": "Importa da un file…",
+      "restoreBuiltins": "Ripristina i profili integrati",
+      "restored_one": "{{count}} profilo ripristinato",
+      "restored_many": "{{count}} di profili ripristinati",
+      "restored_other": "{{count}} profili ripristinati",
+      "restoredNone": "Tutti i profili integrati sono già presenti",
+      "inUse": "In uso",
+      "use": "Usa questo profilo",
+      "more": "Altre opzioni per questo profilo",
+      "duplicate": "Duplica",
+      "export": "Esporta…",
+      "exported": "Profilo esportato",
+      "restoreDefault": "Ripristina l'originale",
+      "delete": "Elimina profilo…",
+      "deleteTitle": "Eliminare {{name}}?",
+      "deleteBody": "L'operazione non può essere annullata.",
+      "addPicture": "Aggiungi un'immagine",
+      "changePicture": "Cambia immagine",
+      "removePicture": "Rimuovi immagine",
+      "roleLabel": "Descrizione",
+      "roleTip": "Poche parole mostrate sotto il nome.",
+      "rolePlaceholder": "Per esempio: risposte brevi e dirette",
+      "instructionsLabel": "Istruzioni",
+      "instructionsTip": "Come ragiona e parla questo profilo. Inviate con ogni messaggio.",
+      "lengthLabel": "Lunghezza delle risposte",
+      "lengthTip": "Predefinita segue la Lunghezza delle risposte nella pagina Assistente.",
+      "lengths": {
+        "inherit": "Predefinita",
+        "short": "Breve",
+        "medium": "Media",
+        "long": "Lunga"
+      },
+      "greetingLabel": "Saluto",
+      "greetingTip": "Facoltativo. Mostrato all'inizio di una nuova chat.",
+      "greetingPlaceholder": "Ciao! Su cosa lavoriamo?",
+      "aiTitle": "Descrivi un nuovo profilo",
+      "aiBody": "Di' o scrivi come dovrebbe essere. L'assistente ne scrive il nome e le istruzioni.",
+      "aiCreate": "Crea profilo"
+    },
+    "panel": {
+      "where": "Dove si apre",
+      "text": "Dimensione del testo",
+      "size": "Dimensione del pannello",
+      "opacity": "Opacità",
+      "screen": "Quale schermo"
+    }
+  },
+  "meetingsPage": {
+    "transcript": "Trascrizione",
+    "notes": "Note",
+    "hero": {
+      "title": "Ogni chiamata, <em>messa per iscritto.</em>",
+      "subtitle": "Divisa per interlocutore, con le note alla fine."
+    },
+    "transcribedBy": "Trascritto da",
+    "notesBy": "Note di",
+    "transcribedByTip": "Scrive la trascrizione. È il tuo modello di Riconoscimento vocale, lo stesso usato dalla dettatura.",
+    "notesByTip": "Scrive le note e il titolo e risponde alle domande su una riunione. È il modello del tuo Assistente."
+  },
+  "historyPage": {
+    "today": "Oggi",
+    "yesterday": "Ieri",
+    "storage": "Archiviazione",
+    "cleaned": "Ripulito",
+    "showOriginal": "Mostra l'originale",
+    "showSaid": "Mostra cosa hai detto",
+    "hideOriginal": "Nascondi l'originale",
+    "playRecording": "Riproduci la registrazione",
+    "hideRecording": "Chiudi il lettore",
+    "audioMissing": "Il file audio di questa registrazione non è più disponibile.",
+    "failed": "Trascrizione non riuscita",
+    "retry": "Riprova",
+    "dismissed": "Questa trascrizione è stata scartata.",
+    "recover": "Recupera",
+    "recoverTitle": "Trascrivila di nuovo e conservala",
+    "recoverError": "Impossibile recuperare questa trascrizione. Riprova.",
+    "more": "Altre azioni",
+    "chat": {
+      "continue": "Continua",
+      "continueTitle": "Apri questa chat nell'assistente",
+      "showMessages": "Mostra i messaggi",
+      "hideMessages": "Nascondi i messaggi",
+      "assistantOff": "Attiva l'assistente per continuare questa chat."
+    }
+  },
+  "pickers": {
+    "browse": "Gestisci i modelli",
+    "download": "Scarica altri modelli",
+    "choose": "Scegli un modello",
+    "switchFailed": "Impossibile cambiare modello. Riprova.",
+    "borrowsAssistant": "Usa {{model}} dell'assistente",
+    "needsKey": "Serve una chiave API",
+    "groups": {
+      "device": "Su questo computer",
+      "cloud": "Cloud",
+      "setup": "Non ancora configurati"
+    },
+    "label": {
+      "assistant": "Modello dell'assistente",
+      "cleanup": "Modello di pulizia IA",
+      "stt": "Modello di riconoscimento vocale",
+      "voice": "Voce"
+    },
+    "needsSetup": "Da configurare",
+    "finishSetup": "Completa la configurazione",
+    "setup": {
+      "title": "Configura {{provider}}",
+      "bodyKey": "Incolla la tua chiave API, poi scegli un modello.",
+      "bodyServer": "Inserisci l'indirizzo del tuo server, poi scegli un modello.",
+      "bodyBoth": "Inserisci l'endpoint e la tua chiave API, poi scegli un modello.",
+      "endpoint": "URL dell'endpoint",
+      "apiKey": "Chiave API",
+      "apiKeyOptional": "Chiave API (facoltativa)",
+      "keyPlaceholder": "Incolla la tua chiave",
+      "getKey": "Ottieni una chiave su {{site}}",
+      "model": "Modello",
+      "modelPlaceholder": "Scegli o scrivi un modello",
+      "loadModels": "Carica i modelli",
+      "noModels": "Nessun modello trovato. Scrivi invece il nome del modello.",
+      "typeInstead": "Scrivi invece un nome",
+      "pickFromList": "Scegli dall'elenco",
+      "use": "Salva e usa",
+      "done": "Ora usi {{provider}}"
+    },
+    "voiceSetup": {
+      "bodyKey": "Incolla la tua chiave API, poi scegli una voce.",
+      "bodyEndpoint": "Inserisci l'endpoint e la tua chiave API, poi scegli una voce.",
+      "voice": "Voce",
+      "voicePlaceholder": "Scegli una voce",
+      "loadVoices": "Carica le voci",
+      "noVoices": "Nessuna voce trovata. Incolla invece l'ID di una voce.",
+      "model": "Modello (facoltativo)"
+    }
+  },
+  "catalog": {
+    "recommended": "Consigliato",
+    "searchHuggingFace": "Cerca su Hugging Face",
+    "useFor": {
+      "button": "Usa per",
+      "label": "Usa {{model}} per…",
+      "assistant": "Assistente",
+      "cleanup": "Pulizia IA",
+      "cleanupOnly": "Pensato solo per la pulizia: non sa sostenere una conversazione."
+    },
+    "inUse": {
+      "assistant": "Assistente",
+      "cleanup": "Pulizia IA"
+    },
+    "use": "Usa",
+    "useNamed": "Usa {{model}} per {{job}}",
+    "useForJob": "Usa per {{job}}",
+    "inUseShort": "In uso",
+    "more": "Altro",
+    "moreFor": "Altre azioni per {{model}}",
+    "showDetails": "Mostra i dettagli del file",
+    "hideDetails": "Nascondi i dettagli del file",
+    "removeFromList": "Rimuovi dall'elenco",
+    "nowUsing": "Ora usi {{model}} per {{job}}.",
+    "yoursInfo": "Modelli che hai scaricato o aggiunto dal tuo disco. Ognuno può svolgere entrambe le attività; il menu ⋯ ne assegna uno all'altra."
+  },
+  "models": {
+    "runsOn": "Funziona su",
+    "options": "Opzioni",
+    "downloadTitle": "Scarica modelli",
+    "cleanupOff": "La pulizia IA è disattivata. Le note delle riunioni usano comunque questo modello.",
+    "assistantOff": "L'assistente è disattivato. Genera con Flow e la pulizia usano comunque questo modello.",
+    "usedBy": "Usato da: {{features}}."
+  },
+  "shortcutEditor": {
+    "change": "Cambia la scorciatoia {{name}}",
+    "reset": "Ripristina {{name}} al valore predefinito"
+  },
+  "memoryManager": {
+    "status": {
+      "on": "Attiva: usata nelle risposte e alimentata dalle chat",
+      "off": "Disattivata: nulla viene usato o appreso"
+    },
+    "incognitoHint": "Questa chat non viene usata né appresa",
+    "editNote": "Modifica nota",
+    "source": {
+      "learned": "Appresa",
+      "added": "Aggiunta da te"
+    },
+    "filterLabel": "Mostra note",
+    "filters": {
+      "all": "Tutte",
+      "learned": "Apprese {{count}}",
+      "added": "Mie {{count}}"
+    },
+    "search": "Cerca nelle note",
+    "noMatches": "Nessuna nota corrisponde.",
+    "detailHints": {
+      "light": "In ogni risposta entra solo il riassunto Su di te. La più veloce.",
+      "balanced": "Il riassunto più alcune note pertinenti alla domanda.",
+      "detailed": "Il riassunto più altre note pertinenti. La più ricca, un po' più lenta."
+    },
+    "learnNow": "Impara da questa chat",
+    "tips": {
+      "enable": "Consente all'assistente di usare e costruire una memoria su di te. Disattivata per impostazione predefinita.",
+      "incognito": "Questa chat non viene né usata né appresa.",
+      "aboutYou": "Un breve riassunto incluso in ogni risposta quando la memoria è attiva."
+    }
+  },
+  "providerGrid": {
+    "showAll": "Mostra tutti i {{count}} provider",
+    "showFewer": "Mostra meno"
+  },
   "voiceEngines": {
+    "kokoro": "Qualità migliore",
+    "kitten": "Il più leggero",
+    "pocket": "14 voci",
+    "supertonic": "Veloce e nitido",
     "openai": "Voci GPT",
+    "elevenlabs": "Il più naturale",
+    "openrouter": "Molte voci",
     "deepgram": "Veloce, economico",
     "cartesia": "Latenza minima",
     "google": "Voci Chirp 3 HD",
+    "azure": "Voci neurali",
     "groq": "Voci Orpheus",
     "xai": "Voci Grok",
     "mistral": "Voci Voxtral",
     "inworld": "Voci espressive",
     "custom": "Il tuo server",
     "names": {
+      "kokoro": "Kokoro",
+      "kitten": "Kitten",
+      "pocket": "Pocket TTS",
+      "supertonic": "Supertonic",
+      "openai": "OpenAI",
+      "elevenlabs": "ElevenLabs",
+      "openrouter": "OpenRouter",
       "deepgram": "Deepgram",
       "cartesia": "Cartesia",
       "google": "Google Cloud",
+      "azure": "Azure Speech",
       "groq": "Groq",
       "xai": "xAI",
       "mistral": "Mistral",
       "inworld": "Inworld",
       "custom": "Personalizzato"
     }
+  },
+  "insights": {
+    "description": "La tua dettatura nel tempo, calcolata su questo computer.",
+    "empty": "Le tue statistiche compariranno dopo la prima dettatura.",
+    "dictations": "Dettature",
+    "today": "{{words}} parole oggi",
+    "pages_one": "Circa {{count}} pagina",
+    "pages_many": "Circa {{count}} di pagine",
+    "pages_other": "Circa {{count}} pagine",
+    "fasterThanTyping": "{{times}}× più veloce che digitare",
+    "streak_one": "{{count}} giorno di fila",
+    "streak_many": "{{count}} di giorni di fila",
+    "streak_other": "{{count}} giorni di fila",
+    "longest_one": "Record: {{count}} giorno",
+    "longest_many": "Record: {{count}} di giorni",
+    "longest_other": "Record: {{count}} giorni",
+    "gridLabel_one": "{{words}} parole in {{count}} giorno negli ultimi sei mesi",
+    "gridLabel_many": "{{words}} parole in {{count}} di giorni negli ultimi sei mesi",
+    "gridLabel_other": "{{words}} parole in {{count}} giorni negli ultimi sei mesi",
+    "gridSummary_one": "{{words}} parole in {{count}} giorno negli ultimi 6 mesi",
+    "gridSummary_many": "{{words}} parole in {{count}} di giorni negli ultimi 6 mesi",
+    "gridSummary_other": "{{words}} parole in {{count}} giorni negli ultimi 6 mesi",
+    "dayWords_one": "{{formatted}} parola",
+    "dayWords_many": "{{formatted}} di parole",
+    "dayWords_other": "{{formatted}} parole",
+    "dayNone": "Nessuna dettatura",
+    "less": "Meno",
+    "more": "Più",
+    "busiest": "Giorno più intenso",
+    "best": "Giorno migliore",
+    "typical": "Giorno tipico",
+    "typicalSub": "Nei giorni in cui detti"
   }
 }

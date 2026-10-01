@@ -812,7 +812,13 @@
         "label": "Feedback sound",
         "description": "Choose the start/stop cue played during dictation",
         "default": "Default",
-        "preview": "Preview sound (plays start then stop)"
+        "preview": "Preview sound (plays start then stop)",
+        "themes": {
+          "marimba": "Marimba",
+          "pop": "Pop",
+          "click": "Click",
+          "custom": "Custom"
+        }
       },
       "outputDevice": {
         "title": "Output device",
@@ -1111,7 +1117,8 @@
         "baseUrl": {
           "title": "Base URL",
           "description": "API base URL for the selected provider. Editable for Custom, Local, and Azure OpenAI (set it to your resource, e.g. https://your-resource.openai.azure.com/openai/v1).",
-          "placeholder": "https://api.openai.com/v1"
+          "placeholder": "https://api.openai.com/v1",
+          "managed": "Base URL is managed by the selected provider."
         },
         "apiKey": {
           "title": "API key",
@@ -1342,7 +1349,14 @@
       },
       "logLevel": {
         "title": "Log level",
-        "description": ""
+        "description": "",
+        "levels": {
+          "error": "Error",
+          "warn": "Warning",
+          "info": "Info",
+          "debug": "Debug",
+          "trace": "Trace"
+        }
       },
       "updateChecks": {
         "label": "Check for updates automatically",
@@ -1813,7 +1827,21 @@
         "elevenVoiceLabel": "Voice ID",
         "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
         "promptLabel": "Summary Prompt",
-        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+        "promptDescription": "Instructions for generating the brief spoken summary of each answer.",
+        "kokoroVoices": {
+          "usFemale": "{{name}} (US female)",
+          "usFemaleSoft": "{{name}} (US female, soft)",
+          "usMale": "{{name}} (US male)",
+          "ukFemale": "{{name}} (UK female)",
+          "ukMale": "{{name}} (UK male)"
+        },
+        "dtypes": {
+          "fp32": "fp32 (best quality, WebGPU)",
+          "fp16": "fp16 (half precision)",
+          "q8": "q8 (8-bit, fast on CPU)",
+          "q4": "q4 (4-bit, fastest)",
+          "q4f16": "q4f16 (4-bit mixed)"
+        }
       },
       "appearance": {
         "title": "Panel appearance",
@@ -2085,7 +2113,10 @@
     "saveFailed": "Couldn't save that change. Try again.",
     "more": "More",
     "hideTips": "Hide tips",
-    "showTips": "Show tips"
+    "showTips": "Show tips",
+    "play": "Play",
+    "pause": "Pause",
+    "unknownSize": "Unknown size"
   },
   "accessibility": {
     "permissionsRequired": "Accessibility permissions required",
@@ -2107,6 +2138,11 @@
     "recordingFailed": "Couldn't start recording: {{error}}",
     "modelLoadFailed": "Couldn't load model: {{model}}",
     "modelLoadFailedUnknown": "unknown model",
+    "loadModelsFailed": "Couldn't load models: {{error}}",
+    "switchModelFailed": "Couldn't switch models: {{error}}",
+    "cancelDownloadFailed": "Couldn't cancel the download: {{error}}",
+    "deleteModelFailed": "Couldn't delete the model: {{error}}",
+    "extractModelFailed": "Couldn't extract the model: {{error}}",
     "downloadFailedTitle": "Download failed",
     "pasteFailedTitle": "Couldn't paste text",
     "pasteFailed": "The text couldn't be pasted into the active app."
@@ -2271,14 +2307,14 @@
     "insertShort": "Insert",
     "insertReplace": "Replace your selected text with this",
     "insertReplaceShort": "Replace",
-    "selectionAttached": "{{count}} character selected",
+    "selectionAttached_one": "{{count}} character selected",
     "selectionAttached_other": "{{count}} characters selected",
     "regenerate": "Regenerate answer (the old one stays in History)",
     "summarizing": "Summarizing earlier messages…",
     "screenAttached": "Screen",
     "attach": {
       "file": "Attach an image or file",
-      "imageCount": "{{count}} image",
+      "imageCount_one": "{{count}} image",
       "imageCount_other": "{{count}} images",
       "dropHint": "Drop to attach"
     },

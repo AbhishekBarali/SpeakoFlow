@@ -77,24 +77,19 @@ import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 /** The built-in (local) llama.cpp provider id, mirrored from the backend. */
 const BUILTIN_PROVIDER_ID = "builtin";
 
-const KOKORO_DTYPES = [
-  { value: "fp32", label: "fp32 (best quality, WebGPU)" },
-  { value: "fp16", label: "fp16 (half precision)" },
-  { value: "q8", label: "q8 (8-bit, fast on CPU)" },
-  { value: "q4", label: "q4 (4-bit, fastest)" },
-  { value: "q4f16", label: "q4f16 (4-bit mixed)" },
-];
+const KOKORO_DTYPES = ["fp32", "fp16", "q8", "q4", "q4f16"] as const;
 
+/** Voice names stay as-is; only the accent/gender descriptor is translated. */
 const KOKORO_VOICES = [
-  { value: "af_heart", label: "Heart (US female)" },
-  { value: "af_bella", label: "Bella (US female)" },
-  { value: "af_nicole", label: "Nicole (US female, soft)" },
-  { value: "af_sky", label: "Sky (US female)" },
-  { value: "am_adam", label: "Adam (US male)" },
-  { value: "am_michael", label: "Michael (US male)" },
-  { value: "bf_emma", label: "Emma (UK female)" },
-  { value: "bm_george", label: "George (UK male)" },
-];
+  { value: "af_heart", name: "Heart", kind: "usFemale" },
+  { value: "af_bella", name: "Bella", kind: "usFemale" },
+  { value: "af_nicole", name: "Nicole", kind: "usFemaleSoft" },
+  { value: "af_sky", name: "Sky", kind: "usFemale" },
+  { value: "am_adam", name: "Adam", kind: "usMale" },
+  { value: "am_michael", name: "Michael", kind: "usMale" },
+  { value: "bf_emma", name: "Emma", kind: "ukFemale" },
+  { value: "bm_george", name: "George", kind: "ukMale" },
+] as const;
 
 /** Quick-pick playback speeds for the TTS speed control. Users can also type
  *  an arbitrary value (clamped to 0.25–4 by the backend). */
@@ -1682,7 +1677,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     grouped={true}
                   >
                     <Dropdown
-                      options={KOKORO_VOICES}
+                      options={KOKORO_VOICES.map((voice) => ({
+                        value: voice.value,
+                        label: t(
+                          `settings.assistant.tts.kokoroVoices.${voice.kind}`,
+                          { name: voice.name },
+                        ),
+                      }))}
                       selectedValue={
                         settings?.assistant_tts_voice ?? "af_heart"
                       }
@@ -1983,7 +1984,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     grouped={true}
                   >
                     <Dropdown
-                      options={KOKORO_DTYPES}
+                      options={KOKORO_DTYPES.map((value) => ({
+                        value,
+                        label: t(`settings.assistant.tts.dtypes.${value}`),
+                      }))}
                       selectedValue={
                         settings?.assistant_tts_kokoro_dtype ?? "fp32"
                       }

@@ -18,7 +18,11 @@ import type { ModelCardStatus } from "@/components/onboarding";
 import { isLegacyModel } from "@/components/onboarding";
 import { useModelStore } from "@/stores/modelStore";
 import { useSettings } from "@/hooks/useSettings";
-import { LANGUAGES } from "@/lib/constants/languages.ts";
+import {
+  languageLabel,
+  languageMatches,
+  localizedLanguages,
+} from "@/lib/constants/languages.ts";
 import {
   getModelCategory,
   type ModelCategory,
@@ -77,7 +81,7 @@ interface ModelsSettingsProps {
 export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
   lockedCategory,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [switchingModelId, setSwitchingModelId] = useState<string | null>(null);
   const [categoryTab, setCategoryTab] = useState<ModelCategory>("stt");
   const categoryFilter = lockedCategory ?? categoryTab;
@@ -135,22 +139,20 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     }
   }, [languageDropdownOpen]);
 
-  // filtered languages for dropdown (exclude "auto")
+  // filtered languages for dropdown (exclude "auto"), named in the UI language
   const filteredLanguages = useMemo(() => {
-    return LANGUAGES.filter(
-      (lang) =>
-        lang.value !== "auto" &&
-        lang.label.toLowerCase().includes(languageSearch.toLowerCase()),
+    return localizedLanguages(i18n.language).filter(
+      (lang) => lang.value !== "auto" && languageMatches(lang, languageSearch),
     );
-  }, [languageSearch]);
+  }, [languageSearch, i18n.language]);
 
   // Get selected language label
   const selectedLanguageLabel = useMemo(() => {
     if (languageFilter === "all") {
       return t("settings.models.filters.allLanguages");
     }
-    return LANGUAGES.find((lang) => lang.value === languageFilter)?.label || "";
-  }, [languageFilter, t]);
+    return languageLabel(languageFilter, i18n.language);
+  }, [languageFilter, t, i18n.language]);
 
   const getModelStatus = (modelId: string): ModelCardStatus => {
     if (modelId in extractingModels) {
@@ -467,9 +469,7 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     const languageText =
       languages.length === 1
         ? t("modelSelector.capabilities.languageOnly", {
-            language:
-              LANGUAGES.find((lang) => lang.value === languages[0])?.label ??
-              languages[0],
+            language: languageLabel(languages[0], i18n.language),
           })
         : languages.length > 1
           ? t("modelSelector.capabilities.multiLanguage")

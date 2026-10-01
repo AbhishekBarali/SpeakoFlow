@@ -14,17 +14,111 @@
   },
   "tray": {
     "home": "ホーム",
+    "openAssistant": "アシスタントを開く",
     "checkUpdates": "アップデートを確認…",
+    "sendFeedback": "フィードバックを送信…",
     "copyLastTranscript": "最新の文字起こしをコピー",
     "unloadModel": "モデルをアンロード",
     "model": "モデル",
     "quit": "終了",
     "cancel": "キャンセル"
   },
+  "updates": {
+    "check": "アップデートを確認",
+    "checking": "確認中…",
+    "upToDate": "最新バージョンです",
+    "checkFailed": "アップデートを確認できませんでした。接続を確認して、もう一度お試しください。",
+    "noBuild": "新しいバージョンはこのシステム向けにはまだ提供されていません。",
+    "available": "バージョン {{version}} が利用可能です",
+    "availableShort": "アップデートあり",
+    "installNow": "今すぐアップデート",
+    "downloading": "ダウンロード中… {{progress}}%",
+    "downloadingUnknown": "ダウンロード中…",
+    "installing": "インストール中…",
+    "restart": "今すぐ再起動",
+    "readyToRestart": "アップデートをインストールしました。SpeakoFlowを再起動すると使えるようになります。",
+    "installFailed": "アップデートをインストールできませんでした。もう一度試すか、インストーラーをダウンロードしてご自身で実行してください。",
+    "downloadFailed": "ダウンロードが完了しませんでした。接続を確認して、もう一度お試しください。",
+    "downloadInstaller": "インストーラーをダウンロード",
+    "downloadInstead": "代わりにインストーラーをダウンロード",
+    "downloadNewVersion": "新しいバージョンをダウンロード",
+    "installerSaved": "インストーラーはダウンロードフォルダーにあります",
+    "openInstaller": "インストーラーを実行",
+    "showInFolder": "フォルダーで表示",
+    "viewRelease": "GitHubで見る",
+    "hint": {
+      "windows": "SpeakoFlowが終了し、アップデートをインストールして再び起動します。ほかに操作は必要ありません。",
+      "macos": "SpeakoFlowが新しいバージョンで再起動します。その後、macOSからマイクとアクセシビリティの許可を再度求められることがあります。",
+      "linux": "SpeakoFlowが新しいバージョンで再起動します。.debでのインストールでは、最初にパスワードを求められます。"
+    },
+    "modes": {
+      "portable": "これはポータブル版のため、自身を置き換えることができません。新しいバージョンをダウンロードし、Dataフォルダーをそこにコピーしてください。",
+      "packageManager": "SpeakoFlowはパッケージマネージャーでインストールされているため、そちらでアップデートしてください（例：yay -Syu speakoflow-bin）。",
+      "download": "このコピーはその場でアップデートできません。インストーラーをダウンロードして実行し、新しいバージョンを入手してください。"
+    },
+    "pill": {
+      "available": "アップデートあり",
+      "version": "バージョン {{version}}",
+      "progress": "アップデート中… {{progress}}%",
+      "working": "アップデート中…",
+      "restart": "再起動してアップデート",
+      "installerReady": "インストーラーをダウンロードしました"
+    }
+  },
+  "feedback": {
+    "button": "フィードバックを送信",
+    "title": "フィードバックを送信",
+    "description": "メッセージはすべて私自身が読んでいます。思ったままに書いてください。SpeakoFlowをより良くするためのご協力に感謝します。",
+    "kind": {
+      "label": "フィードバックの種類",
+      "bug": "不具合",
+      "idea": "アイデア",
+      "question": "質問"
+    },
+    "placeholder": {
+      "bug": "何が起きましたか？本来はどうなるはずでしたか？",
+      "idea": "SpeakoFlowがどうなれば、もっと使いやすくなりますか？",
+      "question": "知りたいことは何ですか？"
+    },
+    "messageLabel": "メッセージ",
+    "emailLabel": "返信先のメールアドレス",
+    "emailPlaceholder": "返信をご希望の場合はメールアドレス",
+    "emailInvalid": "メールアドレスの形式が正しくないようです。",
+    "includeSystem": "アプリのバージョンとOSを含める",
+    "systemDetails": "送信内容：{{system}}",
+    "remaining": "残り {{count}} 文字",
+    "screenshots": {
+      "add": "スクリーンショットを追加",
+      "pasteHint": "または {{shortcut}} で貼り付け",
+      "remove": "スクリーンショット {{index}} を削除",
+      "preview": "スクリーンショット {{index}}、{{width}} × {{height}}、{{size}}",
+      "working": "スクリーンショットを縮小中…",
+      "limit": "スクリーンショットは {{count}} 枚まで添付できます。",
+      "notImage": "このファイルは画像ではありません。",
+      "tooLarge": "この画像は大きすぎて添付できません。",
+      "unreadable": "この画像を読み込めませんでした。"
+    },
+    "send": "送信",
+    "sending": "送信中…",
+    "sentTitle": "ありがとうございます。送信しました",
+    "sentBody": "無事に届きました。近いうちに読ませていただきます。",
+    "sentWithEmail": "確認したいことがあれば、{{email}} 宛てにご連絡します。",
+    "screenshotsDropped_other": "{{count}} 枚のスクリーンショットを保存できませんでしたが、メッセージは届いています。",
+    "sendAnother": "もう一件送る",
+    "errors": {
+      "generic": "フィードバックを送信できませんでした。メッセージはここに残っているので、少し待ってからもう一度お試しください。"
+    },
+    "aboutRow": {
+      "title": "フィードバック",
+      "description": "不具合の報告、アイデアの提案、質問などをお送りください。",
+      "button": "フィードバックを送信"
+    }
+  },
   "sidebar": {
     "general": "一般",
     "dictation": "音声入力",
     "assistant": "アシスタント",
+    "meetings": "ミーティング",
     "history": "履歴",
     "about": "概要",
     "debug": "デバッグ",
@@ -43,16 +137,104 @@
     "general": "ショートカット、マイク、アプリの見た目。",
     "dictation": "音声をテキストに変換するモデルと、その整形方法。",
     "assistant": "アシスタントを設定し、音声、画面認識、ウェブ検索を調整します。",
+    "meetings": "通話を録音し、話者ごとに分けて読み返し、メモにまとめます。",
     "history": "このデバイスに保存されている、最近の音声入力、Flowでの生成、アシスタントのチャット。",
     "about": "バージョン、アプリの言語、データの保存場所、クレジット。",
     "debug": "診断と開発者向けツール。"
   },
   "onboarding": {
+    "flow": {
+      "progress": "ステップ {{current}}/{{total}}",
+      "steps": {
+        "setup": "設定",
+        "tour": "ツアー",
+        "finish": "開始"
+      }
+    },
+    "setup": {
+      "installed": "インストール済み",
+      "loadFailed": "モデルの一覧を読み込めませんでした。",
+      "retry": "再試行"
+    },
+    "tour": {
+      "features": "SpeakoFlowでできること",
+      "count": "{{current}}/{{total}}",
+      "skip": "ツアーをスキップ",
+      "next": "次へ",
+      "done": "続ける",
+      "tabs": {
+        "dictate": "音声入力",
+        "ask": "アシスタント",
+        "call": "通話"
+      },
+      "keys": {
+        "hold": "押している間だけ録音",
+        "tap": "押して開始、もう一度押して停止",
+        "call": "押して開始、もう一度押して終了"
+      },
+      "mail": {
+        "window": "新規メッセージ",
+        "to": "宛先",
+        "toValue": "佐藤さん",
+        "subject": "件名",
+        "subjectValue": "金曜日の件"
+      },
+      "dictate": {
+        "title": "話せば、\n文字になる。",
+        "cleanup": "必要なときはAI整形も",
+        "said": "佐藤さん、打ち合わせを金曜日に変更できますか？それまでに予算をお送りします。"
+      },
+      "ask": {
+        "title": "何でも\n聞いてみよう。",
+        "chips": {
+          "translate": "翻訳",
+          "decline": "返信を書く",
+          "explain": "説明",
+          "anything": "…何でも"
+        },
+        "examples": {
+          "translate": {
+            "window": "メッセージ",
+            "doc": "打ち合わせを金曜日に変更できますか？",
+            "question": "これを英語に翻訳して",
+            "answer": "Can we move our call to Friday?"
+          },
+          "decline": {
+            "window": "メール",
+            "doc": "お疲れさまです。木曜日15時からの企画レビューにご参加いただけますか？",
+            "question": "木曜日は参加できないと丁寧に返信して",
+            "answer": "お誘いありがとうございます。あいにく木曜日の15時は都合がつきませんが、金曜日の午前でしたら空いております。"
+          },
+          "explain": {
+            "window": "ブラウザー",
+            "doc": "The API returns 429 Too Many Requests.",
+            "question": "これはどういう意味？",
+            "answer": "サービスが許可する速さを超えてリクエストを送っています。少し待ってから、ペースを落としてもう一度お試しください。"
+          }
+        }
+      },
+      "call": {
+        "title": "または、\n話し合うだけ。",
+        "you": "あなた",
+        "assistant": "アシスタント",
+        "said": "金曜日のチームミーティングで話す短いスピーチの構成を一緒に考えて。",
+        "reply": "もちろんです。一番の成果から始めて、うまくいった理由を2つ挙げ、最後に今後の予定で締めくくりましょう。"
+      }
+    },
+    "finish": {
+      "status": {
+        "ready": "準備完了",
+        "installing": "インストール中…",
+        "percent": "{{percent}}%",
+        "retry": "再試行",
+        "waiting": "待機中"
+      }
+    },
     "subtitle": "開始するには、文字起こしモデルを選択してください",
     "steps": {
       "progress": "ステップ {{current}}/{{total}}",
       "counter": "ステップ {{current}}/{{total}} · {{label}}",
-      "speechToText": "音声認識",
+      "speechToText": "音声を聞き取る",
       "aiModel": "頭脳を与える",
       "ready": "準備完了"
     },
@@ -77,8 +259,8 @@
       "downloadStarted": "モデルをバックグラウンドでダウンロードしています。"
     },
     "aiModel": {
-      "title": "ローカルAIモデルを追加",
-      "subtitle": "応答の速さと性能で選んでください。E4B はバランスの取れた既定値で、12B はより賢い代わりに遅くなります。",
+      "title": "ローカルAIを追加（任意）",
+      "subtitle": "会話できるアシスタントと、音声入力を整える独自モデルです。どちらか一方でも、両方でも選べます。",
       "tiers": {
         "small": {
           "description": "どのマシンでも動作します。文章の整形に最適です。"
@@ -90,16 +272,16 @@
           "description": "最も的確な回答が得られ、画面を見ることもできます。"
         }
       },
-      "seesScreen": "画面を認識",
+      "seesScreen": "画像認識モデル",
       "textOnly": "テキストのみ",
       "recommendedForAssistant": "アシスタントにおすすめ",
       "download": "モデルをダウンロード",
       "useDownloaded": "ダウンロード済みのモデルを使う",
       "skip": "今はスキップ",
-      "skipHint": "これは後から「設定」→「アシスタント」→「このデバイス上」で行えます。",
+      "skipHint": "どちらも後から「設定」で追加できます。",
       "continue": "続ける",
-      "downloadingHint": "モデルはバックグラウンドでダウンロード中です。すぐにアプリを使い始められます。",
-      "downloadStarted": "AIモデルをバックグラウンドでダウンロードしています。"
+      "downloadingHint": "バックグラウンドでダウンロードされます。すぐにアプリを使い始められます。",
+      "downloadStarted": "モデルをバックグラウンドでダウンロードしています。"
     },
     "cleanup": {
       "cardTitle": "SpeakoFlow Mini",
@@ -126,8 +308,8 @@
     },
     "errors": {
       "selectModel": "そのモデルを選択できませんでした。もう一度お試しください。",
-      "loadModels": "利用可能なモデルの読み込みに失敗しました",
-      "downloadModel": "モデルのダウンロードに失敗しました: {{error}}"
+      "loadModels": "利用可能なモデルを読み込めませんでした。",
+      "downloadModel": "モデルをダウンロードできませんでした: {{error}}"
     },
     "downloadProgress": {
       "sizeOf": "{{downloaded}} / {{total}} · {{percentage}}%"
@@ -176,7 +358,7 @@
         "description": "日常会話に最も速い現行のGemma。複雑な依頼には力不足です。"
       },
       "gemma-4-e4b": {
-        "description": "会話におすすめ：思考を既定で使わず、品質と速度のバランスに優れます。"
+        "description": "品質と速度のバランスがさらに良く、既定では思考を使いません。"
       },
       "gemma-4-12b": {
         "description": "細かなニュアンスのある質問に強い一方、明らかに低速で、高性能なGPUが必要です。"
@@ -193,19 +375,19 @@
       },
       "medium": {
         "name": "Whisper Medium",
-        "description": "良好な精度、中程度の速度"
+        "description": "良好な精度で、速度は中程度です。"
       },
       "turbo": {
         "name": "Whisper Turbo",
-        "description": "精度と速度のバランスが良い。"
+        "description": "精度と速度のバランス型です。"
       },
       "large": {
         "name": "Whisper Large",
-        "description": "良好な精度、ただし低速。"
+        "description": "非常に高精度ですが、低速です。"
       },
       "parakeet-tdt-0.6b-v2": {
         "name": "Parakeet V2",
-        "description": "英語のみ。英語話者に最適なモデル。"
+        "description": "英語のみ。英語話者に最適です。"
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
@@ -217,39 +399,39 @@
       },
       "moonshine-tiny-streaming-en": {
         "name": "Moonshine V2 Tiny",
-        "description": "超高速、英語のみ"
+        "description": "超高速。英語のみ。"
       },
       "moonshine-small-streaming-en": {
         "name": "Moonshine V2 Small",
-        "description": "高速、英語のみ。速度と精度のバランスが良い。"
+        "description": "高速、英語のみ。速度と精度のバランスが良好です。"
       },
       "moonshine-medium-streaming-en": {
         "name": "Moonshine V2 Medium",
-        "description": "英語のみ。高品質。"
+        "description": "英語のみ。より高品質ですが、やや低速です。"
       },
       "breeze-asr": {
         "name": "Breeze ASR",
-        "description": "台湾華語に最適化。コードスイッチングに対応。"
+        "description": "台湾華語向けに調整され、英語の混在にも対応します。"
       },
       "sense-voice-int8": {
         "name": "SenseVoice",
-        "description": "非常に高速。中国語、英語、日本語、韓国語、広東語。"
+        "description": "非常に高速。中国語、英語、日本語、韓国語、広東語に対応。"
       },
       "gigaam-v3-e2e-ctc": {
         "name": "GigaAM v3",
-        "description": "ロシア語音声認識。高速かつ高精度。"
+        "description": "ロシア語のみ。高速かつ高精度です。"
       },
       "canary-180m-flash": {
         "name": "Canary 180M Flash",
-        "description": "非常に高速。英語、ドイツ語、スペイン語、フランス語。翻訳対応。"
+        "description": "非常に高速。英語、ドイツ語、スペイン語、フランス語に対応し、翻訳もできます。"
       },
       "canary-1b-v2": {
         "name": "Canary 1B v2",
-        "description": "高精度な多言語対応。25のヨーロッパ言語。翻訳対応。"
+        "description": "25のヨーロッパ言語で高精度。翻訳にも対応します。"
       },
       "cohere-int8": {
         "name": "Cohere",
-        "description": "大型で低速ですが、非常に高精度な多言語モデル。"
+        "description": "大型で低速ですが、非常に高精度です。多言語に対応。"
       }
     },
     "permissions": {
@@ -271,15 +453,71 @@
       "waiting": "待機中…",
       "allGranted": "準備完了！",
       "errors": {
-        "checkFailed": "権限の確認に失敗しました。もう一度お試しください。",
-        "requestFailed": "権限のリクエストに失敗しました。もう一度お試しください。",
+        "checkFailed": "権限を確認できませんでした。もう一度お試しください。",
+        "requestFailed": "権限をリクエストできませんでした。もう一度お試しください。",
         "resetFailed": "権限をリセットできませんでした。アクセシビリティの一覧から SpeakoFlow を削除して、もう一度追加してください。"
       }
+    },
+    "frame": {
+      "setup": "設定",
+      "tour": "ツアー",
+      "finish": "開始"
+    },
+    "welcome": {
+      "line": "話せば入力され、聞けば答えが返ってきます。",
+      "start": "はじめる",
+      "note": "1分ほどで終わります。"
+    },
+    "speech": {
+      "title": "音声モデルを選ぶ",
+      "body": "このPC上で動作し、オフラインでも使えます。",
+      "english": "英語",
+      "languages_other": "{{count}}言語",
+      "tags": {
+        "english": "最速",
+        "languages": "言語を自動判別",
+        "small": "最小",
+        "accurate": "最高精度",
+        "widest": "低速"
+      },
+      "more_other": "ほか {{count}} 個のモデル",
+      "anytime": "モデルはいつでも追加できます。",
+      "download": "ダウンロードして続ける",
+      "continue": "続ける",
+      "later": "後で設定する",
+      "loading": "音声モデルを探しています"
+    },
+    "start": {
+      "ready": {
+        "title": "さっそく試してみましょう"
+      },
+      "downloading": {
+        "title": "もうすぐ準備完了"
+      },
+      "failed": {
+        "title": "ダウンロードが止まりました"
+      },
+      "none": {
+        "title": "音声モデルを選んで始めましょう"
+      },
+      "progress": {
+        "of": "{{done}} / {{total}}",
+        "failed": "完了しませんでした。もう一度試しますか？",
+        "underMinute": "残り1分未満",
+        "minutes_other": "残り約{{count}}分"
+      },
+      "try": {
+        "label": "音声入力を試す",
+        "placeholder": "話した言葉がここに表示されます…",
+        "success": "これで完了です。どのアプリでも使えます。"
+      },
+      "open": "SpeakoFlowを開く",
+      "choose": "音声モデルを選ぶ"
     }
   },
   "modelSelector": {
     "custom": "カスタム",
-    "active": "アクティブ",
+    "active": "使用中",
     "switching": "切替中…",
     "noModelsAvailable": "利用可能なモデルがありません",
     "verifying": "{{modelName}}を検証中…",
@@ -295,8 +533,8 @@
     "loading": "{{modelName}}を読み込み中…",
     "loadingGeneric": "読み込み中…",
     "modelError": "モデルエラー",
-    "modelUnloaded": "モデルがアンロードされました",
-    "noModelDownloadRequired": "モデルなし - ダウンロードが必要",
+    "modelUnloaded": "モデルはアンロード済み",
+    "noModelDownloadRequired": "モデルなし — ダウンロードが必要です",
     "llmSelectModel": "アシスタントモデルを選択",
     "llmModelTitle": "アシスタントモデル：{{model}}",
     "deleteModel": "{{modelName}}を削除",
@@ -380,8 +618,8 @@
       }
     },
     "modelSettings": {
-      "title": "{{model}} 設定",
-      "noSettingsNeeded": "このモデルは設定不要で自動的に動作します。"
+      "title": "{{model}}の設定",
+      "noSettingsNeeded": "このモデルは自動で動作します。設定は不要です。"
     },
     "general": {
       "title": "一般",
@@ -397,7 +635,7 @@
       },
       "shortcut": {
         "title": "ショートカット",
-        "description": "音声録音を開始するキーボードショートカットを設定",
+        "description": "録音を開始・停止するキーボードショートカットです。",
         "loading": "ショートカットを読み込み中…",
         "none": "ショートカットが設定されていません",
         "notFound": "ショートカットが見つかりません",
@@ -405,7 +643,7 @@
         "bindings": {
           "transcribe": {
             "name": "音声入力",
-            "description": "音声を録音して文字起こしするためのキーボードショートカット。"
+            "description": "押すと録音を開始し、もう一度押すと停止して入力します。"
           },
           "transcribe_toggle": {
             "name": "ハンズフリー音声入力",
@@ -413,10 +651,10 @@
           },
           "cancel": {
             "name": "キャンセル",
-            "description": "現在の録音をキャンセルするためのキーボードショートカット。"
+            "description": "現在の録音や、ストリーミング中の返答を停止します。"
           },
           "transcribe_with_post_process": {
-            "name": "後処理ホットキー",
+            "name": "音声入力して整形",
             "description": "音声入力してから、AI で整形したうえで入力します。"
           },
           "assistant": {
@@ -426,25 +664,31 @@
           "assistant_vision": {
             "name": "画面付きで聞く",
             "description": "画面を添えて音声で質問し、見ている内容をアシスタントに把握させます。"
+          },
+          "assistant_call": {
+            "name": "通話を開始",
+            "description": "ハンズフリーでアシスタントと話し、返答を音声で聞けます。もう一度押すと通話を終了します。"
           }
         },
         "errors": {
-          "restore": "元のショートカットを復元できませんでした",
+          "restore": "元のショートカットを復元できませんでした。",
           "set": "ショートカットを設定できませんでした: {{error}}",
           "reset": "ショートカットをリセットできませんでした。"
-        }
+        },
+        "clickToChange": "クリックして変更",
+        "notSet": "未設定"
       },
       "language": {
         "title": "言語",
         "description": "音声認識に使う言語。特定の言語を選ぶと精度が上がることがあります。",
-        "descriptionUnsupported": "Parakeetモデルは言語を自動的に検出します。手動選択は不要です。",
+        "descriptionUnsupported": "このモデルは言語を自動的に検出します。",
         "searchPlaceholder": "言語を検索…",
         "noResults": "言語が見つかりません",
         "auto": "自動"
       },
       "pushToTalk": {
-        "label": "プッシュトゥトーク",
-        "description": "「ホールド」は、音声入力ショートカットを押している間だけ録音します。「タップ」は、一度押すと録音を開始し、もう一度押すと停止します。",
+        "label": "録音の操作方法",
+        "description": "ホールド：録音ショートカットを押している間だけ録音します。タップ：一度押すと開始し、もう一度押すと停止します。すべての録音ショートカットに適用されます。",
         "hold": "ホールド",
         "tap": "タップ"
       },
@@ -456,14 +700,14 @@
       }
     },
     "models": {
-      "title": "転写モデル",
+      "title": "文字起こしモデル",
       "description": "モデルによって精度と速度のバランスが変わります——お使いのマシンに合うものを選んでください。",
       "yourModels": "ダウンロード済みモデル",
       "availableModels": "ダウンロード可能",
       "downloaded": "ダウンロード済み",
       "available": "ダウンロード可能",
-      "deleteConfirm": "{{modelName}}を削除してもよろしいですか？再度使用するにはダウンロードが必要です。",
-      "deleteActiveConfirm": "{{modelName}}は現在使用中のモデルです。削除すると、新しいモデルを選択するまで文字起こしが停止します。本当に削除しますか？",
+      "deleteConfirm": "{{modelName}}を削除してもよろしいですか？再び使うにはダウンロードし直す必要があります。",
+      "deleteActiveConfirm": "{{modelName}}は使用中のモデルです。削除すると、新しいモデルを選ぶまで文字起こしが停止します。削除してもよろしいですか？",
       "deleteTitle": "モデルを削除",
       "categories": {
         "stt": "文字起こし",
@@ -499,7 +743,6 @@
         "searchPlaceholder": "モデル名または作成者で検索…",
         "popularTitle": "人気のGGUFモデル",
         "resultsTitle": "検索結果",
-        "resultCount_one": "{{count}}件のモデル",
         "resultCount_other": "{{count}}件のモデル",
         "searching": "Hugging Faceを検索中…",
         "searchError": "検索に失敗しました。接続を確認してもう一度お試しください。",
@@ -528,9 +771,7 @@
         "linkFolder": "フォルダーをリンク",
         "linkFolderHint": "サブフォルダーも含めて自動でスキャンします。リンクできるフォルダーの数に制限はありません。",
         "fileFilter": "モデルファイル",
-        "filesAdded_one": "{{count}}件のモデルを追加しました。",
         "filesAdded_other": "{{count}}件のモデルを追加しました。",
-        "folderAdded_one": "フォルダーをリンクしました。{{count}}件のモデルが見つかりました。",
         "folderAdded_other": "フォルダーをリンクしました。{{count}}件のモデルが見つかりました。",
         "folderRemoved": "フォルダーのリンクを解除しました。ファイルはそのまま残っています。",
         "foldersTitle": "リンク済みのフォルダー",
@@ -538,13 +779,13 @@
         "removeFolder": "{{folder}}のリンクを解除",
         "rescan": "再スキャン",
         "rescanning": "再スキャン中…",
-        "rescanDone_one": "{{count}}件のローカルモデルが見つかりました。",
         "rescanDone_other": "{{count}}件のローカルモデルが見つかりました。",
         "footnote": "リンクしたフォルダーはSpeakoFlowの起動時に再スキャンされるため、後から追加したモデルも自動的に表示されます。フォルダーのリンク解除やモデルの削除は、このリストから取り除くだけです。ファイルは元の場所に残ります。",
         "removeTitle": "リストから削除しますか？",
         "removeConfirm": "「{{modelName}}」をモデルリストから削除しますか？\n\nファイル自体は元の場所に残ります:\n{{path}}",
         "missingBadge": "ファイルなし",
-        "fileMissing": "このモデルのファイルが見つかりません:\n{{path}}\n\n移動または名前が変更されたか、接続されていないドライブにある可能性があります。"
+        "fileMissing": "このモデルのファイルが見つかりません:\n{{path}}\n\n移動または名前が変更されたか、接続されていないドライブにある可能性があります。",
+        "foldersEmptyShort": "リンクされたフォルダーはまだありません。"
       }
     },
     "sound": {
@@ -557,13 +798,19 @@
       },
       "audioFeedback": {
         "label": "音声フィードバック",
-        "description": "録音の開始と停止時にサウンドを再生"
+        "description": "録音の開始時と停止時にサウンドを再生します"
       },
       "soundTheme": {
         "label": "フィードバックサウンド",
         "description": "音声入力の開始・停止時に鳴るサウンドを選択",
         "default": "デフォルト",
-        "preview": "サウンドを試聴（開始音のあとに停止音）"
+        "preview": "サウンドを試聴（開始音のあとに停止音）",
+        "themes": {
+          "marimba": "マリンバ",
+          "pop": "ポップ",
+          "click": "クリック",
+          "custom": "カスタム"
+        }
       },
       "outputDevice": {
         "title": "出力デバイス",
@@ -599,7 +846,7 @@
       },
       "experimentalToggle": {
         "label": "実験的機能",
-        "description": "まだ開発中の実験的機能を有効にします。"
+        "description": "開発中の機能を表示します。既定ではオフです。"
       },
       "lazyStreamClose": {
         "label": "文字起こし間でマイクを開いたままにする",
@@ -630,15 +877,15 @@
       },
       "startHidden": {
         "label": "非表示で起動",
-        "description": "ウィンドウを開かずにシステムトレイに起動。"
+        "description": "ウィンドウを開かずにトレイで起動します。"
       },
       "autostart": {
-        "label": "起動時に実行",
-        "description": "コンピューターにログインしたときにSpeakoFlowを自動的に起動。"
+        "label": "ログイン時に起動",
+        "description": "サインインしたときにSpeakoFlowを自動的に開きます。"
       },
       "showTrayIcon": {
         "label": "トレイアイコンを表示",
-        "description": "システムトレイにSpeakoFlowのアイコンを表示します。"
+        "description": "SpeakoFlowをシステムトレイに常駐させます。"
       },
       "closeBehavior": {
         "label": "ウィンドウを閉じたら終了する",
@@ -651,6 +898,16 @@
           "none": "なし",
           "minimal": "ミニマル",
           "live": "リアルタイム"
+        }
+      },
+      "overlayLinger": {
+        "title": "入力後もテキストを表示しておく",
+        "description": "音声入力を終えたあと、入力された内容を読んだりコピーしたりできるよう、リアルタイムカードを表示しておく時間です。カードにマウスを重ねている間は表示されたままになります。",
+        "options": {
+          "quick": "短め（1秒）",
+          "standard": "標準（3秒）",
+          "long": "長め（6秒）",
+          "extended": "かなり長め（10秒）"
         }
       },
       "overlay": {
@@ -679,7 +936,7 @@
         "title": "タイピングツール",
         "description": "「直接」貼り付け方法で使用する Linux のツール。",
         "options": {
-          "auto": "Auto（推奨）"
+          "auto": "自動（推奨）"
         }
       },
       "clipboardHandling": {
@@ -730,6 +987,18 @@
         "remove": "{{word}}を削除",
         "duplicate": "「{{word}}」は既に存在します"
       },
+      "autoLearn": {
+        "label": "修正した単語を学習する",
+        "description": "SpeakoFlowが聞き間違えた単語をあなたが直すと、その表記を覚えます。",
+        "info": "読み取るのは直前に入力したフィールドだけで、時間は約1分です。何もアップロードされず、学習した単語はすべてここに表示されます。",
+        "unsupported": "修正からの学習は、現在Windowsでのみ利用できます。上から手動で単語を追加することはできます。",
+        "learnedTitle": "修正から学習した単語",
+        "learnedEmpty": "まだ何も学習していません。音声入力したアプリで聞き間違えられた単語を直すと、ここに表示されます。",
+        "keep": "{{word}} をカスタム単語に残す",
+        "remove": "{{word}} を忘れる",
+        "clearAll": "すべて忘れる",
+        "reviewHint": "これらは推測です。チェックを入れるとカスタム単語に移動し、不要なものは削除できます。{{max}} 件を超えると古いものから消えます。"
+      },
       "textReplacements": {
         "title": "テキスト置換",
         "description": "文字起こしの中の言い回しを、よく使うテキストに置き換えます。例：「my email」が「alex@example.com」になります。",
@@ -759,14 +1028,14 @@
         "capitalization": {
           "label": "大文字小文字",
           "none": "なし",
-          "uppercase": "UPPERCASE",
-          "lowercase": "lowercase",
-          "capitalize": "Capitalize"
+          "uppercase": "大文字",
+          "lowercase": "小文字",
+          "capitalize": "先頭を大文字"
         }
       }
     },
     "postProcessing": {
-      "title": "後処理",
+      "title": "AI整形",
       "readiness": {
         "checking": "AI整形の設定を確認中…",
         "checkFailed": "AI整形の設定を確認できませんでした。",
@@ -798,8 +1067,8 @@
         "title": "ショートカット"
       },
       "tone": {
-        "title": "文体プリセット",
-        "description": "整形後の音声入力をどんな文章に仕上げるかを選びます。「整形のみ」は、言葉の雰囲気を意図的に変えずにテキストを直します。",
+        "title": "2 · 文体",
+        "description": "システムプロンプトの上に重ねて適用されます。変わるのは整形後の文章の読み味で、修正内容は変わりません。「なし」はあなたの言葉づかいをそのまま残します。",
         "options": {
           "none": "なし（整形のみ）",
           "formal": "フォーマル",
@@ -840,7 +1109,8 @@
         "baseUrl": {
           "title": "ベースURL",
           "description": "選択したプロバイダーのAPIベースURL。Custom、Local、Azure OpenAIでは編集できます（ご自身のリソースを指定してください。例：https://your-resource.openai.azure.com/openai/v1）。",
-          "placeholder": "https://api.openai.com/v1"
+          "placeholder": "https://api.openai.com/v1",
+          "managed": "ベースURLは選択したプロバイダーが管理します。"
         },
         "apiKey": {
           "title": "APIキー",
@@ -855,8 +1125,8 @@
         },
         "model": {
           "title": "モデル",
-          "descriptionApple": "オプションの数値トークン制限を指定するか、デフォルトのオンデバイスプリセットを使用。",
-          "descriptionCustom": "カスタムエンドポイントが期待するモデル識別子を指定。",
+          "descriptionApple": "任意で長さの上限を数値で指定するか、既定のオンデバイスプリセットのままにします。",
+          "descriptionCustom": "カスタムプロバイダーが求めるモデル識別子を入力します。",
           "descriptionDefault": "選択したプロバイダーが提供するモデルを選択。",
           "placeholderApple": "Apple Intelligence",
           "placeholderWithOptions": "モデルを検索または選択",
@@ -867,8 +1137,8 @@
       "prompts": {
         "title": "プロンプト",
         "selectedPrompt": {
-          "title": "選択したプロンプト",
-          "description": "文字起こしを改善するテンプレートを選択するか、新しく作成します。プロンプトテキスト内で${output}を使用して、キャプチャした文字起こしを参照します。"
+          "title": "プロンプト",
+          "description": "基本の指示です。モデルが何を直し、何を変えてはいけないかを決めます。文字起こしのテキストは別に送られるため、指示だけを書いてください。"
         },
         "noPrompts": "プロンプトがありません",
         "nonePrompt": "なし（プロンプトなし）",
@@ -879,7 +1149,7 @@
         "promptLabel": "プロンプト名",
         "promptLabelPlaceholder": "プロンプト名を入力",
         "promptInstructions": "プロンプトの指示",
-        "promptInstructionsPlaceholder": "文字起こし後に実行する指示を記述します。例：以下のテキストの文法と明瞭さを改善してください: ${output}",
+        "promptInstructionsPlaceholder": "文字起こしを整える指示を書きます。例：文法と句読点を直し、洗練されたビジネス向けのメッセージに書き直してください。",
         "promptTip": "ヒント：文字起こしされたテキストは自動でモデルに送られるので、指示だけを書いてください。（<code>${output}</code> を使う古いプロンプトも動作します。）",
         "updatePrompt": "プロンプトを更新",
         "deletePrompt": "プロンプトを削除",
@@ -887,7 +1157,7 @@
         "createPrompt": "プロンプトを作成",
         "cancel": "キャンセル",
         "selectToEdit": "上からプロンプトを選択して、詳細を表示・編集します。",
-        "createFirst": "上の「新しいプロンプトを作成」をクリックして、最初の後処理プロンプトを作成してください。"
+        "createFirst": "上の「新しいプロンプトを作成」をクリックして、最初の整形用プロンプトを作成してください。"
       }
     },
     "dictation": {
@@ -905,6 +1175,66 @@
       "catalog": {
         "title": "モデルを選択",
         "description": "どのモデルもお使いのマシン上で動作します — 精度と速度のバランスから、合うものを選んでください。"
+      },
+      "cloud": {
+        "groupTitle": "文字起こしの実行場所",
+        "engine": {
+          "title": "音声認識エンジン",
+          "description": "このPC上で実行するか、APIキーを用意したクラウドプロバイダーを使います。",
+          "info": "「このデバイス上」では、ダウンロードしたモデルを使います。プライベートで無料、オフラインでも動作します。「クラウド」では、選んだプロバイダーに録音を送信し、音声1分ごとにプロバイダーから課金されます。その代わり、ダウンロードやGPUなしで最先端のモデルを使えます。"
+        },
+        "bypassNotice": "クラウド文字起こしがオンのため、上のモデルは使われず、読み込まれません。",
+        "provider": {
+          "title": "プロバイダー"
+        },
+        "key": {
+          "title": "APIキー",
+          "stored": "キーはシステムのキーチェーンに保存されています。",
+          "missing": "このプロバイダーのキーはまだ保存されていません。",
+          "placeholder": "APIキーを貼り付け",
+          "replacePlaceholder": "新しいキーを貼り付けて、保存済みのキーを置き換え",
+          "save": "保存",
+          "saved": "APIキーを保存しました",
+          "clear": "削除",
+          "getOne": "キーを取得"
+        },
+        "endpoint": {
+          "title": "エンドポイント",
+          "description": "OpenAI互換の文字起こしサーバーのベースURL。",
+          "azureDescription": "Azureリソースのエンドポイント。Azureポータルの「キーとエンドポイント」で確認できます。MAI-Transcribeには、インド中部、東南アジア、米国東部、米国西部、米国西部2、北ヨーロッパのいずれかのリソースが必要です。",
+          "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
+        },
+        "model": {
+          "title": "モデル",
+          "info": "プロバイダーが提供するモデル名を入力するか、一覧を読み込んでください。ElevenLabsの場合、話しながら文字起こしするには scribe_v2_realtime を、話し終えてから文字起こしするには scribe_v2 を選びます。",
+          "load": "モデルを読み込む"
+        },
+        "streaming": {
+          "label": "話しながら文字起こし",
+          "description": "話している間にテキストが届くため、キーを離したときに処理されるのは最後の数語だけです。",
+          "needsRealtimeModel": "この機能を使うには、上でリアルタイムモデルを選んでください。現在のモデルは話し終えてからしか文字起こしできません。"
+        },
+        "keyterms": {
+          "label": "カスタム単語を送信",
+          "description": "カスタム単語をプロバイダーに渡し、その表記を優先して認識させます。"
+        },
+        "noVerbatim": {
+          "label": "フィラーを除去",
+          "description": "「えー」「あのー」、言い直し、繰り返しを取り除きます。オフにすると、話した内容を一語一句そのまま受け取れます。"
+        },
+        "language": {
+          "description": "あなたが話す言語。ここにあるプロバイダーはすべて同じ言語で結果を返します。事前に指定すると精度が上がり、「自動」にすると言語を自動で判別します。"
+        },
+        "translate": {
+          "supported": "{{provider}}は、話した言語の代わりに英語で結果を返せます。英語のみです。ほかの言語に翻訳できる文字起こしAPIはありません。",
+          "unsupported": "{{provider}}は話した言語で文字起こしを行い、翻訳用のエンドポイントがないため、ここでは使えません。デバイス上のエンジンや、OpenAI、Groq、自前のWhisperサーバーでは動作します。"
+        },
+        "test": {
+          "title": "接続をテスト",
+          "description": "1秒間の音声を送信して、キー、エンドポイント、モデルを確認します。",
+          "action": "テストを実行",
+          "running": "テスト中…"
+        }
       },
       "aiCleanup": {
         "groupTitle": "AI整形",
@@ -925,13 +1255,13 @@
           "recommendedTitle": "整形におすすめ",
           "recommendedDescription": "SpeakoFlow Mini はこの仕事だけのために学習しており、はるかに大きなモデルよりも優れています。"
         },
-        "promptGroupTitle": "整形用のプロンプト",
+        "promptGroupTitle": "整形の指示",
         "tunedModelNotice": "このモデルは英語の音声入力の整形に特化してファインチューニングされているため、推奨プロンプトで文体を指定しないときに最も高い性能を発揮します。",
         "tunedModelNoticeDismiss": "このヒントを隠す",
         "tunedModelNoticeRestore": "モデルのヒントを表示",
         "title": "音声入力をAIで整える",
         "caption": "実験的機能 — 音声入力のあとに句読点やつなぎ言葉を整えます。",
-        "info": "音声入力の結果に言語モデルを通し、句読点を整え、つなぎ言葉を削除し、必要に応じてトーンも調整します。対象は音声入力のみで、専用のショートカットで動作します。話し終えたあとに少し遅延が生じ、モデルが失敗またはタイムアウトした場合は元のテキストが使われます。まだ開発中の機能です。"
+        "info": "整形は、話した内容を入力する前にAIモデルで書き直します。少し時間がかかることがあり、遅い場合は元の言葉がそのまま使われます。"
       },
       "spokenEmoji": {
         "title": "音声で絵文字",
@@ -960,7 +1290,7 @@
       "filters": {
         "label": "履歴の種類",
         "all": "すべて",
-        "recordings": "Recordings",
+        "recordings": "音声入力",
         "flow": "Flow",
         "assistant": "アシスタントのチャット"
       },
@@ -984,48 +1314,56 @@
       "save": "文字起こしを保存",
       "unsave": "保存から削除",
       "delete": "エントリーを削除",
-      "deleteError": "エントリーの削除に失敗しました。もう一度お試しください。",
+      "deleteError": "エントリーを削除できませんでした。もう一度お試しください。",
       "retranscribe": "再文字起こし",
-      "retranscribeError": "再文字起こしに失敗しました。もう一度お試しください。",
+      "retranscribeError": "再文字起こしできませんでした。もう一度お試しください。",
       "transcribing": "文字起こし中…",
-      "transcriptionFailed": "文字起こしに失敗しました。リトライアイコンを使用して再文字起こしできます。",
+      "transcriptionFailed": "文字起こしに失敗しました。リトライアイコンでもう一度お試しください。",
       "assistantLabel": "アシスタントのチャット",
       "copyConversation": "会話をコピー",
       "resumeConversation": "この会話をアシスタントで続ける",
+      "branchConversation": "ここから新しい会話として続けます。この会話はそのまま残ります。",
       "showConversation": "会話を表示",
       "hideConversation": "会話を隠す",
       "roleUser": "あなた",
       "roleAssistant": "アシスタント",
       "screenshotAttached": "画面",
-      "messageCount_one": "{{count}}件のメッセージ",
       "messageCount_other": "{{count}}件のメッセージ",
-      "deleteAssistantError": "会話を削除できませんでした。もう一度お試しください。"
+      "deleteAssistantError": "会話を削除できませんでした。もう一度お試しください。",
+      "openFolderError": "録音フォルダーを開けませんでした。"
     },
     "debug": {
       "title": "デバッグ",
       "logDirectory": {
         "title": "ログディレクトリ",
-        "description": "ログファイルの保存場所"
+        "description": ""
       },
       "logLevel": {
         "title": "ログレベル",
-        "description": "ログの詳細度を設定"
+        "description": "",
+        "levels": {
+          "error": "エラー",
+          "warn": "警告",
+          "info": "情報",
+          "debug": "デバッグ",
+          "trace": "トレース"
+        }
       },
       "updateChecks": {
-        "label": "アップデートを確認",
-        "description": "SpeakoFlowの新しいバージョンを自動的にチェック"
+        "label": "アップデートを自動的に確認",
+        "description": "SpeakoFlowの起動時と12時間ごとに新しいバージョンを確認します。いつでも手動で確認することもできます。"
       },
       "soundTheme": {
         "label": "サウンドテーマ",
-        "description": "録音開始・停止フィードバックのサウンドテーマを選択"
+        "description": ""
       },
       "wordCorrectionThreshold": {
         "title": "単語修正しきい値",
         "description": "カスタム単語修正の感度"
       },
       "historyLimit": {
-        "title": "履歴上限",
-        "description": "保存していない音声入力とFlowの録音を、最大でいくつ残すか。保存済みの録音は常に残り、アシスタントのチャットは数に含まれません。",
+        "title": "録音の上限",
+        "description": "スターを付けていない音声入力とFlowの録音を、最大でいくつ残すかを指定します。スター付きの録音は常に残り、アシスタントのチャットは数に含まれません。設定できる最小値は1です。",
         "entries": "件の録音"
       },
       "recordingRetention": {
@@ -1036,9 +1374,19 @@
         "days3": "3日後",
         "weeks2": "2週間後",
         "months3": "3ヶ月後",
+        "customDays": "指定した日数が経過したら",
+        "customDaysTitle": "削除までの期間",
+        "customDaysDescription": "スターを付けていない録音は、この日数を過ぎると削除されます。スター付きの録音は常に保持されます。",
+        "days": "日",
         "placeholder": "保持期間を選択…",
         "savedToast": "保持期間を保存しました。",
-        "appliedToast": "録音の保持設定を適用しました"
+        "appliedToast": "録音の保持設定を適用しました",
+        "saveFailed": "保持期間の設定を保存できませんでした。",
+        "confirmTitle_other": "{{count}} 件の録音が削除されます",
+        "confirmTitleUnknown": "録音が削除される可能性があります",
+        "confirmBody": "音声と文字起こしはこのデバイスから削除され、復元できません。スター付きの録音は保持されます。",
+        "confirmAction_other": "{{count}} 件の録音を削除",
+        "confirmActionUnknown": "このまま適用"
       },
       "alwaysOnMicrophone": {
         "label": "マイク常時オン",
@@ -1049,8 +1397,8 @@
         "description": "ノートパソコンの蓋を閉じたときに使用するマイク"
       },
       "postProcessingToggle": {
-        "label": "後処理",
-        "description": "文字起こし後のAIによるテキスト改善を有効化"
+        "label": "AI整形",
+        "description": "文字起こしのあと、音声入力をAIで整えます"
       },
       "muteWhileRecording": {
         "label": "録音中にミュート",
@@ -1058,7 +1406,7 @@
       },
       "appendTrailingSpace": {
         "label": "末尾にスペースを追加",
-        "description": "貼り付けた文字起こしの後にスペースを追加"
+        "description": ""
       },
       "keyboardImplementation": {
         "title": "キーボード実装",
@@ -1072,7 +1420,7 @@
       },
       "pasteDelay": {
         "title": "貼り付け遅延",
-        "description": "貼り付けキー送信前の遅延（ミリ秒）。間違ったテキストが貼り付けられる場合は増やしてください。"
+        "description": "貼り付けるまでの待ち時間（ミリ秒）。違うテキストが貼り付けられる場合は増やしてください。"
       },
       "recordingBuffer": {
         "title": "追加録音バッファ",
@@ -1083,7 +1431,7 @@
       "title": "概要",
       "version": {
         "title": "バージョン",
-        "description": "SpeakoFlowの現在のバージョン"
+        "description": ""
       },
       "updates": {
         "title": "アップデート",
@@ -1094,12 +1442,12 @@
         "title": "フォルダ"
       },
       "appDataDirectory": {
-        "title": "アプリデータディレクトリ",
-        "description": "SpeakoFlowがデータを保存する場所"
+        "title": "アプリデータフォルダ",
+        "description": "SpeakoFlowがモデル、履歴、設定を保存する場所です。"
       },
       "sourceCode": {
         "title": "ソースコード",
-        "description": "ソースコードを見て貢献する",
+        "description": "",
         "button": "GitHubで見る"
       },
       "license": {
@@ -1109,7 +1457,7 @@
       },
       "supportDevelopment": {
         "title": "開発を支援",
-        "description": "SpeakoFlowの開発を支援してください",
+        "description": "SpeakoFlowの開発継続にご協力ください",
         "button": "寄付する"
       }
     },
@@ -1125,8 +1473,12 @@
       "brain": {
         "title": "アシスタントの頭脳",
         "whereLabel": "実行場所",
-        "onDevice": "このデバイス上",
-        "cloud": "クラウドプロバイダー",
+        "testLabel": "接続をテスト",
+        "testDescription": "短い質問を1つ送信して、アシスタントがこのモデルに実際に接続できるか確認します。デバイス上のモデルは先に読み込まれるため、初回のテストは時間がかかることがあります。",
+        "testButton": "接続をテスト",
+        "testing": "テスト中…",
+        "onDevice": "このPC上",
+        "cloud": "クラウド",
         "downloadModel": "モデルを見てダウンロード",
         "downloadModelDescription": "おすすめのモデルを選ぶか、Hugging Faceで検索します。",
         "downloadModelAction": "モデルを見る",
@@ -1147,7 +1499,7 @@
         "detailLocation": "場所",
         "detailFormat": "形式",
         "detailId": "モデルID",
-        "switchBeforeDelete": "このモデルを削除する前に、内蔵アシスタントを別のモデルに切り替えてください。",
+        "switchBeforeDelete": "このモデルは使用中です。削除する前に別のモデルに切り替えてください。",
         "deleteModelConfirm": "{{modelName}}を削除しますか？ダウンロード済みのファイルと保存された項目が削除されます。",
         "deleteModelFailed": "モデルを削除できませんでした。",
         "finderSectionTitle": "デバイス上で動く他のモデル",
@@ -1195,7 +1547,7 @@
         "builtinEngineExtracting": "ローカルエンジンをインストール中…",
         "builtinEngineReady": "ローカルエンジンの準備が完了しました。",
         "contextSizeLabel": "コンテキストウィンドウ",
-        "contextSizeDescription": "ローカルモデルが一度に把握できる量です — システムの指示、チャット履歴、スクリーンショット（画像1枚で大きく消費します）、そして回答が含まれます。大きくすると多くを保持でき、画面認識やウェブ検索も安定しますが、メモリの使用量が増えます。既定は8192で、RAMに余裕があれば16384が良い一段上の選択です。メモリを節約するために、後から下げることもできます。",
+        "contextSizeDescription": "モデルが一度に読める会話の量です。大きくすると多くを覚えていられますが、メモリの使用量が増え、読み込みも遅くなります。",
         "unloadTimeoutLabel": "メモリから解放するまでの時間",
         "unloadTimeoutDescription": "この時間だけ使われなかったローカルモデルをアンロードして、メモリを解放します。次に使うときに自動的に再読み込みされます。"
       },
@@ -1206,7 +1558,7 @@
       },
       "characters": {
         "title": "プロフィール",
-        "description": "作業に合わせて切り替えられるプロフィールです。有効なプロフィールがアシスタントの名前、役割、指示、そして返答の長さを決めます。パネルのヘッダーからいつでも切り替えられます。",
+        "description": "それぞれに名前、指示、返答の長さを持つペルソナです。パネルからいつでも切り替えられます。",
         "galleryLabel": "あなたのプロフィール",
         "editSection": "プロフィールを編集",
         "avatarLabel": "アバター",
@@ -1264,7 +1616,7 @@
       },
       "autoSummarize": {
         "label": "長い会話を要約する",
-        "description": "会話がモデルのコンテキストウィンドウを超えたら、古いメッセージを自動的に要約にまとめ、冒頭を忘れずに文脈を保ちます。処理中は控えめなインジケーターが表示されます。"
+        "description": "長いチャットを要約して、アシスタントが冒頭を忘れないようにします。"
       },
       "responseLength": {
         "label": "返答の長さ",
@@ -1327,26 +1679,84 @@
       },
       "tts": {
         "title": "音声出力",
-        "enableLabel": "回答を読み上げる",
-        "enableDescription": "アシスタントの返答を声に出して読み上げます。",
+        "enableLabel": "会話中に返答を読み上げる",
+        "enableDescription": "ライブ会話中に返答を声に出して読み上げます。テキストでのクイック回答は読み上げません。",
         "stopOnDictationLabel": "音声入力を始めたら読み上げを停止",
         "stopOnDictationDescription": "音声入力を始めたときに、再生中の返答を停止します。",
         "engineLabel": "エンジン",
-        "engineDescription": "KokoroはこのPC上で無料で動作します。クラウドエンジンは各プロバイダーのAPIキーを使います。カスタムは自分で運用する音声サーバーに接続します。",
+        "engineDescription": "このPC上の音声は無料でプライベートに使え、インターネットなしでも動作します。クラウドの音声は各プロバイダーのAPIキーを使います。カスタムは自分で運用する音声サーバーに接続します。",
+        "sectionLocal": "このPC上",
+        "sectionLocalHint": "無料でプライベート。このPC上で動作し、オフラインでも使えます。",
+        "sectionCloud": "クラウド",
+        "sectionCloudHint": "プロバイダーのAPIキーが必要です。「カスタム」では、自分で運用する音声サーバーに接続します。",
+        "readyLabel": "使用可能",
         "kokoroSetupLabel": "Kokoro音声モデル",
         "kokoroSetupDescription": "一度ダウンロードすれば、読み上げはこのデバイス上でプライベートに動作します。",
         "kokoroDownload": "Kokoroをダウンロード",
         "kokoroDownloading": "Kokoroをダウンロード中",
         "kokoroReady": "このデバイスで準備完了",
         "kokoroRetry": "もう一度ダウンロードする",
+        "runsOnLabel": "実行デバイス",
+        "runsOn": {
+          "auto": "自動",
+          "gpu": "グラフィックスカード",
+          "cpu": "プロセッサー"
+        },
+        "runsOnStatus": {
+          "checking": "グラフィックスカードが使える場合はそちらを、使えない場合はプロセッサーを使います。",
+          "gpu": "グラフィックスカードで読み上げています。",
+          "processor": "プロセッサーで読み上げています。",
+          "gpuUnusable": "このPCのグラフィックスカードでは音声を実行できないため、プロセッサーで読み上げています。",
+          "needsPack": "このPCのグラフィックスカードでは音声を実行できません。すばやく返答させるには、下のプロセッサー用音声をダウンロードしてください。",
+          "cpuNeedsPack": "下のプロセッサー用音声をダウンロードしてください。それまではKokoroがアプリ内で動作するため、低速になります。",
+          "loadFailed": "このPCではプロセッサー用音声を起動できなかったため、当面はKokoroがアプリ内で動作します。",
+          "noNativeSlow": "このPCのグラフィックスカードでは音声を実行できないため、Kokoroがアプリ内で低速に動作します。クラウドの音声のほうが高速です。",
+          "gpuForcedUnusable": "このPCのグラフィックスカードでは音声を正しく実行できません。「実行デバイス」を「自動」または「プロセッサー」に設定してください。"
+        },
+        "kokoroNativeLabel": "プロセッサー用音声",
+        "kokoroNativeDescription": "グラフィックスカードが使えないときでも、Kokoroがプロセッサー上で高速に話せるようにします。ダウンロードサイズは{{size}}です。",
+        "kittenSizeLabel": "Kittenのサイズ",
+        "kittenSizeDescription": "3つのサイズはどれも同じ8種類の音声を備えています。大きいサイズほど自然に聞こえますが、話し始めるまでに時間がかかり、特に非力なプロセッサーでは顕著です。",
+        "kittenSizes": {
+          "nano": "Nano · 最速（{{size}}）",
+          "micro": "Micro · バランス型（{{size}}）",
+          "mini": "Mini · 最も自然（{{size}}）"
+        },
+        "packLabel": {
+          "kitten": "Kittenの音声",
+          "pocket": "Pocket TTSの音声",
+          "supertonic": "Supertonicの音声"
+        },
+        "packDescription": {
+          "kitten": "プロセッサー上で動作する軽量な音声。ダウンロードサイズは{{size}}です。",
+          "pocket": "Kyutaiによる自然な響きの音声で、プロセッサー向けに作られており、14人の話者を収録。ダウンロードサイズは{{size}}です。",
+          "supertonic": "Supertoneによる高速でクリアな音声で、10人の話者を収録。ダウンロードサイズは{{size}}です。"
+        },
+        "voiceNamedFemale": "{{name}}（女性）",
+        "voiceNamedMale": "{{name}}（男性）",
+        "voiceNumberedFemale": "女性 {{n}}",
+        "voiceNumberedMale": "男性 {{n}}",
+        "packSize": "{{size}} MB",
+        "packDownload": "ダウンロード（{{size}}）",
+        "packDownloading": "ダウンロード中",
+        "packInstalling": "セットアップ中",
+        "packCancel": "ダウンロードをキャンセル",
+        "packRemove": "削除",
+        "packUnsupported": "このシステムでは利用できません",
+        "kittenSuggestLabel": "Kittenを試す",
+        "kittenSuggestDescription": "このPCのプロセッサーは非力です。Kittenは軽量な音声で、ここではより速く返答します。",
+        "kittenSuggestButton": "Kittenを使う",
         "engines": {
           "kokoro": "Kokoro（ローカル、無料）",
+          "kitten": "Kitten（ローカル、軽量）",
+          "pocket": "Pocket TTS（ローカル）",
+          "supertonic": "Supertonic（ローカル）",
           "openai": "OpenAI",
+          "elevenlabs": "ElevenLabs",
           "openrouter": "OpenRouter",
           "deepgram": "Deepgram Aura",
           "cartesia": "Cartesia Sonic",
           "google": "Google Cloud TTS",
-          "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech",
           "groq": "Groq Orpheus",
           "xai": "xAI Grok Voice",
@@ -1357,18 +1767,24 @@
         "voiceLabel": "音声",
         "voiceDescription": "読み上げに使うKokoroの音声。",
         "dtypeLabel": "Kokoroの精度",
-        "dtypeDescription": "fp32は最高品質、q8はCPUで高速です。変更するとモデルを再読み込みします。",
+        "dtypeDescription": "アプリ内で動作するKokoro専用です。fp32は最高品質、q8はサイズが小さくなります。変更するとモデルを再読み込みします。音声が乱れる場合は「実行デバイス」を「プロセッサー」に設定してください。",
         "speedLabel": "再生速度",
         "speedDescription": "1×が通常の速度です。",
         "speedRange": "{{engine}}は{{min}}×から{{max}}×に対応しています。範囲外の速度は最も近い上限・下限が使われます。",
         "speedUnsupported": "{{engine}}は常に本来の速度で話します。",
         "speedValue": "{{value}}×",
         "speedCustomLabel": "カスタム再生速度",
+        "volumeLabel": "音声の音量",
+        "volumeDescription": "読み上げる返答の音量です。フィードバックサウンドとは別に設定できます。",
         "testLabel": "音声をテスト",
         "testDescription": "現在の設定で短いサンプルを再生します。",
         "testButton": "音声をテスト",
         "testing": "テスト中…",
         "testOk": "再生しました ✓",
+        "testFailed": "Kokoroでサンプルを作成できませんでした。もう一度試すか、「実行デバイス」を「プロセッサー」に設定してください。",
+        "testGpuMoved": "グラフィックスカードでサンプルの音声が乱れたため、ミュートしました。Kokoroはプロセッサーを使うようになったので、もう一度テストして聞いてみてください。",
+        "testGpuForced": "グラフィックスカードでサンプルの音声が乱れたため、ミュートしました。「実行デバイス」を「自動」または「プロセッサー」に設定してください。",
+        "testGpuSuspect": "サンプルの音声が乱れたため、ミュートしました。もう一度テストして、グラフィックスカードを確認してください。",
         "testPhrase": "こんにちは！これはSpeakoFlowの音声出力のテストです。",
         "downloadStart": "Kokoroの音声をダウンロード中…",
         "downloadProgress": "Kokoroの音声をダウンロード中… {{progress}}%",
@@ -1400,7 +1816,21 @@
         "elevenVoiceLabel": "音声ID",
         "elevenVoiceDescription": "ElevenLabsの音声ID（ダッシュボードのVoicesタブから取得）。",
         "promptLabel": "要約プロンプト",
-        "promptDescription": "各回答の短い読み上げ用要約を生成するための指示。"
+        "promptDescription": "各回答の短い読み上げ用要約を生成するための指示。",
+        "kokoroVoices": {
+          "usFemale": "{{name}}（米国・女性）",
+          "usFemaleSoft": "{{name}}（米国・女性、柔らかめ）",
+          "usMale": "{{name}}（米国・男性）",
+          "ukFemale": "{{name}}（英国・女性）",
+          "ukMale": "{{name}}（英国・男性）"
+        },
+        "dtypes": {
+          "fp32": "fp32（最高品質、WebGPU）",
+          "fp16": "fp16（半精度）",
+          "q8": "q8（8ビット、CPUで高速）",
+          "q4": "q4（4ビット、最速）",
+          "q4f16": "q4f16（4ビット混合）"
+        }
       },
       "appearance": {
         "title": "パネルの外観",
@@ -1413,7 +1843,8 @@
         "fontSizes": {
           "small": "小",
           "medium": "中",
-          "large": "大"
+          "large": "大",
+          "extraLarge": "特大"
         },
         "panelSizeLabel": "パネルのサイズ",
         "panelSizeDescription": "フローティングのアシスタントパネル全体の大きさ。",
@@ -1422,6 +1853,22 @@
           "compact": "コンパクト",
           "standard": "標準",
           "large": "大"
+        },
+        "askDisplayLabel": "表示する画面",
+        "askDisplayDescription": "アシスタントを開く画面です。既定では、マウスがある画面に開きます。",
+        "askDisplays": {
+          "cursor": "マウスがある画面",
+          "numbered": "画面 {{number}}（{{width}}×{{height}}）{{suffix}}",
+          "mainSuffix": " · メイン"
+        },
+        "askAnchorLabel": "表示位置",
+        "askAnchorDescription": "アシスタントを毎回開く位置です。",
+        "askAnchors": {
+          "center": "画面の中央",
+          "top": "上",
+          "bottom": "下",
+          "left": "左側",
+          "right": "右側"
         },
         "opacityLabel": "パネルの不透明度",
         "opacityDescription": "フローティングパネルの不透明度。100%は完全に不透明で、値を下げるとデスクトップがぼかしで透けて見えます。"
@@ -1436,7 +1883,7 @@
     "upToDate": "最新です",
     "downloadUpdate": "アップデートをダウンロード",
     "restart": "再起動",
-    "updateCheckingDisabled": "アップデート確認無効",
+    "updateCheckingDisabled": "アップデート確認は無効です",
     "downloading": "ダウンロード中… {{progress}}%",
     "installing": "インストール中…",
     "preparing": "準備中…",
@@ -1447,6 +1894,179 @@
     "portableUpdateTitle": "手動でのアップデートが必要です",
     "portableUpdateMessage": "ポータブル版は自動でアップデートできません。アップデートするには、GitHub Releasesから最新のNSISインストーラーをダウンロードし、同じフォルダにインストールしてから、旧バージョンのData/フォルダ（設定、モデル、録音）を新しいバージョンにコピーしてください。",
     "portableUpdateButton": "GitHub Releasesを開く"
+  },
+  "meetings": {
+    "newTitle": "ミーティング {{when}}",
+    "speakers": {
+      "me": "あなた",
+      "others": "他の参加者",
+      "numbered": "話者 {{number}}"
+    },
+    "recorder": {
+      "idleTitle": "ミーティングを録音",
+      "idleCaption": "あなたのマイクと他の参加者の音声を、別々の2つのストリームとして記録します。",
+      "recording": "録音中",
+      "paused": "一時停止中",
+      "liveCaption": "話している内容をリアルタイムで文字起こししています。",
+      "start": "録音を開始",
+      "starting": "開始中…",
+      "stop": "停止",
+      "stopping": "停止中…",
+      "stoppingHint": "文字起こしを仕上げています。長いミーティングでは少し時間がかかることがあります。",
+      "pause": "一時停止",
+      "resume": "再開",
+      "transcriptEmpty": "まだ何も文字起こしされていません。話し始めるとここに表示されます。"
+    },
+    "offer": {
+      "detected": "通話中のようです。録音しますか？",
+      "detectedApp": "{{app}}で通話中のようです。録音しますか？",
+      "idle": "録音していません",
+      "record": "この通話を録音",
+      "dismiss": "今回はしない"
+    },
+    "autoDetect": {
+      "title": "通話の録音を提案する",
+      "description": "別のアプリがマイクを使い始めたことを検知して、録音を提案します。勝手に録音を始めることはありません。見当違いの場合は、カードを閉じるだけで構いません。",
+      "unsupported": "通話の検知は、現在Windowsでのみ利用できます。このシステムでは、ご自身でミーティングを開始してください。"
+    },
+    "indicator": {
+      "title": "フローティングインジケーター",
+      "description": "録音中であることを示す小さなピルです。クリックするとリアルタイムの文字起こしを表示します。オフにすると画面がすっきりします。その場合、録音はこのページに表示され、ここから停止します。",
+      "hide": "フローティングインジケーターを隠す",
+      "show": "フローティングインジケーターを表示"
+    },
+    "pill": {
+      "expand": "リアルタイムの文字起こしを開く",
+      "collapse": "小さなピルに戻る",
+      "stop": "録音を停止",
+      "listening": "聞き取り中です。話した内容がここに表示されます。",
+      "micOnly": "あなたのマイクの音声だけを記録しています。他の参加者の発言はこの文字起こしに含まれません。"
+    },
+    "ask": {
+      "placeholder": "このミーティングについて何でも質問…",
+      "send": "質問",
+      "stop": "停止",
+      "thinking": "文字起こしを読んでいます…",
+      "title": "このミーティングについて質問",
+      "empty": "決まったこと、誰が何を担当するか、そのほか話題に上がったことを質問してみましょう。",
+      "clear": "これらの質問を消去",
+      "youAsked": "あなたの質問"
+    },
+    "systemAudio": {
+      "liveTitle": "あなたの声だけを録音しています",
+      "liveBody": "システム音声を取り込めなかったため、このミーティングにはあなた側の会話だけが含まれ、他の参加者の発言は含まれません。",
+      "unavailableTitle": "このPCでは他の参加者の声を録音できません",
+      "unavailableBody": "システム音声を取り込めないため、今録音するミーティングにはあなた自身の声だけが含まれます。",
+      "help": "設定のヘルプ"
+    },
+    "list": {
+      "title": "録音したミーティング",
+      "emptyTitle": "ミーティングはまだありません",
+      "emptyHint": "通話の前に録音を開始すると、SpeakoFlowが話者ごとに分けた文字起こしを保存します。",
+      "loadMore": "さらに読み込む",
+      "speakers_other": "{{count}}人の話者",
+      "hasNotes": "メモを生成済み",
+      "notesBadge": "メモ"
+    },
+    "status": {
+      "recording": "録音中",
+      "processing": "処理中",
+      "complete": "完了",
+      "interrupted": "中断"
+    },
+    "delete": {
+      "action": "ミーティングを削除",
+      "whileRecording": "このミーティングを削除する前に、録音を停止してください。"
+    },
+    "detail": {
+      "title": "ミーティング",
+      "rename": "ミーティング名を変更",
+      "gone": "このミーティングは削除されました。",
+      "tabsLabel": "ミーティングの表示"
+    },
+    "tabs": {
+      "myNotes": "自分のメモ",
+      "transcript": "文字起こし",
+      "summary": "要約",
+      "ask": "質問"
+    },
+    "myNotes": {
+      "description": "大事だと思ったことを書き留めてください。メモを生成するときに文字起こしと統合されます。",
+      "placeholder": "このミーティングで覚えておきたいこと…",
+      "saving": "保存中…",
+      "saved": "保存しました"
+    },
+    "transcript": {
+      "empty": "このミーティングには文字起こしがありません。",
+      "loadingMore": "文字起こしの続きを読み込んでいます…",
+      "renameSpeaker": "この話者の名前を変更",
+      "lowConfidence": "不確か",
+      "lowConfidenceHelp": "この話者ラベルは推測です。発言内容は話されたとおりに文字起こしされていますが、誰の発言かは確かではありません。"
+    },
+    "diarize": {
+      "title": "話者を聞き分ける",
+      "ready": "他の参加者を話者1、話者2…のように分類します。",
+      "needsModel": "初回のみ {{size}} MB のダウンロードが必要です。その後はこのPC上で動作し、以降のミーティングには自動でラベルが付きます。",
+      "install": "ダウンロードして識別",
+      "downloading": "ダウンロード中…",
+      "identify": "話者を識別",
+      "running": "聞き取り中…",
+      "progress": "声を比較しています（{{done}}/{{total}} 区間）。",
+      "oneSpeaker": "この通話には他の声が1人分しかなかったため、聞き分ける必要がありません。",
+      "skipped": {
+        "modelNotInstalled": "話者モデルはまだインストールされていません。",
+        "noSystemAudio": "このミーティングには他の参加者の録音がありません。",
+        "audioUnreadable": "他の参加者の録音を読み込めませんでした。ミーティングの途中でアプリが終了した場合に起こります。",
+        "tooFewSegments": "他の参加者の発言が少なすぎて比較できません。",
+        "alreadyDone": "このミーティングの話者はすでに識別されています。",
+        "modelUnusable": "話者モデルを読み込めなかったため、削除しました。もう一度ダウンロードしてください。"
+      }
+    },
+    "summary": {
+      "template": "テンプレート",
+      "templates": {
+        "general": "一般",
+        "standup": "朝会",
+        "one_on_one": "1on1",
+        "interview": "面接",
+        "action_items": "アクションアイテム"
+      },
+      "templateHints": {
+        "general": "要約、要点、トピック、決定事項、次のステップ。既定のテンプレートです。",
+        "standup": "人ごとに、完了したこと、次にやること、妨げになっていることをまとめます。",
+        "one_on_one": "トピック、フィードバック、それぞれが約束したこと。",
+        "interview": "候補者に関する根拠のみをまとめ、合否の判断はしません。",
+        "action_items": "タスクだけを、あなたの分とほかの人の分に分けてまとめます。"
+      },
+      "generate": "メモを生成",
+      "regenerate": "再生成",
+      "rewrite": "別のテンプレートで書き直す",
+      "generating": "メモを作成中…",
+      "writing": "このミーティングのメモを作成しています。長い通話では少し時間がかかります。",
+      "autoCaption": "通話の終了時に作成",
+      "retryCaption": "このミーティングのメモはまだ作成されていません。",
+      "copy": "コピー",
+      "copied": "コピーしました",
+      "toggleTask": "この次のステップを完了／未完了にする",
+      "failed": "メモを作成できませんでした：{{error}}",
+      "tryAgain": "再試行",
+      "empty": "このミーティングのメモはまだありません。",
+      "needsTranscript": "要約する文字起こしがありません。",
+      "skipped_other": "文字起こしのうち {{count}} か所を要約できなかったため、このメモには抜けている部分があります。"
+    },
+    "errors": {
+      "startFailed": "ミーティングを開始できませんでした：{{error}}",
+      "stopFailed": "ミーティングを停止できませんでした：{{error}}",
+      "pauseFailed": "録音の状態を変更できませんでした：{{error}}",
+      "loadFailed": "ミーティングを読み込めませんでした：{{error}}",
+      "transcriptFailed": "文字起こしを読み込めませんでした：{{error}}",
+      "deleteFailed": "ミーティングを削除できませんでした：{{error}}",
+      "renameFailed": "ミーティング名を変更できませんでした：{{error}}",
+      "renameSpeakerFailed": "話者の名前を変更できませんでした：{{error}}",
+      "notesSaveFailed": "メモを保存できませんでした：{{error}}",
+      "copyFailed": "メモをコピーできませんでした：{{error}}",
+      "generateFailed": "メモを生成できませんでした：{{error}}"
+    }
   },
   "common": {
     "loading": "読み込み中…",
@@ -1471,7 +2091,19 @@
     "noOptionsFound": "オプションが見つかりません",
     "back": "戻る",
     "showAdvanced": "その他のオプション",
-    "showLess": "表示を減らす"
+    "showLess": "表示を減らす",
+    "beta": "ベータ",
+    "select": "選択…",
+    "search": "検索",
+    "moreInfo": "詳細情報",
+    "change": "変更",
+    "saveFailed": "変更を保存できませんでした。もう一度お試しください。",
+    "more": "その他",
+    "hideTips": "ヒントを隠す",
+    "showTips": "ヒントを表示",
+    "play": "再生",
+    "pause": "一時停止",
+    "unknownSize": "サイズ不明"
   },
   "accessibility": {
     "permissionsRequired": "アクセシビリティ権限が必要です",
@@ -1480,7 +2112,7 @@
     "dismiss": "閉じる"
   },
   "errors": {
-    "loadDirectory": "ディレクトリの読み込みエラー: {{error}}",
+    "loadDirectory": "ディレクトリを読み込めませんでした: {{error}}",
     "micPermissionDeniedTitle": "マイクへのアクセスが拒否されました",
     "micPermissionDenied": {
       "generic": "オペレーティングシステムによりマイクへのアクセスが拒否されました。システム設定でマイクの許可を付与してください。",
@@ -1490,34 +2122,46 @@
     },
     "noInputDeviceTitle": "マイクが見つかりません",
     "noInputDevice": "オーディオ入力デバイスが検出されませんでした。マイクまたはヘッドセットを接続してから再試行してください。",
-    "recordingFailed": "録音の開始に失敗しました: {{error}}",
-    "modelLoadFailed": "モデルの読み込みに失敗しました: {{model}}",
+    "recordingFailed": "録音を開始できませんでした: {{error}}",
+    "modelLoadFailed": "モデルを読み込めませんでした: {{model}}",
     "modelLoadFailedUnknown": "不明なモデル",
+    "loadModelsFailed": "モデルを読み込めませんでした: {{error}}",
+    "switchModelFailed": "モデルを切り替えられませんでした: {{error}}",
+    "cancelDownloadFailed": "ダウンロードをキャンセルできませんでした: {{error}}",
+    "deleteModelFailed": "モデルを削除できませんでした: {{error}}",
+    "extractModelFailed": "モデルを展開できませんでした: {{error}}",
     "downloadFailedTitle": "ダウンロードに失敗しました",
-    "pasteFailedTitle": "テキストの貼り付けに失敗しました",
-    "pasteFailed": "アクティブなアプリケーションにテキストを貼り付けられませんでした。"
+    "pasteFailedTitle": "テキストを貼り付けられませんでした",
+    "pasteFailed": "アクティブなアプリにテキストを貼り付けられませんでした。"
   },
   "appLanguage": {
-    "title": "アプリケーション言語",
+    "title": "アプリの言語",
     "description": "SpeakoFlowインターフェースの言語を変更"
   },
   "overlay": {
     "preparing": "マイクを準備中…",
     "recording": "録音中",
     "transcribing": "文字起こし中…",
-    "processing": "処理中…",
+    "processing": "整形中…",
     "generating": "Flowで作成中…",
     "vision": "画面を確認中…",
     "notices": {
       "flowNotConfigured": "Flowにはアシスタントのモデルが必要です — 音声入力として貼り付けました",
       "flowFailed": "Flowが生成できませんでした — 何も貼り付けられていません",
+      "cloudSttFailed": "クラウド文字起こしに失敗しました — 設定でキーとクレジットを確認してください",
       "flowEmpty": "起動フレーズのあとに指示を話してください",
+      "cleanupFallback": "AI整形は実行されませんでした — 元のテキストを貼り付けました",
+      "cleanupModelRejected": "AI整形のプロバイダーがこのモデルを拒否しました — 設定でモデルを確認してください",
       "cloudSttFellBack": "クラウド文字起こしが応答しませんでした — デバイス上のモデルを使用しました",
-      "cleanupFallback": "AI整形は実行されませんでした — 元のテキストを貼り付けました"
+      "noSpeechModel": "音声モデルがまだありません。「モデル」ページで選んでください"
     },
     "listening": "聞いています…",
     "locked": "ハンズフリーで録音中 — 停止するにはもう一度ホットキーを押してください",
     "cancel": "キャンセル",
+    "copy": "文字起こしをコピー",
+    "transcript": "文字起こし",
+    "copied": "コピーしました",
+    "copyFailed": "コピーできませんでした — もう一度お試しください",
     "done": "完了",
     "askAssistant": "これを入力せずアシスタントに聞く",
     "recovery": {
@@ -1525,28 +2169,134 @@
       "failed": "文字起こしに失敗しました",
       "undo": "元に戻す",
       "retry": "再試行"
+    },
+    "downloading": {
+      "title": "音声モデルをダウンロード中…",
+      "percent": "音声モデルをダウンロード中 · {{percent}}%",
+      "hint": "完了すると音声入力が使えるようになります"
+    }
+  },
+  "reminders": {
+    "title": "リマインダー",
+    "due": {
+      "now": "たった今",
+      "minutesAgo": "{{count}}分前",
+      "hoursAgo": "{{count}}時間前"
+    },
+    "done": "完了",
+    "snooze": "スヌーズ",
+    "snoozeFor_other": "{{count}}分",
+    "snoozedTimes_other": "スヌーズ {{count}}回",
+    "later": "今は隠す — リマインダーは残ります",
+    "settings": {
+      "label": "リマインダー",
+      "description": "アシスタントにリマインドを頼むと、その時刻になるまでここに表示されます。",
+      "empty": "予定はありません。アシスタントに何かをリマインドするよう頼んでみましょう。",
+      "waiting": "確認待ち",
+      "cancel": "このリマインダーをキャンセル",
+      "dueAt": "{{when}}に通知"
     }
   },
   "assistant": {
+    "conversation": {
+      "title": "通話",
+      "newChat": "新しいチャット",
+      "type": "メッセージを入力",
+      "backToVoice": "音声に戻る",
+      "mute": "マイクをミュート",
+      "unmute": "マイクのミュートを解除",
+      "speakerOn": "返答を読み上げる",
+      "speakerOff": "返答の読み上げをやめる",
+      "expand": "会話を開く",
+      "collapse": "通話バーに戻る",
+      "historyOpen": "過去の会話",
+      "historyClose": "この会話に戻る",
+      "end": "通話を終了",
+      "send": "送信",
+      "stop": "返答を停止",
+      "placeholder": "{{name}}にメッセージ",
+      "dismiss": "閉じる",
+      "retry": "再試行",
+      "details": "詳細",
+      "startHint": "話しかけるか、メッセージを入力してください。",
+      "mutedHint": "マイクはオフです。文字の入力はできます。",
+      "preparingVoice": "音声を準備中… {{progress}}%",
+      "history": {
+        "title": "過去の会話",
+        "hint": "選ぶと、前回の続きから再開できます。通話はつながったままです。",
+        "empty": "保存された会話はまだありません。",
+        "loading": "読み込み中…",
+        "failed": "会話を読み込めませんでした。",
+        "more": "さらに表示",
+        "untitled": "無題の会話",
+        "current": "表示中",
+        "messages_other": "{{count}}件のメッセージ"
+      },
+      "options": "通話のオプション",
+      "pace": "話し終わりの待ち時間",
+      "paceHint": "話を区切ってから返答するまでに待つ時間です。",
+      "paces": {
+        "quick": "短め",
+        "natural": "自然",
+        "patient": "長め"
+      },
+      "sensitivity": "マイクの感度",
+      "sensitivityHint": "どの程度の音を発話とみなすかです。周囲の雑音やアシスタント自身の声で話が遮られる場合は下げてください。",
+      "sensitivities": {
+        "low": "低 — 騒がしい部屋やスピーカー使用時",
+        "normal": "標準",
+        "high": "高 — 静かな部屋やヘッドホン使用時"
+      },
+      "phase": {
+        "off": "通話終了",
+        "starting": "接続中…",
+        "listening": "聞き取り待ち",
+        "hearing": "聞き取り中…",
+        "transcribing": "文字起こし中…",
+        "responding": "考え中…",
+        "speaking": "話しています",
+        "muted": "マイクオフ",
+        "error": "通話が中断されました"
+      },
+      "errors": {
+        "microphone": "マイクを開けませんでした。マイクへのアクセスを許可し、ほかのアプリで使用中でないか確認してください。",
+        "device": "マイクの接続が切れました。接続し直してから、もう一度お試しください。",
+        "setup": "会話を開始できませんでした。設定でマイク、スピーカー、アシスタントモデルを確認してください。",
+        "turn": "この返答を完了できませんでした。詳細を確認してから、もう一度お試しください。",
+        "playback": "音声での返答を再生できませんでした。音声プロバイダーと出力デバイスを確認してください。",
+        "tooLong": "録音が1分の上限に達しました。もう少し短く区切って、もう一度お試しください。",
+        "history": "その会話を開けませんでした。もう一度お試しください。"
+      },
+      "chooseProfile": "プロフィールを変更（現在：{{name}}）",
+      "profiles": "プロフィール",
+      "profileHint": "変更は次の返答から反映されます。",
+      "chatOnlyProfile": "このプロフィールはチャットでのみ利用できます。",
+      "profileError": "プロフィールを切り替えられませんでした。もう一度お試しください。"
+    },
     "title": "アシスタント",
     "character": {
       "switch": "ペルソナを切り替える"
     },
     "empty": "アシスタントのショートカットで音声で質問するか、\n下に入力してください。",
     "inputPlaceholder": "メッセージ…",
-    "queuedUntilReady": "順番待ち — この返信が終わり次第、送信します。",
+    "bar": {
+      "placeholder": "何でも質問…"
+    },
     "send": "送信",
     "stop": "停止",
     "cancel": "キャンセル",
-    "clear": "会話をクリア",
     "copy": "コピー",
     "copyCode": "コードをコピー",
+    "insert": "入力中の場所に挿入",
+    "insertShort": "挿入",
+    "insertReplace": "選択中のテキストをこれで置き換える",
+    "insertReplaceShort": "置換",
+    "selectionAttached_other": "{{count}}文字を選択中",
     "regenerate": "回答を再生成（元の回答は履歴に残ります）",
     "summarizing": "以前のメッセージを要約中…",
     "screenAttached": "画面",
     "attach": {
       "file": "画像またはファイルを添付",
-      "imageCount": "{{count}}枚の画像",
       "imageCount_other": "{{count}}枚の画像",
       "dropHint": "ドロップして添付"
     },
@@ -1563,13 +2313,13 @@
       "listening": "聞いています…",
       "locked": "聞いています",
       "transcribing": "文字起こし中…",
-      "searching": "ウェブを検索中...",
-      "thinking": "考えています...",
-      "speaking": "読み上げ中..."
+      "searching": "ウェブを検索中…",
+      "thinking": "考え中…",
+      "speaking": "読み上げ中…"
     },
     "tool": {
       "search": "ウェブを検索中",
-      "screen": "画面を確認中",
+      "screen": "画面を確認中…",
       "working": "処理中",
       "elapsed": "{{seconds}}秒"
     },
@@ -1602,6 +2352,12 @@
       "tts_blockedShort": "パネルをタップして再生",
       "tts_playback": "出力デバイスで音声を再生できませんでした。スピーカーや出力の設定を確認して、もう一度お試しください。",
       "tts_playbackShort": "音声の再生に失敗",
+      "tts_gpu": "グラフィックスカードで音声が乱れたため、ミュートしました。次の返答からはプロセッサー用音声を使います。",
+      "tts_gpuShort": "音声をミュート：グラフィックスカードで音声が乱れました",
+      "tts_gpu_slow": "グラフィックスカードで音声が乱れたため、ミュートしました。返答は今後プロセッサーで実行されますが、「モデル」→「音声」でプロセッサー用音声をダウンロードするまでは低速になります。",
+      "tts_gpu_slowShort": "音声をミュート：グラフィックスカードで音声が乱れました",
+      "tts_gpu_forced": "グラフィックスカードで音声が乱れたため、ミュートしました。「モデル」→「音声」で「実行デバイス」を「自動」または「プロセッサー」に設定してください。",
+      "tts_gpu_forcedShort": "音声をミュート：グラフィックスカードで音声が乱れました",
       "mic_denied": "マイクへのアクセスがブロックされています。システムのプライバシー設定で許可してください。",
       "mic_deniedShort": "マイクへのアクセスがブロック",
       "mic_unavailable": "マイクが見つかりませんでした。接続してもう一度お試しください。",
@@ -1613,7 +2369,9 @@
     },
     "notices": {
       "web_search_failed": "ウェブ検索で結果が得られませんでした — 検索結果なしで回答します。",
-      "web_search_failedShort": "検索結果なし"
+      "web_search_failedShort": "検索結果なし",
+      "queued": "待機中 — この返答が終わりしだい送信します。",
+      "queuedShort": "待機中"
     },
     "engineSetup": {
       "downloading": "ローカルエンジンを準備中（初回のみ）… {{percent}}%",
@@ -1626,25 +2384,818 @@
       "copied": "コピーしました"
     }
   },
+  "nav": {
+    "label": "メイン",
+    "home": "ホーム",
+    "history": "履歴",
+    "assistant": "アシスタント",
+    "meetings": "会議",
+    "cleanup": "AI整形",
+    "dictionary": "辞書",
+    "models": "モデル",
+    "settings": "設定",
+    "status": {
+      "label": "音声認識モデル：{{model}}、{{status}}。音声認識の設定を開きます。",
+      "setup": "設定が必要",
+      "cloud": "クラウド · {{provider}}",
+      "loading": "読み込み中…",
+      "error": "読み込めませんでした",
+      "ready": "準備完了",
+      "idle": "音声入力時に読み込みます",
+      "noModel": "音声認識モデルなし"
+    },
+    "insights": "インサイト"
+  },
+  "settingsDialog": {
+    "title": "設定",
+    "tabs": {
+      "general": "一般",
+      "shortcuts": "ショートカット",
+      "audio": "オーディオ",
+      "dictation": "音声入力",
+      "privacy": "プライバシーとデータ",
+      "advanced": "詳細設定",
+      "about": "概要",
+      "debug": "デバッグ"
+    },
+    "general": {
+      "appearance": "外観",
+      "onboarding": {
+        "title": "オンボーディング",
+        "replay": "初回セットアップ",
+        "replayInfo": "新規インストール時と同じように、セットアップとツアーをもう一度たどります。インストール済みのモデルはそのまま残ります。",
+        "replayButton": "オンボーディングをもう一度表示"
+      }
+    },
+    "shortcuts": {
+      "intro": "すべてのショートカットはどのアプリでも使えます。ショートカットをクリックすると、新しいキーを登録できます。",
+      "dictation": "音声入力",
+      "assistant": "アシスタント",
+      "cleanupOff": "このショートカットを使うには、AI整形をオンにしてください。",
+      "cleanupOnDictation": "音声入力のショートカットですべての音声入力が整形されるため、このショートカットは不要です。",
+      "openCleanup": "AI整形を開く",
+      "assistantOff": "アシスタントがオフのため、そのショートカットは動作しません。",
+      "openAssistant": "アシスタントを開く"
+    },
+    "audio": {
+      "microphone": "マイク",
+      "overlayHint": "録音中に表示される小さなピルです。"
+    },
+    "dictation": {
+      "intro": "入力中のアプリに言葉をどのように入れるかを設定します。",
+      "output": "入力と貼り付け",
+      "extras": "その他"
+    },
+    "privacy": {
+      "intro": "録音と履歴はこのデバイスにのみ保存されます。録音を保存しておく期間を選んでください。",
+      "recordingsFolder": "録音フォルダ"
+    },
+    "advanced": {
+      "performance": "パフォーマンス"
+    },
+    "about": {
+      "appName": "SpeakoFlow",
+      "version": "バージョン {{version}}",
+      "project": "プロジェクト",
+      "docs": "ドキュメント",
+      "openDocs": "ドキュメントを開く"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "おはようございます",
+      "afternoon": "こんにちは",
+      "evening": "こんばんは",
+      "night": "遅くまでお疲れさまです"
+    },
+    "subtitleHold": "どのアプリでもショートカットを押したまま話し、離すだけ。カーソルの位置に言葉が入力されます。",
+    "subtitleTap": "どのアプリでもショートカットをタップして話し、もう一度タップするだけ。カーソルの位置に言葉が入力されます。",
+    "needsModel": {
+      "title": "音声入力を始めるには、音声認識モデルを選んでください。",
+      "description": "話した内容を入力するには、SpeakoFlowに音声認識モデルが必要です。",
+      "action": "モデルを選ぶ"
+    },
+    "stats": {
+      "label": "利用状況",
+      "none": "–",
+      "spoken": "話した時間",
+      "words": "語",
+      "wpm": "WPM",
+      "wpmHint": "録音全体での1分あたりの語数（間も含みます）。",
+      "saved": "短縮",
+      "savedHint": "同じ語数を1分あたり{{wpm}}語で入力した場合との比較です。",
+      "empty": "最初の音声入力のあとに数値が表示されます。",
+      "streak_other": "{{count}}日連続",
+      "noStreak": "今日音声入力して連続記録を始めましょう",
+      "today": "今日 {{words}} 語",
+      "duration": {
+        "seconds": "{{seconds}}秒",
+        "minutes": "{{minutes}}分",
+        "hours": "{{hours}}時間",
+        "hoursMinutes": "{{hours}}時間{{minutes}}分"
+      },
+      "wordsLabel": "音声入力した語数",
+      "wpmLabel": "1分あたりの語数",
+      "savedLabel": "短縮できた時間",
+      "streakLabel_other": "連続日数",
+      "streakUnit_other": "日連続",
+      "seeInsights": "インサイトを見る"
+    },
+    "shortcuts": {
+      "title": "ショートカット",
+      "edit": "ショートカットを編集",
+      "turnOn": "オンにする",
+      "off": "オフ",
+      "setKey": "ショートカットを設定",
+      "dictate": {
+        "title": "音声入力",
+        "hold": "押したまま話して、離します。カーソルの位置に言葉が入力されます。",
+        "tap": "タップして開始し、話して、タップで停止します。カーソルの位置に言葉が入力されます。",
+        "whatHold": "押したまま話して、離すだけ。カーソルの位置に入力されます。",
+        "whatTap": "タップして話し、もう一度タップ。カーソルの位置に入力されます。"
+      },
+      "cleanup": {
+        "title": "音声入力して整形",
+        "description": "音声入力と同じ操作のあと、AIが句読点、つなぎ言葉、文体を整えます。",
+        "what": "音声入力のあと、AIが句読点、つなぎ言葉、文体を整えます。"
+      },
+      "ask": {
+        "title": "アシスタントに聞く",
+        "description": "声に出して質問すると、回答がフローティングパネルに表示されます。",
+        "what": "声で質問すると、回答がフローティングパネルに表示されます。"
+      },
+      "call": {
+        "title": "通話を始める",
+        "description": "音声で返答する、ハンズフリーの会話です。",
+        "what": "ハンズフリーで会話します。もう一度押すと通話を終了します。"
+      },
+      "info": "どのアプリでも使えます。キーをクリックすると変更できます。",
+      "offHint": "オフ",
+      "mode": {
+        "hold": "押している間だけ話す",
+        "tap": "タップで切り替え"
+      },
+      "cancel": {
+        "title": "キャンセル",
+        "what": "録音や、読み上げ中の返答を止めます。"
+      }
+    },
+    "setup": {
+      "title": "使用中のモデル",
+      "manage": "管理"
+    },
+    "recent": {
+      "title": "最近",
+      "viewAll": "すべて表示",
+      "copy": "テキストをコピー",
+      "cleaned": "整形済み",
+      "tryPrefix": "試してみましょう：ボックス内をクリックしてから",
+      "trySuffixHold": "を押したまま話してください。",
+      "trySuffixTap": "を押して話してください。終わったらもう一度押します。",
+      "tryPlaceholder": "ここに言葉が表示されます…"
+    },
+    "hero": {
+      "hold": "どのアプリでもキーを押したまま話し、離すだけ。",
+      "tap": "どのアプリでもキーをタップして話し、もう一度タップするだけ。",
+      "holdHint": "押している間だけ話す",
+      "tapHint": "タップで開始・停止"
+    },
+    "activity": {
+      "title": "過去30日間",
+      "summary_other": "{{count}}日間で{{words}}語",
+      "chartLabel": "過去{{days}}日間に毎日音声入力した語数：合計{{words}}語。",
+      "words_other": "{{formatted}}語",
+      "today": "今日"
+    }
+  },
+  "modelsHub": {
+    "description": "SpeakoFlowの各機能は、あなたが選んだモデルが担当します。プライバシーを重視するならこのデバイス上で、速さを重視するならクラウドで実行できます。",
+    "addLocal": "モデルファイルを追加",
+    "privacyNote": "このデバイス上のモデルは、あなたの声やテキストをどこにも送信しません。クラウドのモデルは、あなたのAPIキーを使って、選んだプロバイダーに送信します。",
+    "inUse": "使用中",
+    "needsSetup": "設定が必要",
+    "performance": "パフォーマンス",
+    "where": {
+      "device": "このデバイス上",
+      "cloud": "クラウド",
+      "cloudWith": "クラウド · {{provider}}",
+      "deviceShort": "このデバイス"
+    },
+    "status": {
+      "voiceOff": "音声での返答はオフです",
+      "assistantOff": "アシスタントはオフです",
+      "noModel": "モデルがまだ選ばれていません",
+      "notDownloaded": "モデルがダウンロードされていません",
+      "noKey": "APIキーを追加してください",
+      "noEndpoint": "エンドポイントを追加してください"
+    },
+    "voice": {
+      "kokoroModel": "Kokoroの音声"
+    },
+    "usedBy": {
+      "label": "使用している機能",
+      "dictation": "音声入力",
+      "assistant": "アシスタント",
+      "meetings": "会議",
+      "cleanup": "AI整形",
+      "meetingNotes": "会議メモ",
+      "calls": "通話",
+      "flow": "Flowで生成",
+      "spokenReplies": "音声での返答"
+    },
+    "slots": {
+      "stt": {
+        "name": "音声認識",
+        "description": "あなたの声をテキストに変換します。",
+        "whereHint": "このデバイス上ならプライベートで無料です。クラウドはプロバイダーのAPIとあなたのキーを使います。",
+        "catalogTitle": "音声認識モデル",
+        "catalogDescription": "ここにあるモデルはすべてこのデバイス上で動作します。速いモデルは音声入力向き、大きいモデルはより正確です。"
+      },
+      "cleanup": {
+        "name": "AI整形",
+        "description": "話して伝えた修正を反映して文体を整え、会議メモも作成します。",
+        "turnOn": "AI整形をオンにする",
+        "offNotice": "AI整形はオフです。会議メモは引き続きこのモデルを使います。",
+        "borrowsNotice": "整形モデルが設定されていないため、整形にはアシスタントのモデル（{{model}}）を使います。",
+        "catalogTitle": "整形モデル"
+      },
+      "assistant": {
+        "name": "アシスタント",
+        "description": "質問に答え、画面を確認し、通話にも対応します。",
+        "openAssistant": "アシスタントを開く",
+        "offNotice": "アシスタントはオフです。Flowで生成と、整形の代替モデルは引き続きこのモデルを使います。",
+        "catalogTitle": "アシスタントのモデル",
+        "fallbackNote": "AI整形と会議メモに専用のモデルがない場合も、このモデルを使います。"
+      },
+      "voice": {
+        "name": "音声",
+        "description": "アシスタントの返答を読み上げます。"
+      }
+    }
+  },
+  "cleanup": {
+    "description": "つなぎ言葉はすべての音声入力ですでに取り除かれています。AI整形はさらに、話して伝えた修正を反映し、文体を整えます。",
+    "toggle": "AI整形",
+    "how": {
+      "plain": "話したとおりに入力します。",
+      "cleaned": "話した内容をAIで整えて入力します。",
+      "off": "このショートカットを使うには、AI整形をオンにしてください。",
+      "change": "変更"
+    },
+    "model": {
+      "title": "整形モデル",
+      "borrows": "アシスタントのモデルを使用",
+      "own": "整形のショートカットを使うたびに実行されます",
+      "change": "変更",
+      "info": "整形のショートカットを使うたびに実行されます。専用のモデルがない場合は、アシスタントのモデルを使います。"
+    },
+    "needsModel": {
+      "description": "AI整形を実行するにはモデルが必要です。それまでは、話したとおりにテキストが入力されます。",
+      "action": "モデルを選ぶ",
+      "short": "整形を始めるには、モデルを選んでください。"
+    },
+    "instructions": {
+      "title": "整形の指示",
+      "description": "モデルに何を直すかを伝える基本のプロンプトです。ほとんどの方は変更する必要がありません。",
+      "current": "使用中"
+    },
+    "styles": {
+      "title": "文体",
+      "description": "整形後のテキストをどんな文章にするか。修正のあとに適用されるため、修正内容は変わりません。",
+      "createTitle": "新しい文体",
+      "createHint": "テキストをどんな雰囲気にしたいかを説明してください。",
+      "editTitle": "文体を編集",
+      "editorIntro": "文体に名前を付けて、テキストをどう変えたいかを説明してください。整形のあとに適用されるため、修正内容は変わりません。",
+      "inUse": "使用中",
+      "editNamed": "{{name}}を編集",
+      "builtin": {
+        "none": "誤りだけを直し、言い回しはそのままにします。",
+        "professional": "仕事のメッセージやメール向けの、洗練されたわかりやすい文章。",
+        "friendly": "友人へのメモのような、温かくくだけた文章。",
+        "concise": "余分な言葉を削り、要点を伝えます。",
+        "formal": "完全な文で、改まった言葉づかいにします。",
+        "casual": "気軽な話し言葉。"
+      },
+      "groups": {
+        "builtin": "内蔵",
+        "custom": "自分の文体"
+      },
+      "manage": "管理",
+      "manageTitle": "自分の文体",
+      "noneYet": "自分の文体はまだありません。",
+      "newStyle": "新しい文体",
+      "customHint": "あなたが作成した文体です。修正のあとに適用されます。",
+      "preview": {
+        "youSay": "話した内容",
+        "itTypes": "入力される内容",
+        "yourInstruction": "あなたの指示"
+      },
+      "samples": {
+        "raw": "明日の10時に、あ、やっぱり11時に集まって、予算の確認をしようか",
+        "none": "明日の11時に集まって、予算の確認をしよう。",
+        "professional": "明日11:00に予算の確認のお時間をいただけますでしょうか。",
+        "friendly": "明日の11時に集まって、一緒に予算を見直さない？",
+        "concise": "明日11時、予算確認。",
+        "formal": "明日11時に会合を開き、予算について確認することをご提案いたします。",
+        "casual": "明日11時に集まって予算見ようよ"
+      },
+      "form": {
+        "name": "名前",
+        "instruction": "指示",
+        "instructionTip": "言い回しをどう変えるか。整形のあとに適用されるため、修正内容は変わりません。",
+        "instructionPlaceholder": "例：くだけた口調にして、話した絵文字の名前は絵文字に変える。"
+      }
+    },
+    "hero": {
+      "title": "ざっくり話して、<em>きれいに仕上げる。</em>",
+      "before": "10時に集まろう、あ、やっぱ11時で、あと予算も持ってきて",
+      "after": "11時に集まりましょう。予算も持ってきてください。",
+      "offHint": "このショートカットを使うには、AI整形をオンにしてください",
+      "onHint": "押したまま話して、離すだけ。整形されたテキストが入力されます。",
+      "onHintTap": "タップして話し、もう一度タップ。整形されたテキストが入力されます。",
+      "onDictationHint": "すべての音声入力が整形されます。"
+    },
+    "shortcut": {
+      "title": "ショートカット",
+      "info": "整形専用のショートカットを設定するか、音声入力のショートカットですべての音声入力を整形して、覚えるキーをひとつにできます。",
+      "separate": "専用のショートカット",
+      "dictation": "音声入力と同じ"
+    },
+    "shortcutRow": "ショートカット"
+  },
+  "dictionary": {
+    "description": "よく使う名前や用語をSpeakoFlowに覚えさせたり、長いテキストに展開される短縮語を設定したりできます。",
+    "words": {
+      "title": "登録した単語",
+      "description": "SpeakoFlowに常に正しく書いてほしい名前、専門用語、表記。",
+      "placeholder": "名前、用語、表記を追加…",
+      "empty": "まだ何もありません。SpeakoFlowがよく間違える単語を追加しましょう。"
+    },
+    "replacements": {
+      "title": "置換",
+      "description": "フレーズを話すと別のテキストに置き換えます。たとえば「my email」があなたのメールアドレスになります。"
+    },
+    "addWord": "単語を追加",
+    "hero": {
+      "title": "SpeakoFlowが<em>あなたの表記どおりに。</em>",
+      "subtitle": "よく間違える名前や専門用語を追加しましょう。"
+    }
+  },
+  "assistantPage": {
+    "description": "どのアプリからでも、声で何でも質問できます。アシスタントは画面を確認し、ウェブを検索し、あなたにとって大切なことを覚えておけます。",
+    "offNotice": "アシスタントはオフです。もう一度オンにするまで、ショートカットは動作せず、メモリも使いません。",
+    "hero": {
+      "askHold": "押したまま質問して、離すだけ。回答がフローティングパネルに表示されます。",
+      "askTap": "タップして質問し、もう一度タップ。回答がフローティングパネルに表示されます。",
+      "call": "ハンズフリーで会話します。もう一度押すと通話を終了します。",
+      "title": "何でも、<em>どこからでも。</em>",
+      "ask": "質問",
+      "callLabel": "通話",
+      "askHoldShort": "押したまま質問して離す",
+      "askTapShort": "タップして質問、もう一度タップ",
+      "callShort": "もう一度押すと終了",
+      "subtitle": "声に出して質問するか、通話を始めて話し合いましょう。"
+    },
+    "models": {
+      "title": "使用するモデル",
+      "assistant": "考えるモデル",
+      "voice": "返答の読み上げ"
+    },
+    "features": {
+      "title": "できること",
+      "vision": {
+        "title": "画面認識",
+        "description": "画面について質問したときに、アシスタントが画面を確認できるようにします。"
+      },
+      "webSearch": {
+        "title": "ウェブ検索",
+        "description": "オンラインで調べて、最新の正確な回答を返します。"
+      },
+      "reminders": {
+        "title": "リマインダー",
+        "description": "「20分後に知らせて」と言えば、そのとおりに知らせます。",
+        "status": "声で依頼"
+      },
+      "profiles": {
+        "title": "プロフィール",
+        "description": "アシスタントが切り替えられるペルソナです。それぞれに専用の指示があります。",
+        "status": "デフォルト"
+      },
+      "memory": {
+        "title": "メモリ",
+        "description": "アシスタントが覚えているあなたの情報。このデバイスに保存されます。"
+      },
+      "behavior": {
+        "title": "返答",
+        "description": "回答の長さと、チャットのどこまでを覚えておくか。"
+      },
+      "appearance": {
+        "title": "パネル",
+        "description": "フローティングパネルのサイズ、文字、位置、不透明度。",
+        "status": "カスタマイズ"
+      }
+    },
+    "cards": {
+      "keySaved": "キーを保存しました",
+      "vision": {
+        "description": "画面を確認して、見えているものについての質問に答えます。",
+        "timing": {
+          "immediate": "話し始めたとき",
+          "onSend": "送信したとき"
+        }
+      },
+      "webSearch": {
+        "description": "オンラインで調べて、最新の正確な回答を返します。",
+        "offHint": "オフ：回答はモデルの知識のみから作られるため、情報が古い場合があります。",
+        "keyFor": "{{provider}} のAPIキー",
+        "getKey": "{{site}} で無料のキーを取得できます。",
+        "hints": {
+          "tinyfish": "無料、カード不要",
+          "serper": "Googleの検索結果",
+          "brave": "独自のインデックス",
+          "tavily": "AI向けに設計",
+          "exa": "ニューラル検索",
+          "serpapi": "Googleの検索結果"
+        }
+      },
+      "reminders": {
+        "description": "リマインドを頼むと、時間になったらメモが表示されます。",
+        "trySaying": "こう話してみましょう",
+        "examples": {
+          "one": "「20分後にサムに電話するよう知らせて」",
+          "two": "「午後6時に請求書を送るよう知らせて」",
+          "three": "「これを見て、明日知らせて」"
+        },
+        "upcoming": "予定",
+        "none": "予定はまだありません。",
+        "more_other": "ほか{{count}}件"
+      },
+      "memory": {
+        "title": "メモリ",
+        "description": "あなたにとって大切なことを覚えておきます。保存先はこのデバイスのみです。",
+        "open": "メモリを開く",
+        "manage_other": "メモリを表示・編集 · {{count}}件のメモ",
+        "pausedHint": "一時停止中：保存済みのメモリは残りますが、使われません。"
+      },
+      "profiles": {
+        "title": "プロフィール",
+        "description": "それぞれに名前、指示、返答スタイルを持つペルソナです。",
+        "edit": "プロフィールを編集",
+        "more": "+{{count}}"
+      },
+      "replies": {
+        "title": "返答",
+        "description": "回答の長さと、チャットのどこまでを覚えておくか。",
+        "lengths": {
+          "default": "デフォルト",
+          "short": "短め",
+          "medium": "普通",
+          "long": "長め"
+        },
+        "lengthHints": {
+          "default": "質問に必要なだけの長さ。",
+          "short": "1〜2文。",
+          "medium": "短い段落ひとつ。",
+          "long": "詳しく丁寧に。"
+        },
+        "history": "覚えておくメッセージ数"
+      },
+      "panel": {
+        "title": "フローティングパネル",
+        "description": "パネルの見た目と開く位置。変更するとプレビューに反映されます。",
+        "positionHint": "画面上の位置をクリックしてください。表示される形が開くときの形です。端に沿った縦長の列、または上下に沿った横長の帯になります。パネルを位置の近くまでドラッグすると、そこに吸着します。"
+      }
+    },
+    "groups": {
+      "personal": "パーソナル",
+      "replies": "返答"
+    },
+    "rows": {
+      "replyLength": "返答の長さ",
+      "reminders": {
+        "none": "設定なし",
+        "count_other": "{{count}}件設定済み"
+      },
+      "memory": {
+        "edit": "メモリを表示",
+        "manage": "管理"
+      },
+      "profiles": {
+        "manage": "管理"
+      },
+      "screen": {
+        "ask": "質問時の画面認識",
+        "call": "通話時の画面認識"
+      }
+    },
+    "tips": {
+      "thinksWith": "あなたに回答するモデルです。AI整形と会議メモに専用のモデルがない場合も、このモデルを使います。",
+      "speaks": "通話中に返答を読み上げます。",
+      "screenAsk": "画面についての質問や、あなたが頼んだときに、アシスタントが画面を確認します。選択したテキストについての質問は、そのテキストから回答します。スクリーンショットはあなたのAIプロバイダーにのみ送られます。",
+      "screenCall": "通話中に、あなたが頼んだときや画面上のものについて話しているときに、アシスタントが画面を確認します。",
+      "captureTiming": "質問を始めたときの画面と、送信したときの画面のどちらを取り込むかを選びます。",
+      "webSearch": "最新の情報が必要な質問では、オンラインで調べます。",
+      "depth": "簡単な事実には「クイック」、難しい質問には「ディープ」。",
+      "openRouterSearch": "OpenRouter独自の検索を使い、あなたのOpenRouterクレジットを消費します。",
+      "localSmart": "検索するタイミングをデバイス上のモデルが判断します。",
+      "reminders": "頼むだけです：「20分後にサムに電話するよう知らせて」。時間になるとメモが表示されます。",
+      "memory": "あなたにとって大切なことを覚えておきます。保存先はこのデバイスのみです。",
+      "profiles": "それぞれに名前、指示、返答スタイルを持つペルソナです。",
+      "replyLength": "回答のおおよその長さ。",
+      "history": "直近のメッセージをいくつ覚えておくか。",
+      "summarize": "長いチャットを要約して、最初の内容を忘れないようにします。",
+      "panelSize": "画面をどれだけ使うか。",
+      "opacity": "下げるとデスクトップが透けて見えます。",
+      "position": "画面上の位置をクリックしてください。",
+      "display": "パネルを開く画面。"
+    },
+    "memory": {
+      "aboutTip": "毎回の返答で参照する短い要約です。会話に合わせて更新され、いつでも編集できます。",
+      "aboutEmpty": "まだ何もありません。会話するうちに埋まっていきます。自分で書くこともできます。",
+      "write": "書く",
+      "notesTitle": "覚えていること",
+      "notesTip": "チャットから得た事実と、あなたが追加した内容です。返答ごとに関係するものが使われます。",
+      "notesEmpty": "まだ何もありません。チャットから学習します。上から追加することもできます。",
+      "showAll": "すべて表示（{{count}}件）",
+      "showFewer": "表示を減らす",
+      "detailTip": "「簡潔」は要約のみを使います。「詳細」はより多くのメモを加え、少し遅くなります。",
+      "more": "メモリのその他のオプション",
+      "learnNow": "このチャットから今すぐ学習",
+      "export": "メモリをエクスポート…",
+      "import": "メモリをインポート…",
+      "erase": "メモリを消去…",
+      "eraseTitle": "メモリを消去しますか？",
+      "eraseBody_other": "要約と{{count}}件すべてのメモを削除します。この操作は取り消せません。",
+      "eraseConfirm": "消去",
+      "learnedToast": "このチャットからメモリを更新しました",
+      "exportedToast": "メモリをエクスポートしました",
+      "importedToast": "メモリをインポートしました",
+      "dialogDescription": "アシスタントがあなたについて知っていることです。このデバイスに保存され、どの内容も変更や消去ができます。"
+    },
+    "profiles": {
+      "new": "新しいプロフィール",
+      "newBlank": "白紙から作成",
+      "newWithAi": "説明してAIに作成してもらう",
+      "listMore": "プロフィールのその他のオプション",
+      "import": "ファイルからインポート…",
+      "restoreBuiltins": "内蔵プロフィールを復元",
+      "restored_other": "{{count}}件のプロフィールを復元しました",
+      "restoredNone": "内蔵プロフィールはすべてそろっています",
+      "inUse": "使用中",
+      "use": "このプロフィールを使う",
+      "more": "このプロフィールのその他のオプション",
+      "duplicate": "複製",
+      "export": "エクスポート…",
+      "exported": "プロフィールをエクスポートしました",
+      "restoreDefault": "元に戻す",
+      "delete": "プロフィールを削除…",
+      "deleteTitle": "{{name}}を削除しますか？",
+      "deleteBody": "この操作は取り消せません。",
+      "addPicture": "画像を追加",
+      "changePicture": "画像を変更",
+      "removePicture": "画像を削除",
+      "roleLabel": "説明",
+      "roleTip": "名前の下に表示される短い説明。",
+      "rolePlaceholder": "例：短く率直な回答",
+      "instructionsLabel": "指示",
+      "instructionsTip": "このプロフィールの考え方と話し方。すべてのメッセージと一緒に送信されます。",
+      "lengthLabel": "返答の長さ",
+      "lengthTip": "「デフォルト」はアシスタントページの「返答の長さ」に従います。",
+      "lengths": {
+        "inherit": "デフォルト",
+        "short": "短め",
+        "medium": "普通",
+        "long": "長め"
+      },
+      "greetingLabel": "あいさつ",
+      "greetingTip": "任意。新しいチャットの開始時に表示されます。",
+      "greetingPlaceholder": "こんにちは！今日は何をしましょうか？",
+      "aiTitle": "新しいプロフィールを説明",
+      "aiBody": "どんなプロフィールにしたいかを話すか入力してください。アシスタントが名前と指示を書きます。",
+      "aiCreate": "プロフィールを作成"
+    },
+    "panel": {
+      "where": "開く位置",
+      "text": "文字サイズ",
+      "size": "パネルのサイズ",
+      "opacity": "不透明度",
+      "screen": "表示する画面"
+    }
+  },
+  "meetingsPage": {
+    "transcript": "文字起こし",
+    "notes": "メモ",
+    "hero": {
+      "title": "すべての会議を、<em>文字に。</em>",
+      "subtitle": "話者ごとに分けて記録し、終了後にメモを作成します。"
+    },
+    "transcribedBy": "文字起こし",
+    "notesBy": "メモ作成",
+    "transcribedByTip": "文字起こしを作成します。音声入力と同じ、あなたの音声認識モデルです。",
+    "notesByTip": "メモとタイトルを作成し、会議についての質問に答えます。あなたのアシスタントのモデルです。"
+  },
+  "historyPage": {
+    "today": "今日",
+    "yesterday": "昨日",
+    "storage": "ストレージ",
+    "cleaned": "整形済み",
+    "showOriginal": "元のテキストを表示",
+    "showSaid": "話した内容を表示",
+    "hideOriginal": "元のテキストを隠す",
+    "playRecording": "録音を再生",
+    "hideRecording": "プレーヤーを閉じる",
+    "audioMissing": "この録音の音声ファイルはもう利用できません。",
+    "failed": "文字起こしに失敗しました",
+    "retry": "再試行",
+    "dismissed": "この文字起こしは破棄されました。",
+    "recover": "復元",
+    "recoverTitle": "もう一度文字起こしして保存します",
+    "recoverError": "この文字起こしを復元できませんでした。もう一度お試しください。",
+    "more": "その他の操作",
+    "chat": {
+      "continue": "続ける",
+      "continueTitle": "このチャットをアシスタントで開く",
+      "showMessages": "メッセージを表示",
+      "hideMessages": "メッセージを隠す",
+      "assistantOff": "このチャットを続けるには、アシスタントをオンにしてください。"
+    }
+  },
+  "pickers": {
+    "browse": "モデルを管理",
+    "download": "ほかのモデルをダウンロード",
+    "choose": "モデルを選ぶ",
+    "switchFailed": "モデルを切り替えられませんでした。もう一度お試しください。",
+    "borrowsAssistant": "アシスタントの{{model}}を使用中",
+    "needsKey": "APIキーが必要です",
+    "groups": {
+      "device": "このデバイス上",
+      "cloud": "クラウド",
+      "setup": "未設定"
+    },
+    "label": {
+      "assistant": "アシスタントのモデル",
+      "cleanup": "AI整形のモデル",
+      "stt": "音声認識モデル",
+      "voice": "音声"
+    },
+    "needsSetup": "設定が必要",
+    "finishSetup": "設定を完了",
+    "setup": {
+      "title": "{{provider}}を設定",
+      "bodyKey": "APIキーを貼り付けてから、モデルを選んでください。",
+      "bodyServer": "サーバーのアドレスを入力してから、モデルを選んでください。",
+      "bodyBoth": "エンドポイントとAPIキーを入力してから、モデルを選んでください。",
+      "endpoint": "エンドポイントURL",
+      "apiKey": "APIキー",
+      "apiKeyOptional": "APIキー（任意）",
+      "keyPlaceholder": "キーを貼り付け",
+      "getKey": "{{site}} でキーを取得",
+      "model": "モデル",
+      "modelPlaceholder": "モデルを選ぶか入力",
+      "loadModels": "モデルを読み込む",
+      "noModels": "モデルが見つかりません。代わりにモデル名を入力してください。",
+      "typeInstead": "名前を入力する",
+      "pickFromList": "一覧から選ぶ",
+      "use": "保存して使う",
+      "done": "{{provider}}を使用中"
+    },
+    "voiceSetup": {
+      "bodyKey": "APIキーを貼り付けてから、音声を選んでください。",
+      "bodyEndpoint": "エンドポイントとAPIキーを入力してから、音声を選んでください。",
+      "voice": "音声",
+      "voicePlaceholder": "音声を選ぶ",
+      "loadVoices": "音声を読み込む",
+      "noVoices": "音声が見つかりません。代わりに音声IDを貼り付けてください。",
+      "model": "モデル（任意）"
+    }
+  },
+  "catalog": {
+    "recommended": "おすすめ",
+    "searchHuggingFace": "Hugging Faceを検索",
+    "useFor": {
+      "button": "用途を選ぶ",
+      "label": "{{model}}の用途…",
+      "assistant": "アシスタント",
+      "cleanup": "AI整形",
+      "cleanupOnly": "整形専用のモデルのため、会話はできません。"
+    },
+    "inUse": {
+      "assistant": "アシスタント",
+      "cleanup": "AI整形"
+    },
+    "use": "使う",
+    "useNamed": "{{model}}を{{job}}に使う",
+    "useForJob": "{{job}}に使う",
+    "inUseShort": "使用中",
+    "more": "その他",
+    "moreFor": "{{model}}のその他の操作",
+    "showDetails": "ファイルの詳細を表示",
+    "hideDetails": "ファイルの詳細を隠す",
+    "removeFromList": "一覧から削除",
+    "nowUsing": "{{model}}を{{job}}に使用しています。",
+    "yoursInfo": "ダウンロードしたモデルや、ディスクから追加したモデルです。どのモデルもどちらの用途にも使えます。⋯ メニューからもう一方の用途に割り当てられます。"
+  },
+  "models": {
+    "runsOn": "実行場所",
+    "options": "オプション",
+    "downloadTitle": "モデルをダウンロード",
+    "cleanupOff": "AI整形はオフです。会議メモは引き続きこのモデルを使います。",
+    "assistantOff": "アシスタントはオフです。Flowで生成と整形は引き続きこのモデルを使います。",
+    "usedBy": "使用している機能：{{features}}。"
+  },
+  "shortcutEditor": {
+    "change": "{{name}}のショートカットを変更",
+    "reset": "{{name}}をデフォルトに戻す"
+  },
+  "memoryManager": {
+    "status": {
+      "on": "オン：返答に使われ、チャットから学習します",
+      "off": "オフ：使用も学習もしません"
+    },
+    "incognitoHint": "このチャットは使用も学習もされません",
+    "editNote": "メモを編集",
+    "source": {
+      "learned": "学習",
+      "added": "自分で追加"
+    },
+    "filterLabel": "表示するメモ",
+    "filters": {
+      "all": "すべて",
+      "learned": "学習 {{count}}",
+      "added": "自分 {{count}}"
+    },
+    "search": "メモを検索",
+    "noMatches": "一致するメモはありません。",
+    "detailHints": {
+      "light": "各返答には「あなたについて」の要約のみを使います。最速です。",
+      "balanced": "要約に加えて、質問に合うメモをいくつか使います。",
+      "detailed": "要約に加えて、関連するメモをより多く使います。最も充実しますが、少し遅くなります。"
+    },
+    "learnNow": "このチャットから学習",
+    "tips": {
+      "enable": "アシスタントがあなたについてのメモリを使い、学習できるようにします。既定ではオフです。",
+      "incognito": "このチャットは使用も学習もされません。",
+      "aboutYou": "メモリがオンのとき、すべての返答に含まれる短い要約です。"
+    }
+  },
+  "providerGrid": {
+    "showAll": "{{count}}件のプロバイダーをすべて表示",
+    "showFewer": "表示を減らす"
+  },
   "voiceEngines": {
+    "kokoro": "最高品質",
+    "kitten": "最軽量",
+    "pocket": "14種類の音声",
+    "supertonic": "速くて明瞭",
     "openai": "GPTの音声",
+    "elevenlabs": "最も自然",
+    "openrouter": "多彩な音声",
     "deepgram": "高速・低コスト",
     "cartesia": "最小の遅延",
     "google": "Chirp 3 HDの音声",
+    "azure": "ニューラル音声",
     "groq": "Orpheusの音声",
     "xai": "Grokの音声",
     "mistral": "Voxtralの音声",
     "inworld": "表現豊かな音声",
     "custom": "自分のサーバー",
     "names": {
+      "kokoro": "Kokoro",
+      "kitten": "Kitten",
+      "pocket": "Pocket TTS",
+      "supertonic": "Supertonic",
+      "openai": "OpenAI",
+      "elevenlabs": "ElevenLabs",
+      "openrouter": "OpenRouter",
       "deepgram": "Deepgram",
       "cartesia": "Cartesia",
       "google": "Google Cloud",
+      "azure": "Azure Speech",
       "groq": "Groq",
       "xai": "xAI",
       "mistral": "Mistral",
       "inworld": "Inworld",
       "custom": "カスタム"
     }
+  },
+  "insights": {
+    "description": "これまでの音声入力の記録です。集計はこのデバイス上で行われます。",
+    "empty": "最初の音声入力のあとにインサイトが表示されます。",
+    "dictations": "音声入力の回数",
+    "today": "今日 {{words}} 語",
+    "pages_other": "約{{count}}ページ",
+    "fasterThanTyping": "タイピングの{{times}}倍の速さ",
+    "streak_other": "{{count}}日連続",
+    "longest_other": "最長：{{count}}日",
+    "gridLabel_other": "過去6か月間の{{count}}日で{{words}}語",
+    "gridSummary_other": "過去6か月間の{{count}}日で{{words}}語",
+    "dayWords_other": "{{formatted}}語",
+    "dayNone": "音声入力なし",
+    "less": "少ない",
+    "more": "多い",
+    "busiest": "最も多かった日",
+    "best": "ベストの日",
+    "typical": "平均的な日",
+    "typicalSub": "音声入力した日の平均"
   }
 }

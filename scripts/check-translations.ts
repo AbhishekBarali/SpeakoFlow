@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { expectedKeys, flatten, placeholdersMatch } from "./i18n-plurals.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,11 +20,12 @@ const BASELINE_PATH = path.join(
 const UPDATE_BASELINE = process.argv.includes("--update-baseline");
 
 type TranslationData = Record<string, unknown>;
+type FlatStrings = Record<string, string>;
 
 interface ValidationResult {
   valid: boolean;
-  missing: string[][];
-  extra: string[][];
+  missing: string[];
+  extra: string[];
 }
 
 /** Per-language record of values that are allowed to stay in English. */
@@ -55,43 +57,6 @@ function colorize(text: string, color: string): string {
   return `${colors[color]}${text}${colors.reset}`;
 }
 
-function getAllKeyPaths(
-  obj: TranslationData,
-  prefix: string[] = [],
-): string[][] {
-  let paths: string[][] = [];
-  for (const key in obj) {
-    if (!Object.hasOwn(obj, key)) continue;
-
-    const currentPath = prefix.concat([key]);
-    const value = obj[key];
-
-    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-      paths = paths.concat(
-        getAllKeyPaths(value as TranslationData, currentPath),
-      );
-    } else {
-      paths.push(currentPath);
-    }
-  }
-  return paths;
-}
-
-function hasKeyPath(obj: TranslationData, keyPath: string[]): boolean {
-  let current: unknown = obj;
-  for (const key of keyPath) {
-    if (
-      typeof current !== "object" ||
-      current === null ||
-      (current as Record<string, unknown>)[key] === undefined
-    ) {
-      return false;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-  return true;
-}
-
 function loadTranslationFile(lang: string): TranslationData | null {
   const filePath = path.join(LOCALES_DIR, lang, "translation.json");
 
@@ -105,22 +70,18 @@ function loadTranslationFile(lang: string): TranslationData | null {
   }
 }
 
-function flattenStrings(
-  obj: TranslationData,
-  prefix = "",
-  out: Record<string, string> = {},
-): Record<string, string> {
-  for (const key in obj) {
-    if (!Object.hasOwn(obj, key)) continue;
-    const value = obj[key];
-    const dotted = prefix ? `${prefix}.${key}` : key;
-    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-      flattenStrings(value as TranslationData, dotted, out);
-    } else if (typeof value === "string") {
-      out[dotted] = value;
-    }
-  }
-  return out;
+function loadFlat(lang: string): FlatStrings | null {
+  const data = loadTranslationFile(lang);
+  return data ? (flatten(data) as FlatStrings) : null;
+}
+
+/**
+ * Locale key → English key it is translated from. Plural groups expand to the
+ * categories the language uses (Russian needs `_few`/`_many`, Japanese only
+ * `_other`), so a locale is not expected to mirror English's `_one`/`_other`.
+ */
+function expectedFor(lang: string, en: FlatStrings): Map<string, string> {
+  return expectedKeys(lang, en) as Map<string, string>;
 }
 
 function loadBaseline(): Record<string, LocaleBaseline> {
@@ -145,10 +106,7 @@ function loadBaseline(): Record<string, LocaleBaseline> {
  * the legitimate cases: brand names, key caps, sample values, and words that
  * are simply identical in that language.
  */
-function checkUntranslated(referenceData: TranslationData): {
-  hasErrors: boolean;
-} {
-  const en = flattenStrings(referenceData);
+function checkUntranslated(en: FlatStrings): { hasErrors: boolean } {
   const englishValues = new Set(Object.values(en));
   const baseline = loadBaseline();
   const nextBaseline: Record<string, LocaleBaseline> = {};
@@ -160,19 +118,22 @@ function checkUntranslated(referenceData: TranslationData): {
   console.log("─".repeat(60));
 
   for (const lang of LANGUAGES) {
-    const langData = loadTranslationFile(lang);
-    if (!langData) {
+    const flat = loadFlat(lang);
+    if (!flat) {
       hasErrors = true;
       continue;
     }
-    const flat = flattenStrings(langData);
+    const expected = expectedFor(lang, en);
 
     const sameAsEnglish: string[] = [];
     const englishFromOtherKey: string[] = [];
-    for (const key of Object.keys(en)) {
+    for (const [key, sourceKey] of expected) {
       const value = flat[key];
       if (value === undefined) continue;
-      if (value === en[key]) sameAsEnglish.push(key);
+      // An empty English value (a description deliberately left blank) has
+      // nothing to translate; the locale matching it is correct.
+      if (!en[sourceKey]?.trim()) continue;
+      if (value === en[sourceKey]) sameAsEnglish.push(key);
       else if (englishValues.has(value)) englishFromOtherKey.push(key);
     }
     nextBaseline[lang] = {
@@ -185,12 +146,12 @@ function checkUntranslated(referenceData: TranslationData): {
     const unexpected = [
       ...sameAsEnglish
         .filter((key) => !allowedSame.has(key))
-        .map((key) => `${key} = ${JSON.stringify(en[key])}`),
+        .map((key) => `${key} = ${JSON.stringify(flat[key])}`),
       ...englishFromOtherKey
         .filter((key) => !allowedStale.has(key))
         .map(
           (key) =>
-            `${key} = ${JSON.stringify(flat[key])} — stale English, source now says ${JSON.stringify(en[key])}`,
+            `${key} = ${JSON.stringify(flat[key])} — stale English, source now says ${JSON.stringify(en[expected.get(key)!])}`,
         ),
     ];
 
@@ -256,30 +217,26 @@ function checkUntranslated(referenceData: TranslationData): {
 
 /**
  * i18next substitutes {{placeholders}} at runtime, so a translation that drops
- * or renames one silently ships a broken string.
+ * or renames one silently ships a broken string. A language's zero/one/two
+ * plural forms may leave out {{count}} ("no images"); nothing else may.
  */
-function checkPlaceholders(referenceData: TranslationData): {
-  hasErrors: boolean;
-} {
-  const en = flattenStrings(referenceData);
+function checkPlaceholders(en: FlatStrings): { hasErrors: boolean } {
   let hasErrors = false;
   const findings: string[] = [];
 
   for (const lang of LANGUAGES) {
-    const langData = loadTranslationFile(lang);
-    if (!langData) {
+    const flat = loadFlat(lang);
+    if (!flat) {
       hasErrors = true;
       continue;
     }
-    const flat = flattenStrings(langData);
-    for (const key of Object.keys(en)) {
+    for (const [key, sourceKey] of expectedFor(lang, en)) {
       if (!(key in flat)) continue;
-      const expected = (en[key].match(/\{\{[^}]+\}\}/g) ?? []).sort().join(",");
-      const actual = (flat[key].match(/\{\{[^}]+\}\}/g) ?? []).sort().join(",");
-      if (expected !== actual) {
+      if (!placeholdersMatch(key, en[sourceKey], flat[key])) {
         hasErrors = true;
+        const ph = (s: string) => (s.match(/\{\{[^}]+\}\}/g) ?? []).join(",");
         findings.push(
-          `  ${lang}: ${key} expected [${expected}] got [${actual}]`,
+          `  ${lang}: ${key} expected [${ph(en[sourceKey])}] got [${ph(flat[key])}]`,
         );
       }
     }
@@ -309,18 +266,16 @@ function validateTranslations(): void {
 
   // Load reference file
   console.log(`Loading reference language: ${REFERENCE_LANG}`);
-  const referenceData = loadTranslationFile(REFERENCE_LANG);
+  const en = loadFlat(REFERENCE_LANG);
 
-  if (!referenceData) {
+  if (!en) {
     console.error(
       colorize(`\n✗ Failed to load reference file (${REFERENCE_LANG})`, "red"),
     );
     process.exit(1);
   }
 
-  // Get all key paths from reference
-  const referenceKeyPaths = getAllKeyPaths(referenceData);
-  console.log(`Reference has ${referenceKeyPaths.length} keys\n`);
+  console.log(`Reference has ${Object.keys(en).length} keys\n`);
 
   // Track validation results
   let hasErrors = false;
@@ -328,24 +283,17 @@ function validateTranslations(): void {
 
   // Validate each language
   for (const lang of LANGUAGES) {
-    const langData = loadTranslationFile(lang);
+    const flat = loadFlat(lang);
 
-    if (!langData) {
+    if (!flat) {
       hasErrors = true;
       results[lang] = { valid: false, missing: [], extra: [] };
       continue;
     }
 
-    // Find missing keys
-    const missing = referenceKeyPaths.filter(
-      (keyPath) => !hasKeyPath(langData, keyPath),
-    );
-
-    // Find extra keys (keys in language but not in reference)
-    const langKeyPaths = getAllKeyPaths(langData);
-    const extra = langKeyPaths.filter(
-      (keyPath) => !hasKeyPath(referenceData, keyPath),
-    );
+    const expected = expectedFor(lang, en);
+    const missing = [...expected.keys()].filter((key) => !(key in flat));
+    const extra = Object.keys(flat).filter((key) => !expected.has(key));
 
     results[lang] = {
       valid: missing.length === 0 && extra.length === 0,
@@ -376,8 +324,8 @@ function validateTranslations(): void {
         console.log(
           colorize(`  Missing ${result.missing.length} keys:`, "yellow"),
         );
-        result.missing.slice(0, 10).forEach((keyPath) => {
-          console.log(`    - ${keyPath.join(".")}`);
+        result.missing.slice(0, 10).forEach((key) => {
+          console.log(`    - ${key}`);
         });
         if (result.missing.length > 10) {
           console.log(
@@ -396,8 +344,8 @@ function validateTranslations(): void {
             "yellow",
           ),
         );
-        result.extra.slice(0, 10).forEach((keyPath) => {
-          console.log(`    - ${keyPath.join(".")}`);
+        result.extra.slice(0, 10).forEach((key) => {
+          console.log(`    - ${key}`);
         });
         if (result.extra.length > 10) {
           console.log(
@@ -412,10 +360,10 @@ function validateTranslations(): void {
 
   console.log("─".repeat(60));
 
-  const untranslated = checkUntranslated(referenceData);
+  const untranslated = checkUntranslated(en);
   if (untranslated.hasErrors) hasErrors = true;
 
-  const placeholders = checkPlaceholders(referenceData);
+  const placeholders = checkPlaceholders(en);
   if (placeholders.hasErrors) hasErrors = true;
 
   // Summary

@@ -5,13 +5,7 @@ import { Dropdown, type DropdownOption } from "../../ui/Dropdown";
 import { useSettings } from "../../../hooks/useSettings";
 import type { LogLevel } from "../../../bindings";
 
-const LOG_LEVEL_OPTIONS: DropdownOption[] = [
-  { value: "error", label: "Error" },
-  { value: "warn", label: "Warn" },
-  { value: "info", label: "Info" },
-  { value: "debug", label: "Debug" },
-  { value: "trace", label: "Trace" },
-];
+const LOG_LEVELS = ["error", "warn", "info", "debug", "trace"] as const;
 
 interface LogLevelSelectorProps {
   descriptionMode?: "tooltip" | "inline";
@@ -45,7 +39,12 @@ export const LogLevelSelector: React.FC<LogLevelSelectorProps> = ({
       layout="horizontal"
     >
       <Dropdown
-        options={LOG_LEVEL_OPTIONS}
+        options={LOG_LEVELS.map(
+          (value): DropdownOption => ({
+            value,
+            label: t(`settings.debug.logLevel.levels.${value}`),
+          }),
+        )}
         selectedValue={currentLevel}
         onSelect={handleSelect}
         disabled={!settings || isUpdating("log_level")}

@@ -91,7 +91,10 @@ export const AccelerationSelector: FC<AccelerationSelectorProps> = ({
       setOrtOptions(
         ortVals.map((v) => ({
           value: v,
-          label: ORT_LABELS[v as OrtAcceleratorSetting] ?? v,
+          label:
+            v === "auto"
+              ? t("settings.advanced.acceleration.gpuDevice.auto")
+              : (ORT_LABELS[v as OrtAcceleratorSetting] ?? v),
         })),
       );
     });

@@ -19,7 +19,7 @@ import {
   getTranslatedModelDescription,
   getTranslatedModelName,
 } from "../../lib/utils/modelTranslation";
-import { LANGUAGES } from "../../lib/constants/languages";
+import { languageLabel } from "../../lib/constants/languages";
 import Badge from "../ui/Badge";
 import { Button } from "../ui/Button";
 
@@ -27,11 +27,10 @@ import { Button } from "../ui/Button";
 const getLanguageDisplayText = (
   supportedLanguages: string[],
   t: (key: string, options?: Record<string, unknown>) => string,
+  uiLanguage: string,
 ): string => {
   if (supportedLanguages.length === 1) {
-    const langCode = supportedLanguages[0];
-    const langName =
-      LANGUAGES.find((l) => l.value === langCode)?.label || langCode;
+    const langName = languageLabel(supportedLanguages[0], uiLanguage);
     return t("modelSelector.capabilities.languageOnly", { language: langName });
   }
   return t("modelSelector.capabilities.multiLanguage");
@@ -132,7 +131,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
   showInlineProgress = true,
   showPrimaryAction = false,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isFeatured = variant === "featured";
   const isClickable =
     status === "available" || status === "active" || status === "downloadable";
@@ -279,7 +278,13 @@ const ModelCard: React.FC<ModelCardProps> = ({
             }
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>{getLanguageDisplayText(model.supported_languages, t)}</span>
+            <span>
+              {getLanguageDisplayText(
+                model.supported_languages,
+                t,
+                i18n.language,
+              )}
+            </span>
           </div>
         )}
         {model.supports_translation && (
