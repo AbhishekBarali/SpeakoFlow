@@ -294,8 +294,8 @@ Full documentation for each:
 <td width="50%" valign="top"><img src="assets/readme/screens/insights.webp" alt="The Insights page: words dictated, words per minute, time saved, number of dictations, and a six-month activity map" /><br /><sub><b>Insights.</b> How much you dictate, and how much typing it saved.</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="assets/readme/screens/models.webp" alt="The speech-to-text model settings, with cloud providers such as ElevenLabs, OpenRouter, OpenAI, Deepgram, and Azure AI Speech" /><br /><sub><b>Models.</b> On this computer or in the cloud, one job at a time.</sub></td>
-<td width="50%" valign="top"><img src="assets/readme/screens/models-voice.webp" alt="The voice settings, with on-device voices such as Kokoro, Kitten, Pocket TTS, and Supertonic, and cloud voices from a dozen providers" /><br /><sub><b>Voices.</b> Local voices or a dozen cloud ones for spoken replies.</sub></td>
+<td width="50%" valign="top"><img src="assets/readme/screens/models.webp" alt="The speech-to-text model settings running on this computer, with Parakeet in use and more local models ready to download" /><br /><sub><b>Models.</b> On this computer or in the cloud, one job at a time.</sub></td>
+<td width="50%" valign="top"><img src="assets/readme/screens/models-voice.webp" alt="The voice settings with Kokoro selected and running on this computer, beside the other on-device voices and a dozen cloud ones" /><br /><sub><b>Voices.</b> Local voices or a dozen cloud ones for spoken replies.</sub></td>
 </tr>
 </table>
 
