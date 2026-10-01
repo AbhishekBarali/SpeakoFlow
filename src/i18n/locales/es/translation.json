@@ -2032,6 +2032,7 @@
       "writing": "Escribiendo las notas de esta reunión. En una llamada larga tarda un momento.",
       "autoCaption": "Escritas al terminar la llamada",
       "retryCaption": "Las notas de esta reunión aún no se han escrito.",
+      "whileRecording": "Las notas se escriben automáticamente cuando se detiene la grabación.",
       "copy": "Copiar",
       "copied": "Copiado",
       "toggleTask": "Marcar este próximo paso como hecho o no hecho",

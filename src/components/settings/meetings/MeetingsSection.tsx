@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
@@ -75,6 +81,26 @@ export const MeetingsSection: React.FC<{
   const [openId, setOpenId] = useState<number | null>(null);
   // Clicking Meetings in the sidebar again goes back to the list.
   usePageReset("meetings", () => setOpenId(null));
+
+  /* ── where the page is scrolled ── */
+
+  // The page is one scroll container for both the list and a meeting, so a
+  // meeting opened from far down the list used to open partway down its own
+  // page, header and tabs scrolled out of view. A meeting opens at the top;
+  // going back returns to the place in the list it was opened from.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listScroll = useRef(0);
+  const scroller = () =>
+    rootRef.current?.closest<HTMLElement>("[data-page]") ?? null;
+  const openMeeting = useCallback((meetingId: number) => {
+    listScroll.current = scroller()?.scrollTop ?? 0;
+    setOpenId(meetingId);
+  }, []);
+  const isOpen = openId !== null;
+  useLayoutEffect(() => {
+    const element = scroller();
+    if (element) element.scrollTop = isOpen ? 0 : listScroll.current;
+  }, [isOpen]);
 
   /* ── the list ── */
 
@@ -228,7 +254,7 @@ export const MeetingsSection: React.FC<{
         setState(IDLE_STATE);
         // Open what was just recorded: the transcript is complete by the time
         // `stop_meeting` answers, so there is something to read immediately.
-        setOpenId(meetingId);
+        openMeeting(meetingId);
       })
       .catch((error: unknown) => {
         toast.error(t("meetings.errors.stopFailed", { error: String(error) }));
@@ -265,20 +291,22 @@ export const MeetingsSection: React.FC<{
 
   if (openId !== null) {
     return (
-      <MeetingDetail
-        meetingId={openId}
-        recordingMeetingId={liveMeetingId(state)}
-        onChanged={refresh}
-        onBack={() => setOpenId(null)}
-        backLabel={t("nav.meetings")}
-      />
+      <div ref={rootRef} className="w-full">
+        <MeetingDetail
+          meetingId={openId}
+          recordingMeetingId={liveMeetingId(state)}
+          onChanged={refresh}
+          onBack={() => setOpenId(null)}
+          backLabel={t("nav.meetings")}
+        />
+      </div>
     );
   }
 
   const recording = liveMeetingId(state) !== null;
 
   return (
-    <div className="w-full">
+    <div ref={rootRef} className="w-full">
       <PageHeader
         title={t("sidebar.meetings")}
         badge={<Badge variant="outline">{t("common.beta")}</Badge>}
@@ -336,7 +364,7 @@ export const MeetingsSection: React.FC<{
           loading={loading}
           hasMore={hasMore}
           onLoadMore={() => setPages((value) => value + 1)}
-          onOpen={setOpenId}
+          onOpen={openMeeting}
           onDelete={remove}
           recordingMeetingId={liveMeetingId(state)}
         />

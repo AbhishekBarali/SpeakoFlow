@@ -2021,6 +2021,7 @@
       "writing": "Bu toplantının notları yazılıyor. Uzun bir görüşmede bu biraz sürer.",
       "autoCaption": "Görüşme bittiğinde yazıldı",
       "retryCaption": "Bu toplantının notları henüz yazılmadı.",
+      "whileRecording": "Notlar, kayıt durduğunda otomatik olarak yazılır.",
       "copy": "Kopyala",
       "copied": "Kopyalandı",
       "toggleTask": "Bu adımı tamamlandı ya da tamamlanmadı olarak işaretle",

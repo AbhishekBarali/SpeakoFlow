@@ -2032,6 +2032,7 @@
       "writing": "Rédaction des notes de cette réunion. Cela prend un moment pour un long appel.",
       "autoCaption": "Rédigées à la fin de l'appel",
       "retryCaption": "Les notes de cette réunion n'ont pas encore été rédigées.",
+      "whileRecording": "Les notes sont rédigées automatiquement à l'arrêt de l'enregistrement.",
       "copy": "Copier",
       "copied": "Copié",
       "toggleTask": "Marquer cette étape comme faite ou non faite",

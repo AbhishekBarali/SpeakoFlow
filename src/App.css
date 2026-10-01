@@ -671,6 +671,16 @@
   background: rgba(255, 190, 110, 0.14);
   border-color: rgba(255, 200, 130, 0.28);
 }
+/* A corner toggle that is not the tips bulb (the recorder's indicator
+ * switch): on is plain light, because the amber glow means "tips are open". */
+.hero-corner.hero-corner-plain[aria-pressed="true"] {
+  color: var(--color-hero-ink);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.hero-corner.hero-corner-plain[aria-pressed="true"]:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
 
 /* Tips fold away: rows animate from their height to zero, content keeps its
  * size (so nothing rewraps mid-fold) and fades a little ahead of the fold. */

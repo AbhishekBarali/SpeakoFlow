@@ -2010,6 +2010,7 @@
       "writing": "Đang viết ghi chú cho cuộc họp này. Với cuộc gọi dài, việc này mất một lúc.",
       "autoCaption": "Được viết khi cuộc gọi kết thúc",
       "retryCaption": "Ghi chú cho cuộc họp này chưa được viết.",
+      "whileRecording": "Ghi chú sẽ được viết tự động khi dừng ghi âm.",
       "copy": "Sao chép",
       "copied": "Đã sao chép",
       "toggleTask": "Đánh dấu bước tiếp theo này là đã xong hoặc chưa xong",

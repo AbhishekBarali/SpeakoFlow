@@ -2043,6 +2043,7 @@
       "writing": "Píšu poznámky k této schůzce. U dlouhého hovoru to chvíli trvá.",
       "autoCaption": "Napsáno po skončení hovoru",
       "retryCaption": "Poznámky k této schůzce zatím nebyly napsány.",
+      "whileRecording": "Poznámky se napíšou automaticky, jakmile nahrávání skončí.",
       "copy": "Kopírovat",
       "copied": "Zkopírováno",
       "toggleTask": "Označit tento krok jako hotový nebo nehotový",

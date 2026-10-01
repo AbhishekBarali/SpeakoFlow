@@ -2032,6 +2032,7 @@
       "writing": "Sto scrivendo gli appunti di questa riunione. In una chiamata lunga ci vuole un momento.",
       "autoCaption": "Scritti al termine della chiamata",
       "retryCaption": "Gli appunti di questa riunione non sono ancora stati scritti.",
+      "whileRecording": "Gli appunti vengono scritti automaticamente quando la registrazione si ferma.",
       "copy": "Copia",
       "copied": "Copiato",
       "toggleTask": "Segna questo passo come fatto o da fare",

@@ -2034,6 +2034,7 @@
       "writing": "Writing the notes for this meeting. This takes a moment on a long call.",
       "autoCaption": "Written when the call ended",
       "retryCaption": "The notes for this meeting have not been written yet.",
+      "whileRecording": "Notes are written automatically when the recording stops.",
       "copy": "Copy",
       "copied": "Copied",
       "toggleTask": "Mark this next step done or not done",

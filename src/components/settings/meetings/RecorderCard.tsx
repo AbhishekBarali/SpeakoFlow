@@ -164,7 +164,7 @@ export const RecorderCard: React.FC<RecorderCardProps> = ({
                 : t("meetings.indicator.show")
             }
             aria-pressed={indicator.enabled}
-            className="hero-corner absolute end-3.5 top-3.5 grid h-8 w-8 cursor-pointer place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-ink/70 disabled:cursor-wait"
+            className="hero-corner hero-corner-plain absolute end-3.5 top-3.5 grid h-8 w-8 cursor-pointer place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-ink/70 disabled:cursor-wait"
           >
             {indicator.enabled ? (
               <Eye className="h-4 w-4" aria-hidden="true" />

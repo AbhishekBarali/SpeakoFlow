@@ -971,10 +971,15 @@ const meetings: Json[] = fresh
     }));
 
 if (liveMeeting) {
+  const startedAt = now - 754;
   meetings.unshift({
     id: LIVE_MEETING_ID,
-    title: "Meeting 1 Oct 2026, 20:10",
-    started_at: now - 754,
+    // Composed the way `MeetingsSection.start` composes it.
+    title: `Meeting ${new Intl.DateTimeFormat("en", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(startedAt * 1000))}`,
+    started_at: startedAt,
     ended_at: null,
     status: "recording",
     mic_file: "mic.wav",
@@ -1028,24 +1033,24 @@ const meetingChat: Json[] = fresh
 const startLiveFeed = () => {
   if (!liveMeeting) return;
   const turns = MEETING_TURNS.slice(0, params.has("pill") ? 7 : 5);
-  window.setTimeout(() => {
-    for (const [speaker, source, at, text] of turns) {
-      const keyed =
-        source === "mic"
-          ? "me"
-          : speaker === "spk_1" || speaker === "spk_2"
-            ? "them"
-            : speaker;
-      void emit("meeting-segment", {
-        meeting_id: LIVE_MEETING_ID,
-        source,
-        speaker_key: keyed,
-        start_ms: at * 1000,
-        end_ms: (at + 8) * 1000,
-        text,
-      });
-    }
-  }, 350);
+  // Spread out like a real call, so a page opened a moment later still sees
+  // some of it arrive.
+  turns.forEach(([, source, at, text], index) => {
+    window.setTimeout(
+      () => {
+        // Live segments carry the channel key; diarization comes after.
+        void emit("meeting-segment", {
+          meeting_id: LIVE_MEETING_ID,
+          source,
+          speaker_key: source === "mic" ? "me" : "them",
+          start_ms: at * 1000,
+          end_ms: (at + 8) * 1000,
+          text,
+        });
+      },
+      350 + index * 700,
+    );
+  });
   let phase = 0;
   window.setInterval(() => {
     phase += 1;

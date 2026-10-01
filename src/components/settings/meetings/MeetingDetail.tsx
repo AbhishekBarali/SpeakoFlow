@@ -286,8 +286,11 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
   // Summary first. It used to be "My thoughts", which made sense when notes only
   // existed if you asked for them; now they are written automatically the moment
   // the call ends, so the summary is what someone opening a finished meeting came
-  // to read.
-  const [tab, setTab] = useState<DetailTab>("summary");
+  // to read. A meeting still recording has no summary yet, and its transcript
+  // keeps filling in, so that one opens on the transcript.
+  const [tab, setTab] = useState<DetailTab>(() =>
+    recordingMeetingId === meetingId ? "transcript" : "summary",
+  );
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [speakers, setSpeakers] = useState<MeetingSpeaker[]>([]);
@@ -674,6 +677,11 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
   }
 
   const durationMs = meetingDurationMs(meeting.started_at, meeting.ended_at);
+  const live = isLive || meeting.status === "recording";
+  const when = formatWhen(meeting.started_at, i18n.language);
+  // A meeting nobody has named yet is titled with its own start time, so the
+  // date beside it would say the same thing twice.
+  const titleSaysWhen = meeting.title.includes(when);
   const statusPill =
     meeting.status === "interrupted" || meeting.status === "processing"
       ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
@@ -764,13 +772,28 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
           )}
 
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarDays
-                className="h-4 w-4 text-muted-soft"
-                aria-hidden="true"
-              />
-              {formatWhen(meeting.started_at, i18n.language)}
-            </span>
+            {statusPill && (
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusPill}`}
+              >
+                {meeting.status === "recording" && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-current motion-safe:animate-pulse"
+                    aria-hidden="true"
+                  />
+                )}
+                {t(`meetings.status.${meeting.status}`)}
+              </span>
+            )}
+            {!titleSaysWhen && (
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays
+                  className="h-4 w-4 text-muted-soft"
+                  aria-hidden="true"
+                />
+                {when}
+              </span>
+            )}
             {durationMs !== null && (
               <span className="inline-flex items-center gap-1.5 tabular-nums">
                 <Clock className="h-4 w-4 text-muted-soft" aria-hidden="true" />
@@ -783,19 +806,21 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
                 {t("meetings.list.speakers", { count: spokenSpeakers })}
               </span>
             )}
-            {statusPill && (
-              <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusPill}`}
-              >
-                {t(`meetings.status.${meeting.status}`)}
-              </span>
-            )}
           </div>
         </div>
 
-        <div className="shrink-0">
-          <DiscussButton model={discuss} />
-        </div>
+        {discuss.available && (
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <DiscussButton model={discuss} />
+            {/* Said, not only hovered: a greyed button with its reason in a
+                tooltip reads as broken. */}
+            {discuss.disabledReason && (
+              <p className="max-w-[16rem] text-end text-xs leading-snug text-muted">
+                {discuss.disabledReason}
+              </p>
+            )}
+          </div>
+        )}
       </header>
 
       <Tabs
@@ -943,22 +968,33 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
                     <FileText className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted text-pretty">
-                    {items.length === 0
-                      ? t("meetings.summary.needsTranscript")
-                      : t("meetings.summary.retryCaption")}
+                    {/* Mid-call the notes are not late, they are not due yet:
+                        the post-call job writes them. Writing a draft now is
+                        still allowed, so it stays offered, one step quieter. */}
+                    {live
+                      ? t("meetings.summary.whileRecording")
+                      : items.length === 0
+                        ? t("meetings.summary.needsTranscript")
+                        : t("meetings.summary.retryCaption")}
                   </p>
                   {items.length > 0 && (
                     <>
                       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                         {templatePicker}
-                        <Button variant="primary" size="md" onClick={generate}>
+                        <Button
+                          variant={live ? "secondary" : "primary"}
+                          size="md"
+                          onClick={generate}
+                        >
                           <Sparkles className="h-4 w-4" aria-hidden="true" />
                           {t("meetings.summary.generate")}
                         </Button>
                       </div>
-                      <p className="mt-3 max-w-sm text-xs leading-relaxed text-muted-soft">
-                        {t(`meetings.summary.templateHints.${template}`)}
-                      </p>
+                      {!live && (
+                        <p className="mt-3 max-w-sm text-xs leading-relaxed text-muted-soft">
+                          {t(`meetings.summary.templateHints.${template}`)}
+                        </p>
+                      )}
                     </>
                   )}
                 </div>

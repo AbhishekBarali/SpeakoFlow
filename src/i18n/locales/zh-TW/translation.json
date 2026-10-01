@@ -2010,6 +2010,7 @@
       "writing": "正在撰寫這場會議的筆記。通話較長時需要一點時間。",
       "autoCaption": "於通話結束時撰寫",
       "retryCaption": "這場會議的筆記尚未撰寫。",
+      "whileRecording": "錄音停止後會自動撰寫筆記。",
       "copy": "複製",
       "copied": "已複製",
       "toggleTask": "將這個後續步驟標示為已完成或未完成",

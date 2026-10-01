@@ -2021,6 +2021,7 @@
       "writing": "Skriver anteckningarna för mötet. Det tar en stund för ett långt samtal.",
       "autoCaption": "Skrivna när samtalet avslutades",
       "retryCaption": "Anteckningarna för mötet har inte skrivits än.",
+      "whileRecording": "Anteckningarna skrivs automatiskt när inspelningen stoppas.",
       "copy": "Kopiera",
       "copied": "Kopierat",
       "toggleTask": "Markera nästa steg som klart eller inte klart",

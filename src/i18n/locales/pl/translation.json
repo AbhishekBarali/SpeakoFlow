@@ -2043,6 +2043,7 @@
       "writing": "Piszę notatki z tego spotkania. Przy długiej rozmowie może to chwilę potrwać.",
       "autoCaption": "Napisane po zakończeniu rozmowy",
       "retryCaption": "Notatki z tego spotkania nie zostały jeszcze napisane.",
+      "whileRecording": "Notatki zostaną napisane automatycznie po zatrzymaniu nagrywania.",
       "copy": "Kopiuj",
       "copied": "Skopiowano",
       "toggleTask": "Oznacz ten krok jako wykonany lub niewykonany",

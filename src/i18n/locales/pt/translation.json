@@ -2032,6 +2032,7 @@
       "writing": "Escrevendo as anotações desta reunião. Em uma chamada longa, isso leva um momento.",
       "autoCaption": "Escritas quando a chamada terminou",
       "retryCaption": "As anotações desta reunião ainda não foram escritas.",
+      "whileRecording": "As anotações são escritas automaticamente quando a gravação termina.",
       "copy": "Copiar",
       "copied": "Copiado",
       "toggleTask": "Marcar este próximo passo como concluído ou não concluído",

@@ -2021,6 +2021,7 @@
       "writing": "Die Notizen für dieses Meeting werden geschrieben. Bei einem langen Anruf dauert das einen Moment.",
       "autoCaption": "Nach Ende des Anrufs geschrieben",
       "retryCaption": "Die Notizen für dieses Meeting wurden noch nicht geschrieben.",
+      "whileRecording": "Die Notizen werden automatisch geschrieben, sobald die Aufnahme endet.",
       "copy": "Kopieren",
       "copied": "Kopiert",
       "toggleTask": "Diesen nächsten Schritt als erledigt oder offen markieren",
