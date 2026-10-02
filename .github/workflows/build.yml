@@ -1125,14 +1125,35 @@ jobs:
             ARCH="${APPIMAGETOOL_ARCH}" "./${APPIMAGETOOL}" --no-appstream \
               --runtime-file "$RUNTIME" squashfs-root "$APPIMAGE_NAME"
 
-            # The repacked file must start with exactly the pinned static type2
-            # runtime, or it would still need libfuse2 on the user's machine. The
-            # old runtime dlopens libfuse.so.2 by name (not a NEEDED entry, so
+            # The repacked file must start with the pinned static type2 runtime,
+            # or it would still need libfuse2 on the user's machine. The old
+            # runtime dlopens libfuse.so.2 by name (not a NEEDED entry, so
             # readelf cannot see it); the static one never mentions it. Only the
             # runtime's own bytes are searched, so the squashfs payload cannot
             # trip this.
+            #
+            # appimagetool writes into four reserved sections of the runtime
+            # (.digest_md5 always, plus .upd_info/.sha256_sig/.sig_key when
+            # update info or signing is used), so a plain byte compare always
+            # fails. Compare everything else and zero those ranges in both.
             RUNTIME_SIZE="$(stat -c%s "$RUNTIME")"
-            if ! cmp -s -n "$RUNTIME_SIZE" "$RUNTIME" "$APPIMAGE_NAME"; then
+            RESERVED="$(readelf -S -W "$RUNTIME" | awk '{for (i = 1; i <= NF; i++) if ($i ~ /^\.(digest_md5|upd_info|sha256_sig|sig_key)$/) print $(i+3), $(i+4)}')"
+            if [ "$(printf '%s\n' "$RESERVED" | grep -c .)" != "4" ]; then
+              echo "ERROR: pinned runtime is missing its digest/update/signature sections" >&2
+              exit 1
+            fi
+            if ! RESERVED="$RESERVED" python3 - "$RUNTIME" "$APPIMAGE_NAME" <<'PY'
+          import os, sys
+          runtime = bytearray(open(sys.argv[1], "rb").read())
+          with open(sys.argv[2], "rb") as f:
+              embedded = bytearray(f.read(len(runtime)))
+          for line in os.environ["RESERVED"].split("\n"):
+              off, size = (int(x, 16) for x in line.split())
+              runtime[off:off + size] = bytes(size)
+              embedded[off:off + size] = bytes(size)
+          sys.exit(0 if runtime == embedded else 1)
+          PY
+            then
               echo "ERROR: repacked AppImage does not start with the pinned type2 runtime" >&2
               exit 1
             fi
