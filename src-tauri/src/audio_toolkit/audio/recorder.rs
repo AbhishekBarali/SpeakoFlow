@@ -178,6 +178,14 @@ impl AudioRecorder {
         let worker = std::thread::spawn(move || {
             let stop_flag = Arc::new(AtomicBool::new(false));
             let stop_flag_for_stream = stop_flag.clone();
+            // Set while the stream is open but not recording (always-on mic,
+            // or the lazy-close window after a dictation): the callback then
+            // returns at once instead of copying each block and waking the
+            // consumer thread just to discard it. Separate from `stop_flag`
+            // so the stop/end-of-stream handshake is untouched. `Cmd::Start`
+            // clears it, `Cmd::Stop` sets it again after replying.
+            let idle = Arc::new(AtomicBool::new(true));
+            let idle_for_stream = idle.clone();
             let init_result = (|| -> Result<(cpal::Stream, u32), String> {
                 // `config` was resolved (and cached) in `open()` before this
                 // worker was spawned, so we don't re-enumerate the device here.
@@ -199,6 +207,7 @@ impl AudioRecorder {
                         &config,
                         sample_tx,
                         channels,
+                        idle_for_stream,
                         stop_flag_for_stream,
                         stream_error.clone(),
                     )
@@ -208,6 +217,7 @@ impl AudioRecorder {
                         &config,
                         sample_tx,
                         channels,
+                        idle_for_stream,
                         stop_flag_for_stream,
                         stream_error.clone(),
                     )
@@ -217,6 +227,7 @@ impl AudioRecorder {
                         &config,
                         sample_tx,
                         channels,
+                        idle_for_stream,
                         stop_flag_for_stream,
                         stream_error.clone(),
                     )
@@ -226,6 +237,7 @@ impl AudioRecorder {
                         &config,
                         sample_tx,
                         channels,
+                        idle_for_stream,
                         stop_flag_for_stream,
                         stream_error.clone(),
                     )
@@ -235,6 +247,7 @@ impl AudioRecorder {
                         &config,
                         sample_tx,
                         channels,
+                        idle_for_stream,
                         stop_flag_for_stream,
                         stream_error.clone(),
                     )
@@ -261,6 +274,7 @@ impl AudioRecorder {
                         sample_rx,
                         level_cb,
                         frame_cb,
+                        idle,
                         stop_flag,
                         capture_ready,
                     );
@@ -380,6 +394,7 @@ impl AudioRecorder {
         config: &cpal::SupportedStreamConfig,
         sample_tx: mpsc::Sender<RecorderEvent>,
         channels: usize,
+        idle: Arc<AtomicBool>,
         stop_flag: Arc<AtomicBool>,
         stream_error: Arc<AtomicBool>,
     ) -> Result<cpal::Stream, cpal::BuildStreamError>
@@ -394,6 +409,7 @@ impl AudioRecorder {
             handle_input_block(
                 data,
                 channels,
+                &idle,
                 &stop_flag,
                 &mut eos_sent,
                 &mut output_buffer,
@@ -477,9 +493,15 @@ impl AudioRecorder {
 /// on every recording — 10-100 ms, worst on Bluetooth — which is the clipped
 /// last syllable on a push-to-talk release. Later blocks are dropped until the
 /// flag clears. Backport of Handy PR #1958.
+///
+/// While `idle` is set (stream open, not recording) every block is dropped
+/// before any conversion or send. Recording state never changes inside an
+/// idle span: `Cmd::Stop` sets `idle` only after its end-of-stream drain has
+/// replied, and `Cmd::Start` clears it before the first block is wanted.
 fn handle_input_block<T>(
     data: &[T],
     channels: usize,
+    idle: &AtomicBool,
     stop_flag: &AtomicBool,
     eos_sent: &mut bool,
     output_buffer: &mut Vec<f32>,
@@ -488,6 +510,9 @@ fn handle_input_block<T>(
     T: Sample,
     f32: cpal::FromSample<T>,
 {
+    if idle.load(Ordering::Relaxed) {
+        return;
+    }
     let stopping = stop_flag.load(Ordering::Relaxed);
     if stopping && *eos_sent {
         return;
@@ -560,6 +585,7 @@ mod tests {
                 rx,
                 None,
                 None,
+                Arc::new(AtomicBool::new(true)),
                 Arc::new(AtomicBool::new(false)),
                 Arc::new((Mutex::new(false), Condvar::new())),
             );
@@ -603,11 +629,12 @@ mod tests {
     #[test]
     fn boundary_block_forwarded_before_eos() {
         let (tx, rx) = mpsc::channel();
+        let idle = AtomicBool::new(false);
         let stop_flag = AtomicBool::new(false);
         let mut eos_sent = false;
         let mut scratch = Vec::new();
         let mut push = |flag: &AtomicBool, eos: &mut bool, block: &[f32]| {
-            handle_input_block::<f32>(block, 1, flag, eos, &mut scratch, &tx)
+            handle_input_block::<f32>(block, 1, &idle, flag, eos, &mut scratch, &tx)
         };
 
         // Running: blocks forwarded, no sentinel.
@@ -631,6 +658,52 @@ mod tests {
         push(&stop_flag, &mut eos_sent, &[0.2]);
         assert!(matches!(rx.try_recv(), Ok(RecorderEvent::Samples(_))));
         assert!(rx.try_recv().is_err(), "no sentinel while running");
+    }
+
+    #[test]
+    fn idle_stream_ships_nothing_and_keeps_the_stop_handshake() {
+        let (tx, rx) = mpsc::channel();
+        let idle = AtomicBool::new(true);
+        let stop = AtomicBool::new(false);
+        let mut eos_sent = false;
+        let mut scratch = Vec::new();
+        let mut push = |idle: &AtomicBool, stop: &AtomicBool, eos: &mut bool, block: &[f32]| {
+            handle_input_block::<f32>(block, 1, idle, stop, eos, &mut scratch, &tx)
+        };
+
+        // Freshly opened (or between recordings): nothing reaches the consumer.
+        push(&idle, &stop, &mut eos_sent, &[0.9]);
+        assert!(
+            rx.try_recv().is_err(),
+            "an idle stream must not ship blocks"
+        );
+
+        // Start: blocks flow. Stop: boundary block, then exactly one EOS.
+        idle.store(false, Ordering::Relaxed);
+        push(&idle, &stop, &mut eos_sent, &[0.1]);
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::Samples(_))));
+        stop.store(true, Ordering::Relaxed);
+        push(&idle, &stop, &mut eos_sent, &[0.2]);
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::Samples(_))));
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::EndOfStream)));
+
+        // After the reply the consumer parks the callback, then clears stop:
+        // still nothing shipped, and no stray sentinel left for the next Stop.
+        idle.store(true, Ordering::Relaxed);
+        stop.store(false, Ordering::Relaxed);
+        push(&idle, &stop, &mut eos_sent, &[0.3]);
+        assert!(rx.try_recv().is_err());
+
+        // Next recording: the first block flows and re-arms the sentinel, so
+        // its Stop gets its own EOS.
+        idle.store(false, Ordering::Relaxed);
+        push(&idle, &stop, &mut eos_sent, &[0.4]);
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::Samples(_))));
+        assert!(rx.try_recv().is_err(), "no sentinel while running");
+        stop.store(true, Ordering::Relaxed);
+        push(&idle, &stop, &mut eos_sent, &[0.5]);
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::Samples(_))));
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::EndOfStream)));
     }
 
     #[test]
@@ -658,6 +731,7 @@ mod tests {
             Some(Arc::new(move |_| {
                 frame_count.fetch_add(1, Ordering::Relaxed);
             })),
+            Arc::new(AtomicBool::new(true)),
             Arc::new(AtomicBool::new(false)),
             ready.clone(),
         );
@@ -673,8 +747,11 @@ mod tests {
         let (reply_tx, reply_rx) = mpsc::channel();
         let (level_tx, level_rx) = mpsc::channel();
         let (frame_tx, frame_rx) = mpsc::channel();
+        // An opened stream starts idle, exactly like `open()` sets it.
+        let idle = Arc::new(AtomicBool::new(true));
         let stop = Arc::new(AtomicBool::new(false));
         let ready = Arc::new((Mutex::new(false), Condvar::new()));
+        let worker_idle = idle.clone();
         let worker_stop = stop.clone();
         let worker_ready = ready.clone();
         let worker = std::thread::spawn(move || {
@@ -688,6 +765,7 @@ mod tests {
                 Some(Arc::new(move |frame| {
                     let _ = frame_tx.send(frame.to_vec());
                 })),
+                worker_idle,
                 worker_stop,
                 worker_ready,
             )
@@ -703,6 +781,10 @@ mod tests {
             .unwrap();
         level_rx.recv_timeout(Duration::from_secs(2)).unwrap();
         assert!(*ready.0.lock().unwrap());
+        assert!(
+            !idle.load(Ordering::Relaxed),
+            "Start resumes the capture callback"
+        );
 
         // Stop consumes this chunk and flushes the partial final frame before
         // replying. Both the batch transcript and cloud stream need that tail.
@@ -722,6 +804,10 @@ mod tests {
         assert_eq!(&output[..960], &[0.2; 960]);
         assert_eq!(&output[960..1200], &[0.3; 240]);
         assert!(output[1200..].iter().all(|s| *s == 0.0));
+        // Between recordings the capture callback is parked (it drops blocks
+        // instead of shipping them to be discarded) and the stop flag is clear
+        // again, ready for the next Start.
+        assert!(idle.load(Ordering::Relaxed));
         assert!(!stop.load(Ordering::Relaxed));
     }
 
@@ -770,6 +856,7 @@ fn run_consumer(
     sample_rx: mpsc::Receiver<RecorderEvent>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
     frame_cb: Option<Arc<dyn Fn(&[f32]) + Send + Sync + 'static>>,
+    idle: Arc<AtomicBool>,
     stop_flag: Arc<AtomicBool>,
     capture_ready: Arc<(Mutex<bool>, Condvar)>,
 ) {
@@ -877,6 +964,7 @@ fn run_consumer(
             match cmd {
                 Cmd::Start => {
                     stop_flag.store(false, Ordering::Relaxed);
+                    idle.store(false, Ordering::Relaxed);
                     processed_samples.clear();
                     // Clear resampler state left over from any previous
                     // recording (partial input chunk, pending output frame, and
@@ -952,8 +1040,13 @@ fn run_consumer(
 
                     let _ = reply_tx.send(std::mem::take(&mut processed_samples));
 
-                    // Resume the audio callback so the consumer loop can continue
-                    // receiving chunks (important for always-on microphone mode).
+                    // Park the callback until the next `Cmd::Start` (idle first,
+                    // so it never ships a block between the two stores), then
+                    // clear the stop flag as before. The consumer discards
+                    // anything between recordings, so letting the callback keep
+                    // shipping blocks only cost a copy and two thread wakeups
+                    // per audio period (forever, in always-on microphone mode).
+                    idle.store(true, Ordering::Relaxed);
                     stop_flag.store(false, Ordering::Relaxed);
                 }
                 Cmd::Shutdown => {
