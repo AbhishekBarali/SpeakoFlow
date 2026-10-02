@@ -1,5 +1,11 @@
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, RotateCcw, Undo2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -64,6 +70,49 @@ const EMPTY_TRANSCRIPT: Transcript = {
   chunks: [],
   tentative: "",
   reveal: 0,
+};
+
+/**
+ * The latest mic levels, held outside React state.
+ *
+ * `mic-level` arrives ~30x a second while the user speaks, and only the
+ * waveform draws it. Kept in component state it re-rendered the whole overlay
+ * on every event; kept here, only `LiveWaveform` (which subscribes) re-renders.
+ */
+type LevelStore = {
+  get: () => number[];
+  set: (levels: number[]) => void;
+  subscribe: (onChange: () => void) => () => void;
+};
+function createLevelStore(): LevelStore {
+  let value = EMPTY_LEVELS;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => value,
+    set: (next) => {
+      if (next === value) return;
+      value = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (onChange) => {
+      listeners.add(onChange);
+      return () => {
+        listeners.delete(onChange);
+      };
+    },
+  };
+}
+
+/** `AudioWaveform` fed straight from the level store, so a level update renders
+ *  this leaf and nothing above it. */
+const LiveWaveform: React.FC<
+  Omit<React.ComponentProps<typeof AudioWaveform>, "levels"> & {
+    store: LevelStore;
+    live: boolean;
+  }
+> = ({ store, live, ...waveform }) => {
+  const levels = useSyncExternalStore(store.subscribe, store.get);
+  return <AudioWaveform {...waveform} levels={live ? levels : EMPTY_LEVELS} />;
 };
 
 /** The card's indicator slot is 23px: five 3px bars on a 5px pitch, the same
@@ -225,7 +274,9 @@ const RecordingOverlay: React.FC = () => {
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
   const downloadId = useRef<string | null>(null);
   const [locked, setLocked] = useState(false);
-  const [levels, setLevels] = useState<number[]>(EMPTY_LEVELS);
+  const levelStore = useRef<LevelStore | null>(null);
+  levelStore.current ??= createLevelStore();
+  const levels = levelStore.current;
   const [micLive, setMicLive] = useState(false);
   const [transcript, setTranscript] = useState<Transcript>(EMPTY_TRANSCRIPT);
   const [streamingWindow, setStreamingWindow] = useState(false);
@@ -426,7 +477,7 @@ const RecordingOverlay: React.FC = () => {
           lastTop.current = 0;
           setLocked(false);
           setMicLive(false);
-          setLevels(EMPTY_LEVELS);
+          levels.set(EMPTY_LEVELS);
           replaceText(EMPTY_TRANSCRIPT, true);
           setCopied(false);
         }
@@ -452,7 +503,7 @@ const RecordingOverlay: React.FC = () => {
         setInteractive(false);
         setLocked(false);
         setMicLive(false);
-        setLevels(EMPTY_LEVELS);
+        levels.set(EMPTY_LEVELS);
         replaceText(EMPTY_TRANSCRIPT, true);
         setCopied(false);
       }).then(register),
@@ -494,20 +545,9 @@ const RecordingOverlay: React.FC = () => {
       }).then(register),
       listen<number[]>("mic-level", ({ payload }) => {
         if (!recording) return;
-        setLevels(voiceEnergy(payload) === 0 ? EMPTY_LEVELS : payload);
+        levels.set(voiceEnergy(payload) === 0 ? EMPTY_LEVELS : payload);
         setMicLive(true);
       }).then(register),
-      // The model manager reports every download ~10x a second. Only the one
-      // a `downloading` pill is waiting on matters here.
-      listen<{ model_id: string; percentage: number }>(
-        "model-download-progress",
-        ({ payload }) => {
-          if (!payload || payload.model_id !== downloadId.current) return;
-          const percent = Math.round(payload.percentage);
-          if (Number.isFinite(percent))
-            setDownloadPercent(Math.max(0, Math.min(100, percent)));
-        },
-      ).then(register),
       // After completion the card shows the final text; a late live update
       // must not paint the raw transcript back over it.
       listen<StreamTextPayload>("stream-text", ({ payload }) => {
@@ -521,6 +561,37 @@ const RecordingOverlay: React.FC = () => {
       for (const unlisten of unlisteners) unlisten();
     };
   }, []);
+
+  // The model manager reports every download ~10x a second, and Tauri wakes
+  // every webview that listens. Only the one model a visible `downloading`
+  // pill is waiting on matters here, so the overlay listens only while it
+  // shows that pill (the pill starts at "no number yet" either way).
+  const followsDownload = isVisible && state === "downloading";
+  useEffect(() => {
+    if (!followsDownload) return;
+    let disposed = false;
+    let unlisten: UnlistenFn | null = null;
+    listen<{ model_id: string; percentage: number }>(
+      "model-download-progress",
+      ({ payload }) => {
+        if (!payload || payload.model_id !== downloadId.current) return;
+        const percent = Math.round(payload.percentage);
+        if (Number.isFinite(percent))
+          setDownloadPercent(Math.max(0, Math.min(100, percent)));
+      },
+    )
+      .then((stop) => {
+        if (disposed) stop();
+        else unlisten = stop;
+      })
+      .catch((error) =>
+        console.error("Overlay download listener failed:", error),
+      );
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [followsDownload]);
 
   // A press released outside the transcript still ends. Chromium captures the
   // pointer for a selection drag, so the release is reported here even off the
@@ -735,11 +806,12 @@ const RecordingOverlay: React.FC = () => {
         aria-valuemin={working ? 0 : undefined}
         aria-valuemax={working ? 100 : undefined}
       >
-        <AudioWaveform
+        <LiveWaveform
+          store={levels}
+          live={live}
           barCount={shape.bars}
           pitch={shape.pitch}
           barWidth={shape.barWidth}
-          levels={live ? levels : EMPTY_LEVELS}
           size="sm"
           active={isVisible}
           mode={working ? "working" : "reactive"}
