@@ -2124,8 +2124,41 @@ fn apply_panel_passthrough(window: &tauri::WebviewWindow, ignore: bool) {
     }
 }
 
+/// Whether GTK is talking to a Wayland compositor directly (not XWayland).
+///
+/// Mirrors GTK 3's own pick without touching GDK off the main thread: Wayland
+/// wins when a Wayland display is present unless `GDK_BACKEND` puts another
+/// backend first — which is what main.rs does on GNOME (`GDK_BACKEND=x11`).
+#[cfg(target_os = "linux")]
+fn gtk_backend_is_wayland() -> bool {
+    if std::env::var_os("WAYLAND_DISPLAY").is_none() {
+        return false;
+    }
+    match std::env::var("GDK_BACKEND") {
+        Ok(value) => matches!(
+            value.split(',').next().map(str::trim),
+            Some("wayland") | Some("*") | Some("")
+        ),
+        Err(_) => true,
+    }
+}
+
 /// Start watching the cursor while the panel is on screen.
 fn start_panel_input_guard(app: &AppHandle) {
+    // Native Wayland gives clients no global cursor position, and tao reports
+    // `Ok((0, 0))` there instead of an error. The guard then saw the pointer
+    // parked on the frame's top-left corner forever and made the quick-ask card
+    // click-through, so Copy, Insert and the text field could not be used.
+    // Leave the panel tangible on Wayland (the pre-guard behaviour) and skip
+    // the polling. GNOME is unaffected: main.rs runs it under XWayland.
+    #[cfg(target_os = "linux")]
+    if gtk_backend_is_wayland() {
+        if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+            apply_panel_passthrough(&window, false);
+        }
+        return;
+    }
+
     let generation = PANEL_INPUT_GENERATION
         .fetch_add(1, Ordering::SeqCst)
         .wrapping_add(1);
