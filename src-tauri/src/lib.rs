@@ -269,10 +269,10 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         .expect("Failed to initialize cleanup LLM manager"),
     );
 
-    // Initialize transcribe.cpp (logging + backend modules) once, before any
-    // transcribe.cpp model load or device enumeration. Failures are logged and
-    // swallowed so transcribe-rs engines keep working (N1). See PLAN.md S2.
-    managers::transcription::init_transcribe_cpp();
+    // transcribe.cpp (logging + backend modules) initializes lazily, once, at
+    // its first model load or device enumeration — see `init_transcribe_cpp`.
+    // Failures there are logged and swallowed so transcribe-rs engines keep
+    // working (N1).
 
     // Apply accelerator preferences before any model loads
     managers::transcription::apply_accelerator_settings(app_handle);

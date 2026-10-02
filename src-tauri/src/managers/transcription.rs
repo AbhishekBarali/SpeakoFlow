@@ -707,6 +707,7 @@ impl TranscriptionManager {
                 // Reuse the existing whisper accelerator + GPU-device dials for
                 // backend selection (no second device UI — see PLAN.md S2).
                 let options = transcribe_cpp_backend_options(&get_settings(&self.app_handle));
+                init_transcribe_cpp();
                 let model =
                     transcribe_cpp::Model::load_with(&model_path, &options).map_err(|e| {
                         let error_msg =
@@ -2169,14 +2170,21 @@ impl TranscriptionManager {
 /// engines keep working — N1, never break the app. Must run before any
 /// transcribe.cpp model load or `devices()` enumeration.
 pub fn init_transcribe_cpp() {
-    transcribe_cpp::init_logging();
-    match transcribe_cpp::init_backends_default() {
-        Ok(()) => info!("transcribe.cpp backends initialized"),
-        Err(e) => warn!(
-            "transcribe.cpp backend init failed (transcribe.cpp GGUF models unavailable): {}",
-            e
-        ),
-    }
+    // Once, and on first use rather than at launch: registering the ggml
+    // Vulkan module creates a Vulkan instance and loads the GPU driver into
+    // this process, which cloud-STT and ONNX-model users never need. Every
+    // transcribe.cpp entry point (model load, device enumeration) calls this.
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        transcribe_cpp::init_logging();
+        match transcribe_cpp::init_backends_default() {
+            Ok(()) => info!("transcribe.cpp backends initialized"),
+            Err(e) => warn!(
+                "transcribe.cpp backend init failed (transcribe.cpp GGUF models unavailable): {}",
+                e
+            ),
+        }
+    });
 }
 
 /// Map the user's (whisper) accelerator + GPU-device dials onto transcribe.cpp
@@ -2834,6 +2842,7 @@ fn enumerate_transcribe_cpp_devices() -> Vec<GpuDeviceOption> {
         return Vec::new();
     }
 
+    init_transcribe_cpp();
     transcribe_cpp::devices()
         .into_iter()
         .map(|d| GpuDeviceOption {
