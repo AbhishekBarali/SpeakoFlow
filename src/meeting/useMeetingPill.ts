@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
   getMeetingState,
@@ -46,13 +52,93 @@ const MAX_LIVE_ITEMS = 240;
 /** How often the local clock re-renders while recording. */
 const CLOCK_TICK_MS = 500;
 
+/**
+ * The latest levels, held outside React state.
+ *
+ * `meeting-level` arrives ~15x a second for the whole call. Kept in the hook's
+ * state, every event re-rendered the entire pill, the expanded card's
+ * transcript list included. The pill's root never draws a level itself, so the
+ * levels live here and only the leaves that draw them (the waveform, the two
+ * side lights) subscribe, through `useMeetingLevel`.
+ */
+export interface LevelStore {
+  get: () => MeetingLevels;
+  set: (next: MeetingLevels) => void;
+  update: (next: (current: MeetingLevels) => MeetingLevels) => void;
+  subscribe: (onChange: () => void) => () => void;
+}
+
+function createLevelStore(): LevelStore {
+  let value = NO_LEVELS;
+  const listeners = new Set<() => void>();
+  const set = (next: MeetingLevels) => {
+    if (next === value) return;
+    value = next;
+    for (const listener of listeners) listener();
+  };
+  return {
+    get: () => value,
+    set,
+    update: (next) => set(next(value)),
+    subscribe: (onChange) => {
+      listeners.add(onChange);
+      return () => {
+        listeners.delete(onChange);
+      };
+    },
+  };
+}
+
+/** One number derived from the live levels; re-renders only when it changes. */
+export const useMeetingLevel = (
+  store: LevelStore,
+  pick: (levels: MeetingLevels) => number,
+): number => useSyncExternalStore(store.subscribe, () => pick(store.get()));
+
+/** Where the locally interpolated clock counts from: the last `elapsed_ms` the
+ *  backend reported and the wall time it arrived. */
+export interface ClockAnchor {
+  elapsed: number;
+  at: number;
+}
+
+/**
+ * The pill's clock, ticking on its own.
+ *
+ * `elapsed_ms` only arrives when something changes, so a clock driven by it
+ * alone sits still through a silence and looks frozen. The anchor is the last
+ * event and wall time since then is added on top; paused time is excluded
+ * because the backend's counter is the microphone accumulator, which drops
+ * paused frames rather than buffering them. The 500 ms tick lives in whichever
+ * leaf calls this, so it re-renders that leaf and not the whole pill.
+ */
+export const useMeetingClock = (
+  anchor: ClockAnchor,
+  paused: boolean,
+): number => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+  }, [anchor]);
+  useEffect(() => {
+    if (paused) return;
+    const id = window.setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
+    return () => window.clearInterval(id);
+  }, [paused]);
+  return paused
+    ? anchor.elapsed
+    : anchor.elapsed + Math.max(0, now - anchor.at);
+};
+
 export interface MeetingPillModel {
   state: MeetingState;
   recording: boolean;
   paused: boolean;
-  /** Locally interpolated, so the clock does not freeze between state events. */
-  elapsedMs: number;
-  levels: MeetingLevels;
+  /** What the clock interpolates from; read it with `useMeetingClock`, which
+   *  keeps the clock from freezing between state events. */
+  clockAnchor: ClockAnchor;
+  /** The live levels; read them with `useMeetingLevel`. */
+  levels: LevelStore;
   items: TranscriptItem[];
   expanded: boolean;
   setExpanded: (expanded: boolean) => void;
@@ -75,7 +161,9 @@ export interface MeetingPillModel {
  */
 export const useMeetingPill = (): MeetingPillModel => {
   const [state, setState] = useState<MeetingState>(IDLE_STATE);
-  const [levels, setLevels] = useState<MeetingLevels>(NO_LEVELS);
+  const levelStore = useRef<LevelStore | null>(null);
+  levelStore.current ??= createLevelStore();
+  const levels = levelStore.current;
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [expanded, setExpandedState] = useState(false);
   const [offer, setOffer] = useState<{ app: string | null } | null>(null);
@@ -100,13 +188,13 @@ export const useMeetingPill = (): MeetingPillModel => {
       // A recording that ended has nothing live left to show.
       if (liveMeetingId(event.payload) === null) {
         setItems([]);
-        setLevels(NO_LEVELS);
+        levels.set(NO_LEVELS);
       }
     });
     return () => {
       void unlisten.then((off) => off());
     };
-  }, []);
+  }, [levels]);
 
   /* ── transcript ── */
 
@@ -128,12 +216,12 @@ export const useMeetingPill = (): MeetingPillModel => {
 
   useEffect(() => {
     const unlisten = listen<MeetingLevels>(MEETING_LEVEL_EVENT, (event) => {
-      setLevels(event.payload);
+      levels.set(event.payload);
     });
     return () => {
       void unlisten.then((off) => off());
     };
-  }, []);
+  }, [levels]);
 
   // Levels stop arriving the instant capture stops, which would leave the meter
   // frozen at its last reading — indistinguishable from a stalled capture. Decay
@@ -141,14 +229,14 @@ export const useMeetingPill = (): MeetingPillModel => {
   useEffect(() => {
     if (!recording) return;
     const id = window.setInterval(() => {
-      setLevels((current) =>
+      levels.update((current) =>
         current.mic === 0 && current.system === 0
           ? current
           : { mic: current.mic * 0.6, system: current.system * 0.6 },
       );
     }, 400);
     return () => window.clearInterval(id);
-  }, [recording]);
+  }, [recording, levels]);
 
   /* ── mode ── */
 
@@ -195,32 +283,22 @@ export const useMeetingPill = (): MeetingPillModel => {
 
   /* ── clock ── */
 
-  // `elapsed_ms` only arrives when something changes, so a clock driven by it
-  // alone sits still through a silence and looks frozen. The last event is the
-  // anchor and wall time since then is added on top; paused time is excluded
-  // because the backend's counter is the microphone accumulator, which drops
-  // paused frames rather than buffering them.
-  const anchor = useRef({ elapsed: state.elapsed_ms, at: Date.now() });
-  const [tick, setTick] = useState(() => Date.now());
+  // Re-anchored whenever the backend reports a new count or the pause state
+  // flips. The ticking is `useMeetingClock`'s, inside the leaf that draws the
+  // clock, so it re-renders that leaf rather than the whole pill.
+  const [clockAnchor, setClockAnchor] = useState<ClockAnchor>(() => ({
+    elapsed: state.elapsed_ms,
+    at: Date.now(),
+  }));
   useEffect(() => {
-    anchor.current = { elapsed: state.elapsed_ms, at: Date.now() };
-    setTick(Date.now());
+    setClockAnchor({ elapsed: state.elapsed_ms, at: Date.now() });
   }, [state.elapsed_ms, paused]);
-  useEffect(() => {
-    if (!recording || paused) return;
-    const id = window.setInterval(() => setTick(Date.now()), CLOCK_TICK_MS);
-    return () => window.clearInterval(id);
-  }, [recording, paused]);
-
-  const elapsedMs = paused
-    ? anchor.current.elapsed
-    : anchor.current.elapsed + Math.max(0, tick - anchor.current.at);
 
   return {
     state,
     recording,
     paused,
-    elapsedMs,
+    clockAnchor,
     levels,
     items,
     expanded,

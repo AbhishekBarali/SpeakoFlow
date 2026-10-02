@@ -9,6 +9,7 @@ import {
   setMeetingPaused,
   startMeeting,
   stopMeeting,
+  type MeetingLevels,
   type MeetingSpeaker,
 } from "@/components/settings/meetings/api";
 import {
@@ -21,7 +22,13 @@ import {
 } from "@/components/settings/meetings/speakers";
 import AudioWaveform from "@/components/shared/AudioWaveform";
 import { TONE_HEX } from "./tones";
-import { useMeetingPill } from "./useMeetingPill";
+import {
+  useMeetingClock,
+  useMeetingLevel,
+  useMeetingPill,
+  type ClockAnchor,
+  type LevelStore,
+} from "./useMeetingPill";
 import { MeetingAsk } from "./MeetingAsk";
 import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import { preventBrowserContextMenu } from "@/lib/contextMenu";
@@ -93,7 +100,7 @@ const MeetingPill: React.FC = () => {
     state,
     recording,
     paused,
-    elapsedMs,
+    clockAnchor,
     levels,
     items,
     expanded,
@@ -165,15 +172,6 @@ const MeetingPill: React.FC = () => {
     if (node) node.scrollTop = node.scrollHeight;
   }, [turnCount, expanded]);
 
-  /* ── the waveform ── */
-
-  // One combined activity signal, because the pill only answers "is it hearing
-  // anyone". Which side is audible is the card's job, and a far side that is not
-  // being captured at all turns the dot amber here as well. Memoised on the
-  // values so a clock tick does not look like fresh audio to the waveform.
-  const loudest = paused ? 0 : Math.max(levels.mic, levels.system);
-  const waveLevels = useMemo(() => (loudest > 0 ? [loudest] : []), [loudest]);
-
   /* ── actions ── */
 
   const togglePause = () => {
@@ -232,7 +230,6 @@ const MeetingPill: React.FC = () => {
     return <div ref={rootRef} className="pill-shell" />;
   }
 
-  const clock = formatClock(elapsedMs);
   // Amber, not red, when the far side is not being captured: the recording is
   // running but it is only hearing one person, and that is worth noticing
   // before the call ends rather than after.
@@ -268,62 +265,66 @@ const MeetingPill: React.FC = () => {
         className="pill-shell"
         onContextMenu={preventBrowserContextMenu}
       >
-        <div
-          className="mpill"
-          data-paused={String(paused)}
-          data-tauri-drag-region
-          // A group, not a button: `role="button"` is on the never-draggable
-          // list in `useSafeWindowDrag`, and the pill has to stay the handle.
-          role="group"
-          title={t("meetings.pill.expand")}
-          aria-label={`${statusLabel} ${clock}. ${t("meetings.pill.expand")}`}
-          onPointerDown={(event) => {
-            pressRef.current = { x: event.screenX, y: event.screenY };
-          }}
-          onClick={(event) => {
-            const press = pressRef.current;
-            pressRef.current = null;
-            // A press that travelled moved the window; it was not a click.
-            if (
-              press &&
-              (Math.abs(event.screenX - press.x) > CLICK_SLOP_PX ||
-                Math.abs(event.screenY - press.y) > CLICK_SLOP_PX)
-            )
-              return;
-            open();
-          }}
-        >
-          <span className="pill-dot" data-state={dotState} aria-hidden="true" />
-          <span className="mpill-clock">{clock}</span>
-          <span className="mpill-end">
-            <span className="mpill-wave" aria-hidden="true">
-              <AudioWaveform
-                barCount={9}
-                levels={waveLevels}
-                size="sm"
-                active={!paused}
-                mode="reactive"
+        {/* The clock owns its 500 ms tick, so the collapsed pill (whose
+            label carries the time) re-renders on it and nothing else does. */}
+        <MeetingClock anchor={clockAnchor} paused={paused}>
+          {(clock) => (
+            <div
+              className="mpill"
+              data-paused={String(paused)}
+              data-tauri-drag-region
+              // A group, not a button: `role="button"` is on the never-draggable
+              // list in `useSafeWindowDrag`, and the pill has to stay the handle.
+              role="group"
+              title={t("meetings.pill.expand")}
+              aria-label={`${statusLabel} ${clock}. ${t("meetings.pill.expand")}`}
+              onPointerDown={(event) => {
+                pressRef.current = { x: event.screenX, y: event.screenY };
+              }}
+              onClick={(event) => {
+                const press = pressRef.current;
+                pressRef.current = null;
+                // A press that travelled moved the window; it was not a click.
+                if (
+                  press &&
+                  (Math.abs(event.screenX - press.x) > CLICK_SLOP_PX ||
+                    Math.abs(event.screenY - press.y) > CLICK_SLOP_PX)
+                )
+                  return;
+                open();
+              }}
+            >
+              <span
+                className="pill-dot"
+                data-state={dotState}
+                aria-hidden="true"
               />
-            </span>
-            <span className="mpill-controls">
-              {pauseButton}
-              <button
-                type="button"
-                className="pill-action"
-                data-variant="stop"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  stop();
-                }}
-                disabled={busy}
-                title={t("meetings.pill.stop")}
-                aria-label={t("meetings.pill.stop")}
-              >
-                <Square size={10} fill="currentColor" />
-              </button>
-            </span>
-          </span>
-        </div>
+              <span className="mpill-clock">{clock}</span>
+              <span className="mpill-end">
+                <span className="mpill-wave" aria-hidden="true">
+                  <PillWave levels={levels} paused={paused} />
+                </span>
+                <span className="mpill-controls">
+                  {pauseButton}
+                  <button
+                    type="button"
+                    className="pill-action"
+                    data-variant="stop"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      stop();
+                    }}
+                    disabled={busy}
+                    title={t("meetings.pill.stop")}
+                    aria-label={t("meetings.pill.stop")}
+                  >
+                    <Square size={10} fill="currentColor" />
+                  </button>
+                </span>
+              </span>
+            </div>
+          )}
+        </MeetingClock>
       </div>
     );
   }
@@ -347,7 +348,9 @@ const MeetingPill: React.FC = () => {
               aria-hidden="true"
             />
             <span className="pill-clock" data-paused={String(paused)}>
-              {clock}
+              <MeetingClock anchor={clockAnchor} paused={paused}>
+                {(clock) => clock}
+              </MeetingClock>
             </span>
             {/* The breathing red dot already says "recording"; a paused
                 recording is the state that needs saying in words. */}
@@ -360,12 +363,16 @@ const MeetingPill: React.FC = () => {
           <span className="pill-head-sides" aria-hidden="true">
             <SideChip
               label={t("meetings.speakers.me")}
-              level={paused ? 0 : levels.mic}
+              levels={levels}
+              side="mic"
+              paused={paused}
               captured
             />
             <SideChip
               label={t("meetings.speakers.others")}
-              level={paused ? 0 : levels.system}
+              levels={levels}
+              side="system"
+              paused={paused}
               captured={state.system_audio}
             />
           </span>
@@ -427,28 +434,77 @@ const MeetingPill: React.FC = () => {
 };
 
 /**
+ * The recording clock, as text, for whatever `children` draws it into.
+ *
+ * It ticks on its own (`useMeetingClock`), so the pill root, and with it the
+ * expanded card's transcript list, does not re-render twice a second.
+ */
+const MeetingClock: React.FC<{
+  anchor: ClockAnchor;
+  paused: boolean;
+  children: (clock: string) => React.ReactNode;
+}> = ({ anchor, paused, children }) => (
+  <>{children(formatClock(useMeetingClock(anchor, paused)))}</>
+);
+
+/**
+ * The collapsed pill's waveform.
+ *
+ * One combined activity signal, because the pill only answers "is it hearing
+ * anyone". Which side is audible is the card's job, and a far side that is not
+ * being captured at all turns the dot amber here as well. Memoised on the
+ * value so a clock tick does not look like fresh audio to the waveform. Reads
+ * the level store itself, so a level event renders only this.
+ */
+const PillWave: React.FC<{ levels: LevelStore; paused: boolean }> = ({
+  levels,
+  paused,
+}) => {
+  const loudest = useMeetingLevel(levels, (current) =>
+    paused ? 0 : Math.max(current.mic, current.system),
+  );
+  const waveLevels = useMemo(() => (loudest > 0 ? [loudest] : []), [loudest]);
+  return (
+    <AudioWaveform
+      barCount={9}
+      levels={waveLevels}
+      size="sm"
+      active={!paused}
+      mode="reactive"
+    />
+  );
+};
+
+/**
  * "You" / "Others" with a light that is on while that side is audible.
  *
  * This is what the old two-row meter was for — a far side that is not being
  * captured is the feature's most common failure — reduced to the one bit it
  * actually carried. A side that is not captured at all is struck through
  * rather than merely dark, because "quiet" and "not recorded" must not look
- * alike.
+ * alike. It reads its own side's level, so a level event renders only this.
  */
 const SideChip: React.FC<{
   label: string;
-  level: number;
+  levels: LevelStore;
+  side: keyof MeetingLevels;
+  paused: boolean;
   captured: boolean;
-}> = ({ label, level, captured }) => (
-  <span
-    className="pill-side"
-    data-captured={String(captured)}
-    data-active={String(captured && level >= SILENT_LEVEL)}
-  >
-    <span className="pill-side-light" />
-    {label}
-  </span>
-);
+}> = ({ label, levels, side, paused, captured }) => {
+  const level = useMeetingLevel(levels, (current) =>
+    paused ? 0 : current[side],
+  );
+  return (
+    <span
+      className="pill-side"
+      data-captured={String(captured)}
+      data-active={String(captured && level >= SILENT_LEVEL)}
+    >
+      <span className="pill-side-light" />
+      {label}
+    </span>
+  );
+};
 
 interface OfferCardProps {
   /** The capturing app's name, when it could be read. */
