@@ -42,14 +42,27 @@ export const HIT_SURFACE_SELECTORS = [
 const HIT_SURFACES = HIT_SURFACE_SELECTORS.join(", ");
 
 /**
- * How often the drawn rect is re-measured.
+ * How often the drawn rect is re-measured while anything is moving.
  *
  * The quick ask's surface animates its width and grows as an answer streams in,
  * so this has to track a transition rather than just react to a render.
- * Measuring is a `getBoundingClientRect` and a `getComputedStyle` per surface;
- * the report is change-gated, so a still surface costs nothing beyond that.
+ * Measuring is a `getBoundingClientRect` and a `getComputedStyle` per surface,
+ * and after any DOM or style change that read forces a synchronous layout, so
+ * the poll itself is the cost even though the report is change-gated.
  */
-const MEASURE_INTERVAL_MS = 50;
+export const MEASURE_INTERVAL_MS = 50;
+
+/**
+ * The poll's pace once the surface has held still for `SETTLE_AFTER_MEASURES`
+ * measurements in a row: a call can keep the panel up for an hour, and 20
+ * forced layouts a second for all of it buys nothing while nothing moves.
+ * Anything that could move a surface (a DOM or attribute change, a resize, a
+ * transition or animation starting or ending, the pointer) snaps it straight
+ * back to `MEASURE_INTERVAL_MS` and measures at once, so the slow pace only
+ * covers a change that announces itself in none of those ways.
+ */
+export const SETTLED_INTERVAL_MS = 250;
+export const SETTLE_AFTER_MEASURES = 10;
 
 /** Physical pixels of movement worth telling Rust about. */
 const CHANGE_EPSILON = 2;
@@ -159,26 +172,116 @@ export function unionHitRect(
  * stops it being clicked — one source of truth instead of a second opacity rule
  * to keep in sync.
  */
-function collectSurfaces(root: ParentNode): MeasuredSurface[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(HIT_SURFACES)).map(
-    (node) => {
-      const style = window.getComputedStyle(node);
-      const rect = node.getBoundingClientRect();
-      return {
-        drawn: style.pointerEvents !== "none" && style.visibility !== "hidden",
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-      };
-    },
-  );
+function surfaceNodes(root: ParentNode): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(HIT_SURFACES));
+}
+
+function measureSurfaces(nodes: readonly HTMLElement[]): MeasuredSurface[] {
+  return nodes.map((node) => {
+    const style = window.getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return {
+      drawn: style.pointerEvents !== "none" && style.visibility !== "hidden",
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+    };
+  });
+}
+
+function regionOf(nodes: readonly HTMLElement[]): HitRegion {
+  return unionHitRect(measureSurfaces(nodes), window.devicePixelRatio || 1);
 }
 
 /** The union of everything the panel is drawing right now. */
 export function measureHitRegion(root: ParentNode = document): HitRegion {
-  return unionHitRect(collectSurfaces(root), window.devicePixelRatio || 1);
+  return regionOf(surfaceNodes(root));
 }
+
+/** A cancellable one-shot timer, injectable so the pacing can be tested. */
+export type PollClock = {
+  schedule: (run: () => void, ms: number) => unknown;
+  cancel: (handle: unknown) => void;
+};
+
+const WINDOW_CLOCK: PollClock = {
+  schedule: (run, ms) => window.setTimeout(run, ms),
+  cancel: (handle) => window.clearTimeout(handle as number),
+};
+
+/**
+ * A poll that runs at `fastMs` and drops to `slowMs` once `tick` has reported
+ * no change `settleAfter` times in a row.
+ *
+ * `wake()` is the "something may have moved" signal. At the fast pace it only
+ * restarts the settle count (the next tick is at most `fastMs` away, exactly as
+ * with a plain interval). At the slow pace it measures immediately and resumes
+ * the fast pace, so a settled poll never adds lag to a change it was told about.
+ */
+export function createAdaptivePoll(options: {
+  tick: () => boolean;
+  fastMs?: number;
+  slowMs?: number;
+  settleAfter?: number;
+  clock?: PollClock;
+}) {
+  const {
+    tick,
+    fastMs = MEASURE_INTERVAL_MS,
+    slowMs = SETTLED_INTERVAL_MS,
+    settleAfter = SETTLE_AFTER_MEASURES,
+    clock = WINDOW_CLOCK,
+  } = options;
+  let unchanged = 0;
+  let handle: unknown = null;
+  let stopped = false;
+
+  const settled = () => unchanged >= settleAfter;
+  const run = () => {
+    handle = null;
+    if (stopped) return;
+    unchanged = tick() ? 0 : unchanged + 1;
+    if (stopped) return;
+    handle = clock.schedule(run, settled() ? slowMs : fastMs);
+  };
+
+  return {
+    /** Measure now and start polling. */
+    start: run,
+    wake() {
+      if (stopped) return;
+      const wasSettled = settled();
+      unchanged = 0;
+      if (!wasSettled) return;
+      if (handle !== null) clock.cancel(handle);
+      run();
+    },
+    stop() {
+      stopped = true;
+      if (handle !== null) clock.cancel(handle);
+      handle = null;
+    },
+    /** The delay before the next measurement, for tests. */
+    get intervalMs() {
+      return settled() ? slowMs : fastMs;
+    },
+  };
+}
+
+/** Events that can start moving a surface without touching the DOM. */
+const MOTION_EVENTS = [
+  "transitionrun",
+  "transitionstart",
+  "transitionend",
+  "transitioncancel",
+  "animationstart",
+  "animationend",
+  "animationcancel",
+] as const;
+
+/** Pointer events that can change a surface through `:hover` / `:active`. */
+const POINTER_WAKE_EVENTS = ["pointerover", "pointerout"] as const;
 
 /** The payload a region is reported as. `tangible` is the "do not restrict" case. */
 function payloadFor(region: HitRegion) {
@@ -226,34 +329,86 @@ export function usePanelHitRegion(active: boolean): void {
     let last: HitRegion | null = null;
     let disposed = false;
 
+    // Surfaces come and go with the form the window takes, so the resize
+    // observer follows whatever the last measurement found.
+    let observed: HTMLElement[] = [];
+    const resizes =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => poll.wake());
+    const follow = (nodes: HTMLElement[]) => {
+      if (!resizes) return;
+      if (
+        nodes.length === observed.length &&
+        nodes.every((node, i) => node === observed[i])
+      )
+        return;
+      resizes.disconnect();
+      resizes.observe(document.documentElement);
+      for (const node of nodes) resizes.observe(node);
+      observed = nodes;
+    };
+
+    /** Measure and report; true when the region changed. */
     const report = () => {
-      if (disposed) return;
-      const next = measureHitRegion();
-      if (sameRegion(last, next)) return;
+      if (disposed) return false;
+      const nodes = surfaceNodes(document);
+      follow(nodes);
+      const next = regionOf(nodes);
+      if (sameRegion(last, next)) return false;
       last = next;
       void emit("assistant-hit-rect", payloadFor(next));
+      return true;
     };
+    const poll = createAdaptivePoll({ tick: report });
+    const wake = () => poll.wake();
 
     const hold = (held: boolean) => {
       void emit("assistant-panel-hold", { held });
     };
-    const onDown = () => hold(true);
-    const onUp = () => hold(false);
+    const onDown = () => {
+      hold(true);
+      wake();
+    };
+    const onUp = () => {
+      hold(false);
+      wake();
+    };
 
-    report();
-    const timer = window.setInterval(report, MEASURE_INTERVAL_MS);
+    // Any render, class or style change, or text growing in the answer.
+    const mutations = new MutationObserver(wake);
+    mutations.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    });
+
+    poll.start();
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointerup", onUp, true);
     window.addEventListener("pointercancel", onUp, true);
     window.addEventListener("blur", onUp);
+    window.addEventListener("resize", wake);
+    for (const name of MOTION_EVENTS)
+      document.addEventListener(name, wake, true);
+    for (const name of POINTER_WAKE_EVENTS)
+      document.addEventListener(name, wake, true);
 
     return () => {
       disposed = true;
-      window.clearInterval(timer);
+      poll.stop();
+      mutations.disconnect();
+      resizes?.disconnect();
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointerup", onUp, true);
       window.removeEventListener("pointercancel", onUp, true);
       window.removeEventListener("blur", onUp);
+      window.removeEventListener("resize", wake);
+      for (const name of MOTION_EVENTS)
+        document.removeEventListener(name, wake, true);
+      for (const name of POINTER_WAKE_EVENTS)
+        document.removeEventListener(name, wake, true);
       hold(false);
     };
   }, [active]);

@@ -1,6 +1,14 @@
 import { expect, test } from "bun:test";
 
-import { unionHitRect, type MeasuredSurface } from "./hitRegion";
+import {
+  createAdaptivePoll,
+  MEASURE_INTERVAL_MS,
+  SETTLE_AFTER_MEASURES,
+  SETTLED_INTERVAL_MS,
+  unionHitRect,
+  type MeasuredSurface,
+  type PollClock,
+} from "./hitRegion";
 
 /**
  * What the assistant panel tells Rust it is drawing.
@@ -113,4 +121,104 @@ test("a nonsense device pixel ratio does not collapse the rect", () => {
     rect: pill,
     rects: [pill],
   });
+});
+
+/** A clock that only moves when the test says so. */
+function manualClock() {
+  let pending: { run: () => void; ms: number; id: number } | null = null;
+  let nextId = 0;
+  const clock: PollClock = {
+    schedule: (run, ms) => {
+      pending = { run, ms, id: ++nextId };
+      return pending.id;
+    },
+    cancel: (handle) => {
+      if (pending?.id === handle) pending = null;
+    },
+  };
+  return {
+    clock,
+    pendingMs: () => pending?.ms ?? null,
+    fire: () => {
+      const due = pending;
+      pending = null;
+      due?.run();
+    },
+  };
+}
+
+test("a still surface settles to the slow pace, a change snaps it back", () => {
+  const time = manualClock();
+  let changed = true;
+  let measures = 0;
+  const poll = createAdaptivePoll({
+    tick: () => {
+      measures++;
+      return changed;
+    },
+    clock: time.clock,
+  });
+  poll.start();
+  expect(measures).toBe(1);
+  expect(time.pendingMs()).toBe(MEASURE_INTERVAL_MS);
+
+  // Moving keeps it fast however long it goes on.
+  for (let i = 0; i < 30; i++) time.fire();
+  expect(time.pendingMs()).toBe(MEASURE_INTERVAL_MS);
+
+  // Holding still for the settle count slows it down.
+  changed = false;
+  for (let i = 0; i < SETTLE_AFTER_MEASURES; i++) time.fire();
+  expect(time.pendingMs()).toBe(SETTLED_INTERVAL_MS);
+
+  // A measured change at the slow pace is enough to speed it up again.
+  changed = true;
+  time.fire();
+  expect(time.pendingMs()).toBe(MEASURE_INTERVAL_MS);
+});
+
+test("a wake while settled measures at once instead of waiting out the slow tick", () => {
+  const time = manualClock();
+  let measures = 0;
+  const poll = createAdaptivePoll({
+    tick: () => {
+      measures++;
+      return false;
+    },
+    clock: time.clock,
+  });
+  poll.start();
+  for (let i = 0; i < SETTLE_AFTER_MEASURES; i++) time.fire();
+  expect(time.pendingMs()).toBe(SETTLED_INTERVAL_MS);
+
+  const before = measures;
+  poll.wake();
+  expect(measures).toBe(before + 1);
+  expect(time.pendingMs()).toBe(MEASURE_INTERVAL_MS);
+
+  // At the fast pace a wake only restarts the settle count: no extra measure,
+  // and the pending tick is still the next one.
+  poll.wake();
+  expect(measures).toBe(before + 1);
+  expect(time.pendingMs()).toBe(MEASURE_INTERVAL_MS);
+  for (let i = 0; i < SETTLE_AFTER_MEASURES - 1; i++) time.fire();
+  expect(time.pendingMs()).toBe(MEASURE_INTERVAL_MS);
+});
+
+test("a stopped poll neither measures nor schedules again", () => {
+  const time = manualClock();
+  let measures = 0;
+  const poll = createAdaptivePoll({
+    tick: () => {
+      measures++;
+      return false;
+    },
+    clock: time.clock,
+  });
+  poll.start();
+  poll.stop();
+  expect(time.pendingMs()).toBeNull();
+  poll.wake();
+  time.fire();
+  expect(measures).toBe(1);
 });
