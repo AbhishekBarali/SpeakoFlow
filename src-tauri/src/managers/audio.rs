@@ -204,12 +204,11 @@ impl AudioRecordingManager {
     /* ---------- helper methods --------------------------------------------- */
 
     fn get_effective_microphone_device(&self, settings: &AppSettings) -> Option<cpal::Device> {
-        // Check if we're in clamshell mode and have a clamshell microphone configured
-        let use_clamshell_mic = if let Ok(is_clamshell) = clamshell::is_clamshell() {
-            is_clamshell && settings.clamshell_microphone.is_some()
-        } else {
-            false
-        };
+        // Check if we're in clamshell mode and have a clamshell microphone configured.
+        // The setting is checked first: the clamshell probe spawns `ioreg`, and
+        // this runs on every recording start.
+        let use_clamshell_mic =
+            settings.clamshell_microphone.is_some() && clamshell::is_clamshell().unwrap_or(false);
 
         let device_name = if use_clamshell_mic {
             settings.clamshell_microphone.as_ref().unwrap()
@@ -337,17 +336,9 @@ impl AudioRecordingManager {
         let settings = get_settings(&self.app_handle);
         let selected_device = self.get_effective_microphone_device(&settings);
 
-        // Pre-flight check: if no device was selected/configured AND no devices
-        // exist at all, fail early with a clear error instead of letting cpal
-        // produce a cryptic backend-specific message.
-        if selected_device.is_none() {
-            let has_any_device = list_input_devices()
-                .map(|devices| !devices.is_empty())
-                .unwrap_or(false);
-            if !has_any_device {
-                return Err(anyhow::anyhow!("No input device found"));
-            }
-        }
+        // The "is there any input device at all" check runs only after an open
+        // has failed (below), not on every press: listing every input is slow,
+        // and on Linux ALSA opens each PCM to probe it.
 
         // Ensure VAD is loaded if it wasn't for whatever reason
         self.preload_vad()?;
@@ -362,8 +353,20 @@ impl AudioRecordingManager {
                 // error. Backport of Handy PR #1582's cache-clear-and-retry.
                 warn!("Recorder open failed ({first_err}); re-resolving device and retrying once");
                 let fresh_device = self.get_effective_microphone_device(&settings);
-                rec.open(fresh_device)
-                    .map_err(|e| anyhow::anyhow!("Failed to open recorder: {}", e))?;
+                let using_default = fresh_device.is_none();
+                if let Err(e) = rec.open(fresh_device) {
+                    // With no usable device configured, a machine that has no
+                    // input at all gets a clear message instead of whatever
+                    // backend-specific error cpal produced for the default.
+                    if using_default
+                        && !list_input_devices()
+                            .map(|devices| !devices.is_empty())
+                            .unwrap_or(false)
+                    {
+                        return Err(anyhow::anyhow!("No input device found"));
+                    }
+                    return Err(anyhow::anyhow!("Failed to open recorder: {}", e));
+                }
             }
         }
 
