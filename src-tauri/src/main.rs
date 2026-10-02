@@ -35,7 +35,11 @@ fn main() {
     {
         // DMABUF renderer causes crashes on various GPU/display server configurations
         // See: https://github.com/tauri-apps/tauri/issues/9394
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        // Only as a default: someone on a driver stack where it works can opt
+        // back in with WEBKIT_DISABLE_DMABUF_RENDERER=0 and get GPU compositing.
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
     }
 
     // Make the always-on-top recording overlay actually float above other apps
