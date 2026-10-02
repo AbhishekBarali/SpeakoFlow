@@ -279,6 +279,40 @@ fn env_flag_enabled(name: &str) -> bool {
     }
 }
 
+/// Give a hidden window its native `GdkWindow` before anything asks for
+/// click-through.
+///
+/// tao (0.34, Linux) applies `set_ignore_cursor_events(true)` by unwrapping the
+/// window's `GdkWindow`, which GTK only creates when the window is realized. A
+/// window built with `.visible(false)` and never shown has none yet, so the
+/// overlay's click-through call at creation panicked inside the GTK main loop
+/// and aborted the app on every launch. Hiding a window does not unrealize it,
+/// so realizing once at creation covers every later call. GTK must be touched
+/// on the main thread; a caller elsewhere is bounced there, ahead of any later
+/// main-thread work it queues.
+///
+/// The overlay calls this only after `init_gtk_layer_shell`: layer shell has to
+/// be set up before the window is realized.
+#[cfg(target_os = "linux")]
+pub(crate) fn realize_gtk_window(window: &tauri::webview::WebviewWindow) {
+    fn realize(window: &tauri::webview::WebviewWindow) {
+        use gtk::prelude::WidgetExt;
+        if let Ok(gtk_window) = window.gtk_window() {
+            if !gtk_window.is_realized() {
+                gtk_window.realize();
+            }
+        }
+    }
+    if gtk::is_initialized_main_thread() {
+        realize(window);
+    } else {
+        let target = window.clone();
+        if let Err(e) = window.run_on_main_thread(move || realize(&target)) {
+            debug!("Could not realize window '{}': {e}", window.label());
+        }
+    }
+}
+
 /// Initializes GTK layer shell for Linux overlay window
 /// Returns true if layer shell was successfully initialized, false otherwise
 #[cfg(target_os = "linux")]
@@ -836,6 +870,8 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                     // XWayland; ignored on GNOME Wayland). Re-asserted on each show.
                     force_overlay_keep_above(&window);
                 }
+                // After layer shell, which must be set up before realization.
+                realize_gtk_window(&window);
             }
 
             debug!("Recording overlay window created successfully (hidden)");

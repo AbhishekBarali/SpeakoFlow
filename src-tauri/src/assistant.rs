@@ -2309,6 +2309,10 @@ fn build_assistant_panel(app: &AppHandle) {
             PANEL_RESIZABLE.store(false, Ordering::SeqCst);
             PANEL_FOCUSABLE.store(ASK_KEYBOARD_ON_SHOW, Ordering::SeqCst);
             PANEL_PASSTHROUGH.store(false, Ordering::SeqCst);
+            // Click-through on a never-shown GTK window aborts the app (see
+            // `realize_gtk_window`), and a hide can ask for it before any show.
+            #[cfg(target_os = "linux")]
+            crate::overlay::realize_gtk_window(&window);
             // The builder's own `.position()` can surface as a `Moved` event once the
             // window exists, so record it as ours before any handler can see it.
             if let Ok(mut placed) = PLACED_AT.lock() {
