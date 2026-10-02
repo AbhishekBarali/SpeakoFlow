@@ -10,8 +10,6 @@ import React, {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   Camera,
   Check,
@@ -35,6 +33,7 @@ import { CallSurface, MeetingStarter } from "./CallBar";
 import { useCallForm } from "./useCallForm";
 import { AssistantProfilePicker } from "./AssistantProfilePicker";
 import QuickAsk from "./QuickAsk";
+import MarkdownMessage from "./MarkdownMessage";
 import {
   DEFAULT_LAYOUT,
   parseLayout,
@@ -412,12 +411,30 @@ const AssistantPanel: React.FC = () => {
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
-  // Mirrors `state === "listening"` for the mic-level listener, which is
-  // registered once and must not close over a stale state.
-  const listeningRef = useRef(false);
+  // `mic-level` is emitted app-wide ~30x/s during *every* dictation, while this
+  // window is usually hidden, and Tauri only wakes a webview that holds a
+  // listener for it. Only a listening ask renders the levels, so the panel
+  // subscribes for exactly that span instead of for its whole life.
+  const listening = state === "listening";
   useEffect(() => {
-    listeningRef.current = state === "listening";
-  }, [state]);
+    if (!listening) return;
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    listen<number[]>("mic-level", (e) => {
+      setMicLevels(e.payload);
+    })
+      .then((stop) => {
+        if (disposed) stop();
+        else unlisten = stop;
+      })
+      .catch(() => {
+        // Not running inside Tauri (tests / plain browser): no levels.
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [listening]);
   const [tool, setTool] = useState<ToolActivity | null>(null);
   // The meeting the conversation is about ("Discuss in a call"), or null.
   const [meeting, setMeeting] = useState<MeetingAttachment | null>(null);
@@ -720,16 +737,6 @@ const AssistantPanel: React.FC = () => {
             );
           },
         ),
-      );
-
-      track(
-        await listen<number[]>("mic-level", (e) => {
-          // Emitted app-wide ~30x/s during *every* dictation, while this
-          // window is usually hidden. Only a listening ask renders the levels,
-          // so anything else would re-render the whole panel for nothing.
-          if (!listeningRef.current) return;
-          setMicLevels(e.payload);
-        }),
       );
 
       track(
@@ -1272,12 +1279,10 @@ const AssistantPanel: React.FC = () => {
           <div key={i} className={`assistant-message ${message.role}`}>
             <div className="assistant-message-content">
               {message.role === "assistant" ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
+                <MarkdownMessage
+                  content={message.content}
                   components={MD_COMPONENTS}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                />
               ) : (
                 message.content
               )}
@@ -1355,12 +1360,7 @@ const AssistantPanel: React.FC = () => {
         {stream !== "" && (
           <div className="assistant-message assistant">
             <div className="assistant-message-content">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={MD_COMPONENTS}
-              >
-                {stream}
-              </ReactMarkdown>
+              <MarkdownMessage content={stream} components={MD_COMPONENTS} />
             </div>
           </div>
         )}
@@ -1431,7 +1431,7 @@ const AssistantPanel: React.FC = () => {
         <QuickAsk
           phase={shownPhase}
           status={status}
-          levels={state === "listening" ? micLevels : undefined}
+          levels={listening ? micLevels : undefined}
           question={question}
           answer={stream || finishedAnswer}
           markdown={MD_COMPONENTS}

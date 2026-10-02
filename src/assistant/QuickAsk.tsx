@@ -11,11 +11,11 @@ import {
   TextSelect,
   X,
 } from "lucide-react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { type Components } from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { voiceEnergy } from "@/components/shared/waveformSignal";
 import { quickAskShape, type QuickAskPhase } from "./quickAskState";
+import MarkdownMessage from "./MarkdownMessage";
 
 /**
  * The quick ask: one surface that is a pill while it waits, a bar while you type,
@@ -297,9 +297,7 @@ const QuickAsk: React.FC<QuickAskProps> = ({
               aria-live="polite"
               aria-busy={phase === "answering"}
             >
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdown}>
-                {answer}
-              </ReactMarkdown>
+              <MarkdownMessage content={answer} components={markdown} />
             </div>
           )}
 
