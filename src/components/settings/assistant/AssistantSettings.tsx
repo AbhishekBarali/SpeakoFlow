@@ -1925,6 +1925,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                 onChange={(value) =>
                   setAndRefresh(commands.setAssistantTtsVolume(value))
                 }
+                // A call that is speaking hears the change while it is dragged.
+                liveCommitMs={150}
                 min={0}
                 max={1}
                 step={0.05}
@@ -2308,6 +2310,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             onChange={(value) =>
               setAndRefresh(commands.setAssistantPanelOpacity(value))
             }
+            // An open panel follows the drag.
+            liveCommitMs={150}
             min={0.5}
             max={1}
             step={0.05}
