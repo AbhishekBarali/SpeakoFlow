@@ -91,6 +91,11 @@ pub const MAX_CONTEXT_SIZE: u32 = 32_768;
 /// models, slow disks, and first-run GPU shader compilation can take a while.
 const READY_TIMEOUT: Duration = Duration::from_secs(180);
 
+/// How long a warm-up stays good. Within this window a prewarm on a running
+/// engine is skipped; after it, the next one re-faults the weights in, which
+/// only matters for an engine the user keeps loaded ("Never" unload).
+const WARM_UP_REFRESH: Duration = Duration::from_secs(10 * 60);
+
 /// Max time to wait for the engine's `--list-devices` probe (measured at ~210ms
 /// on a warm two-GPU Windows box).
 ///
@@ -422,6 +427,9 @@ pub struct LocalLlmManager {
     /// Number of in-flight LLM requests. The idle watcher never unloads while
     /// this is greater than zero, so a long generation can't be cut off.
     in_flight: Arc<AtomicUsize>,
+    /// When `warm_up` last ran against the current engine process (ms since the
+    /// Unix epoch, 0 = not yet). Reset whenever a new process is spawned.
+    warmed_at: AtomicU64,
 }
 
 impl LocalLlmManager {
@@ -448,6 +456,7 @@ impl LocalLlmManager {
             start_lock: tokio::sync::Mutex::new(()),
             last_activity: Arc::new(AtomicU64::new(Self::now_ms())),
             in_flight: Arc::new(AtomicUsize::new(0)),
+            warmed_at: AtomicU64::new(0),
         };
         // Here rather than before the first spawn: an orphan holds gigabytes of
         // memory whether or not this session ever uses the built-in engine.
@@ -1205,6 +1214,8 @@ impl LocalLlmManager {
             st.model_id = Some(model_id.to_string());
             st.last_error = None;
         }
+        // A fresh process has nothing paged in or compiled yet.
+        self.warmed_at.store(0, Ordering::SeqCst);
         self.emit_status();
 
         match self.wait_until_ready().await {
@@ -1421,6 +1432,22 @@ impl LocalLlmManager {
         // of failing to start. `auto` is already llama.cpp's default; this just
         // pins the intent against any future default change.
         cmd.env("LLAMA_ARG_FLASH_ATTN", "auto");
+
+        // Cap the host-RAM prompt cache. Current llama-server keeps up to
+        // 8192 MiB of saved prompt states by default (`--cache-ram`), and each
+        // new assistant conversation or screenshot turn adds one, so engine RSS
+        // ratcheted up for the whole session. Cleanup is one short rewrite per
+        // dictation and reuses the shared system prompt in its single slot via
+        // `cache_prompt`, so it needs none; the assistant keeps a small cache
+        // for switching back to a recent conversation. Env var for the same
+        // older-build reason as above.
+        cmd.env(
+            "LLAMA_ARG_CACHE_RAM",
+            match self.role {
+                LlmRole::Cleanup => "0",
+                LlmRole::Assistant => "1024",
+            },
+        );
 
         // Multimodal models need their vision projector to "see" images
         // (the assistant's screenshot feature). Cleanup never sends an image, so
@@ -1702,6 +1729,20 @@ impl LocalLlmManager {
     /// invisible one. Failures are ignored: this is best-effort warming, and the
     /// real request path reports errors.
     pub async fn warm_up(&self) {
+        // Prewarm fires on every recording start and assistant press, but the
+        // engine stays up between them. Re-warming an already warm engine
+        // bought nothing and cost a full ~600-token prefill each time (seconds
+        // of all-core CPU without a GPU); with one slot it also queued the real
+        // cleanup behind it and evicted the cached system prompt. So warm once
+        // per process, and again only after a long quiet spell, when the OS may
+        // have paged the mapped weights back out.
+        let now = Self::now_ms();
+        let last = self.warmed_at.load(Ordering::SeqCst);
+        if last != 0 && now.saturating_sub(last) < WARM_UP_REFRESH.as_millis() as u64 {
+            return;
+        }
+        self.warmed_at.store(now, Ordering::SeqCst);
+
         let _guard = self.begin_request();
         let started = Instant::now();
         // ~600 tokens of filler: enough to take the same batched-prefill path a
@@ -1720,6 +1761,7 @@ impl LocalLlmManager {
             Ok(client) => client,
             Err(e) => {
                 debug!("LLM warm-up client build failed: {}", e);
+                self.warmed_at.store(0, Ordering::SeqCst);
                 return;
             }
         };
@@ -1735,7 +1777,11 @@ impl LocalLlmManager {
                 started.elapsed(),
                 response.status()
             ),
-            Err(e) => debug!("Built-in LLM warm-up skipped: {}", e),
+            Err(e) => {
+                // Not warmed after all; let the next press try again.
+                self.warmed_at.store(0, Ordering::SeqCst);
+                debug!("Built-in LLM warm-up skipped: {}", e)
+            }
         }
     }
 
