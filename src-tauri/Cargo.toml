@@ -332,6 +332,9 @@ transcribe-cpp = { version = "0.1.2", default-features = false }
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 gtk = "0.18"
+# Already in the graph through wry; named here so the assistant panel can answer
+# WebKitGTK's microphone permission request (see assistant.rs).
+webkit2gtk = "=2.0.2"
 transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan"] }
 # transcribe.cpp Linux: dynamic (loadable) backend .so modules + Vulkan GPU
 # acceleration (the `dynamic-backends` posture, same as Windows x86_64). Ships a

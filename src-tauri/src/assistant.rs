@@ -2312,7 +2312,10 @@ fn build_assistant_panel(app: &AppHandle) {
             // Click-through on a never-shown GTK window aborts the app (see
             // `realize_gtk_window`), and a hide can ask for it before any show.
             #[cfg(target_os = "linux")]
-            crate::overlay::realize_gtk_window(&window);
+            {
+                crate::overlay::realize_gtk_window(&window);
+                allow_panel_microphone(&window);
+            }
             // The builder's own `.position()` can surface as a `Moved` event once the
             // window exists, so record it as ours before any handler can see it.
             if let Ok(mut placed) = PLACED_AT.lock() {
@@ -2340,6 +2343,44 @@ fn build_assistant_panel(app: &AppHandle) {
             debug!("Assistant panel window created (hidden)");
         }
         Err(e) => error!("Failed to create assistant panel window: {}", e),
+    }
+}
+
+/// Let the hands-free call open the microphone on Linux.
+///
+/// The call's voice detection runs `getUserMedia` inside this webview. WebKitGTK
+/// asks the embedder through `permission-request`, and wry never answers it, so
+/// an unanswered request is denied: the call failed with `NotAllowedError`
+/// (reproduced against WebKitGTK 2.52 with a mock capture device; answering the
+/// request makes the same page get its stream). Older WebKitGTK also ships with
+/// media streams switched off. Only this window's own bundled page can ask, and
+/// only microphone-only requests are granted — camera and screen capture still
+/// fall through to WebKit's default denial.
+#[cfg(target_os = "linux")]
+fn allow_panel_microphone(window: &tauri::WebviewWindow) {
+    let result = window.with_webview(|platform| {
+        use webkit2gtk::glib::Cast;
+        use webkit2gtk::{
+            PermissionRequestExt, SettingsExt, UserMediaPermissionRequest,
+            UserMediaPermissionRequestExt, WebViewExt,
+        };
+
+        let view = platform.inner();
+        if let Some(settings) = WebViewExt::settings(&view) {
+            settings.set_enable_media_stream(true);
+        }
+        view.connect_permission_request(|_, request| {
+            match request.downcast_ref::<UserMediaPermissionRequest>() {
+                Some(media) if media.is_for_audio_device() && !media.is_for_video_device() => {
+                    request.allow();
+                    true
+                }
+                _ => false,
+            }
+        });
+    });
+    if let Err(e) = result {
+        warn!("Could not enable microphone access for the assistant panel: {e}");
     }
 }
 

@@ -6714,6 +6714,7 @@ dependencies = [
  "transcribe-cpp",
  "transcribe-rs",
  "vad-rs",
+ "webkit2gtk",
  "webview2-com",
  "windows 0.61.3",
  "winreg 0.55.0",
