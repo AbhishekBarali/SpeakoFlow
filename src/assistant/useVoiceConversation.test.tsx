@@ -35,6 +35,8 @@ mock.module("@tauri-apps/api/core", () => ({
     if (command === "assistant_conversation_dictation_active")
       return dictationActive;
   },
+  // Module mocks leak into later test files; localVoice.ts imports this.
+  isTauri: () => false,
 }));
 mock.module("@tauri-apps/api/event", () => ({
   emit: async () => {},

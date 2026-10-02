@@ -18,6 +18,8 @@ mock.module("@tauri-apps/api/core", () => ({
     calls.push({ command, args });
     return copyResult;
   },
+  // Module mocks leak into later test files; localVoice.ts imports this.
+  isTauri: () => false,
 }));
 mock.module("@/i18n", () => ({
   default: { language: "en" },

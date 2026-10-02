@@ -1,6 +1,13 @@
 import { describe, expect, mock, test } from "bun:test";
 
-mock.module("@tauri-apps/api/core", () => ({ invoke: async () => {} }));
+// bun:test shares one module registry across test files, so a mock replaces
+// the module for every file that runs after this one. `isTauri` is part of the
+// mock for that reason: localVoice.ts imports it, and without it that suite
+// fails with "Export named 'isTauri' not found" depending on file order.
+mock.module("@tauri-apps/api/core", () => ({
+  invoke: async () => {},
+  isTauri: () => false,
+}));
 mock.module("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     startDragging: async () => {},
