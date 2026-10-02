@@ -21,6 +21,19 @@ fn main() {
     // the `metal` feature, Intel CPU-only with no features.)
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib");
+        // A dev build runs straight from target/debug, where `$ORIGIN/../lib`
+        // holds nothing, so `bun tauri dev` died with "libtranscribe.so.0:
+        // cannot open shared object file". Point dev builds at the build's own
+        // copy too. Release builds keep only the relocatable `$ORIGIN` path,
+        // so no build-machine path ends up in a shipped binary.
+        if std::env::var("PROFILE").as_deref() == Ok("debug") {
+            if let Some(dir) = std::env::var_os("DEP_TRANSCRIBE_CPP_RUNTIME_DIR") {
+                println!(
+                    "cargo:rustc-link-arg=-Wl,-rpath,{}",
+                    std::path::Path::new(&dir).display()
+                );
+            }
+        }
     }
 
     // Windows: load `vulkan-1.dll` on first use instead of at process start.
