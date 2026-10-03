@@ -541,7 +541,7 @@ const settings: Json = {
   selected_model: "parakeet-unified-en-0.6b",
   custom_words: fresh
     ? []
-    : ["Maya Okafor", "SpeakoFlow", "Kubernetes", "Figma", "Tauri"],
+    : ["Abhishek Barali", "SpeakoFlow", "firecrawl", "Gintama", "Tauri"],
   post_process_enabled: true,
   post_process_on_dictation: params.get("cleanupShortcut") === "dictation",
   post_process_provider_id:
@@ -1445,9 +1445,9 @@ const handlers: Record<string, (args: Json) => unknown> = {
     gpu_devices: [
       {
         id: 0,
-        name: "NVIDIA GeForce RTX 4060",
+        name: "NVIDIA GeForce RTX 4070 Ti SUPER",
         kind: "dedicated",
-        total_vram_mb: 8188,
+        total_vram_mb: 16076,
       },
     ],
     transcribe_cpp_devices: [],
