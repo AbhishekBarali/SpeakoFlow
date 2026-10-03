@@ -35,6 +35,8 @@
     "downloading": "Download in corso… {{progress}}%",
     "downloadingUnknown": "Download in corso…",
     "installing": "Installazione in corso…",
+    "reopening": "SpeakoFlow si chiude per installare l'aggiornamento e si riaprirà tra pochi secondi.",
+    "updatedTo": "Aggiornato alla versione {{version}}",
     "restart": "Riavvia ora",
     "readyToRestart": "L'aggiornamento è installato. Riavvia SpeakoFlow per iniziare a usarlo.",
     "installFailed": "L'aggiornamento non è stato installato. Puoi riprovare, oppure scaricare il programma di installazione ed eseguirlo tu.",

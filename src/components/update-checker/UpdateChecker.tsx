@@ -1,8 +1,11 @@
 import React, { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useSettings } from "../../hooks/useSettings";
 import { useNavigation } from "../shell/navigation";
 import { useUpdateStore } from "./updateStore";
+import { takeUpdateNotice } from "./updateCommands";
 import { FIRST_CHECK_DELAY_MS, RECHECK_INTERVAL_MS } from "./updateLogic";
 
 /**
@@ -16,6 +19,7 @@ import { FIRST_CHECK_DELAY_MS, RECHECK_INTERVAL_MS } from "./updateLogic";
  * checks off; asking (tray, About) always works.
  */
 const UpdateChecker: React.FC = () => {
+  const { t } = useTranslation();
   const { settings, isLoading } = useSettings();
   const { openSettings } = useNavigation();
   const settingsLoaded = !isLoading && settings !== null;
@@ -24,6 +28,18 @@ const UpdateChecker: React.FC = () => {
   useEffect(() => {
     void useUpdateStore.getState().loadSupport();
   }, []);
+
+  // The launch right after an in-app update says so; otherwise the app just
+  // reappears and nothing confirms the update worked.
+  useEffect(() => {
+    void takeUpdateNotice()
+      .then((finished) => {
+        if (finished) {
+          toast.success(t("updates.updatedTo", { version: finished.to }));
+        }
+      })
+      .catch((error) => console.warn("take_update_notice failed:", error));
+  }, [t]);
 
   useEffect(() => {
     if (!settingsLoaded || !automatic) return;

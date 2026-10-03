@@ -35,6 +35,8 @@
     "downloading": "正在下载… {{progress}}%",
     "downloadingUnknown": "正在下载…",
     "installing": "正在安装…",
+    "reopening": "SpeakoFlow 将关闭以安装更新，几秒后会重新打开。",
+    "updatedTo": "已更新到版本 {{version}}",
     "restart": "立即重启",
     "readyToRestart": "更新已安装。重启 SpeakoFlow 即可开始使用。",
     "installFailed": "更新未能安装。您可以重试，或下载安装程序自行运行。",

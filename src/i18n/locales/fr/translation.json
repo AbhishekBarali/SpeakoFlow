@@ -35,6 +35,8 @@
     "downloading": "Téléchargement… {{progress}} %",
     "downloadingUnknown": "Téléchargement…",
     "installing": "Installation…",
+    "reopening": "SpeakoFlow se ferme pour installer la mise à jour et se rouvrira dans quelques secondes.",
+    "updatedTo": "Mis à jour vers la version {{version}}",
     "restart": "Redémarrer maintenant",
     "readyToRestart": "La mise à jour est installée. Redémarrez SpeakoFlow pour en profiter.",
     "installFailed": "La mise à jour ne s'est pas installée. Vous pouvez réessayer, ou télécharger le programme d'installation et le lancer vous-même.",

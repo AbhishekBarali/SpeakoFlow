@@ -35,6 +35,8 @@
     "downloading": "Stahování… {{progress}} %",
     "downloadingUnknown": "Stahování…",
     "installing": "Instalace…",
+    "reopening": "SpeakoFlow se zavře, nainstaluje aktualizaci a za několik sekund se znovu otevře.",
+    "updatedTo": "Aktualizováno na verzi {{version}}",
     "restart": "Restartovat",
     "readyToRestart": "Aktualizace je nainstalovaná. Restartujte SpeakoFlow, abyste ji mohli začít používat.",
     "installFailed": "Aktualizace se nenainstalovala. Můžete to zkusit znovu, nebo si stáhnout instalační program a spustit ho sami.",

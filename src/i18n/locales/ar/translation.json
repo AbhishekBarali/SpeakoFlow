@@ -35,6 +35,8 @@
     "downloading": "جارٍ التنزيل… {{progress}}%",
     "downloadingUnknown": "جارٍ التنزيل…",
     "installing": "جارٍ التثبيت…",
+    "reopening": "سيُغلق SpeakoFlow لتثبيت التحديث ثم يُعاد فتحه خلال ثوانٍ.",
+    "updatedTo": "تم التحديث إلى الإصدار {{version}}",
     "restart": "إعادة التشغيل الآن",
     "readyToRestart": "تم تثبيت التحديث. أعد تشغيل SpeakoFlow لبدء استخدامه.",
     "installFailed": "لم يُثبَّت التحديث. يمكنك المحاولة مرة أخرى، أو تنزيل المثبِّت وتشغيله بنفسك.",

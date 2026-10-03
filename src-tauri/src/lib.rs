@@ -1043,6 +1043,8 @@ pub fn run(cli_args: CliArgs) {
             updates::download_update_installer,
             updates::open_update_installer,
             updates::reveal_update_installer,
+            updates::prepare_update_install,
+            updates::take_update_notice,
             feedback::get_feedback_system_info,
             feedback::send_feedback,
             commands::cancel_operation,
@@ -1600,8 +1602,14 @@ pub fn run(cli_args: CliArgs) {
             // If start_hidden but tray is disabled, we must show the window
             // anyway. Without a tray icon, the dock is the only way back in.
             let tray_available = settings.show_tray_icon && !cli_args.no_tray;
-            if should_force_show || !should_hide || !tray_available {
+            // The launch the installer starts after an in-app update always
+            // comes to the front: otherwise the app just vanishes on Update.
+            let finished_update = updates::take_finished_update(&app_handle);
+            if finished_update || should_force_show || !should_hide || !tray_available {
                 show_main_window(&app_handle);
+            }
+            if finished_update {
+                updates::bring_main_window_forward(&app_handle);
             }
 
             Ok(())

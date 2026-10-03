@@ -39,3 +39,16 @@ export const openUpdateInstaller = (path: string) =>
 
 export const revealUpdateInstaller = (path: string) =>
   invoke<void>("reveal_update_installer", { path });
+
+/** Leaves a note so the new version knows it was just updated (`updates.rs`). */
+export const prepareUpdateInstall = (version: string) =>
+  invoke<void>("prepare_update_install", { version });
+
+export interface FinishedUpdate {
+  from: string;
+  to: string;
+}
+
+/** The update this launch finished, if any. Returned once. */
+export const takeUpdateNotice = () =>
+  invoke<FinishedUpdate | null>("take_update_notice");

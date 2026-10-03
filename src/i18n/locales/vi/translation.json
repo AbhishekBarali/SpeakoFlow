@@ -35,6 +35,8 @@
     "downloading": "Đang tải xuống… {{progress}}%",
     "downloadingUnknown": "Đang tải xuống…",
     "installing": "Đang cài đặt…",
+    "reopening": "SpeakoFlow sẽ đóng để cài đặt bản cập nhật và mở lại sau vài giây.",
+    "updatedTo": "Đã cập nhật lên phiên bản {{version}}",
     "restart": "Khởi động lại ngay",
     "readyToRestart": "Bản cập nhật đã được cài. Hãy khởi động lại SpeakoFlow để bắt đầu sử dụng.",
     "installFailed": "Bản cập nhật chưa cài được. Bạn có thể thử lại, hoặc tải bộ cài về và tự chạy.",

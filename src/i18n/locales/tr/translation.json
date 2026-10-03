@@ -35,6 +35,8 @@
     "downloading": "İndiriliyor… %{{progress}}",
     "downloadingUnknown": "İndiriliyor…",
     "installing": "Yükleniyor…",
+    "reopening": "SpeakoFlow güncellemeyi yüklemek için kapanacak ve birkaç saniye içinde yeniden açılacak.",
+    "updatedTo": "{{version}} sürümüne güncellendi",
     "restart": "Şimdi yeniden başlat",
     "readyToRestart": "Güncelleme yüklendi. Kullanmaya başlamak için SpeakoFlow'u yeniden başlatın.",
     "installFailed": "Güncelleme yüklenemedi. Tekrar deneyebilir ya da yükleyiciyi indirip kendiniz çalıştırabilirsiniz.",

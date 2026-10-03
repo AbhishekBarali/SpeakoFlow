@@ -35,6 +35,8 @@
     "downloading": "ダウンロード中… {{progress}}%",
     "downloadingUnknown": "ダウンロード中…",
     "installing": "インストール中…",
+    "reopening": "SpeakoFlow はアップデートをインストールするために終了し、数秒後に再び開きます。",
+    "updatedTo": "バージョン {{version}} にアップデートしました",
     "restart": "今すぐ再起動",
     "readyToRestart": "アップデートをインストールしました。SpeakoFlowを再起動すると使えるようになります。",
     "installFailed": "アップデートをインストールできませんでした。もう一度試すか、インストーラーをダウンロードしてご自身で実行してください。",

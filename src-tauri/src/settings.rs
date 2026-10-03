@@ -5154,13 +5154,55 @@ fn total_physical_memory_bytes() -> Option<u64> {
         .ok()
 }
 
-pub fn get_settings(app: &AppHandle) -> AppSettings {
-    let store = app
-        .store(crate::portable::store_path(SETTINGS_STORE_PATH))
-        .expect("Failed to initialize store");
+/// The settings store, or `None` once the app has started tearing itself down.
+///
+/// `app.store()` fails only when the store has been dropped from the app's
+/// resource table, and the thing that does that is
+/// `AppHandle::cleanup_before_exit`. The updater plugin calls it on Windows
+/// just before it launches the installer, and on Windows it also hides every
+/// window, so the main window's `Focused(false)` handler reads settings at
+/// that exact moment. That used to be an `expect`: the main thread panicked,
+/// the process died before the installer was started, and clicking Update
+/// closed the app and installed nothing.
+fn settings_store(
+    app: &AppHandle,
+) -> Option<std::sync::Arc<tauri_plugin_store::Store<tauri::Wry>>> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static WARNED: AtomicBool = AtomicBool::new(false);
 
-    let (mut settings, mut updated) = if let Some(settings_value) = store.get("settings") {
-        deserialize_settings_value(settings_value.clone())
+    match app.store(crate::portable::store_path(SETTINGS_STORE_PATH)) {
+        Ok(store) => Some(store),
+        Err(e) => {
+            if !WARNED.swap(true, Ordering::Relaxed) {
+                warn!("Settings store unavailable (app shutting down?): {e}");
+            }
+            None
+        }
+    }
+}
+
+/// The persisted `settings` value read straight from the store's file, for
+/// when the store itself is gone (see [`settings_store`]). Read-only.
+fn settings_value_from_disk(app: &AppHandle) -> Option<serde_json::Value> {
+    let path = crate::portable::resolve_app_data(app, SETTINGS_STORE_PATH).ok()?;
+    settings_value_from_store_file(&std::fs::read_to_string(path).ok()?)
+}
+
+/// The `settings` entry of a tauri-plugin-store file (a JSON object of keys).
+fn settings_value_from_store_file(text: &str) -> Option<serde_json::Value> {
+    let mut root: serde_json::Value = serde_json::from_str(text).ok()?;
+    root.get_mut("settings").map(serde_json::Value::take)
+}
+
+pub fn get_settings(app: &AppHandle) -> AppSettings {
+    let store = settings_store(app);
+    let stored = match &store {
+        Some(store) => store.get("settings"),
+        None => settings_value_from_disk(app),
+    };
+
+    let (mut settings, mut updated) = if let Some(settings_value) = stored {
+        deserialize_settings_value(settings_value)
     } else {
         (get_default_settings(), true)
     };
@@ -5172,7 +5214,9 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         updated = true;
     }
     if updated {
-        store.set("settings", serde_json::to_value(&settings).unwrap());
+        if let Some(store) = &store {
+            store.set("settings", serde_json::to_value(&settings).unwrap());
+        }
     }
 
     // Fill the in-memory secrets from the keychain (served from cache after the
@@ -5190,9 +5234,11 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
 }
 
 pub fn write_settings(app: &AppHandle, mut settings: AppSettings) {
-    let store = app
-        .store(crate::portable::store_path(SETTINGS_STORE_PATH))
-        .expect("Failed to initialize store");
+    // Only unavailable while the app is exiting; nothing written then would be
+    // read again by this process, and panicking would abort the exit itself.
+    let Some(store) = settings_store(app) else {
+        return;
+    };
 
     // Keep API keys in the OS keychain, never in the on-disk store. Each key is
     // blanked from the serialized copy only after the keychain confirms it holds
@@ -5228,6 +5274,20 @@ pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn settings_can_be_read_from_the_store_file_when_the_store_is_gone() {
+        // What get_settings falls back to after cleanup_before_exit dropped the
+        // store (the in-app Windows update path): the file's own `settings`.
+        let file = r#"{"settings":{"push_to_talk":false,"main_window_width":900.0},"other":1}"#;
+        let value = settings_value_from_store_file(file).expect("settings entry");
+        let (settings, _) = deserialize_settings_value(value);
+        assert!(!settings.push_to_talk);
+        assert_eq!(settings.main_window_width, Some(900.0));
+
+        assert!(settings_value_from_store_file(r#"{"other":1}"#).is_none());
+        assert!(settings_value_from_store_file("not json").is_none());
+    }
 
     fn binding(id: &str, default: &str, current: &str) -> ShortcutBinding {
         ShortcutBinding {

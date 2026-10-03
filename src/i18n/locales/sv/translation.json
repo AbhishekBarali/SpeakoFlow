@@ -35,6 +35,8 @@
     "downloading": "Laddar ner… {{progress}}%",
     "downloadingUnknown": "Laddar ner…",
     "installing": "Installerar…",
+    "reopening": "SpeakoFlow stängs för att installera uppdateringen och öppnas igen om några sekunder.",
+    "updatedTo": "Uppdaterad till version {{version}}",
     "restart": "Starta om nu",
     "readyToRestart": "Uppdateringen är installerad. Starta om SpeakoFlow för att börja använda den.",
     "installFailed": "Uppdateringen installerades inte. Du kan försöka igen, eller ladda ner installationsprogrammet och köra det själv.",

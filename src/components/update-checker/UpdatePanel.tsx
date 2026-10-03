@@ -171,7 +171,7 @@ export const UpdateDetails: React.FC = () => {
 
   const progressLabel =
     phase === "installing"
-      ? t("updates.installing")
+      ? t("updates.reopening")
       : progress !== null
         ? t("updates.downloading", { progress })
         : t("updates.downloadingUnknown");

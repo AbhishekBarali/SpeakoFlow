@@ -35,6 +35,8 @@
     "downloading": "מוריד… {{progress}}%",
     "downloadingUnknown": "מוריד…",
     "installing": "מתקין…",
+    "reopening": "SpeakoFlow נסגר כדי להתקין את העדכון ויפתח שוב בעוד כמה שניות.",
+    "updatedTo": "עודכן לגרסה {{version}}",
     "restart": "הפעל מחדש עכשיו",
     "readyToRestart": "העדכון הותקן. הפעל מחדש את SpeakoFlow כדי להתחיל להשתמש בו.",
     "installFailed": "העדכון לא הותקן. אפשר לנסות שוב, או להוריד את המתקין ולהריץ אותו בעצמך.",

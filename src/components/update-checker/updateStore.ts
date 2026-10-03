@@ -7,11 +7,15 @@ import {
   downloadUpdateInstaller,
   getUpdateSupport,
   openUpdateInstaller,
+  prepareUpdateInstall,
   revealUpdateInstaller,
   type InstallerProgress,
   type UpdateMode,
 } from "./updateCommands";
 import { classifyCheckError, percentOf } from "./updateLogic";
+
+/** How long "closing to install, reopening in a few seconds" stays up. */
+const HANDOVER_PAUSE_MS = 1500;
 
 /**
  * The whole update flow in one place, so the sidebar pill, the About card and
@@ -170,7 +174,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     let total: number | null = null;
     let done = 0;
     try {
-      await update.downloadAndInstall((event) => {
+      await update.download((event) => {
         switch (event.event) {
           case "Started":
             total = event.data.contentLength ?? null;
@@ -182,11 +186,20 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
             set({ progress: percentOf(done, total) });
             break;
           case "Finished":
-            // On Windows the installer takes over from here and the app exits.
             set({ phase: "installing", progress: 100 });
             break;
         }
       });
+      set({ phase: "installing", progress: 100 });
+      // On Windows the app closes the moment install() starts, so give the
+      // "closing and reopening" message a moment on screen first; without it
+      // the window simply vanished and the update looked like a crash.
+      await new Promise((resolve) => setTimeout(resolve, HANDOVER_PAUSE_MS));
+      // Lets the new version come to the front and say it was updated.
+      await prepareUpdateInstall(update.version).catch((error) =>
+        console.warn("prepare_update_install failed:", error),
+      );
+      await update.install();
     } catch (error) {
       console.error("Update install failed:", error);
       set({

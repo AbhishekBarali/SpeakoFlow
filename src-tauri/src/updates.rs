@@ -442,6 +442,128 @@ pub fn reveal_update_installer(app: AppHandle, path: String) -> Result<(), Strin
         .map_err(|e| e.to_string())
 }
 
+// ── Coming back after an in-app update ────────────────────────────────────
+//
+// On Windows the app exits so the installer can replace it, and the installer
+// starts the new version. Windows does not let a process that was started in
+// the background take the foreground, so that new window opened *behind*
+// whatever the person was looking at: they clicked Update, the app vanished,
+// and as far as they could tell it had crashed. The old version leaves a note
+// before it exits, and the new one reads it at launch: it comes to the front
+// even if it would normally start hidden, and says it was updated.
+
+const PENDING_UPDATE_FILE: &str = "update-pending.json";
+
+/// A note older than this is from an install that never finished.
+const PENDING_UPDATE_MAX_AGE_SECS: u64 = 15 * 60;
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq)]
+pub struct FinishedUpdate {
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PendingUpdate {
+    from: String,
+    to: String,
+    /// Seconds since the Unix epoch.
+    at: u64,
+}
+
+static FINISHED_UPDATE: std::sync::Mutex<Option<FinishedUpdate>> = std::sync::Mutex::new(None);
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn pending_update_path(app: &AppHandle) -> Option<PathBuf> {
+    crate::portable::resolve_app_data(app, PENDING_UPDATE_FILE).ok()
+}
+
+/// Whether a note left by the previous version describes the version now
+/// running. Pure, so the decision is testable without a real install.
+fn finished_update_from_note(
+    note: &str,
+    running_version: &str,
+    now: u64,
+) -> Option<FinishedUpdate> {
+    let note: PendingUpdate = serde_json::from_str(note).ok()?;
+    let fresh = now.saturating_sub(note.at) <= PENDING_UPDATE_MAX_AGE_SECS;
+    (fresh && note.to == running_version && note.from != note.to).then_some(FinishedUpdate {
+        from: note.from,
+        to: note.to,
+    })
+}
+
+/// Called by the frontend right before it hands over to the installer.
+#[tauri::command]
+#[specta::specta]
+pub fn prepare_update_install(app: AppHandle, version: String) -> Result<(), String> {
+    let path = pending_update_path(&app).ok_or("No app data folder")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let note = PendingUpdate {
+        from: app.package_info().version.to_string(),
+        to: version,
+        at: now_secs(),
+    };
+    std::fs::write(&path, serde_json::to_vec(&note).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())
+}
+
+/// Read (and delete) the previous version's note at launch. Returns true when
+/// this launch is the one that finishes an update.
+pub fn take_finished_update(app: &AppHandle) -> bool {
+    let Some(path) = pending_update_path(app) else {
+        return false;
+    };
+    let Ok(note) = std::fs::read_to_string(&path) else {
+        return false;
+    };
+    let _ = std::fs::remove_file(&path);
+    let running = app.package_info().version.to_string();
+    match finished_update_from_note(&note, &running, now_secs()) {
+        Some(finished) => {
+            info!("Updated from {} to {}", finished.from, finished.to);
+            *FINISHED_UPDATE.lock().unwrap_or_else(|e| e.into_inner()) = Some(finished);
+            true
+        }
+        None => {
+            warn!("Ignoring an update note that does not match this launch ({running}): {note}");
+            false
+        }
+    }
+}
+
+/// Put the main window in front of everything once, without keeping it there.
+/// `set_focus` alone is refused by Windows for a process the installer started.
+pub fn bring_main_window_forward(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_focus();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(1500));
+        let _ = window.set_always_on_top(false);
+    });
+}
+
+/// The update this launch finished, once, for the "Updated to …" notice.
+#[tauri::command]
+#[specta::specta]
+pub fn take_update_notice() -> Option<FinishedUpdate> {
+    FINISHED_UPDATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -564,6 +686,37 @@ mod tests {
         ] {
             assert!(!is_trusted_download(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn a_launch_finishes_an_update_only_if_it_is_the_version_that_was_installed() {
+        let note = |from: &str, to: &str, at: u64| {
+            serde_json::to_string(&PendingUpdate {
+                from: from.into(),
+                to: to.into(),
+                at,
+            })
+            .unwrap()
+        };
+        let now = 1_000_000;
+        assert_eq!(
+            finished_update_from_note(&note("1.5.0", "1.5.1", now - 30), "1.5.1", now),
+            Some(FinishedUpdate {
+                from: "1.5.0".into(),
+                to: "1.5.1".into()
+            })
+        );
+        // The install failed and the old version started again.
+        assert_eq!(
+            finished_update_from_note(&note("1.5.0", "1.5.1", now - 30), "1.5.0", now),
+            None
+        );
+        // A note left behind by an install that never finished, long ago.
+        assert_eq!(
+            finished_update_from_note(&note("1.5.0", "1.5.1", now - 3600), "1.5.1", now),
+            None
+        );
+        assert_eq!(finished_update_from_note("garbage", "1.5.1", now), None);
     }
 
     #[test]
