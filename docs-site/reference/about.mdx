@@ -1,58 +1,60 @@
 ---
-title: "About & license"
-description: "What SpeakoFlow's About section shows, where it keeps your data and logs, the current known limitations including Apple Silicon only builds and no Linux .rpm, the roadmap, and the MIT license and credits."
+title: "About"
+description: "What SpeakoFlow is, its MIT license, credits, how updates and signing work, sending feedback, and contributing."
 icon: "circle-info"
 ---
 
-_Settings → About_ is the small housekeeping page.
+SpeakoFlow is a free, open-source desktop voice assistant for Windows, macOS, and Linux. Talk and it types, in any app. Ask and it answers. Start a conversation and talk it through. It also writes up your meetings.
 
-| Row                  | What it gives you                                                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Version              | The build you are running.                                                                                                                            |
-| Check for updates    | A manual check, the same one the tray item runs. Disabled if you turned automatic update checks off in _Settings → General_, which are on by default. |
-| App language         | The language of the SpeakoFlow interface.                                                                                                             |
-| Source code, License | Links to the repository and the license file.                                                                                                         |
-| Folders              | Your app data folder (models, history, settings) and your log directory, each with a button to open it.                                               |
+Speech is transcribed on your own computer by default. The assistant uses whichever model you choose: the built-in offline engine, your own local server, or a cloud provider with your own API key.
 
-## Known limitations
+The project is on [GitHub](https://github.com/AbhishekBarali/SpeakoFlow).
 
-- **macOS builds are Apple Silicon only.** GitHub retired its Intel build machines in December 2025, so there is currently no way to produce and test an Intel build. Intel Mac users can build from source.
-- **There is no Linux `.rpm`.** The packaging does not bundle the speech engine correctly, and shipping an `.rpm` that installs but cannot transcribe would be worse than shipping none. Fedora and openSUSE users should use the AppImage.
-- **Builds are not code signed yet.** On macOS that means one Terminal command on first install. On Windows, SmartScreen may warn you the first time you run the installer.
-- **Unsigned builds cannot auto-update on macOS.** Updating means downloading the new `.dmg` and repeating the one-time command.
+## License
 
-<Note>
-  The release pipeline is already wired for signing. It needs the paid Apple
-  Developer membership and a Windows certificate. Steps for the macOS command
-  are in [Install](/start/install).
-</Note>
+MIT. The full text is in [`LICENSE`](https://github.com/AbhishekBarali/SpeakoFlow/blob/main/LICENSE).
 
-## Roadmap
+## Credits
 
-- Code signing for Windows and macOS
-- A wider model catalog and more one-click local models
-- More community translations
-- Voice-to-text tuned for agentic coding
-- Prompt-engineering help: describe what you want to build and get a solid prompt back
-- Voice commands: trigger actions and complete tasks by voice
+The dictation core comes from [Handy](https://github.com/cjpais/Handy) by CJ Pais, used under the MIT license. The Whisper and Parakeet pipeline, voice-activity detection, overlay, and settings architecture trace back to that project.
 
-## License and credits
+The assistant, conversations, meetings, screen vision, Generate with Flow, translation, spoken replies, memory, reminders, Insights, and cloud transcription are SpeakoFlow's own.
 
-SpeakoFlow is open source under the **MIT License**.
+Thanks also to:
 
-Its dictation core comes from [Handy](https://github.com/cjpais/Handy) by CJ Pais, used under the MIT license. The Whisper and Parakeet pipeline, VAD, overlay, and settings architecture all trace back to that project. Thanks to CJ for making it open.
+- [Tauri](https://tauri.app) (the app framework, Rust backend + React/TypeScript frontend)
+- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and [llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [ONNX Runtime](https://github.com/microsoft/onnxruntime) and [Silero VAD](https://github.com/snakers4/silero-vad)
+- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (native voice engine)
+- [Kokoro](https://github.com/hexgrad/kokoro) (local text-to-speech in the browser)
+- [WeSpeaker](https://github.com/wenet-e2e/wespeaker) (speaker embeddings for meeting diarization)
+- Kyutai's [Pocket TTS](https://github.com/kyutai-labs/moshi)
 
-The assistant, screen vision, Generate with Flow, translation, text-to-speech, and memory layers are SpeakoFlow's own. Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, Silero VAD, and [Kokoro](https://github.com/hexgrad/kokoro).
+## Updates and signing
 
-<AccordionGroup>
-  <Accordion title="Tech stack">
-    | Layer | What it uses | | --- | --- | | App | Tauri 2, with a Rust backend
-    and a React and TypeScript frontend. | | Speech-to-text | whisper.cpp and
-    Parakeet with GPU acceleration, plus Silero VAD for voice detection. | |
-    Assistant | A built-in llama.cpp engine, or any OpenAI-compatible provider
-    you configure. | | Text-to-speech | Kokoro locally, with OpenAI-compatible,
-    ElevenLabs, and Azure options. |
-  </Accordion>
-</AccordionGroup>
+SpeakoFlow checks for new versions in the background (on by default; toggle in _Settings → About_). When an update is available, it shows in the sidebar and in _Settings → About_, where you can install or download it.
 
-Have an idea, or hit a bug not covered here? Open an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues) or browse the [repository](https://github.com/AbhishekBarali/SpeakoFlow).
+Every update is verified against the project's own minisign signing key (public half in the Tauri config, key id `73D1FDFF87780381`). A tampered update will not install.
+
+The installers themselves are not code-signed with an Apple or Microsoft certificate yet. On macOS that means one Terminal command on first install (see [Install](/start/install)). On Windows, SmartScreen may warn the first time you run the installer. The release pipeline is wired for signing and needs only the paid certificates.
+
+The AUR package on Arch Linux updates through your package manager instead of the built-in updater.
+
+## Sending feedback
+
+Click the **?** beside the gear in the sidebar, or go to _Settings → About → Send feedback_, or use **Send feedback** in the tray menu.
+
+The dialog sends exactly what it shows you:
+
+- Your message.
+- Your email, only if you type one.
+- Up to three screenshots (pasted or picked, shrunk to about 100-400 KB each).
+- A system info line, only if you tick the box.
+
+No logs, no transcripts. The report goes to a Cloudflare Worker that files a GitHub issue. The draft is saved as you type, so closing the dialog or a failed send loses nothing.
+
+## Reporting issues and contributing
+
+For bugs not covered in [Troubleshooting](/reference/troubleshooting), [open an issue](https://github.com/AbhishekBarali/SpeakoFlow/issues). Raise your log level to Debug or Trace first (see [Debug & advanced](/settings/debug)) and attach the log file.
+
+Contributions are welcome. [`CONTRIBUTING.md`](https://github.com/AbhishekBarali/SpeakoFlow/blob/main/CONTRIBUTING.md) explains how to get started, and [`CONTRIBUTING_TRANSLATIONS.md`](https://github.com/AbhishekBarali/SpeakoFlow/blob/main/CONTRIBUTING_TRANSLATIONS.md) covers translating the app.

@@ -1,48 +1,45 @@
 ---
-title: "Live vs. batch transcription"
-description: "Streaming models show your words in SpeakoFlow's overlay while you speak, but text is still inserted once after you stop. This page lists which transcription models stream and how the overlay style switches streaming on and off."
+title: "Live transcription"
+description: "See your words in the overlay as you speak, with models that support streaming. Cloud streaming is available through ElevenLabs and Deepgram."
 icon: "tower-broadcast"
 ---
 
-Live transcription changes what you **see**, not when text lands. The transcript is inserted into your app exactly once, after you stop recording.
+Live transcription shows a running transcript in the overlay while you talk. The text is still inserted into your app once, after you stop recording, but the final insert is close to instant because most of the work is already done.
 
-What streaming buys you is a running transcript in the overlay while you talk, plus a final insert that is close to instant because most of the work is already done.
+## Which local models stream
 
-## Which models stream
+Models built for streaming show text as you speak. The rest transcribe in one batch after you stop. The catalog marks this per model, and you can filter by it on the **Models** page.
 
-| Model                                                                        | Streams |
-| ---------------------------------------------------------------------------- | ------- |
-| Parakeet Unified EN 0.6B (default, English only)                             | Yes     |
-| Nemotron Streaming 3.5 (English)                                             | Yes     |
-| Moonshine V2 Tiny / Small / Medium (English only)                            | Yes     |
-| Whisper, Canary, Cohere, Sense Voice, GigaAM, Breeze, non-streaming Parakeet | No      |
+Models that stream include the Parakeet and Nemotron streaming variants and the Moonshine family. Whisper, Canary, Cohere, SenseVoice, GigaAM, and non-streaming Parakeet do not. See [Transcription models](/models/transcription-models) for the full catalog.
 
-Streaming is capability-gated. The streaming worker only starts for a model that natively supports it, so it cannot be forced onto a model that would misbehave.
+Switching to a non-streaming model moves you back to batch transcription automatically.
 
-Switching to a non-streaming model, Whisper Medium for its language coverage for example, moves you back to batch transcription automatically. See [Transcription models](/models/transcription-models) for the full catalog.
+## Cloud streaming
 
-## Turning it on and off
+Two cloud providers support live streaming: **ElevenLabs** (with `scribe_v2_realtime`) and **Deepgram**. Their text arrives while you are still talking, so releasing the keys only flushes the last few words.
 
-There is no separate live transcription switch. It follows the overlay style in _Settings → General → Overlay_.
+Turn this on with the **Transcribe as I speak** switch in the cloud transcription settings. For ElevenLabs you need to select a realtime model; the batch model (`scribe_v2`) only transcribes after you stop.
 
-- **Live**. Streaming on. On a model that cannot stream, the overlay falls back to the compact pill.
-- **Minimal** or **None**. Streaming off.
+If the live stream fails or produces nothing, SpeakoFlow falls back to transcribing the full recording in one batch request. You never lose your words. The batch and realtime models can produce slightly different wording for the same audio, and the substitution is logged.
 
-Until you pick one, the setting sits in an `Auto` state that streams whenever the selected model supports it. `Auto` is the shipped default, which is why streaming already runs on a fresh install with the default model.
+See [Cloud transcription](/dictation/cloud-transcription) for setup.
 
-## Good to know
+## How it connects to the overlay
 
-<AccordionGroup>
-  <Accordion title="Two shades of text in the overlay">
-    The running text renders in two shades. The committed prefix is solid, and a still-revisable tail is dimmed.
+There is no separate streaming switch for local models. It follows the overlay style in _Settings → Dictation → Dictation overlay_.
 
-    Not every engine reports a revisable tail, so on some models everything you see is already committed.
+- **Live.** Streaming on. Shows a readable card with the running text.
+- **Minimal.** Streaming off. Shows the compact pill.
+- **None.** No overlay, no streaming.
 
-  </Accordion>
+A fresh install is on **Auto**, which resolves to Live when the selected model streams and Minimal when it does not. Picking any option writes a concrete choice that overrides Auto.
 
-  <Accordion title="What happens if streaming fails">
-    If the streaming pass produces nothing, errors, or times out, SpeakoFlow falls back to transcribing the recorded audio in one batch. You never lose your words.
-  </Accordion>
-</AccordionGroup>
+If Live is selected but the model cannot stream, the overlay falls back to Minimal. A non-streaming model never shows an empty live card.
 
-See [The recording overlay](/dictation/overlay) for the full set of style and position options.
+## Two shades of text
+
+The running text renders in two shades. Committed text is solid and will not change. A still-revisable tail is dimmer. Not every engine reports a revisable tail, so on some models everything you see is already committed.
+
+## The live card
+
+The card is interactive: you can scroll back through the text, select a phrase, and copy it. It never takes keyboard focus from the app you are dictating into. See [The recording overlay](/dictation/overlay) for more on the card's behavior.

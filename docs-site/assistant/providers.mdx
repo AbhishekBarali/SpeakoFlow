@@ -1,106 +1,96 @@
 ---
 title: "Models and providers"
-description: "Choose what powers the SpeakoFlow assistant: a private offline model that needs no API key, your own Ollama or LM Studio server, or a cloud provider with your own key. Covers the curated local models and the full provider list."
+description: "Choose what powers the assistant: an offline model on your computer, your own Ollama or LM Studio server, or a cloud provider with your API key."
 icon: "brain"
 ---
 
-The assistant runs on whatever model you pick. This is the most important assistant setting. Set it in _Settings → Assistant → Assistant brain_.
+The assistant runs on whatever model you pick. Set it on the **Assistant** page under the model picker.
 
-| Route                     | What it means                                                                                                 | Key needed |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------- |
-| **Built-in (offline)**    | Download a curated local model. It runs on this machine through the bundled llama.cpp engine and stays there. | No         |
-| **Your own local server** | Point SpeakoFlow at Ollama or LM Studio on your machine.                                                      | No         |
-| **Cloud provider**        | Any OpenAI-compatible provider, using your own API key.                                                       | Yes        |
+| Route                     | What it means                                                                                                | Key needed |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------- |
+| **On my device**          | A model downloaded through the **Models** page, running through the bundled llama.cpp engine. Fully offline. | No         |
+| **Your own local server** | Ollama or LM Studio on your machine, through their OpenAI-compatible endpoint.                               | No         |
+| **Cloud provider**        | Any supported provider, using your own API key.                                                              | Yes        |
 
-## Curated local models
+The **Assistant** page shows a toggle between **On my device** and **Cloud provider**. Switching to cloud restores whichever cloud provider you last used, so you do not lose your choice.
 
-Three conversation-first choices: quickest, recommended, and more capable but slower. All three see images, so any of them can do [screen vision](/assistant/screen-vision).
+## Built-in engine (offline)
 
-| Model                         | Download | Pick it when                                                                               |
-| ----------------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| **Gemma 4 E2B**               | ~4 GB    | You want the quickest replies and can accept weaker answers on complex requests.           |
-| **Gemma 4 E4B** (recommended) | ~5.9 GB  | You want the best balance of quality and speed for conversation.                           |
-| **Gemma 4 12B**               | ~6.8 GB  | You want sharper answers on nuanced questions and have a strong GPU to absorb the latency. |
+The built-in engine is llama.cpp, bundled with the app. It downloads on first use. Models are downloaded from the **Models** page.
 
-Want a different size, a different family, or a non-vision model? Search Hugging Face for any GGUF from the same screen. See [Custom models](/models/custom-models).
+Two settings appear only for this engine:
 
-<AccordionGroup>
-  <Accordion title="What the catalog tells you about your GPU">
-    Before you pick, the catalog reports the GPU it detected and how much graphics memory it has: dedicated VRAM, shared memory, or a plain "graphics memory unavailable" when it cannot tell.
+| Setting                  | Default     | Range                |
+| ------------------------ | ----------- | -------------------- |
+| Context window           | `8192`      | 512 to 32,768        |
+| Unload from memory after | `5 minutes` | Immediately to Never |
 
-    That last case is honest rather than reassuring. With no GPU information, response speed genuinely cannot be predicted, so expect CPU-speed replies.
+A bigger context window holds more conversation history and makes screen vision and web search more reliable, at the cost of more memory. The model unloads after idle time to free RAM and VRAM, then reloads on next use.
 
-  </Accordion>
+## Ollama and LM Studio
 
-  <Accordion title="Why each download is larger than the weights">
-    These models are multimodal, so each one downloads a companion projector file automatically alongside the weights. The sizes above already include it.
-  </Accordion>
-</AccordionGroup>
+Pick the **Local** provider and point it at your server's address. Ollama defaults to `http://localhost:11434/v1`, LM Studio to `http://localhost:1234/v1`. No API key is needed.
 
-## Providers
+## Cloud providers
 
-Every provider is preconfigured. You pick it from a list and enter a key. The built-in local engine is pinned to the top, because it is the only option that needs no key at all.
+Every cloud provider is preconfigured. Pick it from the list and enter your key. The full list:
 
-| Provider                                                                                                                                                                        | Key                          | Base URL                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------- |
-| **Built-in (Local)**                                                                                                                                                            | Not needed                   | Fixed, on a loopback port                         |
-| **Local (Ollama / LM Studio)**                                                                                                                                                  | Not needed                   | Editable, defaults to `http://localhost:11434/v1` |
-| **Custom**                                                                                                                                                                      | Whatever your endpoint wants | Editable                                          |
-| **Azure OpenAI**                                                                                                                                                                | Yes                          | Editable                                          |
-| OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Cerebras, xAI (Grok), DeepSeek, Mistral, Moonshot (Kimi), Z.AI, Together AI, Fireworks AI, Perplexity, AWS Bedrock (Mantle) | Yes                          | Fixed                                             |
+| Provider                   | Notes                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| OpenAI                     |                                                                                                    |
+| Anthropic                  | Authenticated with the native `x-api-key` header.                                                  |
+| Google Gemini              |                                                                                                    |
+| Azure OpenAI               | The "model" field is your deployment name. The base URL is editable and normalized to the v1 path. |
+| AWS Bedrock (Mantle)       |                                                                                                    |
+| OpenRouter                 | The only provider with built-in [web search](/assistant/web-search) (the `:online` models).        |
+| Groq                       |                                                                                                    |
+| Cerebras                   |                                                                                                    |
+| xAI (Grok)                 |                                                                                                    |
+| DeepSeek                   |                                                                                                    |
+| Mistral                    |                                                                                                    |
+| Moonshot (Kimi)            |                                                                                                    |
+| Z.AI                       |                                                                                                    |
+| Together AI                |                                                                                                    |
+| Fireworks AI               |                                                                                                    |
+| Perplexity                 | No model-list endpoint, so Load models does nothing. Type the model name.                          |
+| Custom (OpenAI-compatible) | Editable base URL for any endpoint that speaks the OpenAI chat API.                                |
 
-Base URL is editable for `Custom`, `Local`, and `Azure OpenAI` only. Everything else is fixed, so there is nothing to get wrong. For LM Studio, use `http://localhost:1234/v1`.
+Click **Load models** to fetch the provider's model list, or type any model name directly. The picker accepts values that are not in the list.
+
+## API keys
+
+Keys are stored in your operating system's keychain, not a settings file. Each provider keeps its own key, and switching providers does not lose one you already entered. See [Privacy](/reference/privacy).
+
+## Shared provider
+
+The assistant, [AI cleanup](/writing/ai-cleanup), and [Generate with Flow](/writing/generate-with-flow) share the same provider and model. Picking a provider on the **Assistant** page changes it for all three, unless AI cleanup has its own model set.
 
 <Note>
   Apple Intelligence appears in the provider list for [AI
-  cleanup](/writing/ai-cleanup) on Apple Silicon Macs, but not for the
-  assistant. The on-device Foundation model does not back a streaming chat turn
-  here, so it is filtered out of the assistant's picker on purpose.
+  cleanup](/writing/ai-cleanup) on Apple silicon Macs, but not for the
+  assistant.
 </Note>
 
-## Keys and model names
+## Assistant master switch
 
-Your API key lives in your operating system's keychain, not a settings file. Each provider keeps its own key, so switching providers does not lose the one you already entered. The key is shared with [AI cleanup](/writing/ai-cleanup), since both features use the same chat client. See [Privacy](/reference/privacy).
+The **Assistant** page has an on/off switch in its header. Turning it off:
 
-For the model, click _Load models_ to fetch the provider's list, or type any name directly. The picker accepts values that are not in the list.
+- Removes the assistant panel window entirely (it is destroyed, not hidden).
+- Disables both assistant shortcuts (the quick ask and the conversation). They do nothing.
+- Stops the built-in llama.cpp engine instead of leaving it idle.
+- Hides Profiles and Memory from the **Assistant** page.
 
-<AccordionGroup>
-  <Accordion title="OpenRouter, Azure, and Perplexity quirks">
-    - **OpenRouter**. The only provider with built-in [web search](/assistant/web-search). It also sends `HTTP-Referer` and `X-Title` for app attribution.
-    - **Azure OpenAI**. The "model" is your deployment name. Whatever you paste from the portal is normalized to the v1 surface `https://{host}/openai/v1`, so a bare resource URL or an AI Foundry project endpoint both work instead of returning 404 on a missing path. The key is sent as both `Authorization: Bearer` and the `api-key` header, since gateways differ on which they honor. Requests use HTTP/1.1 and a smaller image budget, because Azure's gateway truncates large bodies.
-    - **Perplexity**. No model-list endpoint, so *Load models* does nothing. Type the model name.
-  </Accordion>
+AI cleanup and Generate with Flow keep working, since they share the provider picker. The model picker stays visible on the **Assistant** page so you can still choose what those features run on.
 
-  <Accordion title="Anthropic and the built-in engine">
-    - **Anthropic**. Authenticated with the native `x-api-key` header plus `anthropic-version`, which works on both the OpenAI-compatible layer and the classic API.
-    - **Built-in local engine**. Gemma-style chat templates reject a `system` role, so the system prompt is folded into the first user message. Thinking is disabled in the template so a small model spends its tokens on the answer.
-  </Accordion>
-</AccordionGroup>
+## Testing the connection
 
-## Local engine tuning
+A **Test connection** button sits at the bottom of the provider group on the **Assistant** page. It sends a throwaway question and reports whether the model answered. Use it after entering a new key or changing a model to catch a bad key, an empty balance, or a model id the endpoint does not serve, before the first real ask fails silently.
 
-Two settings appear only for the built-in local engine. External providers, including Ollama and LM Studio, manage their own context and memory.
-
-| Setting                  | Default     | Options                                    |
-| ------------------------ | ----------- | ------------------------------------------ |
-| Context window           | `8192`      | 512 to 32768                               |
-| Unload from memory after | `5 minutes` | _Immediately_ through _1 hour_, or _Never_ |
-
-<AccordionGroup>
-  <Accordion title="How big a context window you want">
-    The context window holds everything at once: the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and the reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory.
-
-    `16384` is a good step up if your machine has the RAM, and you can lower it later to save memory. The change applies when the engine starts.
-
-  </Accordion>
-
-  <Accordion title="Why the model unloads after five minutes">
-    Unloading frees RAM and VRAM once the model has been idle that long, and it reloads automatically on next use. Five minutes keeps it warm through a working session without holding memory overnight.
-  </Accordion>
-</AccordionGroup>
-
-## System prompt
-
-Sets the assistant's baseline behavior, in _Settings → Assistant → System prompt_. The default tells the model it is hearing transcribed speech, so it should expect the occasional mis-hear and infer intent, keep answers concise, and use plain text that reads well in a small panel.
-
-Individual [profiles](/personalize/profiles) override it entirely for their own turns. The system prompt is really the fallback persona rather than a global preamble.
+<CardGroup cols={2}>
+  <Card title="Custom models" icon="hard-drive" href="/models/custom-models">
+    Add your own GGUF files or link a folder.
+  </Card>
+  <Card title="Quick ask" icon="comments" href="/assistant/panel">
+    How to use the assistant once it is set up.
+  </Card>
+</CardGroup>

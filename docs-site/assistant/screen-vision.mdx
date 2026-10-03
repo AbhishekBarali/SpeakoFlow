@@ -1,69 +1,77 @@
 ---
 title: "Screen vision"
-description: "Ask the SpeakoFlow assistant about what is on your screen. Covers the two screen switches, how the assistant decides when to look, when the frame is captured, image quality per provider, and the macOS Screen Recording permission."
+description: "Let the assistant see your screen when a question needs it. Two switches, one for the quick ask and one for a conversation, both off by default."
 icon: "eye"
 ---
 
 Ask about what is on your screen and the assistant answers with that context. It only looks when you let it.
 
-Set it up on the _Assistant_ page, under _What it can do_. You need a vision-capable model. Most curated local models qualify (the catalog marks them "Vision"), as do the mainstream cloud multimodal models.
+Set it up on the **Assistant** page, under the features section. You need a vision-capable model. Most curated local models qualify (the catalog marks them "Vision"), as do the mainstream cloud multimodal models.
 
 ## Two switches
 
-| Switch                          | What it covers                                     |
-| ------------------------------- | -------------------------------------------------- |
-| **Screen vision for questions** | The quick ask: one question from the ask shortcut. |
-| **Screen vision for calls**     | A hands-free call, for its whole length.           |
+| Switch                              | What it covers                                     |
+| ----------------------------------- | -------------------------------------------------- |
+| **Screen vision for questions**     | The quick ask, one question from the ask shortcut. |
+| **Screen vision for conversations** | A hands-free conversation, for its whole length.   |
 
-Both are **off** until you turn them on. They are separate because a call turns every sentence into a question, so you may be happy for a one-off question to look but not want the screen in reach for a whole conversation.
+Both are **off** until you turn them on. They are separate because a conversation turns every sentence into a question. You may want a one-off question to see the screen but not want it available for an entire conversation.
 
 ## How the assistant decides to look
 
 Turning a switch on does not mean every question takes a screenshot. It means the assistant _may_ look, and it decides per message:
 
-- **It looks** when you ask it to ("look at my screen", "can you see this?"), or when your question is about something on screen it has not been given as text, such as "what's this error?" or "reply to this email".
+- **It looks** when you ask it to ("look at my screen", "can you see this?"), or when your question is about something visible it has not been given as text, like "what's this error?" or "reply to this email".
 - **It does not look** for anything it can answer without seeing: general knowledge, writing, translation, maths, the time, reminders, or a follow-up about something already in the conversation.
 - **Selected text counts as "this".** Select a sentence and ask "what does this mean?", and it answers from the selection instead of taking a screenshot. Ask it to look at the screen as well and it will.
 
-It looks at most once per message. Every screenshot that goes to the model is shown in the conversation, so there is always a visible record of when the assistant looked.
+It looks at most once per message. Every screenshot that goes to the model appears in the conversation, so there is always a visible record of when the assistant looked.
+
+## What gets captured
+
+SpeakoFlow captures the monitor under your mouse cursor, so on a multi-monitor desk you get the screen you are working on.
+
+Only a compact thumbnail is stored in the conversation and in [History](/personalize/history). The full-resolution frame is sent to the model once and never written to disk. A screenshot the model does not ask for is dropped at the end of the turn and never leaves your device. Thumbnails show inline in the panel and in History, and you can click one to enlarge it.
 
 <Warning>
   **macOS.** Screen vision needs macOS Screen Recording permission. Grant it in
-  *System Settings → Privacy & Security → Screen Recording*, then restart
+  _System Settings → Privacy & Security → Screen Recording_, then restart
   SpeakoFlow for it to take effect.
 </Warning>
 
-## What actually gets sent
-
-SpeakoFlow captures the monitor under your mouse cursor, so on a multi-monitor desk you get the screen you are actually working on.
-
-Only a compact thumbnail is stored in the conversation and in [History](/personalize/history). The full-resolution frame is sent to the model once and never written to disk. Thumbnails show inline in the panel and can be clicked to enlarge.
-
 <AccordionGroup>
-  <Accordion title="When the frame is grabbed for a voice question">
-    *When I start, When I send. Default: When I start. Shown when screen vision for questions is on.*
+  <Accordion title="When the frame is captured for a voice question">
+    _Capture timing_ appears on the **Assistant** page when screen vision for questions is on. It has two options:
 
-    This only changes *when* the frame is taken, never whether it is sent. The frame waits on your machine, and is dropped at the end of the question if the assistant does not ask to look.
+    - **Immediate** (default). Grabs the frame the moment you press the hotkey, so it shows what you were looking at when you started talking. When the assistant decides to look, the screenshot is already waiting.
+    - **On send**. Grabs it once you stop talking, so it shows the screen as it is when the question goes out.
 
-    - **When I start** (default). Grabs the frame the moment you press the hotkey, so it shows what you were looking at when you started talking. It also means that when the assistant does decide to look, the screenshot is already there.
-    - **When I send**. Grabs it once you stop talking, so it shows the screen as it is when the question goes out.
+    This only changes _when_ the frame is taken, never whether it is sent. The frame sits on your machine, and is dropped at the end of the question if the assistant does not ask to look.
 
-    Typed questions capture when they are sent. A call captures only at the moment the assistant asks to look.
+    Typed questions capture when they are sent. A conversation captures only at the moment the assistant asks to look, never in advance.
 
   </Accordion>
 
-  <Accordion title="How much image quality each provider gets">
-    The frame is JPEG-compressed down to a budget picked from your provider, because "send the sharpest possible image" and "the request succeeds" are not the same goal.
+  <Accordion title="Image quality and provider budgets">
+    The frame is JPEG-compressed to a budget that depends on your provider, because sending the sharpest possible image and having the request succeed are not the same goal.
 
     | Provider | Budget | Why |
     | --- | --- | --- |
-    | Azure | Smallest | Azure's gateway rejects oversized request bodies outright. |
-    | Built-in or a local server | Middle | Keeps on-screen text legible without spending a huge share of a small local context on vision tokens. |
+    | Azure | Smallest | Azure's gateway rejects oversized request bodies. |
+    | Built-in or a local server | Middle | Keeps on-screen text legible without spending a large share of a small local context on vision tokens. |
     | Other cloud providers | Largest | Sharpest, so fine text, code, and error messages stay readable. |
 
   </Accordion>
 
-  <Accordion title="What happens if your model cannot read images">
-    The panel says so and names the problem rather than silently dropping the screenshot. Switch to a vision-capable model, or ask again with screen vision off.
+<Accordion title="What happens if your model cannot read images">
+  When the assistant tries to use a screenshot but the model does not support
+  images, SpeakoFlow recovers the turn: it drops the image, tells the model the
+  screenshot was not available, and lets it answer from text alone. You will see
+  a notice in the conversation. Switch to a vision-capable model if you want
+  screen vision to work.
+</Accordion>
+
+  <Accordion title="The Cat persona">
+    The Cat profile never gets the screen tool, regardless of your switches. Cat does not call a model at all, so there is nothing to send a screenshot to.
   </Accordion>
 </AccordionGroup>

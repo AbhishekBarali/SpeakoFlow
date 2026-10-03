@@ -1,76 +1,62 @@
 ---
 title: "Privacy"
-description: "What SpeakoFlow sends and what it keeps on your device: speech-to-text runs locally, there is no telemetry and no account, web search and personal memory are off by default, and API keys go to your OS credential store."
+description: "What SpeakoFlow sends, what it keeps on your device, and what it never collects. Local by default, no telemetry, no account."
 icon: "shield-halved"
 ---
 
-Four things are true no matter how you configure SpeakoFlow.
+SpeakoFlow is local by default. There is no telemetry, no analytics, no account, and no "SpeakoFlow cloud."
 
-- **Your voice is transcribed on your device.** Speech-to-text always runs locally, on your GPU or CPU, and audio is never uploaded.
-- **The assistant only contacts the provider you chose.** That can be the fully offline built-in llama.cpp engine, a local server like Ollama or LM Studio, or a cloud provider with your own key.
-- **No telemetry and no account.** SpeakoFlow does not phone home.
-- **Optional features stay off until you turn them on.** [Web search](/assistant/web-search) and [personal memory](/personalize/memory) are both off by default.
+Your voice is transcribed on your own computer unless you pick a cloud speech service. The assistant contacts only the provider you chose: the built-in offline engine, a local server like Ollama or LM Studio, or a cloud provider with your own API key.
 
-## What leaves your machine, and when
+## What leaves your device, and only when you set it up
 
-| What                                                                                                            | When                                                                         | Where it goes                            |
-| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------- |
-| Assistant, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), spoken answers | Only when you use them, and only if you configured a remote provider         | The provider you chose, and nowhere else |
-| [Web search](/assistant/web-search)                                                                             | Off by default. When on, only when the assistant decides a search would help | Your chosen search backend               |
-| Screen captures                                                                                                 | Off by default. When on, only when the assistant decides it needs to look    | The provider you chose                   |
-| Model downloads                                                                                                 | When you download a transcription or local assistant model                   | The model host                           |
-| Update checks                                                                                                   | **On by default.** Toggle in _Settings → General_                            | This project's GitHub releases page      |
+| What                                                    | When                                                                                                                       | Where it goes                                                                                                                                                                                                                         |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Your recordings                                         | Only if you pick a [cloud speech service](/dictation/cloud-transcription) instead of a local model                         | The cloud transcription provider you chose (ElevenLabs, Deepgram, OpenAI, Groq, etc.)                                                                                                                                                 |
+| Your questions, selected text, and conversation context | Only if the assistant or [AI cleanup](/writing/ai-cleanup) uses a remote provider                                          | The provider you chose, and nowhere else                                                                                                                                                                                              |
+| A screenshot of your screen                             | Only if [screen vision](/assistant/screen-vision) is on (off by default) and the model decides a question needs the screen | The assistant's provider                                                                                                                                                                                                              |
+| A meeting transcript                                    | Only when you generate notes or ask questions about a meeting, and only if the model provider is remote                    | The assistant's provider                                                                                                                                                                                                              |
+| A search query                                          | Only if [web search](/assistant/web-search) is on (off by default) and the assistant decides a search would help           | The search provider you chose (Serper, Brave, Tavily, etc.)                                                                                                                                                                           |
+| Feedback                                                | Only if you send it from the in-app dialog                                                                                 | A Cloudflare Worker that files a GitHub issue. It sends exactly what the dialog shows you: your message, your email if you typed one, up to three screenshots, and a system-info line if you ticked the box. No logs, no transcripts. |
+| Update checks                                           | On by default. Checks a file on GitHub Releases.                                                                           | GitHub. No personal data is sent. You can disable this in _Settings → About_.                                                                                                                                                         |
+| Model downloads                                         | When you download a speech, language, or voice model                                                                       | The model host (typically Hugging Face or GitHub). A plain file download; no personal data is sent.                                                                                                                                   |
 
-Pick a local provider for the first three rows and the app never opens a connection at all.
+Pick a local provider for the assistant and a local speech model, and the app never opens a connection beyond update checks and model downloads.
 
-## What is stored on this device
+## What stays on your device
 
-<AccordionGroup>
-  <Accordion title="Screen captures">
-    Screen vision is off until you turn it on. Once it is on, the assistant looks only when a question needs the screen, and then only at the monitor under your mouse cursor.
+**Recordings and transcripts.** Saved locally in the recordings folder, subject to your [retention settings](/settings/general). You can delete them from the History page or open the folder from _Settings → Privacy & data_.
 
-    The full-resolution frame is sent once to the model provider you chose and is not kept. What persists locally is a small thumbnail attached to the message, so you can see later what the assistant was looking at. Details in [Screen vision](/assistant/screen-vision).
+**Personal memory.** Off by default. When on, stored entirely on your device in the settings file. the **Assistant** page under Memory lets you view, edit, export, or erase every note. Memory is advisory: it never overrides what you asked in the current message. It refuses to keep secrets, personal identifiers, or instruction-shaped text.
 
-  </Accordion>
+**History.** Dictations, Flow generations, assistant conversations, and meetings are stored locally.
 
-  <Accordion title="Personal memory">
-    Off by default. When you turn it on, everything is stored on this device in your settings file. *Settings → Assistant → Memory* lets you read, edit, export, or erase every note.
+**Settings.** All preferences stay on your device.
 
-    Memory is advisory only, so injected memory never overrides what you asked for in the current message. It actively refuses to keep secrets, personal identifiers, or instruction-shaped text at capture, consolidation, and injection time.
+## API keys
 
-    An Incognito toggle skips both using and learning memory for a single conversation.
+Provider API keys are stored in your operating system's credential store: Windows Credential Manager, the macOS Keychain, or the Linux Secret Service, under the service name `com.abhishekbarali.speakoflow`.
 
-  </Accordion>
+Keys are read into memory once at load and cached. The credential store is never hit in the hot path.
 
-  <Accordion title="History and recordings">
-    *Settings → History* keeps your recent dictations, Flow generations, and assistant chats on this device. Two settings control how much is kept:
+<Note>
+  If the platform credential store is not available (a headless Linux box with
+  no Secret Service, for example), the key stays in the settings file on disk in
+  plain text. On such a machine, it is worth knowing.
+</Note>
 
-    - **Recording limit**. How many recordings to keep. Default 20.
-    - **Auto-delete recordings**. `Keep a set number` (the default, which means the recording limit above does the trimming), `Never`, `After 3 days`, `After 2 weeks`, or `After 3 months`.
+API keys are never written to log files, in any build.
 
-    Both apply only to unstarred dictation and Flow recordings. Starred recordings are always kept, and assistant chats are never counted or auto-deleted.
+## Log files
 
-    Changes apply immediately, so lowering the limit deletes the excess right away.
+Release builds log only the length of transcripts and model replies, not their text. Settings contents (custom words, prompts, profiles, memory notes) are also suppressed. A log file you attach to a bug report does not contain what you said. See [Debug & advanced](/settings/debug).
 
-  </Accordion>
+## Keyboard access
 
-  <Accordion title="API keys">
-    Provider API keys go into the OS credential store, not into a plain-text settings file: Windows Credential Manager, the macOS Keychain, or the Linux Secret Service, under the service name `com.abhishekbarali.speakoflow`.
+Global shortcuts observe your keyboard to detect the registered key combination. Nothing is logged or stored about what you type.
 
-    They are read back into memory once at load and cached there, so the keychain is never touched in the hot path.
+On Linux, the handy-keys engine reads `/dev/input/event*` directly, which is why it needs your user in the `input` group. The Tauri engine (the default on Linux) uses the compositor's global-shortcut API and reads nothing.
 
-    <Note>
-      If the platform store is not available, a headless Linux box with no Secret Service for example, the app keeps the key in its settings file rather than losing it. On such a machine the key is on disk in plain text, so it is worth knowing.
-    </Note>
+## The full privacy policy
 
-  </Accordion>
-
-  <Accordion title="Keyboard access">
-    Global shortcuts have to observe your keyboard to know when you pressed one. Nothing logs or stores what you type.
-
-    On Linux the handy-keys engine reads `/dev/input/event*` directly, which is why it needs your user in the `input` group. The Tauri engine, the default on Linux, uses the compositor's global-shortcut API and reads nothing.
-
-  </Accordion>
-</AccordionGroup>
-
-See [How SpeakoFlow works](/start/how-it-works) for the full data flow, and [Providers & keys](/assistant/providers) for what gets sent where when you use a cloud model.
+The complete privacy policy is in [`PRIVACY.md`](https://github.com/AbhishekBarali/SpeakoFlow/blob/main/PRIVACY.md) in the repository, versioned in Git so the full history is publicly visible.

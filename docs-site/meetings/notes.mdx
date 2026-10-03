@@ -1,0 +1,79 @@
+---
+title: "Meeting notes"
+sidebarTitle: "Notes"
+description: "After a meeting, SpeakoFlow writes notes from the transcript with a template you choose. Speaker labels, asking questions, and discussing a meeting with the assistant."
+icon: "clipboard-list"
+---
+
+When a recording stops, SpeakoFlow writes the notes automatically. You can also generate or regenerate them later from the meeting's **Summary** tab.
+
+## Templates
+
+Pick a template before or after recording. It decides the shape of the notes.
+
+| Template              | What it produces                                                            |
+| --------------------- | --------------------------------------------------------------------------- |
+| **General** (default) | Summary, key takeaways, topics, decisions and next steps.                   |
+| **Standup**           | Grouped by person: what they finished, what is next, what is blocking them. |
+| **One-on-one**        | Topics, feedback, and what each person committed to.                        |
+| **Interview**         | Evidence about the candidate, with no verdict.                              |
+| **Action items**      | Nothing but the tasks, split into yours and everyone else's.                |
+
+Change the template on the meeting's **Summary** tab. If notes have already been written, **Rewrite with a different template** regenerates them with the new one.
+
+## Which model writes the notes
+
+Notes are written by your assistant model. SpeakoFlow resolves this on its own: it tries the assistant's provider and model first, falls back to the cleanup model if the assistant is not set up, and refuses a cleanup-only model like SpeakoFlow Mini because a fine-tune trained on single-sentence dictation cannot summarize a meeting.
+
+There is no separate "meeting model" setting. If the assistant works, notes work.
+
+<Warning>
+  When notes are generated, the meeting's transcript is sent to whichever
+  provider powers your assistant. If that is a cloud provider, the transcript
+  leaves your computer. If the assistant runs locally, everything stays on your
+  machine.
+</Warning>
+
+For long meetings, the transcript is split into windows and each window is summarized separately, then the partial summaries are merged into the finished notes. This happens transparently. A meeting longer than about nine hours of continuous speech is capped, and notes are written for as much as fits.
+
+## My thoughts
+
+The **My thoughts** tab lets you type what matters to you while the call is happening. These notes are merged with the transcript when notes are generated, so the result is organized around what you cared about rather than a flat chronological summary. You can also add them after the call.
+
+## Speaker labels
+
+During the call, the two capture streams are labelled **You** and **Others**. After the call, SpeakoFlow can split "Others" into **Speaker 1**, **Speaker 2**, and so on.
+
+This uses a WeSpeaker voice-embedding model (27 MB, runs on your computer) that compares voice segments from the system audio and clusters them. The model is not installed by default. The first time you open a finished meeting with multiple voices on the other side, the app offers to download it:
+
+> "Needs a one-time 27 MB download. It then runs on your machine, and every later meeting is labelled automatically."
+
+Press **Download and identify** and the model downloads, then runs speaker identification on that meeting. After the first download, every later meeting is labelled automatically when the recording stops.
+
+If the model finds only one other voice, no labels are added. One speaker renamed to "Speaker 1" would imply there are others.
+
+You can rename any speaker in the transcript. Click a speaker label and type the person's name.
+
+### When speaker identification is skipped
+
+- The 27 MB model is not installed yet. The app offers to download it.
+- No system audio was captured (macOS without a virtual audio device, for example).
+- The recording was interrupted and the audio file could not be read.
+- There are too few segments from the other side to compare.
+- The model file was corrupt. It is removed and can be downloaded again.
+
+## Asking questions about a meeting
+
+The **Ask** tab on a meeting lets you ask questions about what was said. "What did we decide?", "Did anyone commit to a date?", "What did I miss?" The answers come from the transcript.
+
+This is separate from the assistant. It answers from the transcript only and does not use the assistant's conversation history, profiles, or memory.
+
+For short meetings, the whole transcript fits in the model's context. For long ones, relevant passages are retrieved from the transcript to answer each question.
+
+## Discuss this meeting
+
+The **Discuss this meeting** button opens a [conversation](/assistant/conversation) about the meeting. Unlike the Ask tab, a discussion uses the assistant's full capabilities: its persona, tools, web search, and its own judgement. You can ask it to draft a follow-up email, evaluate what someone said, or think through what to do next.
+
+For short meetings, the full transcript is part of the conversation. For long ones, the notes serve as the map, and the assistant can search and read passages from the transcript as needed.
+
+Past discussions are listed under **Earlier discussions** on the meeting. You can continue one or start a new one.

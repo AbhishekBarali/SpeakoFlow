@@ -1,104 +1,184 @@
 ---
 title: "Troubleshooting"
-description: "Fixes for the most common SpeakoFlow problems: the macOS damaged-app message, blocked microphone or accessibility permissions, text that will not type, Linux hotkey permissions and the floating overlay, and clipped or wrong pastes."
+description: "Fixes for common SpeakoFlow problems: macOS damaged-app message, stale permissions, the globe key, Windows SmartScreen, Linux overlay and hotkey issues, Whisper CPU requirements, model downloads, and more."
 icon: "life-ring"
 ---
 
 Find your symptom and open it.
 
 <AccordionGroup>
-  <Accordion title="macOS says SpeakoFlow is damaged and I should move it to the Trash" icon="apple">
-    The download is fine. Do not delete it. macOS shows that message for any app it cannot trace to a paid Apple Developer account, and SpeakoFlow is not signed yet.
+  <Accordion title={`macOS says SpeakoFlow "is damaged and can't be opened"`} icon="apple">
+    The download is fine. macOS shows this message for any app that is not signed
+    with a paid Apple Developer certificate. SpeakoFlow is not signed yet.
 
-    One Terminal command clears it, once per version you install:
+    One Terminal command clears the block, once per `.dmg` you download:
 
     ```bash
     xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app
     ```
 
-    Full explanation in [Install](/start/install).
+    Then open the app normally. Updates installed from inside the app are not
+    tagged, so they do not need this step. If you download a new `.dmg` by hand,
+    run the command again for that copy.
+
+    More detail in [Install](/start/install).
 
   </Accordion>
 
-  <Accordion title="The Linux AppImage has no icon or app menu entry" icon="linux">
-    Expected. An AppImage is one self-contained file and cannot register an icon or app-menu entry with your desktop, so the file stays generic in your file manager. The icon does appear once the app is running.
-
-    Install the `.deb` instead on Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, or Tuxedo OS. A helper like Gear Lever or AppImageLauncher also adds the integration. Details in [Install](/start/install).
-
-  </Accordion>
-
-  <Accordion title="SpeakoFlow cannot hear my microphone" icon="microphone-slash">
-    Microphone access is blocked at the OS level. Grant it, then restart the app.
-
-    - **Windows**. *Settings → Privacy & security → Microphone*, including desktop-app access.
-    - **macOS**. *System Settings → Privacy & Security → Microphone*.
-    - **Linux**. Your system's sound or privacy settings.
-
-  </Accordion>
-
-<Accordion title="Nothing gets typed after I dictate (macOS)" icon="keyboard">
-  SpeakoFlow needs Accessibility permission to type into other apps. Grant it in
-  *System Settings → Privacy & Security → Accessibility*, then restart the app.
+<Accordion
+  title="macOS permissions stopped working after an update"
+  icon="apple"
+>
+  After an update, macOS sometimes shows SpeakoFlow as allowed under
+  Accessibility, Microphone, or Screen Recording while no longer honoring it. If
+  a permission check in the app keeps waiting even though the toggle is on, go
+  to the relevant section in **System Settings → Privacy & Security**, click
+  **Reset permission** (or remove SpeakoFlow from the list), then add it back
+  and restart the app.
 </Accordion>
 
-<Accordion title="Screen vision does nothing (macOS)" icon="eye-slash">
-  Grant Screen Recording permission in *System Settings → Privacy & Security →
-  Screen Recording*, then restart SpeakoFlow for it to take effect.
+  <Accordion title="The macOS globe key opens the emoji picker instead of dictating" icon="apple">
+    The Fn (globe) key is shared between SpeakoFlow and the system emoji picker.
+    Go to **System Settings → Keyboard** and set **Press 🌐 key to** to **Do
+    Nothing**. SpeakoFlow then gets the key press without interference.
+
+    Macs that were already on the older Option + Space defaults before the Fn
+    defaults shipped keep their Option-based shortcuts after updating. You can
+    switch to the new defaults by clicking the keys in _Settings → Shortcuts_ and
+    choosing "Use default".
+
+  </Accordion>
+
+<Accordion title="Windows SmartScreen warns about the installer" icon="windows">
+  SpeakoFlow's installer is not code-signed yet, so Windows SmartScreen may show
+  a warning the first time you run it. Choose **More info → Run anyway**. This
+  happens once per version.
 </Accordion>
 
-  <Accordion title="The recording overlay will not stay on top of other windows (Linux)" icon="window-restore">
-    The overlay has to float above every other window. On Linux that requires either the `wlr-layer-shell` protocol (wlroots compositors like Sway and Hyprland, and KDE Plasma) or classic X11 "keep above" stacking.
+  <Accordion title="Whisper refuses to run or crashes on startup" icon="microchip">
+    The Whisper engine in SpeakoFlow requires a CPU with AVX2, FMA, F16C, and
+    BMI2 support. Most CPUs made after 2013 have these. If your CPU does not,
+    SpeakoFlow shows a message instead of crashing.
 
-    **Native GNOME/Wayland supports neither.** Mutter deliberately does not implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves above others.
-
-    SpeakoFlow handles this automatically. When it detects GNOME on Wayland it runs under XWayland, where "keep above" works and the overlay floats normally. This is on by default and needs no setup. X11 sessions and KDE or wlroots Wayland already work out of the box and are left on native Wayland.
-
-    Two escape hatches, if you need them:
-
-    - **Force native Wayland anyway**, accepting that the overlay may not stay on top: launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`.
-    - **Disable layer shell**, if the overlay misbehaves under a layer-shell compositor: `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
-
-    Setting `GDK_BACKEND` yourself always wins. SpeakoFlow never overrides an explicit choice.
+    Use a non-Whisper model instead: Parakeet, Canary, or any ONNX-based model
+    in the catalog works on any CPU. You can also use
+    [cloud transcription](/dictation/cloud-transcription).
 
   </Accordion>
 
-  <Accordion title="My hotkeys do nothing and the log repeats PermissionDenied (Linux)" icon="key">
-    If dictation and assistant hotkeys do not respond and your log repeats `rdev grab error: ... PermissionDenied` (errno 13), the app cannot read your input devices. This affects the **handy-keys** keyboard engine, which reads `/dev/input/event*` and needs your user in the `input` group.
+  <Accordion title="A model download failed or stopped" icon="download">
+    Model downloads resume where they stopped. A `.partial` file in the models
+    folder holds the progress. Restart the download from the Models page and it
+    picks up from the last byte.
 
-    Either grant access:
-
-    ```bash
-    sudo usermod -aG input $USER
-    ```
-
-    Then log out and back in, because group membership only applies to new sessions.
-
-    Or switch the keyboard engine to **Tauri** in *Settings → General → Experimental*, which uses the compositor's global-shortcut API and needs no special permissions. Tauri is already the default engine on Linux, so this only affects you if you switched to handy-keys. See [General settings](/settings/general).
+    If the download keeps failing, check your network connection. Downloads fetch
+    eight chunks at once from Hugging Face (or a mirror), so a firewall blocking
+    that host would stop them. The model page shows the download's progress and
+    any error.
 
   </Accordion>
 
-  <Accordion title="The app crashes when I pinch-to-zoom on my touchpad (Linux)" icon="hand">
-    On some Linux setups a trackpad pinch-to-zoom gesture crashes the window, with `Received invalid message: 'DrawingArea_CommitTransientZoom'` in the logs.
+  <Accordion title="Hotkeys do nothing" icon="keyboard">
+    A few things to check:
 
-    This is a bug in **WebKitGTK**, the Linux web engine Tauri uses, not in SpeakoFlow. It affects many WebKitGTK-based apps and is tracked upstream in [tauri#13115](https://github.com/tauri-apps/tauri/issues/13115) and [wry#544](https://github.com/tauri-apps/wry/issues/544).
+    1. **Onboarding finished?** Shortcuts are only registered after you complete
+       the first-run setup. If you skipped it, reopen it from _Settings →
+       General → Show onboarding again_.
+    2. **Another app took the key?** Some apps register the same global shortcut.
+       Try recording a different shortcut in _Settings → Shortcuts_.
+    3. **Linux keyboard engine.** On Linux with the Tauri engine (the default),
+       shortcuts are registered through X11 and may only work while an X11 window
+       has focus under native Wayland. Compositor-owned shortcuts are more
+       reliable. See [Command-line flags](/settings/cli) for examples.
+    4. **Linux input group.** If you switched to the handy-keys engine and the
+       log shows `rdev grab error: PermissionDenied`, add your user to the
+       `input` group and log out:
 
-    Until there is an upstream fix, avoid pinch-to-zoom inside the app window. Updating your system's `webkit2gtk-4.1` packages can also help, since newer releases handle the gesture more gracefully.
+       ```bash
+       sudo usermod -aG input $USER
+       ```
+
+       Or switch the engine back to Tauri in _Settings → Advanced →
+       Experimental_.
+
+  </Accordion>
+
+  <Accordion title="The recording overlay will not stay on top (Linux)" icon="window-restore">
+    The overlay needs to float above every other window. On Linux that requires
+    `wlr-layer-shell` (Sway, Hyprland, KDE Plasma) or X11 "keep above" stacking.
+
+    GNOME on Wayland supports neither. SpeakoFlow detects this and runs under
+    XWayland automatically, where the overlay floats normally. No setup needed.
+
+    Two escape hatches if you need them:
+
+    - Force native Wayland: launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`. The
+      overlay may not stay on top.
+    - Disable layer shell: launch with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1` if the
+      overlay misbehaves under a layer-shell compositor.
+
+    Setting `GDK_BACKEND` yourself always wins.
+
+  </Accordion>
+
+  <Accordion title="The app crashes on a touchpad pinch-to-zoom (Linux)" icon="hand">
+    A crash with `DrawingArea_CommitTransientZoom` in the log is a WebKitGTK bug,
+    not a SpeakoFlow bug. It affects many apps built on WebKitGTK and is tracked
+    in [tauri#13115](https://github.com/tauri-apps/tauri/issues/13115) and
+    [wry#544](https://github.com/tauri-apps/wry/issues/544).
+
+    Avoid pinch-to-zoom inside the app window until there is an upstream fix.
+    Updating your system's `webkit2gtk-4.1` packages can help.
+
+  </Accordion>
+
+  <Accordion title="A meeting only records my side of the call (macOS)" icon="phone">
+    macOS gives apps no direct way to record system audio. Windows has WASAPI
+    loopback and Linux has PulseAudio/PipeWire monitor sources, but a Mac needs a
+    virtual audio device.
+
+    Install a loopback driver like
+    [BlackHole](https://github.com/ExistentialAudio/BlackHole), create a
+    Multi-Output Device in Audio MIDI Setup that sends sound to both your speakers
+    and BlackHole, and make it your output. SpeakoFlow can then record the other
+    side of the call. Your microphone is recorded either way.
+
+  </Accordion>
+
+  <Accordion title="Cloud transcription returns an error" icon="cloud">
+    Check three things:
+
+    1. **API key.** Make sure the key is entered for the right provider in the
+       cloud transcription settings on the Models page.
+    2. **Model.** Some providers have separate model namespaces for transcription.
+       OpenRouter, for example, requires the `vendor/model` slug (like
+       `openai/whisper-large-v3`).
+    3. **Base URL.** For Azure AI Speech, the URL must point to your own resource
+       in a region that supports MAI-Transcribe.
+
+  </Accordion>
+
+  <Accordion title="The assistant's voice is not working in a conversation" icon="volume-xmark">
+    A [conversation](/assistant/conversation) speaks every reply regardless of the
+    "Read answers aloud" switch. If you hear nothing:
+
+    1. Check that a voice is selected on the **Assistant** page under Voice.
+    2. If you use a cloud voice engine (not Kokoro or another local voice), make
+       sure the engine has an API key and the key works.
+    3. On Linux, check that your audio output device is working. The output
+       device in _Settings → Audio_ is for feedback sounds only. The assistant
+       uses the system default output.
 
   </Accordion>
 
   <Accordion title="The wrong text pastes, or my last words get clipped" icon="clipboard">
-    Increase the paste delay and the extra recording buffer in [Debug settings](/settings/debug).
+    Raise the paste delay and the extra recording buffer in
+    [Debug settings](/settings/debug).
 
-    If one specific app misbehaves with clipboard paste, try the **Direct** [paste method](/dictation/output).
-
-  </Accordion>
-
-  <Accordion title="The automatic update failed (Windows)" icon="rotate">
-    Portable installs cannot update automatically.
-
-    Download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your `Data/` folder (settings, models, recordings) from the old version to the new one.
+    If one specific app misbehaves with clipboard paste, try the **Direct**
+    [paste method](/dictation/output).
 
   </Accordion>
 </AccordionGroup>
 
-Still stuck? Open an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues) with your log level raised. See [Debug & advanced](/settings/debug).
+Still stuck? Open an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues) with your log level raised to Debug or Trace. See [Debug & advanced](/settings/debug) for where the log file is.

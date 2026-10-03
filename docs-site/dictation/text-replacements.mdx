@@ -1,30 +1,32 @@
 ---
-title: "Text replacements and spoken emoji"
-description: "Map a spoken phrase to text you use often, and say the name of an emoji to insert it. Covers rule options, magic tokens like [date] and [time], the emoji grammar, and where both passes sit in the dictation pipeline. Both are off by default."
+title: "Text replacements"
+description: "Map a spoken phrase to text you use often, and say the name of an emoji to insert it. Both run locally and are off by default."
 icon: "right-left"
 ---
 
-Two local passes rewrite your transcript before it is inserted. Both are off by default, and neither involves a model or the network.
+Two local passes can rewrite your transcript before it is inserted. Both are off by default, and neither involves a model or the network.
 
-| Pass              | Where                                                       | What it does                                   |
-| ----------------- | ----------------------------------------------------------- | ---------------------------------------------- |
-| Text replacements | _Settings → Dictation → Output options → Text replacements_ | Swaps a phrase you say for text you use often. |
-| Spoken emoji      | _Settings → Dictation → Output options → Spoken emoji_      | Turns "thumbs up emoji" into 👍.               |
+| Pass              | Where                                      | What it does                                   |
+| ----------------- | ------------------------------------------ | ---------------------------------------------- |
+| Text replacements | **Dictionary** page → **Replacements** tab | Swaps a phrase you say for text you use often. |
+| Spoken emoji      | _Settings → Dictation → Extras_            | Turns "thumbs up emoji" into 👍.               |
 
 ## Text replacements
 
-Turn on the master toggle and the rule list appears. Each rule has two fields on the row itself.
+Open the **Dictionary** page from the sidebar and switch to the **Replacements** tab. Turn on the master toggle and the rule list appears.
 
-- **Spoken phrase**. What to look for in the transcript, for example `my email`.
-- **Insert this text**. What to put there instead, for example `alex@example.com`.
+Each rule has two fields on the row itself:
 
-Behind the chevron:
+- **Spoken phrase.** What to look for in the transcript, for example `my email`.
+- **Insert this text.** What to put there instead, for example `alex@example.com`.
 
-- **Regex**. Treat the spoken phrase as a regular expression instead of a literal string.
-- **Trim before**. Also consume whitespace immediately before each match.
-- **Trim after**. Also consume whitespace immediately after each match.
-- **Caps**. `None` (default), `UPPERCASE`, `lowercase`, or `Capitalize`, applied to this rule's output.
-- **Enabled**. On by default. Turn it off to park a rule without deleting it.
+Behind the chevron on each rule:
+
+- **Regex.** Treat the spoken phrase as a regular expression instead of a literal string.
+- **Trim before.** Also consume whitespace immediately before each match.
+- **Trim after.** Also consume whitespace immediately after each match.
+- **Caps.** `None` (default), `UPPERCASE`, `lowercase`, or `Capitalize`, applied to this rule's output.
+- **Enabled.** On by default. Turn it off to park a rule without deleting it.
 
 The whole list exports to and imports from a JSON file.
 
@@ -49,7 +51,7 @@ Transform tokens act on the entire rule output no matter where you put them, and
 
     **Literal matching is case-sensitive.** `my email` will not match "My email". Tick **Regex** and start the pattern with `(?i)` for a case-insensitive match.
 
-    **`$` is literal in the inserted text**, so regex capture groups such as `$1` cannot be referenced. Regex is for matching, not for templating.
+    **`$` is literal in the inserted text**, so regex capture groups like `$1` cannot be referenced. Regex is for matching, not for templating.
 
     **An invalid regex is skipped**, with a warning in the log. It will not break the rest of your rules.
 
@@ -64,14 +66,16 @@ Transform tokens act on the entire rule output no matter where you put them, and
 
 ## Spoken emoji
 
+_Settings → Dictation → Extras → Spoken emoji._
+
 Say "happy emoji" or "thumbs up emoji" to insert 😊 or 👍.
 
-A command is a known emoji name followed by the word "emoji". Both parts are required. The trailing "emoji" is what keeps ordinary words like "happy" or "fire" from silently turning into pictures.
+A command is a known emoji name followed by the word "emoji". Both parts are required. The trailing "emoji" is what keeps ordinary words like "happy" or "fire" from turning into pictures.
 
-Anything it does not recognize is left exactly as transcribed, punctuation and spacing included.
+Anything it does not recognize is left exactly as transcribed.
 
 <AccordionGroup>
-  <Accordion title="How names are matched, and how much slop is tolerated">
+  <Accordion title="How names are matched">
     A name can be one to five words, and longer names win over shorter ones. "Broken heart emoji" gives 💔 rather than matching just "heart".
 
     The trailing keyword is accepted within one edit of "emoji", so "emojii" and "emoj" still work.
@@ -85,4 +89,13 @@ Anything it does not recognize is left exactly as transcribed, punctuation and s
 
 AI cleanup runs first, then spoken emoji, then text replacements, and the text is inserted last.
 
-Emoji expansion sitting after AI cleanup means it works on plain dictation too, not just cleaned-up text. Replacements come last because hand-written, deterministic fix-ups should always win over whatever the model produced.
+Emoji expansion sits after AI cleanup so it works on plain dictation too. Replacements come last because hand-written, deterministic fix-ups should always win over whatever the model produced.
+
+<CardGroup cols={2}>
+  <Card title="Custom words" icon="book" href="/dictation/custom-words">
+    Names and terms SpeakoFlow should always get right.
+  </Card>
+  <Card title="AI cleanup" icon="sparkles" href="/writing/ai-cleanup">
+    Let a model clean up what you said.
+  </Card>
+</CardGroup>

@@ -1,7 +1,7 @@
 {
   "theme": "maple",
   "name": "SpeakoFlow",
-  "description": "Documentation for SpeakoFlow, the free and open-source local voice layer for your desktop: dictation, Generate with Flow, AI cleanup, the assistant, screen vision, memory, profiles, settings, and shortcuts for Windows, macOS, and Linux.",
+  "description": "Documentation for SpeakoFlow, free and open-source voice dictation and an AI assistant for Windows, macOS, and Linux: dictation, AI cleanup, the quick ask, spoken conversations, meetings, screen vision, reminders, memory, models, settings, and shortcuts.",
   "colors": {
     "primary": "#0A7A70",
     "light": "#2DD4BF",
@@ -122,6 +122,7 @@
               "start/install",
               "start/getting-started",
               "start/keyboard-shortcuts",
+              "start/tour",
               "start/how-it-works"
             ]
           },
@@ -130,18 +131,24 @@
             "pages": [
               "dictation/basics",
               "dictation/hands-free",
+              "dictation/undo",
               "dictation/live-transcription",
               "dictation/output",
-              "dictation/overlay"
+              "dictation/overlay",
+              "dictation/cloud-transcription"
             ]
           },
           {
             "group": "Writing with AI",
             "pages": [
-              "writing/generate-with-flow",
               "writing/ai-cleanup",
-              "writing/writing-styles"
+              "writing/writing-styles",
+              "writing/generate-with-flow"
             ]
+          },
+          {
+            "group": "Meetings",
+            "pages": ["meetings/recording", "meetings/notes"]
           }
         ]
       },
@@ -153,6 +160,7 @@
             "group": "The basics",
             "pages": [
               "assistant/panel",
+              "assistant/conversation",
               "assistant/providers",
               "assistant/behavior"
             ]
@@ -162,6 +170,7 @@
             "pages": [
               "assistant/screen-vision",
               "assistant/web-search",
+              "assistant/reminders",
               "assistant/voice-output"
             ]
           },
@@ -170,7 +179,8 @@
             "pages": [
               "personalize/profiles",
               "personalize/memory",
-              "personalize/history"
+              "personalize/history",
+              "personalize/insights"
             ]
           }
         ]

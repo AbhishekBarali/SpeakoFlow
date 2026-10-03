@@ -1,93 +1,100 @@
 ---
 title: "AI cleanup"
-description: "AI cleanup runs a language model over a dictation to strip filler and fix grammar and punctuation, on its own Dictate and clean up shortcut. Covers cleanup strength, fixing misheard words, where the model runs, and the timeout."
+description: "AI cleanup runs a language model over your dictation to follow spoken edits, strip filler, and fix grammar and punctuation. Off by default."
 icon: "pen"
 ---
 
-Speak messy, paste polished. Press _Dictate and clean up_ instead of your normal dictate shortcut, and the text that lands has the filler stripped and the grammar and punctuation fixed.
+Dictation already removes filler words on every recording. AI cleanup goes further: it follows your spoken edits and applies a [writing style](/writing/writing-styles).
 
-| Platform          | Shortcut                     |
-| ----------------- | ---------------------------- |
-| Windows and Linux | `Ctrl` + `Shift` + `Space`   |
-| macOS             | `Option` + `Shift` + `Space` |
+Say "we should meet tomorrow at ten, actually no, eleven, and go over the budget" and get back "We should meet tomorrow at eleven and go over the budget." The "actually no, ten" is gone because the model understood you were correcting yourself.
 
-Cleanup is off by default. Turn it on in _Settings → Dictation → AI cleanup_. It is not hidden behind the Experimental features toggle, and while the cleanup toggle is off that shortcut does nothing at all.
+Cleanup is off until you turn it on. Open the **AI cleanup** page from the sidebar and flip the switch at the top.
 
-Your normal dictate shortcut still pastes raw text, so you choose per recording. Cleanup applies to dictation only, never to the assistant chat.
+## Shortcut
+
+You choose how cleanup runs:
+
+| Mode                           | What happens                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **Its own shortcut** (default) | Your normal dictation shortcut pastes raw text. A separate shortcut, the dictation keys plus Shift, pastes cleaned text. |
+| **Same as dictation**          | Every dictation is cleaned up. The separate shortcut goes away, since the dictation keys already do both.                |
+
+Switch between the two on the **AI cleanup** page under **Shortcut**. When cleanup has its own shortcut, the keys are:
+
+| Platform | Shortcut                           |
+| -------- | ---------------------------------- |
+| Windows  | `Left Ctrl` + `Left Win` + `Shift` |
+| macOS    | `Fn` + `Shift`                     |
+| Linux    | `Ctrl` + `Shift` + `Space`         |
+
+Click the keys on the **AI cleanup** page to change them, the same way you change any shortcut.
 
 <Warning>
-  Cleanup adds a short delay after you speak, because the model runs after
-  transcription. If it fails, times out, or is not configured, your raw text is
+  Cleanup adds a short wait after you speak, because the model runs after
+  transcription. If it fails, times out, or has no model, your raw text is
   pasted instead. You never lose your words.
 </Warning>
 
-## The two controls you will actually touch
+## SpeakoFlow Mini
 
-**Cleanup strength** decides how much gets rewritten.
+SpeakoFlow Mini is a small model trained for one job: turning what you said into clean text. It removes filler words, fixes grammar and punctuation, and follows spoken edits, so "scratch that" or "actually, eleven" does what you meant instead of being typed out.
 
-| Strength               | What it changes                                                                                                         |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Light**              | Spelling, capitalization, punctuation, and obvious filler. Your repetition, sentence order, and exact phrasing survive. |
-| **Balanced** (default) | The above, plus collapsing repeated points and dropping false starts.                                                   |
-| **Aggressive**         | The above, plus tightening rambling, merging fragments, and reordering sentences for clarity.                           |
+It is a 795 MB download, runs on your computer, and handles English. Pick it on the **AI cleanup** page under **Cleanup model**, or from the **Models** page.
 
-All three keep every fact, name, number, date, and request, and all three write in your first-person voice.
+When SpeakoFlow Mini is the cleanup model, the app shows a notice near the prompt editor: "This model is fine-tuned for English dictation cleanup, so it works best on the recommended prompt with no style." The recommended prompt ships with the app, and you can restore it any time.
 
-**Fix misheard words** is off by default. It lets the model replace a word that is clearly wrong for the sentence, like a homophone or a near-miss pronunciation. It stays off by default because it is the one place where cleanup is allowed to guess at your intent. Turn it on if speech-to-text mangles your accent often.
+## Other models
 
-## Tone
+Any local or cloud model can do cleanup instead of SpeakoFlow Mini. Pick one under **Cleanup model** on the **AI cleanup** page. The same providers available for the assistant work here: your own downloaded model, Ollama, LM Studio, or a cloud provider with your API key. See [Providers](/assistant/providers) for the full list.
 
-Pick a **Writing style** to change how the result sounds. The default is `None (cleanup only)`, which fixes the text without changing its voice. Six styles ship with the app and you can save your own: see [Writing styles](/writing/writing-styles).
+On an Apple silicon Mac, **Apple Intelligence** also appears. It runs on-device with no key and no network, and needs macOS Tahoe 26.0 or later with Apple Intelligence enabled in System Settings.
 
-Strength and style are separate dials. Strength decides how much gets tidied away. Style decides how whatever survives sounds.
+If no cleanup model is set up, cleanup borrows your assistant's model automatically. Once the assistant works, cleanup works, with nothing extra to configure.
 
-## Setup and edge cases
+## Cleanup instructions
 
-<AccordionGroup>
-  <Accordion title="Where cleanup runs, and the fallback that means you can skip this">
-    Use the **Where it runs** toggle.
+Two prompts ship with the app:
 
-    - **On my device**. A local model you have downloaded. No key, no network.
-    - **Cloud provider**. Any OpenAI-compatible provider with your own API key. The same list the assistant uses is available here: see [Providers](/assistant/providers).
+| Prompt                            | Purpose                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| **Improve Transcriptions**        | The general-purpose prompt. Works with any model.                              |
+| **SpeakoFlow Mini (recommended)** | The short prompt SpeakoFlow Mini was trained on. Best results with that model. |
 
-    On an Apple Silicon Mac, **Apple Intelligence** also appears in the provider list. It runs fully on-device with no key and no network, and needs macOS Tahoe 26.0 or later with Apple Intelligence enabled in System Settings. If it is not available, cleanup falls back to pasting your raw text rather than failing loudly.
+Open the prompt editor from the **Cleanup instructions** row on the **AI cleanup** page. You can edit either prompt, create your own, switch between them, and restore a shipped prompt to its original text with **Restore recommended**.
 
-    If the provider you selected here is not usable, meaning no model chosen or a cloud provider with no key, cleanup quietly falls back to your [assistant's](/assistant/providers) provider and model instead. That is deliberate. Once the assistant works, cleanup works, with nothing extra to set up.
+Your transcribed text is sent to the model separately, so just write instructions.
 
-  </Accordion>
+## Writing style
 
-  <Accordion title="Editing the cleanup prompt">
-    SpeakoFlow ships one prompt, **Improve Transcriptions**, and it is selected out of the box. You can edit it, add your own, and switch between them. You cannot delete the last remaining prompt, because cleanup needs one to run.
+A writing style changes how the cleaned text reads. It is layered on top of the cleanup prompt, so corrections stay the same and only the register changes. See [Writing styles](/writing/writing-styles).
 
-    Your transcribed text is sent to the model automatically, so just write instructions. For example: *"Fix grammar and punctuation, then rewrite as a polished, professional message."*
+## Timeout and fallback
 
-  </Accordion>
+AI cleanup gets 10 seconds by default. If the model takes longer, your raw transcription is pasted instead.
 
-  <Accordion title="AI cleanup timeout">
-    *Default: 10 seconds. Options: 5, 10, 15, 20, 30, 60.*
+The timeout covers the whole round trip, including the first model load if the engine has been idle. On the built-in local engine, a cold load counts against it, so allow more time if your first cleanup of a session keeps timing out.
 
-    How long to wait before giving up and pasting your raw transcription instead.
+Change the timeout on the **Models** page under your cleanup model's settings. Options are 5, 10, 15, 20, 30, and 60 seconds.
 
-    This is the whole budget, not just the model call. On the built-in local engine, loading the model from disk on first use counts against it, so allow more time if your first cleanup of a session keeps timing out.
+## When cleanup does not run
 
-  </Accordion>
+Cleanup fails soft every time. Your raw transcription is pasted and the dictation completes normally. That happens when:
 
-  <Accordion title="When cleanup does not run">
-    Cleanup fails soft every time. Your raw transcription is pasted and the dictation completes normally. That happens when:
+- No model is configured, and neither is the assistant's.
+- A cloud provider is selected but has no API key.
+- No cleanup prompt is selected, or the selected one is empty.
+- The model returns an error, an unreadable response, or nothing at all.
+- The model runs past the timeout.
+- The output is implausibly long or looks like the model narrating its plan instead of returning cleaned text.
 
-    - no provider is configured, or the selected one has no model, and neither does the assistant fallback
-    - a cloud provider is selected but has no API key
-    - no cleanup prompt is selected, or the selected one is empty
-    - the provider returns an error, an unreadable response, or nothing at all
-    - the model runs past the timeout
+History records both versions of a cleaned dictation, so you can compare the original transcription with the final text.
 
-    History records both versions of a cleaned dictation, so you can always compare the original transcription with the final text.
+## Model unload
 
-  </Accordion>
-</AccordionGroup>
+The cleanup engine runs on its own process, separate from the assistant. After 15 minutes of inactivity it unloads the model to free memory. The next cleanup reloads it. Change this on the **Models** page under your cleanup model's settings if your machine is tight on RAM.
 
 <Note>
   Cleanup and [Generate with Flow](/writing/generate-with-flow) are separate
   paths on separate shortcuts. Cleanup never runs over Flow output, and Flow
-  never triggers on the *Dictate and clean up* shortcut.
+  never triggers on the cleanup shortcut.
 </Note>

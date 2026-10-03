@@ -1,0 +1,80 @@
+---
+title: "Recording a meeting"
+sidebarTitle: "Recording"
+description: "Record a call with live transcription that separates what you said from what the other side said. Works with any meeting app, no bot joins."
+icon: "circle-dot"
+---
+
+<Note>
+  Meetings is in beta. The feature works and recordings are kept, but details
+  may change.
+</Note>
+
+Open the **Meetings** page from the sidebar and press **Start recording** before a call. SpeakoFlow records your microphone and your computer's audio as two separate streams, so it always knows which words were yours and which came from the other side.
+
+No bot joins the meeting. It works with any app that uses your microphone: Zoom, Teams, Meet, Discord, Slack, a browser tab, or anything else.
+
+## What you see while recording
+
+A live transcript appears on the **Meetings** page as people speak. Your words are labelled **You** and the other side is labelled **Others**. After the call, speaker identification can split "Others" into Speaker 1, Speaker 2, and so on (see [Notes](/meetings/notes)).
+
+Two level meters on the recorder card show whether both streams are capturing. If the system-audio meter stays flat, the other side's audio is not reaching the app. See the platform notes below.
+
+While recording, you can **Pause** to stop the capture and **Resume** to pick it up again. Press **Stop** to end the recording. Stopping can take a moment on a long meeting while the last chunks are transcribed.
+
+## Platform notes
+
+### Windows
+
+Windows captures the other side of the call through WASAPI loopback. No setup is needed.
+
+**Offer to record calls.** On Windows, SpeakoFlow can notice when another app starts using your microphone and offer to record. It never starts on its own. You see a card with "You seem to be on a call. Record it?" and you accept or dismiss it. Turn this on under the **Offer to record calls** toggle on the **Meetings** page. If it guesses wrong, just dismiss the card.
+
+A **floating indicator** option puts a small pill on screen while a meeting records. Click it for the live transcript. Turn it off to keep your screen clear; the recording stays on the Meetings page and you stop it from there.
+
+### macOS
+
+macOS gives apps no direct way to record the sound your computer plays. You need a virtual audio device in between.
+
+<Steps>
+  <Step title="Install a loopback driver">
+    Install [BlackHole](https://github.com/ExistentialAudio/BlackHole) or
+    another virtual audio device.
+  </Step>
+  <Step title="Create a Multi-Output Device">
+    Open Audio MIDI Setup, create a Multi-Output Device that sends sound to both
+    your speakers (or headphones) and BlackHole, and set it as your system
+    output.
+  </Step>
+  <Step title="Record">
+    SpeakoFlow can now capture the other side of the call through the BlackHole
+    device. Your microphone is recorded either way.
+  </Step>
+</Steps>
+
+Without this setup, the meeting records only your side. The Meetings page shows a notice when system audio is unavailable.
+
+### Linux
+
+Linux captures the other side through your PulseAudio or PipeWire monitor source. No extra setup is usually needed, but the monitor device must be available.
+
+## Models and settings on the Meetings page
+
+Below the recorder, the **Meetings** page shows two model pickers:
+
+| Setting            | What it does                                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| **Transcribed by** | The model that writes the live transcript. This is your speech-to-text model, the same one dictation uses.       |
+| **Notes by**       | The model that writes the notes, the title, and answers questions about a meeting. This is your assistant model. |
+
+Change either by clicking the picker. They go to the same model pages as dictation and the assistant, so there is nothing extra to set up.
+
+## Quitting mid-recording
+
+If the app quits while a meeting is recording, SpeakoFlow saves the audio and transcript it has so far. The next time the app starts, it reconciles the interrupted meeting: the recording appears in the list with an **Interrupted** status, and whatever was transcribed before the quit is kept. The WAV files are written before the quit, so the audio is not lost.
+
+## Call detection (Windows only)
+
+Call detection asks the operating system whether another process is holding the microphone open right now. It does not check app names. A browser in a Meet call holds a capture session; the same browser playing a video does not. The detection fires a suggestion you accept or dismiss. It never starts recording on its own.
+
+On macOS and Linux, call detection is not available. The Meetings page says so: "Call detection is only available on Windows so far. On this system, start a meeting yourself."

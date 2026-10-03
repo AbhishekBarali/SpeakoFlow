@@ -1,39 +1,51 @@
 ---
 title: "Custom words"
-description: 'Teach SpeakoFlow to spell names, products, and phrases your way so dictation stops writing "Coco row" when you say Kokoro. Covers where to add custom words and how to tune the correction threshold.'
+description: "Teach SpeakoFlow the names and terms it keeps getting wrong. Add words by hand, or let Windows learn them when you correct a mistake."
 icon: "book"
 ---
 
-Teach SpeakoFlow to spell names, products, and phrases your way.
+The **Dictionary** page has two tabs: **Your words** and **Replacements**. Custom words live on the first tab. Text replacements have [their own page](/dictation/text-replacements).
 
-Add them in _Settings → Dictation → Output options → Custom words_. Type a name, term, or short phrase and press Add. Add `Kokoro` if it keeps writing "Coco row."
+Open it from the sidebar.
+
+## Adding a word
+
+Type a name, term, or spelling into the input at the top and press **Add**. Add `Kokoro` if it keeps writing "Coco row".
 
 Entries are capped at 50 characters. The characters `<`, `>`, `"` and `'` are stripped, and duplicates are rejected regardless of case.
 
-## Two ways it gets applied
+Each word appears as a chip you can remove with a click.
 
-Which mechanism you get depends on the engine behind your model.
+## How custom words reach the model
 
-| Model family       | How custom words are used                                                                                  |
-| ------------------ | ---------------------------------------------------------------------------------------------------------- |
-| Whisper family     | Sent as the decoder's initial prompt, biasing recognition while you speak. Nothing is rewritten afterward. |
-| Every other engine | A fuzzy correction pass over the finished transcript.                                                      |
+Which mechanism fires depends on the engine running your speech model.
 
-The Whisper route tends to be more accurate, because nothing has to be guessed after the fact.
+| Engine             | How words are used                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Whisper family     | Sent as the decoder's initial prompt, biasing recognition while you speak. Nothing is rewritten afterwards. |
+| Every other engine | A fuzzy correction pass runs over the finished transcript.                                                  |
+
+The Whisper route tends to be more accurate, because the model hears the bias before it decides. Every other engine gets a post-hoc rewrite, which is still good but has to guess.
+
+### Cloud speech-to-text
+
+When you dictate through a cloud provider, custom words are forwarded as provider-native biasing if **Send my custom words** is on (it is by default). ElevenLabs receives them as key terms, OpenAI and Groq as a prompt, and Deepgram as key terms.
+
+When the words are sent to the cloud, the app's own fuzzy correction pass is skipped, because running a second pass over text the model already biased can only corrupt it. If your provider accepts the field but ignores it, turn the setting off so the local pass takes over instead.
 
 <Tip>
-  Custom words are strongest for non-Western names and specialized vocabulary.
-  If you dictate Nepali, Indian, or other South Asian names often, pair a
-  Whisper model with a custom-word list.
+  Custom words help most with non-Western names and specialized vocabulary. If
+  you dictate Nepali, Indian, or other South Asian names often, pair a Whisper
+  model with a custom-word list.
 </Tip>
 
-## Sensitivity
+## Word correction threshold
 
 _Settings → Debug → Word correction threshold. Range 0.0 to 1.0. Default: 0.18._
 
-This is the highest score a fuzzy match may have and still be accepted, so **lower is stricter**. Raise it if a term you added is being ignored. Lower it if unrelated words are being replaced.
+This controls how aggressively the fuzzy pass rewrites your transcript. Lower is stricter. Raise it if a term you added is being ignored. Lower it if unrelated words are being replaced.
 
-The Debug section only appears once debug mode is on: `Ctrl+Shift+D`, or `Cmd+Shift+D` on macOS.
+The Debug tab only appears once debug mode is on: press `Ctrl+Shift+D` (or `Cmd+Shift+D` on macOS).
 
 <AccordionGroup>
   <Accordion title="Why 0.18 is the default">
@@ -45,23 +57,47 @@ The Debug section only appears once debug mode is on: `Ctrl+Shift+D`, or `Cmd+Sh
 
     A candidate has to be within about 25% of the custom word's length before it is even considered, so `openai` cannot swallow "openaigpt".
 
-    The pass keeps what surrounds the match. The case pattern of the first word carries over (`HELLO` gives `WORLD`, `Hello` gives `World`), and leading or trailing punctuation is preserved.
-
-    A word containing `&` gets a second matching form with the ampersand spelled out, so `R&D` matches whether you say "R and D" or it comes back as "R&D".
-
-  </Accordion>
-
-  <Accordion title="Filler removal always runs, and has no setting">
-    Fillers such as "um", "uh", and "hmm" are stripped, and a word stuttered three or more times is collapsed to one.
-
-    The filler list is chosen from your app language, because some of those tokens are real words elsewhere. Portuguese "um" means "a" and Spanish "ha" means "has", so they are only treated as fillers in languages where they genuinely are.
+    The case pattern of the first word carries over (`HELLO` gives `WORLD`, `Hello` gives `World`), and leading or trailing punctuation is preserved. A word containing `&` gets a second matching form with the ampersand spelled out, so `R&D` matches whether you say "R and D" or it comes back as "R&D".
 
   </Accordion>
 
   <Accordion title="What Generate with Flow adds">
-    When Generate with Flow is enabled, `SpeakoFlow` is added to the recognition list automatically.
+    When Generate with Flow is on, `SpeakoFlow` is added to the recognition list automatically.
 
     The activation phrase itself is left out of the fuzzy pass on purpose. Correction runs over the whole transcript, and "Hey Flow" would rewrite ordinary speech like "hey flaw". Flow matches its own leading phrase separately.
 
   </Accordion>
 </AccordionGroup>
+
+## Learn words I correct
+
+Below the word list, a toggle called **Learn words I correct** teaches SpeakoFlow from your own edits.
+
+When it is on, the app reads only the field it just typed into, for about a minute after each paste. If you fix a word SpeakoFlow got wrong, that correction appears in a **Learned from your corrections** list on the same page.
+
+Learned words are guesses. Each one has two actions:
+
+- **Tick** to promote it into your own custom words, where it stays permanently.
+- **Remove** to forget it.
+
+The oldest entries are dropped past 200. Clearing the whole list is one click.
+
+<Note>
+  Learning from corrections is only available on Windows. macOS and Linux show a
+  note instead of the toggle. You can still add words by hand.
+</Note>
+
+The feature uses Windows UI Automation to read the focused control. It never enumerates windows, never reads a control the app did not just write to, and never sends anything anywhere.
+
+<CardGroup cols={2}>
+  <Card
+    title="Text replacements"
+    icon="right-left"
+    href="/dictation/text-replacements"
+  >
+    Map a spoken phrase to text you type often.
+  </Card>
+  <Card title="Languages" icon="language" href="/models/languages">
+    Which model for which languages.
+  </Card>
+</CardGroup>

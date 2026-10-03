@@ -1,68 +1,70 @@
 ---
-title: "Custom models"
-description: "Search Hugging Face from inside SpeakoFlow and download any GGUF model to use as your local assistant, including vision-capable ones. Covers choosing a quantization and what the Include screen vision toggle does."
+title: "Models you already have"
+description: "Add a .gguf or Whisper .bin file, or link a folder, and every model inside shows up in SpeakoFlow without downloading anything. Covers classification, folder scanning, and using Ollama or LM Studio."
 icon: "box"
+sidebarTitle: "Your own models"
 ---
 
-You can pull any GGUF model from Hugging Face and run it as your local assistant model.
+You can register models you already have on disk so they show up in SpeakoFlow without re-downloading them. Nothing is copied or moved.
 
-Go to _Settings → Assistant → Browse and download models_, then choose **Browse Hugging Face**.
+Two ways in, one result:
 
-<Note>
-  This is for **assistant** models only. Speech-to-text uses the curated catalog
-  in [Transcription models](/models/transcription-models), and there is no
-  equivalent search for it.
-</Note>
+| Method               | What happens                                                                      |
+| -------------------- | --------------------------------------------------------------------------------- |
+| **Add a model file** | Pick a single `.gguf` or `.bin` file.                                             |
+| **Link a folder**    | Point at a folder. SpeakoFlow scans it recursively and adds every model it finds. |
 
-<Steps>
-  <Step title="Find a repository">
-    The dialog opens on the most-downloaded GGUF repositories. Type to search by model or creator. Results are ordered by downloads and capped at 25.
+Both are available from the **Models** page in the sidebar, through the **Add a model file** button.
 
-    Each result shows download and like counts, plus a **Vision** badge when the repository's tags mark it as multimodal.
+## Adding a single file
 
-  </Step>
+Click **Add a model file** and pick a `.gguf` or Whisper `.bin` from a file dialog. The model appears in the appropriate tab (Speech to text, AI cleanup, or Assistant) based on what the file contains.
 
-  <Step title="Choose a quantization">
-    Open a repository and SpeakoFlow lists its downloadable `.gguf` files, smallest first, with the quantization label pulled out of each filename.
+## Linking a folder
 
-    **Q4_K_M** is flagged as recommended. It is usually the best balance of quality, speed, and memory.
+Click **Link a folder** and pick any folder. SpeakoFlow scans it, including subfolders, and adds every model file it finds. You can link as many folders as you like.
 
-  </Step>
+Folders are scanned up to 5 levels deep and up to 20,000 entries. Symlink loops are detected and skipped.
 
-  <Step title="Optionally include screen vision">
-    If the repository ships a multimodal projector (`mmproj-*.gguf`), an **Include screen vision** toggle appears, on by default. It downloads that extra file alongside the weights so the model can read images, which is what [Screen vision](/assistant/screen-vision) needs.
+### What happens when the folder changes
 
-    The toggle does not appear at all when the repository has no projector.
+Folder contents are re-derived on every scan, not stored. A model added to a linked folder appears on its own. A model deleted from it disappears on its own.
 
-  </Step>
+### Removing a linked folder
 
-  <Step title="Download">
-    The model is added to your catalog immediately and the download starts in the background, so you can close the dialog and watch progress on the model card.
-  </Step>
-</Steps>
+A model that came from a folder scan cannot be removed individually, because the next scan would add it right back. Remove the folder link instead, and all its models disappear.
 
-Downloaded custom models appear under **Your models** in the assistant's model list, and are deletable like any other.
+Individually picked files can be removed one at a time.
 
-<Warning>
-  Custom models are not officially supported. Hardware needs and compatibility
-  vary from model to model, and a model that downloads fine can still fail to
-  load or answer badly.
-</Warning>
+## How models are classified
 
-<AccordionGroup>
-  <Accordion title="Which files in a repository are offered">
-    Only files at the top level of the repository, since those are the ones that can be downloaded directly. Importance-matrix files are filtered out because they are not loadable models.
+SpeakoFlow classifies by content, not by filename.
 
-    When a repository has several projectors, the higher-precision one is preferred automatically.
+- **`.gguf` files.** The `general.architecture` value is read from the GGUF header. An architecture in the known speech list (whisper, parakeet, canary, moonshine, cohere, voxtral, sensevoice, gigaam, granite speech, and others) is classified as speech-to-text. A `clip` or `mmproj` architecture is a vision projector. Anything else is treated as a chat model (assistant or cleanup).
+- **`.bin` files.** Validated against the ggml magic bytes. If they match, the file is treated as a Whisper model.
+- **Vision projectors.** A projector on its own is rejected when picked as a single file, because it cannot run alone. But if it sits beside a chat model in the same folder, it is paired automatically, and the chat model gains vision.
 
-  </Accordion>
+An unknown architecture in a `.gguf` is far more likely to be a new chat model than a broken file, so it defaults to chat. This means your collection of fine-tuned chat models should just work.
 
-  <Accordion title="How a custom model is remembered">
-    SpeakoFlow records where each one came from (repository, download URL, and projector) in a `custom_models.json` file next to the models. It can re-download one later instead of leaving you with an anonymous `.gguf` on disk.
+## What "delete" does
 
-    Downloads use the same resumable, retrying path as the built-in models.
+Deleting a registered model only unregisters it. The file stays on disk. These files are not SpeakoFlow's, so the app never moves or removes them.
 
-  </Accordion>
-</AccordionGroup>
+## Using Ollama or LM Studio
 
-See [Models and providers](/assistant/providers) for how a local model fits into the assistant.
+If you already run an Ollama or LM Studio server, you can use it for the assistant and AI cleanup without registering any files. Set the provider on the **Assistant** page or the **AI cleanup** page and point it at your server's address.
+
+See [Providers](/assistant/providers) for setup details.
+
+<CardGroup cols={2}>
+  <Card
+    title="Transcription models"
+    icon="microchip"
+    href="/models/transcription-models"
+  >
+    The built-in catalog and recommended models.
+  </Card>
+  <Card title="Providers" icon="globe" href="/assistant/providers">
+    Cloud and local server providers for the assistant.
+  </Card>
+</CardGroup>

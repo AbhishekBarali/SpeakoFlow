@@ -1,80 +1,71 @@
 ---
 title: "The recording overlay"
-description: "The small on-screen indicator that shows SpeakoFlow is listening. This page covers the Auto, None, Minimal, and Live styles, the per-platform position defaults, and why the overlay is hidden by default on Linux."
+description: "The on-screen indicator that shows SpeakoFlow is listening. Covers the None, Minimal, and Live styles, position, the working indicator, and platform behavior."
 icon: "window-maximize"
 ---
 
-A small on-screen indicator that shows SpeakoFlow is listening, so you are never guessing whether it heard you. It appears on the monitor your mouse cursor is on.
+A small on-screen indicator that shows SpeakoFlow is recording, so you never have to guess whether it heard you. It appears on the monitor your mouse cursor is on.
+
+All overlay settings live in _Settings → Dictation → Dictation overlay_.
 
 ## Overlay style
 
-_Settings → General → Overlay → Overlay._
+| Style          | What you see                                                                        | Streaming         |
+| -------------- | ----------------------------------------------------------------------------------- | ----------------- |
+| Auto (default) | Follows the model: Live when it can stream, Minimal when it cannot.                 | Follows the model |
+| Live           | A readable card showing the running transcript. Interactive: scroll, select, copy.  | On                |
+| Minimal        | A compact pill: a waveform while you speak, a working indicator while it processes. | Off               |
+| None           | No overlay.                                                                         | Off               |
 
-| Style     | What you see                                                            | Streaming         |
-| --------- | ----------------------------------------------------------------------- | ----------------- |
-| `Auto`    | Follows the model: `Live` when it can stream, `Minimal` when it cannot. | Follows the model |
-| `Live`    | An enlarged, readable card (400 × 120) showing the running transcript.  | On                |
-| `Minimal` | A compact pill: a waveform while you speak, a spinner while it works.   | Off               |
-| `None`    | No overlay.                                                             | Off               |
+A fresh install is on Auto, which is why you get the live card without configuring anything. Auto resolves to a concrete option based on the selected model. Picking any option writes that choice and overrides Auto.
 
-A fresh install is on `Auto`, which is why you get the live card without configuring anything. See [Live vs. batch transcription](/dictation/live-transcription).
+If Live is selected but the model cannot stream, the overlay falls back to Minimal. A non-streaming model never shows an empty live card.
 
-## Overlay position
+## Position
 
-_Settings → General → Overlay → Overlay position._
+Six positions: Top, Top left, Top right, Bottom (default), Bottom left, Bottom right. A screen-map picker in the settings shows where each sits. Setting the position to None hides the overlay.
 
-| Platform | Default position                 |
-| -------- | -------------------------------- |
-| Windows  | `Bottom`                         |
-| macOS    | `Bottom`                         |
-| Linux    | `None`, so the overlay is hidden |
+## Keep finished text on screen
 
-The other choices are `Top` and `None`. Setting _either_ the style or the position to `None` hides the overlay, because they are checked independently.
+When using the Live card, you can choose how long it stays after a dictation finishes, so you can read or copy what was typed. Options: Briefly (1 second, the default), Standard (3 seconds), Longer (6 seconds), Much longer (10 seconds). Hovering over the card holds it open regardless of this setting. This row only appears while the Live card is the active style.
 
-Linux defaults to `None` because a native GNOME/Wayland session gives an app no reliable way to float a window above everything else. Set it to `Bottom` or `Top` if your compositor handles it.
+## The compact pill
 
-<Note>
-  This one style setting governs the overlay for assistant voice turns too. A
-  separate assistant overlay style exists in the settings file, but nothing
-  reads it in the current build and there is no control for it, so changing it
-  has no effect.
-</Note>
+The minimal style shows a small pill. While recording, it displays a waveform. After you stop, a working indicator fills forward while the model transcribes. If AI cleanup runs, the fill continues for the cleanup pass. The fill is calibrated from this machine's own history, not a fixed animation, so it tracks how long the work actually takes.
 
-## Details
+There is no completion tick. A full, still row is the ending, because the pasted text is the real confirmation. The waveform freezes on that row while the pill fades.
+
+The pill holds briefly after the fill finishes so the run-out is visible, then fades.
+
+## The live card
+
+The live card shows committed and tentative text in two shades as you speak. After the recording stops, it shows the final text for as long as the linger setting allows. You can scroll back through the text, select a phrase, and copy it.
+
+See [Live transcription](/dictation/live-transcription) for which models stream and how cloud streaming works.
+
+## Stays on top, never takes focus
+
+The overlay stays above other windows for the entire recording. It never takes keyboard focus from the app you are dictating into. On Windows this is `WS_EX_NOACTIVATE`; on macOS a non-key panel; on Wayland compositors with layer-shell support, a surface with no keyboard mode.
+
+When a conversation is active, the recording overlay rises above the conversation bar so it does not cover the controls.
+
+## Overlay states
+
+| State                       | Meaning                                          |
+| --------------------------- | ------------------------------------------------ |
+| "Getting mic ready..."      | Recording started but no audio has arrived yet.  |
+| Waveform                    | Recording.                                       |
+| "Transcribing..."           | Recording stopped, the model is running.         |
+| "Cleaning up..."            | AI cleanup is running.                           |
+| "Writing with Flow..."      | A Generate with Flow command is being generated. |
+| "Looking at your screen..." | A screen capture is being taken for Flow.        |
+
+A short notice appears when something did not work, for example "Flow needs an assistant model, pasted as dictation." It auto-hides after a moment.
 
 <AccordionGroup>
-  <Accordion title="How Auto behaves, and when Live is ignored">
-    `Auto` is not offered in the dropdown. The dropdown shows you which option `Auto` currently resolves to, and picking anything writes a concrete value that overrides `Auto` from then on.
-
-    `Live` is only honored on a model that natively streams. On any other model it degrades to `Minimal`, so a batch model never shows an empty live window even if `Live` was explicitly chosen.
-
+  <Accordion title="Cancelling from the overlay">
+    The overlay has no cancel button. To abandon a recording, press Esc (the default Cancel shortcut on Windows and macOS). See [Hold or tap](/dictation/hands-free) for more on cancelling.
   </Accordion>
-
-  <Accordion title="What each overlay state means">
-    | State | Meaning |
-    | --- | --- |
-    | *Getting mic ready…* | Recording started but no audio has arrived yet. Wait for the waveform before speaking. |
-    | Waveform | Recording. A calmer, larger wave means the recording is hands-free. |
-    | *Transcribing…* | Recording stopped, the model is running. |
-    | *Processing…* | AI cleanup or another post-transcription step is running. |
-    | *Writing with Flow…* | A Generate with Flow command is being generated. |
-    | *Looking at your screen…* | A screen capture is being taken for Flow. |
-
-    A short notice appears when something did not work, for example *"Flow needs an assistant model, pasted as dictation."* It auto-hides after a moment.
-
-  </Accordion>
-
-<Accordion title="There is no cancel button">
-  To abandon a recording, use the Cancel shortcut. It has no default binding,
-  because a global `Esc` would swallow `Esc` presses meant for other apps. Bind
-  a key for it in *Settings → General → Recording*.
-</Accordion>
-
-<Accordion title="Why it never flashes in the wrong place">
-  The overlay is re-centered for whichever size the current state needs before
-  it is shown, so a switch between the pill and the live card does not leave it
-  briefly misplaced.
-</Accordion>
 
   <Accordion title="Linux: keeping the overlay on top">
     On a native GNOME/Wayland session the overlay cannot stay above other windows. Mutter does not implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves.

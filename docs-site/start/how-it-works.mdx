@@ -1,55 +1,65 @@
 ---
 title: "How SpeakoFlow works"
-description: "The mental model behind SpeakoFlow: one hotkey layer over the app you are already in, a dictation pipeline that runs entirely on your machine, and an assistant you can run offline, on your own server, or in the cloud."
+description: "How dictation, the assistant, and conversations work under the hood: what runs on your machine, what touches the network, and where your data goes."
 icon: "diagram-project"
 ---
 
 SpeakoFlow sits in your system tray and does nothing until you press a shortcut. You never switch to it to dictate. It is a layer over whatever app you are already in.
 
-Three jobs live under that layer.
-
-- **[Dictation](/dictation/basics)**. Local speech-to-text, typed into the active app.
-- **[Generate with Flow](/writing/generate-with-flow)**. Start a dictation with an activation phrase and the AI writes the finished result.
-- **[The assistant](/assistant/panel)**. A floating panel you summon to ask questions by voice or text.
-
 ## The dictation pipeline
 
 <Steps>
-  <Step title="Your microphone" icon="microphone">
-    Audio is captured from the input device you picked in [General settings](/settings/general).
+  <Step title="Microphone" icon="microphone">
+    Audio is captured from the input device you picked in _Settings → Audio_.
   </Step>
 
-<Step title="Voice-activity detection" icon="filter">
-  Silero VAD filters out silence, so pauses while you think don't become gaps in
-  your text.
+<Step title="Voice activity detection" icon="filter">
+  Silero VAD filters out silence, so pauses while you think do not become gaps
+  in your text.
 </Step>
 
-<Step title="Speech-to-text, on your hardware" icon="microchip">
-  whisper.cpp or Parakeet runs the model on your GPU, or your CPU if no GPU is
-  available. See [Acceleration & GPU](/models/acceleration).
+  <Step title="Speech to text" icon="microchip">
+    A local model (Parakeet, Whisper, Nemotron, or one of the other 65 in the catalog) turns the audio into text, using your GPU or your CPU. See [Acceleration](/models/acceleration).
+
+    If you pick a [cloud speech service](/dictation/cloud-transcription) instead, the audio is sent to that provider. Nothing else in the pipeline changes.
+
+  </Step>
+
+<Step title="AI cleanup (optional)" icon="wand-magic-sparkles">
+  When [AI cleanup](/writing/ai-cleanup) is on, the transcript is handed to a
+  language model that removes filler, fixes grammar, and follows spoken edits.
+  This runs on whichever model you chose for cleanup: the built-in engine (fully
+  local), your own Ollama or LM Studio server, or a cloud provider.
 </Step>
 
   <Step title="Text into the active app" icon="clipboard">
-    Inserted via the clipboard or typed directly. See [Output & pasting](/dictation/output).
+    The finished text is pasted at your cursor via the clipboard, or typed directly. See [Output](/dictation/output).
   </Step>
 </Steps>
 
-Nothing in that chain touches the network.
+With a local speech model and the built-in cleanup engine, nothing in that chain touches the network.
 
-Two things can add a network hop after it, and both are opt-in: [AI cleanup](/writing/ai-cleanup) and [Generate with Flow](/writing/generate-with-flow). They hand the text to whichever model provider you configured, which may be the fully local built-in engine.
+## The assistant
 
-## What the assistant does with a question
+When you ask the assistant a question (the [quick ask](/assistant/panel)), the question goes to whichever model you chose:
 
-An assistant turn is not a single request. The model gets a small set of tools, web search and the current date and time, and decides for itself whether it needs them. The loop is bounded, so a turn can't run away. With web search off, the tool isn't offered at all and the assistant answers from what it knows.
+- **Built-in engine.** A local llama.cpp process. No key, no network.
+- **A local server.** Ollama or LM Studio on your own machine.
+- **A cloud provider.** Your own API key for OpenAI, Anthropic, Google, or any OpenAI-compatible endpoint. See [Providers](/assistant/providers).
 
-[Screen vision](/assistant/screen-vision) works the same way. Nothing is captured unless you ask for it.
+The model gets a small set of tools (the current date and time, plus [web search](/assistant/web-search) and [screen capture](/assistant/screen-vision) if you turned them on) and decides per question whether it needs them. The loop is bounded, so a turn cannot run away.
 
-## Where things run
+The quick ask is one question and one answer, with Copy, Insert, or Replace. [Conversations](/assistant/conversation) are the longer-form mode: you talk, the assistant answers out loud, and you can go back and forth hands-free.
 
-Speech-to-text is always local. The assistant is where you choose your comfort level, in _Settings → Assistant_.
+## What stays local, what goes to the cloud
 
-- **Built-in**. A small local model, fully on your machine. No key, no network.
-- **Local server**. Ollama or LM Studio on your own machine.
-- **Cloud**. Your own API key for any OpenAI-compatible provider.
+| Data                | Local model                                                       | Cloud provider                                                                 |
+| ------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Voice recordings    | Processed on your machine. Never uploaded.                        | Sent to the speech service you chose.                                          |
+| Transcripts         | Stay on your machine.                                             | Stay on your machine after the response.                                       |
+| Assistant questions | Processed on your machine.                                        | Sent to the provider, along with any selected text.                            |
+| Screenshots         | Captured and discarded locally if the model does not ask for one. | Sent to the provider only when the model asks for one and screen vision is on. |
+| Web search queries  | Not applicable.                                                   | Sent to the search provider you chose.                                         |
+| Memory              | Stored on your machine. Never uploaded.                           | Used in the prompt sent to the provider, if memory is on.                      |
 
-See [Models and providers](/assistant/providers) to set this up, and [Privacy](/reference/privacy) for exactly what is stored and where.
+There is no telemetry, no analytics, and no account. More detail is in [Privacy](/reference/privacy).

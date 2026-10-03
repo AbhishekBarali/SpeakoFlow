@@ -1,130 +1,99 @@
 ---
-title: "Voice output (TTS)"
-description: "Have the SpeakoFlow assistant read its replies aloud during a call, free and local with Kokoro or Kitten, or through OpenAI-compatible, OpenRouter, ElevenLabs, or Azure AI Speech voices. Covers where the local voice runs, voices, precision, and playback speed."
+title: "Voice output"
+description: "Have the assistant speak its replies, locally with Kokoro, Kitten, Pocket TTS, or Supertonic, or through a cloud voice. Covers where each voice runs, downloads, volume, and the spoken-replies toggle."
 icon: "volume-high"
 ---
 
-Only a hands-free call speaks. A quick ask always answers in text, because you read that answer and dismiss it. _Speak responses aloud_ in _Settings → Assistant → Voice output_ sets whether a new call starts with its speaker on, and the headphones button in the call changes it for that call.
+A [conversation](/assistant/conversation) always speaks its replies. The quick ask answers in text only. **Speak responses aloud** on the **Assistant** page sets whether a new conversation starts with its speaker on, and the headphones button in the conversation changes it for that session.
 
-It runs locally and free with Kokoro or Kitten, or through a cloud voice with your own key. With speech on, the assistant is also told to write speech-friendly prose: short sentences, no tables or headings, because a Markdown table read aloud is gibberish.
+When speech is on, the assistant is also told to write speech-friendly prose: short sentences, no tables or headings, because a Markdown table read aloud is gibberish.
 
-## Hands-free conversation
+## Local voices
 
-Open the expanded assistant panel and click the **Conversation** waveform button in the header. The microphone stays open: speak, pause, and the assistant replies automatically. Speak again to interrupt its reply. Conversation uses your selected transcription model, assistant provider, profile, and voice engine, and keeps the same chat history.
+Four voices run on your computer. They are downloaded from the **Models** page under the voice tab. Nothing ships in the installer.
 
-- **Mute** closes the microphone only. The assistant keeps talking, so you can mute a reply you want to hear to the end without it hearing the room. **Unmute** opens the microphone again.
-- The **headphones** button next to it turns the sound off both ways: nothing is heard and nothing is spoken, and a reply in progress stops. It holds the microphone shut while it is on, and turning it off hands the microphone back to whatever Mute was set to.
-- Collapse to the small orb pill or hide the panel and keep talking. The microphone stays active until **End**, Escape, starting a dictation, or turning off the assistant. The pill keeps all three controls within reach. Your transcript stays available.
-- Small windows show an orb and simple controls. Larger windows also show a reply preview. The transcript button opens the full conversation and expands the window to give it room.
-- Change profiles from the picker above the orb at any time. The new profile applies to the next reply, using the same settings as regular assistant chat.
-- Under **Conversation options**, **Time to finish speaking** adjusts turn detection: Quick (450 ms), Natural (700 ms), or Patient (1.1 seconds). Choose Patient if you tend to pause mid-sentence.
+All four share one engine (sherpa-onnx, 7 to 12 MB depending on your platform). The engine downloads with the first voice pack and is removed when you delete the last one. Nothing loads until a voice speaks, and it unloads after three minutes of quiet. Only one engine is loaded at a time.
 
-Conversation honors the active profile’s response-length preference, or the global assistant setting when the profile inherits it. With no explicit preference, replies default to one to three short sentences. Ask for detail when you want a longer answer. This mode enables speech for the session without changing the saved _Speak responses aloud_ switch. Ordinary spoken assistant replies also default to a short paragraph when no response-length preference is selected.
-
-Voice detection runs on your device using a bundled Silero model. The microphone requests echo cancellation and noise suppression; all conversation speech plays through the browser audio engine so echo cancellation can use it as a reference. Headphones help when speakers or room echo still trigger false interruptions. If a selected audio device cannot be used by the browser, choose the system default in Settings.
-
-This is a pipeline of speech recognition, assistant generation, and streamed speech synthesis. Recognition begins after a detected pause, so latency still depends on the selected models and providers. It does not use a provider's native speech-to-speech or semantic end-of-turn API. A continuous utterance has a one-minute limit; a longer recording stops with a retry message.
-
-The turn-taking work draws on the public [OpenAI voice-activity detection guide](https://developers.openai.com/api/docs/guides/realtime-vad) and [Deepgram end-of-turn guide](https://developers.deepgram.com/docs/flux/voice-agent-eager-eot).
-
-## Engines
-
-| Engine                | Runs            | Needs                                                                    |
-| --------------------- | --------------- | ------------------------------------------------------------------------ |
-| **Kokoro** (default)  | On your machine | A one-time voice model download, then fully private. Free.               |
-| **Kitten**            | On your machine | A 64 MB download. Lighter and less natural than Kokoro, fast on any CPU. |
-| **OpenAI-compatible** | Cloud           | Base URL, API key, model, voice.                                         |
-| **OpenRouter**        | Cloud           | Your OpenRouter key. Base URL is fixed.                                  |
-| **ElevenLabs**        | Cloud           | API key, model, voice ID.                                                |
-| **Azure AI Speech**   | Cloud           | Speech URL, key, voice.                                                  |
-
-Each engine keeps its own endpoint, model, voice, and API key. Switching engines cannot overwrite or wipe the values you already entered for another one, and an OpenAI voice name cannot leak onto ElevenLabs and fail as `voice_not_found`.
-
-The voice-output API key is separate from your [assistant provider's key](/assistant/providers), even when both point at the same company.
-
-## Where Kokoro runs
-
-Kokoro can speak from your graphics card or from your processor. _Runs on_ picks between them.
-
-| Runs on             | What it does                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Automatic (default) | Uses the graphics card when it works, and switches to the processor when it doesn't.                           |
-| Graphics card       | Always uses the graphics card. Pick this to try it again after a driver update.                                |
-| Processor           | Never touches the graphics card. Pick this if replies come out garbled, silent, or slow on your graphics card. |
-
-On a graphics card with working WebGPU, Kokoro starts speaking almost at once. Some machines don't have that. Linux usually doesn't, and some graphics drivers turn the voice into noise. Inside the app, Kokoro then falls back to a single processor thread, which takes around ten seconds per reply.
-
-The processor voice fixes that. It is a separate 350 MB download under _Runs on_, and it runs Kokoro natively on every core. On an 8-core desktop it writes a second of speech in about 0.2 seconds, and the first sentence starts playing about 0.3 seconds after the reply arrives.
-
-Automatic moves you to the processor voice on its own once it is downloaded. It does that when there is no graphics card it can use, when the card fails to start the voice, or when the first sentence comes back as noise or silence. That bad sentence is muted, so you never hear it, and the app remembers the result for the next launch. Picking _Graphics card_ clears it.
-
-On a processor with four threads or fewer, Settings suggests Kitten instead, because Kokoro is slow there even with the processor voice.
-
-The processor voice and Kitten share one voice engine. It downloads with the first of them, about 8 MB, and goes away when you remove the last one. Nothing loads until a voice speaks, and it unloads after three minutes of quiet. Kokoro on the processor holds about 400 MB of memory while loaded, Kitten about 80 MB.
-
-<Note>
-  The processor engine has been tested on Windows only. On macOS it may refuse
-  to load, because the app isn't signed by Apple. If that happens, Voice
-  settings says so and Kokoro keeps running inside the app. Kitten needs the
-  same engine, so it can't speak there either.
-</Note>
-
-## Playback and quality
-
-| Setting                           | Default     | Options                             |
-| --------------------------------- | ----------- | ----------------------------------- |
-| Playback speed                    | `1x`        | 0.25x to 4x                         |
-| Kokoro runs on                    | `Automatic` | Automatic, Graphics card, Processor |
-| Kokoro precision                  | `fp32`      | fp32, fp16, q8, q4, q4f16           |
-| Stop speech when dictation starts | `Off`       | On, Off                             |
-
-_Test voice_ plays a short sample with the current settings. It is the fastest way to catch a bad key, a wrong voice name, or an output device pointed somewhere you are not listening.
-
-<Note>
-  Asking the assistant a new question always interrupts the previous answer,
-  whatever *Stop speech when dictation starts* is set to. That setting only
-  governs ordinary dictation.
-</Note>
+| Voice          | Download size         | Notes                                                                                                                             |
+| -------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Kokoro**     | ~350 MB (native)      | The default. The most natural local voice. Can run inside the app on your graphics card (WebGPU) or natively on your processor.   |
+| **Kitten**     | 44 to 68 MB           | Three sizes: nano (default, 64 MB), micro (44 MB), and mini (68 MB). Lighter and less natural than Kokoro, fast on any processor. |
+| **Pocket TTS** | ~168 MB + voice clips | 14 cloned voices. Each voice is cloned from a short reference recording, so quality depends on the recording. No speed control.   |
+| **Supertonic** | ~129 MB               | Integer-quantized, compact.                                                                                                       |
 
 <AccordionGroup>
-  <Accordion title="Choosing a voice">
-    Kokoro ships eight built-in voices, with **Heart** as the default: Heart, Bella, Nicole, and Sky (US female), Adam and Michael (US male), Emma and George (UK).
+  <Accordion title="Where Kokoro runs">
+    Kokoro can speak from your graphics card or from your processor. The **Kokoro device** setting has three options:
 
-    Kitten has eight of its own, with **Bella** as the default: Bella, Luna, Rosie, Kiki, Jasper, Bruno, Hugo, and Leo.
+    - **Automatic** (default). Uses the graphics card when it works, and falls back to the processor when it does not. Automatic never makes the voice worse: it only goes native when WebGPU is unusable _and_ the processor voice pack is ready.
+    - **GPU**. Always uses the graphics card. Pick this to try it again after a driver update.
+    - **CPU**. Never touches the graphics card. Pick this if replies come out garbled, silent, or slow on your graphics card.
 
-    Cloud engines let you load and pick from their own lists.
+    On a graphics card with working WebGPU, Kokoro starts speaking almost at once. Linux usually does not have WebGPU, and some graphics drivers turn the voice into noise. The processor voice fixes that. It runs Kokoro natively on every core. On an 8-core desktop it writes a second of speech in about 0.2 seconds, and the first sentence starts playing about 0.3 seconds after the reply arrives.
 
-    - **OpenAI-compatible**. `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`.
-    - **ElevenLabs**. A voice ID from the Voices tab in your ElevenLabs dashboard.
-    - **Azure**. A neural voice like `en-US-AvaMultilingualNeural`, or an HD voice such as `en-US-Ava:DragonHDLatestNeural`. Click *Load voices* to browse.
-
-  </Accordion>
-
-  <Accordion title="Why the model and voice fields start empty">
-    For the cloud engines, model and voice are loadable pickers. They begin blank, you press reload to fetch the engine's real list, then choose. A prefilled value would just be a name you never picked, and the wrong one returns 404.
-
-    Leave them blank and synthesis still works from a sensible fallback: `eleven_flash_v2_5` for ElevenLabs, `en-US-JennyNeural` for Azure.
-
-    Picking an ElevenLabs model: `eleven_v3` is the newest and most expressive, `eleven_multilingual_v2` is the consistent-quality choice across many languages, and `eleven_flash_v2_5` is the fastest. Model names are the API IDs, so type them exactly as shown.
+    Automatic detects a broken graphics card by checking the first two sentences for garbled audio, mutes them so you never hear the noise, and remembers the result for the next launch.
 
   </Accordion>
 
-<Accordion title="Picking a Kokoro precision">
-  Precision only applies while Kokoro runs inside the app, so Settings hides it
-  when the processor voice is speaking. `fp32` is the highest quality and the
-  right choice on a graphics card. `q8` is a smaller download. If the voice is
-  slow or garbled, change _Runs on_ rather than the precision. Changing this
-  reloads the model.
-</Accordion>
+  <Accordion title="Pocket TTS voices">
+    Pocket TTS has no built-in speakers. Its 14 voices are each cloned from a short reference WAV, and recording quality carries through to the output. The voice clips are fetched after the main model archive.
 
-<Accordion title="Playback speed limits">
-  Presets run 0.5x to 3x, and you can type any value in the 0.25x to 4x range.
-  Speed is applied locally for Kokoro and natively for remote engines that
-  support it. ElevenLabs accepts 0.7x to 1.2x only, so values outside that are
-  clamped for that engine.
-</Accordion>
+    Pocket can be weak on very short prompts (one or two words) and follows the pace of its reference clip, so it has no speed control. Temperature 0.3 and 1 flow step are the defaults.
 
-  <Accordion title="Why stop-on-dictation is off by default">
-    Off means starting a plain dictation does not silence a reply that is still being read. With earphones in, people usually want to keep listening while they type or dictate something else. Turn it on if you would rather have the room go quiet the moment you start talking.
+  </Accordion>
+
+  <Accordion title="Kitten sizes">
+    Choose the size on the **Models** page. Nano is the default.
+
+    | Size | Download |
+    | --- | --- |
+    | Nano | ~64 MB |
+    | Micro | ~44 MB |
+    | Mini | ~68 MB |
+
+    All three are lighter and less natural than Kokoro, but fast on any processor.
+
+  </Accordion>
+</AccordionGroup>
+
+## Cloud voices
+
+Set up a cloud voice on the **Assistant** page, under the voice picker. Each engine keeps its own endpoint, model, voice, and API key, so switching engines does not wipe your settings for another one. The voice API key is separate from your [assistant provider's key](/assistant/providers), even when both point at the same company.
+
+| Engine              | Notes                                                                                                                                                                                                      |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OpenAI**          | `POST /v1/audio/speech`. Voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse.                                                                                                 |
+| **ElevenLabs**      | Voice ID from your ElevenLabs dashboard. Expressiveness controls are available.                                                                                                                            |
+| **OpenRouter**      | Uses your OpenRouter key. Base URL is fixed.                                                                                                                                                               |
+| **Deepgram**        | The voice is part of the model id.                                                                                                                                                                         |
+| **Cartesia**        | `POST /tts/bytes`.                                                                                                                                                                                         |
+| **Google Cloud**    | Answered with base64 audio inside JSON.                                                                                                                                                                    |
+| **Azure AI Speech** | A neural voice like `en-US-AvaMultilingualNeural`, or an HD voice. Click _Load voices_ to browse.                                                                                                          |
+| **Groq**            | OpenAI-compatible.                                                                                                                                                                                         |
+| **xAI**             | Requires a `language` field.                                                                                                                                                                               |
+| **Mistral**         | Answered with base64 audio inside JSON.                                                                                                                                                                    |
+| **Inworld**         | Uses Basic auth.                                                                                                                                                                                           |
+| **Custom server**   | Any server that implements `POST /v1/audio/speech` (Kokoro-FastAPI, Speaches, Chatterbox, LocalAI, AllTalk, openai-edge-tts, and others). Paste its address, no key needed unless the server requires one. |
+
+**Test voice** plays a short sample with the current settings. It is the fastest way to catch a bad key, a wrong voice name, or an output device pointed somewhere you are not listening.
+
+## Volume
+
+The assistant has its own volume slider, separate from the feedback beep volume. Set it on the **Assistant** page under the voice settings. 0 means silent.
+
+## Playback speed
+
+Presets run 0.5x to 3x, and you can type any value from 0.25x to 4x. Speed is applied locally for Kokoro and natively for remote engines that support it. ElevenLabs accepts 0.7x to 1.2x only, so values outside that range are clamped.
+
+<AccordionGroup>
+  <Accordion title="Stop speech when dictation starts">
+    Off by default. Off means starting a dictation does not silence a reply that is still playing. With earphones in, you usually want to keep listening while you dictate something else. Turn it on if you would rather have the room go quiet the moment you start talking.
+
+    Asking the assistant a new question always interrupts the previous answer, regardless of this setting.
+
+  </Accordion>
+
+  <Accordion title="Loopback check for local voices">
+    On machines where the processor voice engine refuses to load (macOS library validation on an unsigned app is the expected case), it remembers the failure for the session. Every pack reads as not ready, and Kokoro stays in the WebView rather than failing each reply.
   </Accordion>
 </AccordionGroup>

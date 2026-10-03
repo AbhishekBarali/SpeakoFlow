@@ -1,67 +1,72 @@
 ---
 title: "History"
-description: "History keeps your recent SpeakoFlow dictations, Flow generations, and assistant chats on your device so you can replay, copy, star, re-transcribe, continue, or delete them. Covers the retention settings and their defaults."
+description: "Your dictations, quick asks, and conversations, stored on this device. Play, copy, re-transcribe, recover, or continue any of them."
 icon: "clock-rotate-left"
 ---
 
 Your recent dictations, Flow generations, and assistant chats are kept on this device, and they are yours to reuse or delete.
 
-Open the _History_ section. It is one feed, newest first, filtered by **All**, **Dictations**, **Flow**, or **Assistant chats**. There is no search box, so use the filters and page through the feed.
+Open the **History** page from the sidebar. It is one feed, newest first. Five tabs filter it:
+
+| Tab               | What it shows                                              |
+| ----------------- | ---------------------------------------------------------- |
+| **All**           | Everything, interleaved by time.                           |
+| **Dictations**    | Plain dictation recordings.                                |
+| **Flow**          | [Generate with Flow](/writing/generate-with-flow) results. |
+| **Assistant**     | Quick asks.                                                |
+| **Conversations** | Spoken conversations.                                      |
+
+The Flow tab only appears while Generate with Flow is on. The Assistant and Conversations tabs only appear while the assistant is on. Items from a feature that is turned off still show under All.
 
 ## What each row shows
 
-| Type                | Contents                                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dictations**      | The transcription. If it was cleaned with AI, the row shows _Original transcription_ on top and _Final text_ below, so you can see what cleanup changed.                              |
-| **Flow**            | _You said_, the spoken command as transcribed, and _Flow output_, the exact text that was pasted. Failed and cancelled generations still appear, marked as having produced no output. |
-| **Assistant chats** | One row per conversation, titled from your first message. Expand it to read the whole thing as it appeared in the panel.                                                              |
+Each row shows the time on the left and the content beside it.
+
+- **Dictation.** The transcribed text. If it was cleaned with AI, the row shows the original transcription and the final text, so you can see what cleanup changed.
+- **Flow.** What you said and the exact text that was pasted. Failed and cancelled generations still appear, marked as having produced no output.
+- **Assistant.** One row per conversation, titled from your first message. Expand it to read the whole thing. Messages that carried a screenshot show a camera-badged thumbnail. Click a thumbnail to enlarge it.
 
 ## What you can do
 
-Each dictation and Flow row carries a player for the original audio. The rest of the actions appear when you hover over a row.
+Dictation and Flow rows carry a player for the original audio. Other actions appear when you hover over a row.
 
 - **Copy.** The transcription, the Flow output, the cleaned final text, or a whole conversation.
 - **Star.** Keeps a dictation or Flow recording. Starred recordings are never auto-deleted.
 - **Re-transcribe.** Runs the recording through your current model, for example after switching to a more accurate one. The row updates in place.
-- **Continue.** Reopens an assistant chat in the panel, still saving to the same row.
-- **Delete.** Removes individual entries. You can also open the recordings folder on disk.
+- **Recover.** A dictation that was dismissed (cancelled) or that failed shows a Recover link. Recovering transcribes it again and keeps it in history.
+- **Continue as a conversation.** Opens an assistant chat as a hands-free conversation in the panel.
+- **Delete.** Removes individual entries.
+- **Open recordings folder.** Opens the folder on disk where audio files are stored.
 
-Assistant chats can be copied, continued, and deleted, but not starred or re-transcribed, because there is no audio behind them.
+Assistant chats can be copied, continued as a conversation, and deleted. They cannot be starred or re-transcribed, because there is no audio behind them.
 
-## Retention
+## Recording retention
 
-The storage controls sit above the feed. Changes apply immediately.
+Recording storage controls live in _Settings → Privacy & data_, under **Recording storage**.
 
-| Setting                    | Default             | Options                                                                                                                 |
-| -------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Auto-delete recordings** | `Keep a set number` | `Never`, `Keep a set number`, `After 3 days`, `After 2 weeks`, `After 3 months`, `After a set number of days`           |
-| **Recording limit**        | `20`                | The maximum number of unstarred recordings to keep, from 1 to 1000. Only shown when auto-delete is `Keep a set number`. |
-| **Delete after**           | `30`                | A window of 1 to 3650 days. Only shown when auto-delete is `After a set number of days`.                                |
+| Setting                    | Default             | Options                                                                                                       |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Auto-delete recordings** | `Keep a set number` | `Never`, `Keep a set number`, `After 3 days`, `After 2 weeks`, `After 3 months`, `After a set number of days` |
+| **Recording limit**        | `20`                | 1 to 1,000. Only shown when auto-delete is `Keep a set number`.                                               |
+| **Delete after**           | `30` days           | 1 to 3,650 days. Only shown when auto-delete is `After a set number of days`.                                 |
 
-`Never` means never: nothing is deleted, no matter how old it gets or how many
-recordings pile up. Starred recordings are always kept and do not count toward the
-limit.
+`Never` means nothing is deleted, no matter how old or how many recordings pile up. Starred recordings are always kept and do not count toward the limit.
 
-Any change that would delete something asks first and tells you how many
-recordings it will remove. Nothing is deleted until you confirm it.
+Any change that would delete something tells you how many recordings it will remove and asks you to confirm. Nothing is deleted until you confirm it.
 
 <Note>
-  These controls affect **dictation and Flow recordings only**. Assistant chats
-  have separate storage and are never counted or auto-deleted by these rules.
+  These controls affect dictation and Flow recordings only. Assistant chats have
+  separate storage and are never counted or auto-deleted by these rules.
 </Note>
 
+There is also a **Recordings folder** button in the same section, which opens the folder on disk.
+
 <AccordionGroup>
-  <Accordion title="Images in a row">
-    Messages that carried an image keep a small thumbnail inline, and screen captures get a camera badge. Click one to open it full size.
-
-    Only the compact thumbnail is stored. The full-resolution frame was sent to the model and never saved.
-
+  <Accordion title="When auto-delete runs">
+    An age-based policy is enforced at four moments: at launch, on a background sweep every 30 minutes while the app runs, whenever a new recording is saved, and when you open the History page. The last two matter because a recording can cross its cutoff while the app sits idle. Without them, the entry stayed listed and the setting looked like it was doing nothing.
   </Accordion>
 
-  <Accordion title="When the audio file actually gets deleted">
-    Deleting an entry removes its audio file too, unless an older entry still points at the same file. In that case the file survives until the last reference to it is gone.
-
-    An age-based policy is enforced at four moments: at launch, on a slow background tick while the app runs, whenever a new recording is saved, and when you open the History section. The last two matter because a recording can cross its cutoff while the app sits idle — without them, the entry stayed listed and the setting looked like it did nothing.
-
+  <Accordion title="When the audio file is actually deleted">
+    Deleting an entry removes its audio file too, unless an older entry still points at the same file. The file survives until the last reference to it is gone. Audio files are only unlinked after the database commit, never before.
   </Accordion>
 </AccordionGroup>

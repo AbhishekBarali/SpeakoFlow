@@ -1,0 +1,77 @@
+---
+title: "Cloud transcription"
+description: "Use a cloud speech-to-text provider instead of a local model. Covers provider setup, streaming, custom words, filler removal, language hints, and translation."
+icon: "cloud"
+---
+
+By default, speech is transcribed on your computer with a local model. You can switch to a cloud provider instead: the provider receives your audio recording and returns the text. This trades privacy for a frontier model with no download and no GPU.
+
+## Switching to cloud
+
+Open the **Models** page from the sidebar and go to the speech-to-text section. Switch from "On my device" to "Cloud". Choose a provider, paste your API key, and pick a model. The local model stays on disk but is unloaded while cloud is active.
+
+The same group also appears in _Settings → Dictation_ under "Where transcription runs".
+
+## Providers
+
+Eight providers ship configured. You can also point the Custom entry at any OpenAI-compatible transcription server.
+
+| Provider          | Default model           | Streaming                     | Translation to English           |
+| ----------------- | ----------------------- | ----------------------------- | -------------------------------- |
+| ElevenLabs Scribe | scribe_v2               | Yes (with scribe_v2_realtime) | No                               |
+| Groq              | whisper-large-v3-turbo  | No                            | Yes                              |
+| OpenAI            | gpt-4o-transcribe       | No                            | Yes                              |
+| OpenRouter        | openai/whisper-large-v3 | No                            | No                               |
+| Deepgram          | nova-3                  | Yes                           | No                               |
+| Mistral (Voxtral) | voxtral-mini-latest     | No                            | No                               |
+| Azure AI Speech   | MAI-Transcribe-2        | No                            | No                               |
+| Custom            | whisper-1               | No                            | Yes (if your server supports it) |
+
+API keys are stored in your system keychain. Each provider has a "Get a key" link in Settings that goes to its key page.
+
+The model field is free-text, so a model released after your build still works. You can also load the full list from the provider.
+
+## Streaming
+
+ElevenLabs and Deepgram support live streaming: text arrives while you are still talking, so releasing the keys only flushes the last few words. Turn this on with the **Transcribe as I speak** switch.
+
+For ElevenLabs, you need a realtime model (like `scribe_v2_realtime`). The batch model (`scribe_v2`) only transcribes after you stop.
+
+If the stream fails, SpeakoFlow falls back to a full batch transcription. The batch and realtime models can produce slightly different wording.
+
+## Custom words
+
+The **Send my custom words** switch passes your [Dictionary](/dictation/custom-words) vocabulary to the provider as a recognition hint. This is on by default.
+
+How the hint is sent depends on the provider: ElevenLabs receives them as key terms, OpenAI and Groq as a prompt, Deepgram as key terms. When the provider handles the hint upstream, SpeakoFlow skips its own local fuzzy-correction pass, because a second guess at text the model already got right can only make it worse.
+
+OpenRouter accepts the field but ignores it, so for OpenRouter the app keeps running its own local correction instead.
+
+## Remove filler words
+
+The **Remove filler words** switch controls two layers: it asks the provider to strip "um", "uh", false starts, and repeats server-side, and it runs the app's own filler filter as a backstop. Turn it off to get verbatim output. Off by default.
+
+On a local engine, fillers are always removed. The cloud switch is separate because some providers do not implement filler removal, and because you might want exact wording from a cloud transcription.
+
+## Language
+
+The language selector sets a recognition hint telling the provider what language you are speaking. The transcript comes back in that same language. Set it to Auto and the provider detects the language itself. This is the same setting as the local engine's language selector, but when cloud is active it appears in the cloud group.
+
+## Translate to English
+
+No cloud transcription provider here translates into an arbitrary target language. English is the one exception, and only on providers that use the OpenAI transcription schema: **OpenAI**, **Groq**, and the **Custom** entry (since self-hosted Whisper servers implement it). Those providers show a "Translate to English" switch.
+
+Providers without a translation route show a note explaining that the switch is unavailable for them. On the local side, Whisper, Canary, Granite Speech, and Voxtral models can translate to English.
+
+## Incomplete configuration
+
+If your cloud setup is incomplete (no key saved, no model chosen, or no endpoint for Azure), SpeakoFlow falls back to the local speech engine for that dictation instead of failing. An incomplete configuration never blocks a recording. Once the configuration is complete, only a wire-level failure (a bad key, an exhausted quota) surfaces an error.
+
+## Test connection
+
+A **Run test** button in the cloud settings sends one second of audio to check the key, endpoint, and model, so you can catch problems before they cost a real dictation.
+
+<Warning>
+  Cloud transcription sends your audio recording to the provider you choose. The
+  recording leaves your computer. See [Privacy](/reference/privacy).
+</Warning>

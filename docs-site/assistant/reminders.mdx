@@ -1,0 +1,62 @@
+---
+title: "Reminders"
+description: "Ask the assistant to remind you about something in plain words. The reminder pops up on time, survives restarts, and stays until you handle it."
+icon: "bell"
+---
+
+Say "remind me to send the invoice in twenty minutes" and the assistant sets it. When the time comes, a notification pops up over whatever you are doing.
+
+## Setting a reminder
+
+Ask in your own words during a [quick ask](/assistant/panel) or a [conversation](/assistant/conversation):
+
+- "Remind me to call Sam in 20 minutes."
+- "Set a reminder at 3 PM to check the build."
+- "In half an hour, remind me to reply to that email."
+
+The assistant has a clock, so it resolves "in twenty minutes" or "at six" into an exact time. Times are local: "at six" means six where you are.
+
+If the time is already past or less than a few seconds away, the assistant says so instead of setting it. It also refuses anything more than a year out, which is almost always a mistake.
+
+When the quick ask sets a reminder, the answer card confirms it with a chip showing when it will fire, and offers **Undo** to cancel it right away.
+
+## Listing and cancelling
+
+Ask the assistant "what reminders do I have?" and it lists them. Ask "cancel the invoice reminder" and it removes it. No need to open a settings page for either.
+
+Reminders also appear on the **Assistant** page under **Reminders**, where you can cancel any of them by clicking the X beside it.
+
+## The popup
+
+When a reminder comes due, a card appears in the top-right corner of the display your cursor is on. It is always on top, does not take keyboard focus (on Windows), and never goes away on its own.
+
+Three controls on the card:
+
+| Control    | What it does                                                                                                                            |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Done**   | Marks the reminder as finished and removes it.                                                                                          |
+| **Snooze** | Opens choices: 5 minutes, 15 minutes, or 1 hour. Picking one pushes the reminder back by that amount.                                   |
+| **X**      | Hides the popup without marking the reminder done. It stays set and will come back on the next launch or the next time something fires. |
+
+If several reminders come due at once, they stack in the same popup window.
+
+The popup follows the text size set for the assistant panel, so a larger text size there means a larger reminder too.
+
+## Survives restarts
+
+Reminders are written to disk the moment they are created. Quitting the app, a crash, or a reboot does not lose them.
+
+Anything that came due while the app was closed fires on the next launch. A reminder that fired and was never acknowledged (neither Done nor Snooze) is shown again once at startup.
+
+## Sound
+
+A reminder plays a sound when it fires, even when the feedback beep setting is off. That setting controls the start-and-stop dictation beeps, not reminders. A reminder that makes no sound has failed.
+
+<CardGroup cols={2}>
+  <Card title="Quick ask" icon="comments" href="/assistant/panel">
+    Hold the keys and ask.
+  </Card>
+  <Card title="Conversations" icon="phone" href="/assistant/conversation">
+    A hands-free conversation where reminders are just one sentence.
+  </Card>
+</CardGroup>

@@ -1,63 +1,65 @@
 ---
 title: "Getting started"
-description: "A two-minute SpeakoFlow quickstart: grant microphone and accessibility permissions, pick a local speech-to-text model, optionally add a local assistant model, and dictate your first sentence."
+description: "First-run setup in SpeakoFlow: pick a speech model, walk through the tour, and dictate your first sentence."
 icon: "rocket"
 ---
 
-[Install SpeakoFlow](/start/install), then run the setup wizard. It takes about two minutes.
+[Install SpeakoFlow](/start/install), then open it. A short setup runs on first launch.
+
+## Onboarding
 
 <Steps>
-  <Step title="Grant permissions" icon="lock">
-    The wizard opens with a permissions screen, which it does not count in its own step numbering. The screen skips itself if you have already granted them, and it does not appear on Linux.
+  <Step title="Permissions" icon="lock">
+    On macOS the app asks for **Microphone** and **Accessibility** permission. This screen skips itself if you have already granted them, and it does not appear on Windows or Linux.
 
-    - **Microphone** (macOS and Windows). So SpeakoFlow can hear you.
-    - **Accessibility** (macOS only). So it can type into your other apps.
-
-    Skip them and you'll be asked again the next time SpeakoFlow starts. See [Troubleshooting](/reference/troubleshooting) if a permission gets stuck.
+    See [Troubleshooting](/reference/troubleshooting) if a permission gets stuck after an update.
 
   </Step>
 
-  <Step title="Pick a voice model" icon="microphone">
-    This is the model that turns your voice into text, and it runs entirely on your machine. A fast English model or a real-time multilingual model are both good starting points.
+  <Step title="Pick a speech model" icon="microphone">
+    Five models are offered. Each card shows the model name, the languages it hears, one sentence about what it is for, and its download size (or that it is already installed).
 
-    The download runs in the background, so you don't wait here. You can switch models anytime in *Settings → Dictation*, and the full catalog is in [Transcription models](/models/transcription-models).
+    | Model               | Languages  | What it is for                                         |
+    | ------------------- | ---------- | ------------------------------------------------------ |
+    | Parakeet 0.6B       | English    | Fast and accurate, for English.                        |
+    | Nemotron 3.5        | 28         | Works out which language you are speaking.              |
+    | Canary 180M Flash   | English    | Tiny and quick. Good for older computers.              |
+    | Cohere Transcribe   | English    | The most accurate, but a larger download and slower.   |
+    | Whisper Medium      | 99         | Covers the most languages, but runs slower.            |
+
+    Parakeet and Nemotron carry a "Recommended" badge. The model for your language is preselected. "Set up later" skips the download and lets you choose on the **Models** page instead.
+
+    The download runs in the background, so you do not wait. The full catalog (65 models) is on the [Models](/models/transcription-models) page.
 
   </Step>
 
-  <Step title="Give it a brain (optional)" icon="brain">
-    Download a local model for the assistant and AI cleanup, or choose *Skip for now*. Three Gemma 4 sizes are offered:
+  <Step title="Tour" icon="map">
+    Three scenes show what SpeakoFlow does, each with the real surface you will see beside the steps:
 
-    - **Quick** (E2B). Responds fastest, less capable on complex requests.
-    - **Balanced** (E4B, recommended). The best conversational quality-to-latency tradeoff.
-    - **Capable** (12B). More capable, but noticeably slower.
+    1. **Dictation.** Hold the keys, talk, let go. Your words are typed at the cursor.
+    2. **Assistant.** Select text, hold the keys, and ask. Translate, reply, explain.
+    3. **Conversation.** Press the keys and talk. The assistant answers out loud.
 
-    You can add or change this later in *Settings → Assistant*, including pointing at a local server or a cloud provider instead. See [Models and providers](/assistant/providers).
+    The tour only shows. It downloads nothing and switches nothing on.
 
-  </Step>
-
-  <Step title="You're ready" icon="keyboard">
-    The last screen shows your two shortcuts as keycaps, plus a status line for anything still downloading. Your hotkeys are already live.
   </Step>
 </Steps>
 
-## Say your first sentence
+The tour's last button opens the app. If the speech model is still downloading, the sidebar shows progress, and a dictation pressed before it finishes shows a "downloading" pill in the overlay instead of recording.
+
+## Dictate your first sentence
 
 Open any text field, hold your Dictate shortcut, and talk. Let go, and your words type themselves.
 
-| Action            | Windows                  | macOS                       | Linux                    |
-| ----------------- | ------------------------ | --------------------------- | ------------------------ |
-| Dictate           | `Left Ctrl` + `Left Win` | `Option` + `Space`          | `Ctrl` + `Space`         |
-| Ask the assistant | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
+| Action            | Windows                  | macOS         | Linux                    |
+| ----------------- | ------------------------ | ------------- | ------------------------ |
+| Dictate           | `Left Ctrl` + `Left Win` | `Fn` (🌐)     | `Ctrl` + `Space`         |
+| Ask the assistant | `Left Ctrl` + `Left Alt` | `Fn` + `Ctrl` | `Ctrl` + `Alt` + `Space` |
 
-Every shortcut is rebindable in _Settings → General → Shortcuts_.
+Every shortcut is changeable. See [Keyboard shortcuts](/start/keyboard-shortcuts) for the full table.
 
-<AccordionGroup>
-  <Accordion title="How the size badges are chosen, and what happens if a download fails">
-    The **Quick**, **Balanced**, and **Capable** labels are editorial. They are not inferred from your hardware.
+## Replaying onboarding
 
-    Tapping a card starts the download and flips the footer straight to *Continue*, so you can move on while it finishes. The built-in assistant provider is only pointed at the model once the weights are actually on disk, so a failed or cancelled download can't leave the assistant set to a model you don't have.
+_Settings → General → Onboarding → Show onboarding again_ replays the whole flow from the welcome screen. Nothing is uninstalled, and models you already have stay installed. Downloads in progress continue.
 
-  </Accordion>
-</AccordionGroup>
-
-Next: [how SpeakoFlow works](/start/how-it-works).
+Next: [keyboard shortcuts](/start/keyboard-shortcuts).

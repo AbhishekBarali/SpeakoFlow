@@ -1,81 +1,50 @@
 ---
 title: "Debug & advanced"
-description: "How to reveal SpeakoFlow's hidden Debug section, plus every setting in it: log level and where the log file is written, the word correction threshold, paste delay, and the extra recording buffer."
+description: "How to reveal SpeakoFlow's hidden Debug tab, every setting in it, the --debug flag, where log files are, and what release builds keep out of the log."
 icon: "bug"
 ---
 
-Press `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS) with the Settings window focused. A **Debug** item appears in the sidebar. Press it again to hide the section.
+The Debug tab is hidden by default. Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> (<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> on macOS) with the Settings window focused. A **Debug** tab appears. Press the same keys again to hide it.
 
-Most people never need anything in here.
+The shortcut only works while the Settings window has focus. It does not work from the sidebar or any other window.
 
-## What is in the Debug section
+## What is in the Debug tab
 
-| Setting                   | Range              | Default        | What it does                                                                              |
-| ------------------------- | ------------------ | -------------- | ----------------------------------------------------------------------------------------- |
-| Log level                 | `Error` to `Trace` | `Debug`        | How much detail goes into the log file.                                                   |
-| Word correction threshold | 0.0 to 1.0         | 0.18           | How aggressively near-misses are snapped to your [custom words](/dictation/custom-words). |
-| Paste delay               | 10 to 200 ms       | 60 ms          | How long to wait before pasting the transcript into the active app.                       |
-| Extra recording buffer    | 0 to 1500 ms       | 0 ms           | Keeps recording for this long after you release the shortcut.                             |
-| Feedback sound            | Themes             | `Default`      | The same picker as _Settings → General → Sounds_, repeated here for testing.              |
-| Check for updates         | On or off          | On             | The same toggle as _Settings → General → Startup and tray_.                               |
-| Clamshell microphone      | Your input devices | System default | **macOS laptops only.** Which microphone to use when the lid is closed.                   |
+| Setting                   | Range                                          | Default        | What it does                                                                                                                                                                                   |
+| ------------------------- | ---------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Log level                 | `Error` to `Trace`                             | `Debug`        | How much detail goes into the log file.                                                                                                                                                        |
+| Sound theme test          | The same themes as _Settings → Audio → Sounds_ | `Default`      | The sound picker repeated here so you can test themes without leaving Debug.                                                                                                                   |
+| Word correction threshold | 0.0 to 1.0                                     | 0.18           | How aggressively near-misses are snapped to your [custom words](/dictation/custom-words). Higher means more willing to match, which risks rewriting words you said.                            |
+| Paste delay               | 10 to 200 ms                                   | 60 ms          | How long to wait before pasting the transcript. Raise it if the wrong text occasionally pastes (the target app has not finished reading the clipboard).                                        |
+| Extra recording buffer    | 0 to 1500 ms                                   | 0 ms           | Keeps recording for this many milliseconds after you release the shortcut. Raise it if you consistently lose the last word. Zero by default because voice-activity detection handles the tail. |
+| Clamshell microphone      | Your input devices                             | System default | macOS laptops only. Which microphone to use when the lid is closed (SpeakoFlow switches automatically). The row only appears on machines with an internal battery.                             |
 
 <Note>
-  Turning debug mode on does not change how SpeakoFlow behaves, with one
-  exception. It adds an extra **After 15 seconds (Debug)** choice to the
-  model-unload dropdowns so reload behavior is quick to test.
+  Debug mode itself does not change how SpeakoFlow behaves. It does add an extra
+  "After 15 seconds" choice to the model-unload dropdowns in _Settings →
+  Advanced_, so reload timing is quick to test.
 </Note>
 
-## When to change these
+## The --debug flag
 
-- **Log level**. Raise it to `Trace` when reproducing a bug you are about to report. `Debug` is already fairly verbose, so most reports do not need it changed at all.
-- **Paste delay**. Raise it if the wrong text is occasionally pasted. That is usually the target app not having finished processing the clipboard change before the paste keystroke arrives.
-- **Extra recording buffer**. Raise it if you consistently lose the last word or two. It is zero by default because voice-activity detection normally handles the tail.
-- **Word correction threshold**. Raise it if custom words are still mistranscribed. Higher is more willing to treat a loosely similar word as a match, which risks rewriting words you actually said. The default is deliberately conservative.
+Launch SpeakoFlow with `--debug` to raise logging to Trace for that run. It is never written to your saved settings, so the next launch returns to whatever log level is configured.
 
-## Details
+`--debug` does not reveal the Debug tab. Only the keyboard shortcut above does that.
 
-<AccordionGroup>
-  <Accordion title="Where the log file is">
-    The log file is named `speakoflow` and lives in your platform's standard application log directory, or in `Data/logs` next to the executable in portable mode.
+From a terminal, you can also set `RUST_LOG=trace` to filter console output independently of the log level in Settings. See [Command-line flags](/settings/cli).
 
-    Rather than documenting a path that varies by OS and install method, SpeakoFlow shows you the real one. *Settings → About → Folders* has both the log directory and the app data directory, each with a button that opens it in your file manager.
+## Where the log file is
 
-    Logs rotate at 500 KB and one previous file is kept, so they cannot grow without bound. A long session can therefore push out earlier detail, so capture the log soon after reproducing a problem.
+The log file is named `speakoflow` and lives in your platform's standard log directory, or in `Data/logs` in portable mode.
 
-  </Accordion>
+Rather than listing paths that vary by OS and install method, SpeakoFlow shows you the actual folder. Go to _Settings → Privacy & data → Folders_ and click the button beside the log directory to open it in your file manager.
 
-  <Accordion title="Log level versus RUST_LOG and --debug">
-    Console output is filtered separately by the `RUST_LOG` environment variable. Running SpeakoFlow from a terminal with `RUST_LOG=trace` gives you a live firehose without touching this setting.
+Logs rotate at 500 KB and one previous file is kept, so they stay small. A long session can push out earlier detail, so capture the log soon after reproducing a problem.
 
-    Launching with the `--debug` flag raises logging to `Trace` for that run only, without writing anything to your saved settings. It does not reveal this section, because only the keyboard shortcut does that. See [Command-line flags](/settings/cli).
+## What release builds keep out of the log
 
-  </Accordion>
+The log level defaults to Debug and the file stays on disk, so the content matters. Release builds log only the length of transcripts, model replies, and search queries, never their text. In a development build, the full content is logged for debugging.
 
-  <Accordion title="Which models the word correction threshold affects">
-    It only affects the fuzzy correction pass, which is what non-Whisper models rely on.
+This means a log file you attach to a bug report does not contain what you said. Settings contents (which include custom words, prompts, profiles, and memory notes) are also suppressed in release builds.
 
-    Whisper-family models get your custom words as a recognition prompt instead, so the threshold matters less to them.
-
-  </Accordion>
-
-  <Accordion title="Why the clamshell microphone row is sometimes missing">
-    The row appears only when SpeakoFlow detects an internal battery, so it never shows on a desktop Mac, Windows, or Linux.
-
-    SpeakoFlow reads the lid state from the system and switches to this device automatically when the lid is shut. That is useful when your normal choice is the built-in microphone, which is unusable in clamshell mode.
-
-  </Accordion>
-
-  <Accordion title="Settings that used to be here">
-    Several rows moved out of Debug as the app was reorganized.
-
-    | Setting | Where it is now |
-    | --- | --- |
-    | Keyboard implementation, Whisper and ONNX acceleration, Keep mic open between transcriptions | *Settings → General → Experimental* |
-    | Mute while recording | *Settings → General → Sounds* |
-    | Experimental features | *Settings → General → System* |
-    | Always-on microphone | *Settings → Dictation → Output* |
-    | Log directory, App data directory | *Settings → About → Folders* |
-
-  </Accordion>
-</AccordionGroup>
+API keys are never logged. The `SecretMap` type behind every key field redacts its contents in all builds.

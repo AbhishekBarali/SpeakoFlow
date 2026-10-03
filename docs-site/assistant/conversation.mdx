@@ -1,0 +1,79 @@
+---
+title: "Conversations"
+sidebarTitle: "Conversations"
+description: "Start a hands-free spoken conversation with the assistant. Talk naturally, cut in while it speaks, type when you need to, and dictate without ending the conversation."
+icon: "phone"
+---
+
+Press the conversation shortcut and talk. The assistant answers out loud, and you talk back. It is a hands-free conversation, not a single question. Think of it as a call.
+
+## Shortcuts
+
+| Action                      | Windows                        | macOS               | Linux                |
+| --------------------------- | ------------------------------ | ------------------- | -------------------- |
+| Start or end a conversation | `Left Ctrl` + `Left Alt` + `C` | `Fn` + `Ctrl` + `C` | `Ctrl` + `Alt` + `C` |
+
+The same keys start and end it. You can also turn the shortcut off from the shortcut editor (click the keys, then **Turn off**).
+
+## How it works
+
+1. Press the conversation keys. A floating bar appears with a voice orb in the middle.
+2. Talk naturally. A pause ends your turn and the assistant starts answering.
+3. It speaks the reply. When it finishes, it listens again.
+
+You can cut in while it speaks (barge-in). If you keep talking over the reply, it stops and listens to what you are saying instead.
+
+## The bar
+
+The bar has four controls:
+
+| Control          | What it does                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Type**         | Opens a text field. Type a message and press Enter. Speech returns automatically after a short idle, or click the voice button. |
+| **Mute mic**     | Turns off the microphone. The assistant still speaks.                                                                           |
+| **Orb (End)**    | Ends the conversation. Hover it to see the hang-up icon.                                                                        |
+| **Mute speaker** | Stops the assistant from speaking replies aloud. It still answers in text.                                                      |
+
+Above the bar, a bubble says what the assistant is doing: listening, thinking, searching the web, or looking at your screen. Click the bubble to open the full conversation transcript. Inside the transcript you can start a **New chat**, browse **History** (with search and a meeting filter), and switch profiles.
+
+The bar can be dragged. A live conversation remembers where you moved it.
+
+## Esc
+
+Esc does different things depending on what is happening:
+
+- **While the assistant is replying:** stops the reply and keeps the conversation going.
+- **While the assistant is idle:** ends the conversation (same as pressing the keys again, or clicking the orb).
+
+## Dictation during a conversation
+
+Need to type something while a conversation is running? Use your dictation shortcut as usual. The conversation holds while you record and picks up once the dictation is done. Nothing about the conversation changes: a reply in flight keeps playing, the speaker stays as you set it, and the transcript is untouched.
+
+The recording overlay moves up to stay clear of the conversation bar.
+
+## Closing the panel
+
+Closing the panel ends the conversation, and ending the conversation closes the panel. They are the same action. This keeps the microphone from staying open behind an invisible window.
+
+## Voice requirement
+
+A conversation always speaks its replies, regardless of the **Speak replies** switch on the **Assistant** page. That switch only affects the [quick ask](/assistant/panel).
+
+If the selected [voice](/assistant/voice-output) needs an API key that has not been entered, the conversation will tell you before it starts. Set up a working voice first, either a local one (no key needed) or a cloud one with its key saved.
+
+## Screen access
+
+A separate switch on the **Assistant** page controls whether the assistant can see your screen during conversations. It is off by default. When it is on, the model decides per question whether to look, the same way [screen vision](/assistant/screen-vision) works for the quick ask.
+
+## Memory
+
+When a conversation ends, the assistant runs its [memory](/personalize/memory) learning pass (if memory is on). It reviews what was discussed and saves anything worth remembering. Clearing the conversation or hiding the panel triggers the same pass.
+
+<CardGroup cols={2}>
+  <Card title="Quick ask" icon="comments" href="/assistant/panel">
+    One question, one answer, without a conversation.
+  </Card>
+  <Card title="Voice output" icon="volume-2" href="/assistant/voice-output">
+    Choose how the assistant sounds.
+  </Card>
+</CardGroup>

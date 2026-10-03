@@ -1,50 +1,38 @@
 ---
-title: "Hands-free recording"
-description: "Set SpeakoFlow's recording behavior to Tap so one press starts recording and the next stops it. Covers how to stop or cancel a hands-free recording and why the mid-recording tap-to-lock gesture is inactive."
+title: "Hold or tap"
+sidebarTitle: "Hold or tap"
+description: "Switch between holding the shortcut to record and tapping once to start and once to stop. Covers the recording behavior setting, stopping, and cancelling."
 icon: "hand"
 ---
 
-Set _Settings → General → Recording → Recording behavior_ to `Tap`. One press of your record shortcut starts recording, and the next press stops it and types the transcript out.
+SpeakoFlow has one recording-behavior setting that controls every shortcut: dictation, dictation with cleanup, ask the assistant, and start a conversation. Find it on the **Home** page (in the shortcuts card) or in _Settings → Shortcuts_, labelled "Recording behavior".
 
-Releases are ignored, so nothing depends on how long you hold the keys.
+## Hold (default)
 
-## Hold or Tap
+Records while you hold a recording shortcut, stops when you release. Best for short bursts, and it cannot leave a recording running by accident.
 
-- **Hold** (default). Records while the shortcut is held, stops on release. Best for short bursts, and it cannot leave a recording running by accident.
-- **Tap**. Press once to start, press again to stop. Best for long-form dictation.
+## Tap
 
-The setting is global. It applies to the Dictate shortcut, the AI-cleanup shortcut, and the Assistant shortcut alike.
+One press starts recording, the next press stops it and inserts the text. Releases are ignored, so nothing depends on how long you hold the keys. Best for long-form dictation or dictating hands-free.
 
-## Stopping and canceling
+## Stopping and cancelling
 
-| Action                   | What happens                                          |
-| ------------------------ | ----------------------------------------------------- |
-| Press the shortcut again | Stops recording and inserts the text.                 |
-| Cancel shortcut          | Throws the recording away. It has no default binding. |
-| Do nothing               | The recording is force-finalized after 30 minutes.    |
+| Action                              | What happens                                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| Release the keys (Hold mode)        | Stops recording and inserts the text.                                                        |
+| Press the shortcut again (Tap mode) | Stops recording and inserts the text.                                                        |
+| Press <kbd>Esc</kbd>                | Cancels the recording. The pill offers Undo for a few seconds (see [Undo](/dictation/undo)). |
+| Do nothing                          | The recording stops itself after 30 minutes.                                                 |
 
-The Cancel shortcut ships unbound because a global `Esc` would swallow `Esc` presses meant for other apps whenever a recording is active. Record a key for it in _Settings → General → Recording_. The row is hidden on Linux, where re-registering a dynamic shortcut is unreliable.
+<kbd>Esc</kbd> is the default Cancel shortcut on Windows and macOS. It only acts
+while something is running, like a recording or a reply being read aloud, so
+other apps keep their Esc the rest of the time. Cancel is not available on Linux
+yet.
+
+To change or turn off Cancel, click its keys on the **Home** page or in _Settings → Shortcuts_. The editor that opens has "Use default" and "Turn off". The conversation shortcut can also be turned off from there.
 
 <Note>
-  In the assistant panel, a voice turn can also be ended with the **Finish &
-  send** button, so a hands-free question can be committed without touching the
-  keyboard.
+  On a Mac, set **System Settings → Keyboard → Press 🌐 key to** to **Do
+  Nothing**, or the globe key opens the emoji picker as well. Macs that were on
+  the older Option-based defaults keep them after updating.
 </Note>
-
-## Good to know
-
-<AccordionGroup>
-  <Accordion title="What the overlay looks like in hands-free mode">
-    When a hands-free recording starts, the overlay pill switches to a calmer, slightly larger waveform. Screen readers announce *"Recording hands-free, press the hotkey again to stop."*
-
-    There is no stop button on the overlay. Press the shortcut again.
-
-  </Accordion>
-
-  <Accordion title="Tap-to-lock does not work in this build">
-    A mid-recording tap-to-lock gesture exists in the settings file: tapping `Shift` or `Space` while holding the shortcut was meant to convert a held recording to hands-free.
-
-    Nothing arms the watcher, so the gesture does nothing and there is no control for it in Settings. Use the `Tap` recording behavior above instead.
-
-  </Accordion>
-</AccordionGroup>

@@ -1,16 +1,25 @@
 ---
 title: "Transcription models"
-description: "The full catalog of speech-to-text models SpeakoFlow can download and run locally, with size, language coverage, streaming, and translation for each. Also covers older models, downloads, and deleting models."
+description: "The Models page in SpeakoFlow, organised by the job a model does: speech to text, AI cleanup, assistant, and voice. Covers the speech catalog, downloads, switching models, and how each job can run locally or in the cloud."
 icon: "microchip"
 ---
 
-Every model runs on your machine. They trade accuracy for speed, so pick the one that fits your hardware and languages.
+The **Models** page in the sidebar shows four tabs, one per job:
 
-Open the catalog from _Settings → Dictation → Change model_.
+| Tab                | What it does                                                                 |
+| ------------------ | ---------------------------------------------------------------------------- |
+| **Speech to text** | Turns your voice into text (dictation, meetings).                            |
+| **AI cleanup**     | Follows spoken edits and applies a writing style. Also writes meeting notes. |
+| **Assistant**      | Answers your questions, looks at your screen, holds conversations.           |
+| **Voice**          | Speaks the assistant's replies out loud.                                     |
 
-## Recommended models
+Every tab starts with a **Runs on** switch: "On this computer" or "Cloud". Switching changes the settings inside the card, not the shape of the page. Below the card is the catalog of models you can download for that job.
 
-These five run on SpeakoFlow's current engine, a native ggml/GGUF build. Sizes are the exact download.
+## Speech to text
+
+The catalog has 65 speech models. Five are recommended and shown first. The rest live under **Older models**, which opens as soon as you search.
+
+### Recommended models
 
 | Model                                  | Size   | Languages    | Streams | Translates |
 | -------------------------------------- | ------ | ------------ | ------- | ---------- |
@@ -20,9 +29,7 @@ These five run on SpeakoFlow's current engine, a native ggml/GGUF build. Sizes a
 | **Cohere Transcribe**                  | 1.7 GB | 14           | No      | No         |
 | **Whisper Medium**                     | 793 MB | 99           | No      | Yes        |
 
-Pick **Parakeet Unified EN 0.6B** for fast everyday English, **Canary 180M Flash** on a weak machine, **Whisper Medium** for the widest language coverage, and **Cohere Transcribe** when accuracy matters more than speed. Canary covers English, German, Spanish, and French.
-
-Only catalog entries flagged `recommended` appear in this list. Everything else lives under **Older models**.
+Pick **Parakeet** for fast everyday English. Pick **Canary 180M Flash** on a weak machine (it covers English, German, Spanish, and French). Pick **Nemotron** for multilingual dictation with automatic language detection. Pick **Whisper Medium** for the widest language coverage. Pick **Cohere** when accuracy matters more than speed.
 
 <Note>
   Streaming models can transcribe as you speak, which is what [live
@@ -30,62 +37,89 @@ Only catalog entries flagged `recommended` appear in this list. Everything else 
   transcribes in one pass when you stop talking.
 </Note>
 
-## Managing models
+### Older models
 
-The catalog splits into **Downloaded models**, **Available to download**, and **Older models**. Your active model sorts first, then the recommended order.
+These are fully supported. They run on the previous engine (ONNX and whisper.cpp) rather than the current one and are no longer the first suggestion.
+
+- **Whisper Small, Medium, Turbo, Large.** Nearly 100 languages. Small, Medium, and Large translate to English. Turbo does not.
+- **Parakeet V2** (English only) and **Parakeet V3** (25 languages, mostly European).
+- **Moonshine Base** and **Moonshine V2 Tiny, Small, Medium.** English only, fast, good with accents. The V2 variants stream.
+- **Canary 1B v2.** 25 European languages. Translates to English.
+- **SenseVoice.** Chinese, English, Japanese, Korean, and Cantonese. Very fast.
+- **GigaAM v3.** Russian only.
+- **Breeze ASR.** Tuned for Taiwanese Mandarin with English code-switching.
+
+## Searching and filtering
 
 - **Search by name** to filter the list. Searching also reveals the older models.
-- **Filter by language** with the globe dropdown. It lists only models that claim support for the language you pick.
-- **Delete** a model to free disk space. You get a confirmation, and a stronger one if it is your active model.
-- **Switch from the tray.** The system tray menu has a model submenu, so you can change models without opening Settings.
+- **Filter by language** with the globe dropdown. It shows only models that claim support for the language you pick.
 
-A brand-new install is seeded with **Parakeet Unified EN 0.6B**. If it is not on disk yet, SpeakoFlow falls back to any other transcription model you have downloaded, so the app is never stranded without a working model.
+## Downloads
 
-<AccordionGroup>
-  <Accordion title="Older models: the full list">
-    These run on the previous engine (ONNX and whisper.cpp via transcribe-rs) rather than the current one. They are still fully supported and were never removed. They are just no longer the first suggestion.
+Downloads fetch eight chunks at once and resume where they stopped if interrupted. Progress is written to a `.partial` file, and every retry resumes from there using an HTTP Range request.
 
-    - **Whisper Small, Medium, Turbo, Large.** Nearly 100 languages. Small, Medium, and Large translate to English. Turbo does not.
-    - **Parakeet V2** (English only) and **Parakeet V3** (25 languages, mostly European, plus Russian and Ukrainian).
-    - **Moonshine Base** and **Moonshine V2 Tiny, Small, Medium.** English only, extremely fast, good with accents. The V2 variants stream.
-    - **Canary 180M Flash** (English, German, Spanish, French) and **Canary 1B v2** (25 European languages). Both translate to English.
-    - **Cohere.** Large and slower, very accurate across 14 languages.
-    - **SenseVoice.** Chinese, English, Japanese, Korean, and Cantonese. Very fast.
-    - **GigaAM v3.** Russian only.
-    - **Breeze ASR.** Tuned for Taiwanese Mandarin with English code-switching.
+Each source is retried up to four times with exponential backoff. A server error, a timeout, or a dropped connection is retried. A permanent error like a 404 moves on to the next source.
 
-    The group stays folded so a first-timer only sees the recommended few. It opens automatically as soon as you type in the search box.
-
-  </Accordion>
-
-  <Accordion title="Downloads survive a bad connection">
-    Progress is written to a `.partial` file next to the model, and every retry resumes from where it stopped using an HTTP `Range` request. If the server ignores the range and sends the whole file again, SpeakoFlow notices and restarts cleanly rather than appending garbage.
-
-    Each source is retried up to four times with exponential backoff. A server error, a timeout, or a dropped connection is treated as worth retrying. A permanent client error such as a 404 is not, and moves straight on.
-
-    Cancelling keeps the partial file, so resuming later picks up where you left off.
-
-  </Accordion>
-
-  <Accordion title="Which downloads are checksum-verified">
-    Older-engine models ship with a SHA-256 checksum and are verified after download.
-
-    The current GGUF catalog carries no per-file hashes, so those models are **not** checksum-verified.
-
-  </Accordion>
-</AccordionGroup>
+Cancelling keeps the partial file, so resuming later picks up where you left off.
 
 <Tip>
   If a download looks stuck at 0%, it is usually still negotiating the redirect
-  to Hugging Face's CDN. Give it a few seconds before cancelling.
+  to the CDN. Give it a few seconds before cancelling.
 </Tip>
 
-<CardGroup cols={2}>
-  <Card title="Languages and translation" icon="language" href="/models/languages">
-    Which model to pick for which languages.
-  </Card>
+## Switching models
 
-  <Card title="Performance and memory" icon="bolt" href="/models/acceleration">
-    GPU acceleration, idle unloading, and context size.
+Pick a different model from the dropdown at the top of the Speech to text tab. You can also switch from the system tray menu without opening the app.
+
+A brand-new install is seeded with Parakeet Unified EN 0.6B. If it is not on disk yet, SpeakoFlow falls back to any other downloaded speech model, so the app is never left without a working model.
+
+## Deleting a model
+
+Click the delete button on any downloaded model to free disk space. You get a confirmation, and a stronger one if it is your active model.
+
+## The other three tabs
+
+### AI cleanup
+
+Shows the cleanup provider and model. When no cleanup model is set, cleanup borrows the assistant's model. The tab has its own catalog of cleanup-suitable models and settings for the cleanup timeout and unload timeout.
+
+If AI cleanup is off, the tab shows a button to turn it on. Meeting notes still use this model even when cleanup is off.
+
+### Assistant
+
+Shows the assistant's provider and model. The tab has its own catalog of assistant models. If the assistant is turned off, a note says so and links to the **Assistant** page.
+
+AI cleanup and meeting notes fall back to the assistant's model when they have none of their own.
+
+### Voice
+
+Shows the voice engine and voice for spoken replies. Covers both local voices (Kokoro, Kitten, Pocket TTS, Supertonic) and cloud voices. See [Spoken replies](/assistant/voice-output) for details.
+
+## Local vs. cloud per job
+
+Every tab's **Runs on** switch lets you move that job between your computer and a cloud provider. Cloud uses a provider's API and your own key. Your computer is private and free.
+
+See [Providers](/assistant/providers) for the full list of supported providers and how to set them up.
+
+<CardGroup cols={2}>
+  <Card
+    title="Languages and translation"
+    icon="language"
+    href="/models/languages"
+  >
+    Which model for which languages.
+  </Card>
+  <Card title="Models you already have" icon="box" href="/models/custom-models">
+    Add a model file or link a folder.
+  </Card>
+  <Card title="GPU acceleration" icon="bolt" href="/models/acceleration">
+    GPU backends, idle unloading, and memory.
+  </Card>
+  <Card
+    title="Cloud transcription"
+    icon="cloud"
+    href="/dictation/cloud-transcription"
+  >
+    Using a cloud speech service.
   </Card>
 </CardGroup>

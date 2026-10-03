@@ -1,85 +1,77 @@
 ---
-title: "Assistant panel"
-description: "The SpeakoFlow assistant panel is a floating always-on-top chat you open with a hotkey. Learn its shortcuts, how to ask by voice or text, and resize the panel."
+title: "The quick ask"
+sidebarTitle: "Quick ask"
+description: "Hold the ask shortcut and talk, or type a question. The answer streams into a card over the app you're in, and you can copy it, insert it, or replace your selection."
 icon: "comments"
 ---
 
-A floating always-on-top chat you open with a hotkey. Ask by voice or by typing, get streaming answers, and have them read back aloud without leaving the app you are in.
+Hold the ask shortcut and talk. What you said becomes the question, and the answer streams into a card over whatever app you are in. Select some text first and the answer is about it. One question, one answer, then Copy, Insert, or Replace.
 
 ## Shortcuts
 
-| Action                 | Windows                  | macOS                       | Linux                    |
-| ---------------------- | ------------------------ | --------------------------- | ------------------------ |
-| Ask the assistant      | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
-| Show or hide the panel | `Ctrl` + `Shift` + `A`   | `Option` + `Ctrl` + `A`     | `Ctrl` + `Alt` + `A`     |
+| Action            | Windows                  | macOS         | Linux                    |
+| ----------------- | ------------------------ | ------------- | ------------------------ |
+| Ask the assistant | `Left Ctrl` + `Left Alt` | `Fn` + `Ctrl` | `Ctrl` + `Alt` + `Space` |
 
-Both are rebindable in _Settings → Assistant → Shortcuts_.
+The shortcut follows the **Hold to talk** / **Tap to toggle** switch on the Home page (and in _Settings → Shortcuts_). Hold to talk is the default: hold the keys while you talk, let go, and the answer appears.
 
-<AccordionGroup>
-  <Accordion title="How the ask hotkey handles push to talk">
-    The assistant hotkey follows the same *Push to talk* setting as dictation. It is on by default, so you hold the hotkey while you talk.
+You can change the keys by clicking them on the **Assistant** page or in _Settings → Shortcuts_.
 
-    Add `Shift` for the opposite mode. Or tap the assistant's lock key mid-recording (`Space` on Windows, `Shift` elsewhere) to go hands-free and let go of the hotkey. See [Hands-free](/dictation/hands-free).
+## Ask by voice
 
-  </Accordion>
-</AccordionGroup>
+1. Hold the ask keys and talk.
+2. A small pill appears, showing that it is listening.
+3. Let go. The pill becomes a card and the answer streams in.
 
-## What you can do
+If you selected text before pressing the keys, SpeakoFlow reads that selection and the answer is about it. A chip on the card confirms what was attached (selection, screen, or both).
 
-| Control                | What it does                                                                                                                |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Ask by voice**       | Hold _Ask the assistant_ and talk. Your transcript appears, then the answer streams in token by token.                      |
-| **Ask by text**        | Type in the message box.                                                                                                    |
-| **Collapse to a pill** | Shrink the panel to a small pill you click to talk, then expand it again when you want the full view.                       |
-| **Regenerate**         | Re-ask for a fresh answer. The old one stays in [History](/personalize/history).                                            |
-| **Copy**               | Copy any reply, or a single code block.                                                                                     |
-| **Stop**               | Interrupt a reply mid-stream. Whatever was generated so far is kept. It also silences a spoken reply that is still playing. |
-| **Clear conversation** | Start fresh. Hiding the panel keeps the conversation. Clearing it does not.                                                 |
+## Ask by typing
 
-Screenshots in the conversation appear as inline thumbnails you can click to enlarge.
+Open the panel from the tray icon or start an ask without speaking. The pill becomes a text field. Type your question and press Enter. The rest works the same way.
 
-<Tip>
-  Type `/summarize` to compact the whole conversation into a summary that
-  replaces the transcript. It is the one slash command.
-</Tip>
+On Windows the panel does not take keyboard focus when it appears, so a voice ask never pulls focus from the app you are talking about. Clicking the text field or starting to type is what gives it the keyboard.
 
-## Header controls
+## The answer card
 
-The header carries a persona switcher (see [Profiles](/personalize/profiles)) plus quick toggles for [screen vision](/assistant/screen-vision), [web search](/assistant/web-search), and [voice replies](/assistant/voice-output). Each toggle applies to the conversation you are in, so you can turn one on without opening Settings.
+When the first token arrives the pill unfolds into a card. The answer streams in as markdown: headings, lists, code blocks with their own copy button.
 
-The screen-vision toggle is sticky. Once it is on, your screen is attached to every message until you turn it off. It is hidden entirely when screen access is set to `Off`.
+Three actions sit at the bottom of the card:
 
-## Appearance
+| Action      | What it does                                                                                                |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| **Copy**    | Copies the answer to the clipboard.                                                                         |
+| **Insert**  | Pastes the answer at your cursor in the app behind the card.                                                |
+| **Replace** | Appears instead of Insert when you selected text before asking. Puts the answer in place of that selection. |
 
-Three knobs in _Settings → Assistant → Panel appearance_, with a live preview as you change them.
+If the ask set a reminder, the card confirms it and offers **Undo** instead of Insert.
 
-| Setting       | Options                         | Default    |
-| ------------- | ------------------------------- | ---------- |
-| Text size     | Small, Medium, Large            | `Medium`   |
-| Panel size    | Small, Compact, Standard, Large | `Standard` |
-| Panel opacity | 50% to 100%                     | `100%`     |
+A **Retry** button re-asks the question for a fresh answer. **Stop** (while the answer is still streaming) cuts it off and keeps what was written so far.
 
-The panel is dark only. There is no accent color and no light option, so those three settings are the whole surface. App-wide theme and text size for the settings window live in [General settings](/settings/general).
+## Where it appears
 
-<AccordionGroup>
-  <Accordion title="Resizing by hand, and small screens">
-    You can drag the panel's edges to resize it. A manual resize wins for the rest of the session, and the next app start goes back to the preset.
+The card opens at a fixed spot on screen, chosen on the **Assistant** page under **Floating panel**. Five positions are available: Middle of the screen, Top, Bottom, Left side, and Right side. The default is Top.
 
-    Whichever size you pick is clamped to the monitor the panel is on, so a large preset shrinks to fit a small display instead of running off the edge or hiding under the taskbar.
+On a multi-monitor setup, the **Which screen** setting controls which display the card opens on. The default, **Where the cursor is**, places it on the monitor your mouse is on when you press the keys.
 
-  </Accordion>
+**Text size** has four levels: Small, Medium, Large, and Extra large. Medium is the default.
 
-  <Accordion title="When to lower the opacity">
-    At `100%` the panel is fully solid. Lower values let the desktop show through, which helps when you are reading an answer against the thing you asked about.
-  </Accordion>
-</AccordionGroup>
+**Opacity** runs from 50% to 100% (default 100%). Lower values let the desktop show through the card.
+
+## How each ask works
+
+Every ask starts from an empty conversation. There is no follow-up field: one question, one answer. Hiding the panel clears it.
+
+To continue a conversation from an earlier ask, find it in [History](/personalize/history) and choose **Continue**. That opens a [conversation](/assistant/conversation), not another quick ask.
+
+## Esc
+
+Press Esc while the answer is streaming to stop it. The partial answer stays on the card.
 
 <CardGroup cols={2}>
-  <Card title="Models and providers" icon="brain" href="/assistant/providers">
-    Run it offline, on your own server, or on a cloud key.
+  <Card title="Conversations" icon="phone" href="/assistant/conversation">
+    A hands-free spoken conversation, for when one question is not enough.
   </Card>
-
-  <Card title="Behavior and memory" icon="sliders" href="/assistant/behavior">
-    Conversation context and reply length.
+  <Card title="Models and providers" icon="brain" href="/assistant/providers">
+    What powers the assistant and how to set it up.
   </Card>
 </CardGroup>

@@ -1,0 +1,24 @@
+---
+title: "Undo"
+description: "Get a dictation back after you cancel it or it fails. The recording pill offers Undo or Try again for a few seconds, and History keeps every dismissed dictation."
+icon: "rotate-ccw"
+---
+
+Cancel a recording by accident and the pill does not just vanish. It turns into a quiet line that lets you take it back.
+
+## What you see
+
+- **Cancelled a recording:** the pill says "Dismissed" with an **Undo** button.
+- **Transcription failed:** the pill says "Transcription failed" with a **Try again** button.
+
+The pill stays for about 2.5 seconds. Hover over it and it stays open until you move away. Click the button and SpeakoFlow finishes the dictation from where it stopped: transcribing if needed, cleaning up if that shortcut was used, and pasting the result.
+
+If the pill disappears before you act, the dictation is still in **History** (on the sidebar). Dismissed recordings are kept there with a **Recover** button. Recovering from History transcribes and saves the result, but does not paste it.
+
+## What is not offered
+
+A few situations do not show the Undo pill:
+
+- **Very short recordings.** Less than half a second of voice is almost always a hotkey pressed by mistake and cancelled on purpose. No pill, no History row.
+- **Assistant and in-app destinations.** Recovering pastes the text, which is the wrong destination for a question meant for the assistant or for a field inside SpeakoFlow itself.
+- **X11 on Linux without layer shell.** A clickable overlay on plain X11 would take keyboard focus from the app being dictated into, so the pill stays non-interactive there. History still keeps the recording.
