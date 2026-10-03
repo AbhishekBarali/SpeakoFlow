@@ -500,10 +500,31 @@ fn finished_update_from_note(
 }
 
 /// Called by the frontend right before it hands over to the installer.
+///
+/// On Windows it also does the app's quit cleanup. `install()` there starts
+/// the installer and ends the process with `std::process::exit`, which skips
+/// `RunEvent::Exit`, so without this a meeting recording at that moment lost
+/// its tail and stayed unfinalised until the next launch recovered it.
+/// macOS and Linux don't need it: they install in place and then relaunch
+/// through `request_restart`, which does fire `RunEvent::Exit`.
+///
+/// Async so the cleanup (up to five seconds for a meeting) runs off the main
+/// thread and the "closing and reopening" message stays on screen meanwhile.
 #[tauri::command]
 #[specta::specta]
-pub fn prepare_update_install(app: AppHandle, version: String) -> Result<(), String> {
-    let path = pending_update_path(&app).ok_or("No app data folder")?;
+pub async fn prepare_update_install(app: AppHandle, version: String) -> Result<(), String> {
+    let noted = write_pending_update(&app, version);
+    if cfg!(target_os = "windows") {
+        let handle = app.clone();
+        tauri::async_runtime::spawn_blocking(move || crate::release_before_exit(&handle))
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    noted
+}
+
+fn write_pending_update(app: &AppHandle, version: String) -> Result<(), String> {
+    let path = pending_update_path(app).ok_or("No app data folder")?;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }

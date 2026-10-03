@@ -1684,31 +1684,39 @@ pub fn run(cli_args: CliArgs) {
             // The Windows Job Object in `local_llm.rs` is the backstop for the
             // crash / hard-kill paths where even this handler cannot run.
             if let tauri::RunEvent::Exit = &event {
-                // A meeting still recording would otherwise lose its tail and
-                // leave its recordings unfinalised and unreferenced. Bounded,
-                // because draining a transcription backlog can take minutes.
-                if let Some(recorder) =
-                    app.try_state::<std::sync::Arc<meetings::session::MeetingRecorder>>()
-                {
-                    recorder.stop_before_exit(std::time::Duration::from_secs(5));
-                }
-                if let Some(mgr) =
-                    app.try_state::<std::sync::Arc<managers::local_llm::LocalLlmManager>>()
-                {
-                    mgr.stop();
-                }
-                // The cleanup engine is a second process and needs the same
-                // teardown, or it outlives the app holding its model in memory.
-                if let Some(cleanup) = app.try_state::<managers::local_llm::CleanupLlm>() {
-                    cleanup.0.stop();
-                }
-                // Destroy the native voice (if loaded) while ONNX Runtime is
-                // still intact, rather than leaving its session to the
-                // library's own teardown at process exit.
-                native_tts::release(None);
+                release_before_exit(app);
             }
             let _ = (app, event); // suppress unused warnings on non-macOS
         });
+}
+
+/// Everything that has to be put away before the process ends: a meeting
+/// still recording, both llama.cpp engines, and the native voice.
+///
+/// Runs from `RunEvent::Exit` on every ordinary quit and restart. The one exit
+/// that skips that event is an in-app update on Windows, where the updater
+/// plugin starts the installer and calls `std::process::exit` itself, so
+/// `updates::prepare_update_install` calls this first. Safe to call twice:
+/// each step is a no-op once its thing is already stopped.
+pub(crate) fn release_before_exit(app: &AppHandle) {
+    // A meeting still recording would otherwise lose its tail and leave its
+    // recordings unfinalised and unreferenced. Bounded, because draining a
+    // transcription backlog can take minutes.
+    if let Some(recorder) = app.try_state::<std::sync::Arc<meetings::session::MeetingRecorder>>() {
+        recorder.stop_before_exit(std::time::Duration::from_secs(5));
+    }
+    if let Some(mgr) = app.try_state::<std::sync::Arc<managers::local_llm::LocalLlmManager>>() {
+        mgr.stop();
+    }
+    // The cleanup engine is a second process and needs the same teardown, or
+    // it outlives the app holding its model in memory.
+    if let Some(cleanup) = app.try_state::<managers::local_llm::CleanupLlm>() {
+        cleanup.0.stop();
+    }
+    // Destroy the native voice (if loaded) while ONNX Runtime is still intact,
+    // rather than leaving its session to the library's own teardown at process
+    // exit.
+    native_tts::release(None);
 }
 
 #[cfg(test)]
