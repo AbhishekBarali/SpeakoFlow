@@ -732,10 +732,13 @@ pub fn resolve_overlay_style(style: OverlayStyle, supports_live: bool) -> Overla
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum OverlayLinger {
-    /// Gone almost at once: a glance, then out of the way.
-    Quick,
-    /// The long-standing behaviour.
+    /// Gone almost at once: a glance, then out of the way. The default: the
+    /// text has already been pasted where the user is looking, so the card
+    /// only needs to confirm it, and hovering holds it for anyone who wants to
+    /// read or copy.
     #[default]
+    Quick,
+    /// The long-standing behaviour, and the default until 1 second replaced it.
     Standard,
     Long,
     Extended,
@@ -6661,15 +6664,16 @@ mod tests {
         }
     }
 
-    /// An install from before the linger choice existed keeps the 3-second
-    /// linger it always had, and each choice is strictly longer than the last.
+    /// A fresh install keeps the finished card up for 1 second; a stored
+    /// choice is kept as it was, and each choice is strictly longer than the
+    /// last.
     #[test]
-    fn overlay_linger_defaults_to_the_old_behaviour() {
-        let stored: OverlayLinger = serde_json::from_str("\"long\"").unwrap();
-        assert_eq!(stored, OverlayLinger::Long);
+    fn overlay_linger_defaults_to_one_second() {
+        let stored: OverlayLinger = serde_json::from_str("\"standard\"").unwrap();
+        assert_eq!(stored, OverlayLinger::Standard);
         assert_eq!(
             get_default_settings().overlay_linger.duration(),
-            std::time::Duration::from_secs(3)
+            std::time::Duration::from_secs(1)
         );
         let order = [
             OverlayLinger::Quick,

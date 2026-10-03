@@ -32,7 +32,7 @@ export const OverlayLinger: React.FC<OverlayLingerProps> = React.memo(
       label: t(`settings.advanced.overlayLinger.options.${value}`),
     }));
     const selected = (getSetting("overlay_linger") ??
-      "standard") as OverlayLingerValue;
+      "quick") as OverlayLingerValue;
 
     return (
       <SettingContainer
