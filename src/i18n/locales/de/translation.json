@@ -3133,7 +3133,7 @@
   },
   "shortcutEditor": {
     "change": "Tastenkürzel für {{name}} ändern",
-    "useDefault": "Standard",
+    "useDefault": "Standard verwenden",
     "turnOff": "Ausschalten",
     "turnedOff": "Tastenkürzel für {{name}} ausgeschaltet",
     "undo": "Rückgängig"
