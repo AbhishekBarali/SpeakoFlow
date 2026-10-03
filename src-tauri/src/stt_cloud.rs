@@ -1471,12 +1471,12 @@ mod tests {
 
     #[test]
     fn azure_resolves_to_mai_on_the_users_resource() {
-        let settings = azure_settings("https://kaikidrive-ai.cognitiveservices.azure.com/");
+        let settings = azure_settings("https://contoso-speech.cognitiveservices.azure.com/");
         let cfg = resolve_cloud_stt(&settings).expect("should resolve");
         assert_eq!(cfg.provider.kind, CloudSttKind::AzureSpeech);
         assert_eq!(
             cfg.base_url,
-            "https://kaikidrive-ai.cognitiveservices.azure.com"
+            "https://contoso-speech.cognitiveservices.azure.com"
         );
         assert_eq!(cfg.model, "MAI-Transcribe-2");
         assert!(!cfg.translate);
@@ -1485,15 +1485,15 @@ mod tests {
     /// Every shape Azure's own screens hand out has to land on the same origin.
     #[test]
     fn azure_endpoints_are_normalised_from_whatever_the_portal_shows() {
-        let resource = Some("https://kaikidrive-ai.cognitiveservices.azure.com".to_string());
+        let resource = Some("https://contoso-speech.cognitiveservices.azure.com".to_string());
         for pasted in [
-            "https://kaikidrive-ai.cognitiveservices.azure.com/",
-            "kaikidrive-ai.cognitiveservices.azure.com",
-            "https://kaikidrive-ai.services.ai.azure.com/api/projects/kaikidrive-ai-project",
-            "https://kaikidrive-ai.openai.azure.com/",
-            "https://kaikidrive-ai.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15",
-            "kaikidrive-ai",
-            "  KaikiDrive-AI  ",
+            "https://contoso-speech.cognitiveservices.azure.com/",
+            "contoso-speech.cognitiveservices.azure.com",
+            "https://contoso-speech.services.ai.azure.com/api/projects/contoso-speech-project",
+            "https://contoso-speech.openai.azure.com/",
+            "https://contoso-speech.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15",
+            "contoso-speech",
+            "  Contoso-Speech  ",
         ] {
             assert_eq!(azure_speech_base_url(pasted), resource, "pasted {pasted:?}");
         }
