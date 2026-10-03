@@ -2223,7 +2223,13 @@ impl ShortcutAction for TranscribeAction {
 
         let binding_id = binding_id.to_string();
         change_tray_icon(app, TrayIconState::Recording);
-        show_recording_overlay(app);
+        // Held to talk, these keys may still turn out to be the start of the
+        // ask's (Fn on the way to Fn+Ctrl) or cleanup's. The recording is
+        // already running; the pill waits until the press has settled
+        // (`shortcut::chord`), so it never flashes up on the way to another
+        // shortcut.
+        let hold_back = shortcut::chord::holds_back(&get_settings(app), &binding_id, shortcut_str);
+        shortcut::chord::reveal_when_settled(app, hold_back, show_recording_overlay);
 
         // Get the microphone mode to determine audio feedback timing
         let settings = get_settings(app);
@@ -2330,6 +2336,7 @@ impl ShortcutAction for TranscribeAction {
         } else {
             // Starting failed (for example due to blocked microphone permissions).
             // Revert UI state so we don't stay stuck in the recording overlay.
+            shortcut::chord::forget();
             utils::hide_recording_overlay(app);
             change_tray_icon(app, TrayIconState::Idle);
             // Nothing is recording, so a call this was holding listens again.
@@ -2368,6 +2375,8 @@ impl ShortcutAction for TranscribeAction {
     fn stop(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         let stop_time = Instant::now();
         debug!("TranscribeAction::stop called for binding: {}", binding_id);
+        // Let go before the press settled: it was this shortcut after all.
+        shortcut::chord::reveal_now(app);
 
         let ah = app.clone();
         let rm = Arc::clone(&app.state::<Arc<AudioRecordingManager>>());
@@ -3275,7 +3284,7 @@ impl ShortcutAction for CancelAction {
 struct AssistantAction;
 
 impl ShortcutAction for AssistantAction {
-    fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
+    fn start(&self, app: &AppHandle, binding_id: &str, shortcut_str: &str) {
         debug!("AssistantAction::start called for binding: {}", binding_id);
 
         // A spoken question needs the speech model as much as a dictation does.
@@ -3283,10 +3292,12 @@ impl ShortcutAction for AssistantAction {
             return;
         }
 
-        // A quick ask always owns this surface, including after a call failed
-        // before obtaining a backend session ticket.
-        crate::voice_conversation::end(app);
-        let _ = app.emit("assistant-quick-ask", ());
+        // Held to talk, these keys may still become the call's (Ctrl+Alt on the
+        // way to Ctrl+Alt+C). Recording starts now regardless; what the user
+        // would see, and ending a call that is running, waits until the press
+        // has settled (`shortcut::chord`), so a call never opens with the ask
+        // flashing up first and the call key can hang up the call it opened.
+        let hold_back = shortcut::chord::holds_back(&get_settings(app), binding_id, shortcut_str);
 
         // Harvest whatever the user has selected, now, while their selection and
         // focus are still where they were when they pressed the shortcut. By the
@@ -3328,8 +3339,10 @@ impl ShortcutAction for AssistantAction {
         }
 
         // Starting a new question interrupts the previous spoken answer — the
-        // assistant must never talk over the user's next recording.
-        crate::tts::stop_all(app);
+        // assistant must never talk over the user's next recording. That
+        // happens in the reveal below, once the press has settled: a press that
+        // turns out to be the call key hanging up must not first cut off the
+        // call's reply.
 
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();
@@ -3366,20 +3379,27 @@ impl ShortcutAction for AssistantAction {
             }
         }
 
-        // A quick ask is one job, not a continuation. Reset before the overlay is
-        // presented, while panel visibility still describes the *previous* state —
-        // that is what tells a fresh ask apart from a follow-up to the card the
-        // user is looking at.
-        crate::assistant::begin_quick_ask_exchange(app);
-        // "listening" goes out before the show is queued, never after. The show
-        // runs on the main thread and announces itself with
-        // `assistant-panel-shown`; emitted second, "listening" could arrive after
-        // that, and the panel's first frame was then the idle quick ask: its
-        // typing bar, flashed for a moment in a voice-only ask.
-        crate::assistant::emit_state(app, "listening");
-        // Show the configured non-focus-stealing overlay right away so the user
-        // sees the listening state without opening the full assistant window.
-        crate::assistant::show_assistant_voice_overlay(app);
+        shortcut::chord::reveal_when_settled(app, hold_back, |app| {
+            crate::tts::stop_all(app);
+            // A quick ask always owns this surface, including after a call
+            // failed before obtaining a backend session ticket.
+            crate::voice_conversation::end(app);
+            let _ = app.emit("assistant-quick-ask", ());
+            // A quick ask is one job, not a continuation. Reset before the
+            // overlay is presented, while panel visibility still describes the
+            // *previous* state — that is what tells a fresh ask apart from a
+            // follow-up to the card the user is looking at.
+            crate::assistant::begin_quick_ask_exchange(app);
+            // "listening" goes out before the show is queued, never after. The
+            // show runs on the main thread and announces itself with
+            // `assistant-panel-shown`; emitted second, "listening" could arrive
+            // after that, and the panel's first frame was then the idle quick
+            // ask: its typing bar, flashed for a moment in a voice-only ask.
+            crate::assistant::emit_state(app, "listening");
+            // Show the configured non-focus-stealing overlay so the user sees
+            // the listening state without opening the full assistant window.
+            crate::assistant::show_assistant_voice_overlay(app);
+        });
 
         // The assistant panel renders its own listening/transcribing state, so
         // we intentionally do NOT show the STT recording lozenge here — that
@@ -3407,6 +3427,8 @@ impl ShortcutAction for AssistantAction {
         if recording_error.is_none() {
             shortcut::register_cancel_shortcut(app);
         } else {
+            // The failure is said on the panel, so it must be on screen.
+            shortcut::chord::reveal_now(app);
             change_tray_icon(app, TrayIconState::Idle);
             crate::assistant::emit_state(app, "idle");
             if let Some(err) = recording_error {
@@ -3442,6 +3464,8 @@ impl ShortcutAction for AssistantAction {
         // the assistant's answer generation so Esc can stop a streaming reply;
         // the pipeline's FinishGuard drops it when the whole turn completes.
         debug!("AssistantAction::stop called for binding: {}", binding_id);
+        // Let go before the press settled: it was the ask after all.
+        shortcut::chord::reveal_now(app);
 
         let ah = app.clone();
         let rm = Arc::clone(&app.state::<Arc<AudioRecordingManager>>());

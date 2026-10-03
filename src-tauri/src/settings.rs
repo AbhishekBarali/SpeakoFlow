@@ -3828,9 +3828,10 @@ pub fn get_default_settings() -> AppSettings {
     let default_assistant_shortcut = "ctrl+alt+space";
 
     // The call is the ask keys plus C. A deliberate tap, so it can have a
-    // letter. The hotkey engine holds the ask back while its keys could still
-    // become the call's (`handy_keys::CHORD_GRACE`), so pressing all three
-    // starts a call and never an ask. Left-side on Windows for the same AltGr
+    // letter. Pressing all three starts a call and never shows an ask on the
+    // way: tapped, the ask only fires once its keys are let go with nothing in
+    // between; held, its panel waits until the press has settled
+    // (`shortcut::chord`). Left-side on Windows for the same AltGr
     // reason: AltGr+C types ć on a Polish keyboard. Ctrl+Shift+C, the previous
     // Windows default, was copy in every terminal and DevTools in browsers.
     #[cfg(target_os = "macos")]

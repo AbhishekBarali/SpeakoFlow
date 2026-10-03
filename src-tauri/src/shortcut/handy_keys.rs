@@ -61,6 +61,9 @@ enum ManagerCommand {
         binding_id: String,
         response: Sender<Result<(), String>>,
     },
+    /// Fire modifier-only hotkeys on release (Tap to toggle) or on press
+    /// (Hold to talk). See `HotkeyManager::set_fire_on_release`.
+    FireOnRelease(bool),
     Shutdown,
 }
 
@@ -133,6 +136,9 @@ impl HandyKeysState {
                 return;
             }
         };
+        // With Tap to toggle, a modifier-only shortcut fires when its keys are
+        // let go, so the ask never starts on the way to the call's Ctrl+Alt+C.
+        manager.set_fire_on_release(!get_settings(&app).push_to_talk);
 
         // Maps binding IDs to HotkeyIds and hotkey strings
         let mut binding_to_hotkey: HashMap<String, HotkeyId> = HashMap::new();
@@ -185,6 +191,7 @@ impl HandyKeysState {
                     );
                     let _ = response.send(result);
                 }
+                ManagerCommand::FireOnRelease(on) => manager.set_fire_on_release(on),
                 ManagerCommand::Shutdown => {
                     info!("handy-keys manager thread shutting down");
                     break;
@@ -481,6 +488,19 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
     app.manage(state);
     info!("handy-keys shortcuts initialized");
     Ok(())
+}
+
+/// Tell the hotkey engine whether recording shortcuts are held or tapped, so it
+/// fires modifier-only ones on press or on release. No-op when this engine is
+/// not running.
+pub fn apply_recording_mode(app: &AppHandle) {
+    let Some(state) = app.try_state::<HandyKeysState>() else {
+        return;
+    };
+    let on = !get_settings(app).push_to_talk;
+    if let Ok(sender) = state.command_sender.lock() {
+        let _ = sender.send(ManagerCommand::FireOnRelease(on));
+    };
 }
 
 /// Register the cancel shortcut (called when recording starts)

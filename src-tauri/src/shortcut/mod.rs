@@ -9,6 +9,7 @@
 //! The active implementation is determined by the `keyboard_implementation`
 //! setting and can be changed at runtime.
 
+pub mod chord;
 mod handler;
 pub mod handy_keys;
 mod tauri_impl;
@@ -605,6 +606,7 @@ pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.push_to_talk = enabled;
     settings::write_settings(&app, settings);
+    handy_keys::apply_recording_mode(&app);
     Ok(())
 }
 

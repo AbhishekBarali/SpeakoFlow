@@ -43,17 +43,12 @@ pub fn handle_shortcut_event(
 
     // Transcribe/assistant bindings are handled by the coordinator.
     if is_transcribe_binding(base_id) {
-        // The assistant's own shortcut is a quick ask, which takes the window
-        // over, so it ends a call. Dictation does not: it holds the call's
-        // microphone while it records (see `voice_conversation::DictationTracker`)
-        // and the call carries on afterwards. Hanging up here used to throw the
-        // call's whole conversation away just to type a sentence somewhere else.
-        if is_pressed
-            && crate::assistant::is_assistant_binding(base_id)
-            && crate::voice_conversation::is_active(app)
-        {
-            crate::voice_conversation::end(app);
-        }
+        // The quick ask ends a running call, since it takes the window over, but
+        // it does so itself, once its press has settled (`AssistantAction`):
+        // ending it here, on the press, meant the call key could never hang up
+        // a call, because its first two keys are the ask's. Dictation does not
+        // end a call at all: it holds the call's microphone while it records
+        // (see `voice_conversation::DictationTracker`).
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
             // Every recording shortcut — dictation, dictation + post-processing,
             // and the assistant — follows the single Push-to-talk setting:

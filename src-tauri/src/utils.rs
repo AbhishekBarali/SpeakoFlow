@@ -77,6 +77,14 @@ enum CancelOrigin {
 fn cancel_operation(app: &AppHandle, origin: CancelOrigin) {
     info!("Initiating operation cancellation...");
 
+    // A press that was still holding back its window (`shortcut::chord`) never
+    // showed anything, so nothing it would have shown must appear now. And if
+    // it is being withdrawn rather than cancelled, it had touched nothing of
+    // the assistant yet either: that is how the call key hangs up a call whose
+    // reply is playing without the ask it starts with stopping the reply first.
+    let never_shown = shortcut::chord::forget();
+    let quiet = origin == CancelOrigin::AbortedPress && never_shown;
+
     // Unregister the cancel shortcut asynchronously
     shortcut::unregister_cancel_shortcut(app);
 
@@ -86,10 +94,11 @@ fn cancel_operation(app: &AppHandle, origin: CancelOrigin) {
     // Decided before anything is torn down. A cancel during a dictation that is
     // running beside a call is aimed at the dictation: the call's reply, its
     // voice and its state are left exactly as they are.
-    let spare_call = crate::voice_conversation::cancel_spares_call(
-        crate::voice_conversation::is_active(app),
-        crate::voice_conversation::dictation_in_flight(),
-    );
+    let spare_call = quiet
+        || crate::voice_conversation::cancel_spares_call(
+            crate::voice_conversation::is_active(app),
+            crate::voice_conversation::dictation_in_flight(),
+        );
     let cancelled = audio_manager.cancel_recording();
     let recording_was_active = cancelled.is_some();
     if recording_was_active {
