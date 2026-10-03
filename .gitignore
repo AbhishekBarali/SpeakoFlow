@@ -117,3 +117,6 @@ build/*.AppImage
 
 # Local research cache
 .firecrawl/
+
+# Translation maintenance scratch files (scripts, reports, working copies)
+.i18n-*

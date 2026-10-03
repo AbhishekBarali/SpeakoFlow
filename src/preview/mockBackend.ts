@@ -541,7 +541,7 @@ const settings: Json = {
   selected_model: "parakeet-unified-en-0.6b",
   custom_words: fresh
     ? []
-    : ["Abhishek Barali", "SpeakoFlow", "firecrawl", "Gintama", "Tauri"],
+    : ["Maya Okafor", "SpeakoFlow", "Kubernetes", "Figma", "Tauri"],
   post_process_enabled: true,
   post_process_on_dictation: params.get("cleanupShortcut") === "dictation",
   post_process_provider_id:
@@ -660,28 +660,20 @@ const settings: Json = {
   assistant_memory_detail: "detailed",
   assistant_memory: {
     about_you:
-      "The user is an entrepreneur managing multiple projects, building a desktop voice assistant in Rust and TypeScript. Prefers short, direct answers and dislikes having their name repeated.",
+      "Product designer at a small software studio. Writes a lot of email and design reviews, and prefers short, direct answers with the main point first.",
     notes: [
-      ["Likes eating apples.", "high", "auto"],
-      [
-        "Enjoys playful praise, including being called the Apple God.",
-        "high",
-        "auto",
-      ],
-      ["Prefers not to have their name repeated often.", "high", "auto"],
-      [
-        "Likes being called “boss man” sparingly and only when it fits.",
-        "high",
-        "auto",
-      ],
-      ["Works mostly in Rust and TypeScript.", "high", "user"],
-      ["Studies alone for exams in the evenings.", "medium", "auto"],
-      ["Uses Groq and ElevenLabs as cloud providers.", "medium", "auto"],
-      ["Lives in Nepal (UTC+5:45).", "high", "user"],
+      ["Leads design for a team of six.", "high", "user"],
+      ["Prefers answers as short bullet points.", "high", "auto"],
+      ["Works mostly in Figma and Notion.", "high", "auto"],
+      ["Writes client emails in a friendly but brief tone.", "high", "auto"],
+      ["Based in Lisbon (UTC+0).", "high", "user"],
+      ["Has a weekly design review on Tuesday mornings.", "medium", "auto"],
       ["Prefers metric units.", "medium", "auto"],
+      ["Is learning Portuguese.", "medium", "auto"],
       ["Wants reminders phrased as short commands.", "low", "auto"],
-      ["Drinks coffee before noon only.", "low", "auto"],
-      ["Keeps a separate work and study calendar.", "medium", "auto"],
+      ["Likes examples before theory.", "medium", "auto"],
+      ["Avoids meetings after 4 pm.", "low", "auto"],
+      ["Keeps separate work and personal calendars.", "medium", "auto"],
     ].map(([text, confidence, source], index) => ({
       id: `note-${index}`,
       text,
@@ -801,10 +793,10 @@ const history = fresh
           "Remind me to review the pull request after lunch.",
         ]
       : [
-          "Dit is de lijn, and then the rest of the sentence came through in English.",
-          "I see the problem is basically simple. I'm using small models, especially older ones, and not having access to the new models is probably the problem.",
-          "Right now I'm going to use another DeepSeek model. That will give you one more example to see how good it really is.",
-          "I don't think the outfit was anywhere good.",
+          "Dit is de planning voor volgende week, and the rest of the update is in English.",
+          "The loading spinner hangs on slow connections. Let's add a timeout and show a retry button after ten seconds.",
+          "Let's try the smaller model first and compare the results before we switch everything over.",
+          "I liked the second layout better. The spacing feels calmer.",
           "Can you send the invoice to Sara before the call on Friday?",
           "Remind me to review the pull request after lunch.",
         ]
@@ -1453,9 +1445,9 @@ const handlers: Record<string, (args: Json) => unknown> = {
     gpu_devices: [
       {
         id: 0,
-        name: "NVIDIA GeForce RTX 4070 Ti SUPER",
+        name: "NVIDIA GeForce RTX 4060",
         kind: "dedicated",
-        total_vram_mb: 16076,
+        total_vram_mb: 8188,
       },
     ],
     transcribe_cpp_devices: [],
