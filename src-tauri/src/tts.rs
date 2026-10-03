@@ -1545,6 +1545,32 @@ fn elevenlabs_supports_stitching(model: &str) -> bool {
     !model.to_ascii_lowercase().contains("v3")
 }
 
+/// The `voice_settings` overrides for an ElevenLabs request, or `None` when the
+/// user changed nothing. Each field is sent only when it differs from "leave
+/// it to the voice", so the voice's own saved settings keep applying to
+/// everything the user did not touch.
+///
+/// - Speed is limited to ElevenLabs' 0.7x–1.2x and sent only off 1x.
+/// - Stability is the Expressiveness control (lower is more expressive) and
+///   sent only once the user has set it.
+fn elevenlabs_voice_settings(settings: &AppSettings) -> Option<serde_json::Value> {
+    let mut voice_settings = serde_json::Map::new();
+    let speed = settings.assistant_tts_speed.clamp(0.7, 1.2);
+    if (speed - 1.0).abs() > f64::EPSILON {
+        voice_settings.insert("speed".into(), serde_json::json!(speed));
+    }
+    if let Some(stability) = settings
+        .assistant_tts_elevenlabs_stability
+        .filter(|s| s.is_finite())
+    {
+        // Two decimals: the control moves in 0.05 steps, and an f32 widened to
+        // f64 would otherwise serialize as 0.30000001192092896.
+        let stability = (f64::from(stability.clamp(0.0, 1.0)) * 100.0).round() / 100.0;
+        voice_settings.insert("stability".into(), serde_json::json!(stability));
+    }
+    (!voice_settings.is_empty()).then_some(serde_json::Value::Object(voice_settings))
+}
+
 /// POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
 ///
 /// When earlier chunks of the same reply are supplied via
@@ -1581,12 +1607,8 @@ async fn fetch_elevenlabs_speech(
         "text": text,
         "model_id": model,
     });
-    // ElevenLabs exposes speed inside `voice_settings`, limited to 0.7x–1.2x.
-    // Only send it when the user actually changed the rate so the voice's own
-    // saved settings (stability, similarity) are otherwise left untouched.
-    let speed = settings.assistant_tts_speed.clamp(0.7, 1.2);
-    if (speed - 1.0).abs() > f64::EPSILON {
-        body["voice_settings"] = serde_json::json!({ "speed": speed });
+    if let Some(voice_settings) = elevenlabs_voice_settings(settings) {
+        body["voice_settings"] = voice_settings;
     }
     if !request.previous_request_ids.is_empty() && elevenlabs_supports_stitching(&model) {
         let ids: Vec<&String> = request
@@ -3172,6 +3194,37 @@ mod tests {
         assert_eq!(speed_for(provider("groq").unwrap(), &settings), None);
         settings.assistant_tts_speed = 1.0;
         assert_eq!(speed_for(provider("openai").unwrap(), &settings), None);
+    }
+
+    #[test]
+    fn elevenlabs_voice_settings_send_only_what_the_user_changed() {
+        use super::elevenlabs_voice_settings;
+        let mut settings = get_default_settings();
+        // Untouched: no override at all, so the voice's saved settings apply
+        // exactly as before the Expressiveness control existed.
+        assert_eq!(elevenlabs_voice_settings(&settings), None);
+
+        settings.assistant_tts_elevenlabs_stability = Some(0.3);
+        assert_eq!(
+            elevenlabs_voice_settings(&settings),
+            Some(serde_json::json!({ "stability": 0.3 }))
+        );
+
+        settings.assistant_tts_speed = 3.0;
+        assert_eq!(
+            elevenlabs_voice_settings(&settings),
+            Some(serde_json::json!({ "speed": 1.2, "stability": 0.3 }))
+        );
+
+        settings.assistant_tts_elevenlabs_stability = None;
+        assert_eq!(
+            elevenlabs_voice_settings(&settings),
+            Some(serde_json::json!({ "speed": 1.2 }))
+        );
+
+        settings.assistant_tts_speed = 1.0;
+        settings.assistant_tts_elevenlabs_stability = Some(f32::NAN);
+        assert_eq!(elevenlabs_voice_settings(&settings), None);
     }
 
     #[test]

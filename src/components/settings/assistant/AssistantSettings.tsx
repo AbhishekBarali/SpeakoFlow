@@ -28,6 +28,7 @@ import {
   type ModelChoice,
   type ModelUnloadTimeout,
 } from "@/bindings";
+import { ElevenLabsExpressiveness } from "./ElevenLabsExpressiveness";
 import {
   Dropdown,
   SettingContainer,
@@ -1866,6 +1867,29 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     />
                   </SettingContainer>
                 </>
+              )}
+
+              {/* ElevenLabs only: no other engine reads this setting. */}
+              {ttsEngine === "elevenlabs" && (
+                <ElevenLabsExpressiveness
+                  stability={settings?.assistant_tts_elevenlabs_stability}
+                  onCommit={(stability) =>
+                    // Queued with the other voice saves, so pressing Test
+                    // right after a drag hears the new setting.
+                    queueTtsTask(async () => {
+                      try {
+                        await runTtsCommand(
+                          commands.setAssistantTtsElevenlabsStability(
+                            stability,
+                          ),
+                        );
+                      } catch (error) {
+                        toast.error(String(error));
+                      }
+                      await refreshSettings();
+                    })
+                  }
+                />
               )}
 
               <SettingContainer

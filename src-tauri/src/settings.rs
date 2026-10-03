@@ -1592,6 +1592,12 @@ pub struct AppSettings {
     /// voice quiet with no reachable way to fix it.
     #[serde(default = "default_assistant_tts_volume")]
     pub assistant_tts_volume: f32,
+    /// ElevenLabs `voice_settings.stability` (0.0–1.0), shown in the UI as
+    /// "Expressiveness" (1 − stability). `None` sends nothing, so the voice's
+    /// own saved settings apply exactly as they did before this existed; only
+    /// the ElevenLabs engine reads it.
+    #[serde(default)]
+    pub assistant_tts_elevenlabs_stability: Option<f32>,
     /// How long a hands-free conversation waits for you to finish speaking.
     #[serde(default)]
     pub assistant_conversation_pace: ConversationPace,
@@ -3474,6 +3480,14 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_tts_volume = default_assistant_tts_volume();
         changed = true;
     }
+    // A hand-edited or corrupted value falls back to the voice's own setting
+    // rather than sending ElevenLabs something it rejects.
+    if let Some(stability) = settings.assistant_tts_elevenlabs_stability {
+        if !stability.is_finite() || !(0.0..=1.0).contains(&stability) {
+            settings.assistant_tts_elevenlabs_stability = None;
+            changed = true;
+        }
+    }
     // "last_used" meant "the display I last dragged it to", a remembered position
     // that no longer exists. The quick ask follows the cursor instead.
     if settings.assistant_ask_display == "last_used" {
@@ -3994,6 +4008,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_kokoro_device: default_assistant_tts_kokoro_device(),
         assistant_tts_speed: default_assistant_tts_speed(),
         assistant_tts_volume: default_assistant_tts_volume(),
+        assistant_tts_elevenlabs_stability: None,
         assistant_conversation_pace: ConversationPace::default(),
         assistant_conversation_sensitivity: ConversationSensitivity::default(),
         assistant_max_history_messages: default_assistant_max_history_messages(),

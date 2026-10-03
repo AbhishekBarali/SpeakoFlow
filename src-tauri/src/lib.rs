@@ -1185,6 +1185,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_report_webgpu,
             commands::assistant::set_assistant_tts_speed,
             commands::assistant::set_assistant_tts_volume,
+            commands::assistant::set_assistant_tts_elevenlabs_stability,
             commands::assistant::set_assistant_conversation_pace,
             commands::assistant::set_assistant_conversation_sensitivity,
             commands::assistant::set_assistant_panel_opacity,

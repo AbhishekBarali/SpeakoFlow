@@ -604,6 +604,26 @@ pub fn set_assistant_tts_volume(app: AppHandle, volume: f32) -> Result<(), Strin
     Ok(())
 }
 
+/// ElevenLabs voice stability (0.0–1.0; lower is more expressive). `None`
+/// returns to the voice's own saved setting. Only the ElevenLabs engine reads
+/// it, and it takes effect on the next spoken clip.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_tts_elevenlabs_stability(
+    app: AppHandle,
+    stability: Option<f32>,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_tts_elevenlabs_stability = match stability {
+        Some(value) if value.is_finite() => Some(value.clamp(0.0, 1.0)),
+        Some(_) => return Err("Stability must be a number".to_string()),
+        None => None,
+    };
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 /// How long a hands-free conversation waits for you to finish speaking before it
 /// answers. Persisted, so it applies to every call rather than only the one it
 /// was changed in.

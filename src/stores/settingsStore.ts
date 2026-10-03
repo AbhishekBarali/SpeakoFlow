@@ -141,6 +141,8 @@ const settingUpdaters: {
     commands.changeAudioFeedbackVolumeSetting(value as number),
   assistant_tts_volume: (value) =>
     commands.setAssistantTtsVolume(value as number),
+  assistant_tts_elevenlabs_stability: (value) =>
+    commands.setAssistantTtsElevenlabsStability(value as number | null),
   assistant_tts_kokoro_device: (value) =>
     commands.setAssistantTtsKokoroDevice(value as string),
   assistant_conversation_pace: (value) =>

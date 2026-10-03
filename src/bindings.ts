@@ -2194,6 +2194,19 @@ async setAssistantTtsVolume(volume: number) : Promise<Result<null, string>> {
 }
 },
 /**
+ * ElevenLabs voice stability (0.0–1.0; lower is more expressive). `None`
+ * returns to the voice's own saved setting. Only the ElevenLabs engine reads
+ * it, and it takes effect on the next spoken clip.
+ */
+async setAssistantTtsElevenlabsStability(stability: number | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_tts_elevenlabs_stability", { stability }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * How long a hands-free conversation waits for you to finish speaking before it
  * answers. Persisted, so it applies to every call rather than only the one it
  * was changed in.
@@ -3757,6 +3770,13 @@ assistant_tts_speed?: number;
  * voice quiet with no reachable way to fix it.
  */
 assistant_tts_volume?: number; 
+/**
+ * ElevenLabs `voice_settings.stability` (0.0–1.0), shown in the UI as
+ * "Expressiveness" (1 − stability). `None` sends nothing, so the voice's
+ * own saved settings apply exactly as they did before this existed; only
+ * the ElevenLabs engine reads it.
+ */
+assistant_tts_elevenlabs_stability?: number | null; 
 /**
  * How long a hands-free conversation waits for you to finish speaking.
  */
