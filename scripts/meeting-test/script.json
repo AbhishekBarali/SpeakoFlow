@@ -56,7 +56,10 @@
       "speaker": "alex",
       "text": "Alright, let us get started. This is the launch checkpoint for the third quarter release, and the only thing I really need out of the next twenty minutes is a yes or no on whether we ship on the twelfth."
     },
-    { "speaker": "me", "text": "Sounds good. I have the build notes open, so I can walk through what is actually done versus what we are still hoping gets done." },
+    {
+      "speaker": "me",
+      "text": "Sounds good. I have the build notes open, so I can walk through what is actually done versus what we are still hoping gets done."
+    },
     {
       "speaker": "priya",
       "text": "Before we go into the list, I want to flag something about the migration. We have not run it against a production sized database even once, and I am not comfortable calling that a small risk anymore."
@@ -69,7 +72,10 @@
       "speaker": "priya",
       "text": "A long time is the problem, Sam. If it takes forty minutes on a large account, the app is unusable for forty minutes, and we have no progress indicator to show while that happens. That is what I want to fix before we ship."
     },
-    { "speaker": "me", "text": "Okay, so that is the real decision on the table. Not whether the migration is safe, but whether we ship without knowing how long it takes." },
+    {
+      "speaker": "me",
+      "text": "Okay, so that is the real decision on the table. Not whether the migration is safe, but whether we ship without knowing how long it takes."
+    },
     {
       "speaker": "alex",
       "text": "Then let us settle it with a measurement instead of an argument. Priya, can you restore last week's production snapshot into staging and time the migration against it? If it comes in under five minutes we ship on the twelfth as planned."
@@ -78,18 +84,33 @@
       "speaker": "priya",
       "text": "I can have that number by Thursday morning. I will need someone to give me access to the snapshot bucket though, because my credentials only cover staging right now and I cannot read the backups."
     },
-    { "speaker": "sam", "text": "I will sort out the bucket access today. It is a one line policy change on my side, and I would rather hand you the access than argue about the risk for another twenty minutes." },
-    { "speaker": "me", "text": "I will take the progress indicator either way. Even if the migration turns out to be fast, a silent thirty second startup looks like a hang, and we already have two support tickets that say exactly that." },
+    {
+      "speaker": "sam",
+      "text": "I will sort out the bucket access today. It is a one line policy change on my side, and I would rather hand you the access than argue about the risk for another twenty minutes."
+    },
+    {
+      "speaker": "me",
+      "text": "I will take the progress indicator either way. Even if the migration turns out to be fast, a silent thirty second startup looks like a hang, and we already have two support tickets that say exactly that."
+    },
     {
       "speaker": "alex",
       "text": "Good. So to read it back: Priya times the migration against a production snapshot by Thursday, Sam unblocks the bucket access today, and the progress indicator ships regardless of the number. If Thursday's number is over five minutes, we slip to the nineteenth."
     },
-    { "speaker": "sam", "text": "That works for me. One more thing worth noting is that the nineteenth collides with the conference, so if we slip, nobody is around to watch the rollout. We would effectively be shipping on the twenty second." },
+    {
+      "speaker": "sam",
+      "text": "That works for me. One more thing worth noting is that the nineteenth collides with the conference, so if we slip, nobody is around to watch the rollout. We would effectively be shipping on the twenty second."
+    },
     {
       "speaker": "priya",
       "text": "That is a good catch, and honestly it makes me want the number even more. I would rather find out on Thursday that we need another week than find out on the twelfth while customers are waiting on a progress bar we do not have."
     },
-    { "speaker": "me", "text": "Agreed. I will write this up and send it round after the call so we are all holding the same three commitments and the same fallback date." },
-    { "speaker": "alex", "text": "Perfect. Thanks everyone, let us reconvene Thursday afternoon once Priya has the timing, and we will make the call then rather than guessing now." }
+    {
+      "speaker": "me",
+      "text": "Agreed. I will write this up and send it round after the call so we are all holding the same three commitments and the same fallback date."
+    },
+    {
+      "speaker": "alex",
+      "text": "Perfect. Thanks everyone, let us reconvene Thursday afternoon once Priya has the timing, and we will make the call then rather than guessing now."
+    }
   ]
 }

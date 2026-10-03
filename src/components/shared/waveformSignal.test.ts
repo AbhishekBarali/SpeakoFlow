@@ -3,6 +3,7 @@ import {
   MAX_HEIGHT,
   REST_HEIGHT,
   WORK_REST_HEIGHT,
+  progressWave,
   speechWave,
   stepSpring,
   voiceEnergy,
@@ -200,5 +201,44 @@ describe("working ripple", () => {
     for (const seconds of [NaN, Infinity, -5])
       for (const value of workingWave(5, seconds))
         expect(Number.isFinite(value)).toBe(true);
+  });
+});
+
+describe("progress fill", () => {
+  test("bars behind the fill are raised and lit, bars ahead are not", () => {
+    const { heights, covered } = progressWave(14, 0.5, 0);
+    expect(covered.slice(0, 7).every((c) => c === 1)).toBe(true);
+    expect(covered.slice(7).every((c) => c === 0)).toBe(true);
+    expect(heights[2]).toBeGreaterThan(heights[12]);
+    expect(heights[12]).toBeGreaterThan(REST_HEIGHT);
+  });
+
+  test("an empty fill is low and a finished one is level", () => {
+    const empty = progressWave(14, 0, 0);
+    expect(empty.covered.every((c) => c === 0)).toBe(true);
+    const full = progressWave(14, 1, 0);
+    expect(full.covered.every((c) => c === 1)).toBe(true);
+    // No crest left standing at the end: a done row reads as finished.
+    const spread = Math.max(...full.heights) - Math.min(...full.heights);
+    expect(spread).toBeLessThan(0.01);
+  });
+
+  test("a growing fill never lowers what it has already covered", () => {
+    let previous = progressWave(14, 0, 0).covered;
+    for (let f = 0.01; f <= 1; f += 0.01) {
+      const { covered } = progressWave(14, f, 0);
+      covered.forEach((c, i) => expect(c).toBeGreaterThanOrEqual(previous[i]));
+      previous = covered;
+    }
+  });
+
+  test("stays within the working range for any input", () => {
+    for (const fill of [NaN, -1, 0, 0.3, 1, 4])
+      for (const seconds of [NaN, 0, 3.7])
+        for (const height of progressWave(5, fill, seconds).heights) {
+          expect(Number.isFinite(height)).toBe(true);
+          expect(height).toBeGreaterThan(REST_HEIGHT);
+          expect(height).toBeLessThan(MAX_HEIGHT);
+        }
   });
 });

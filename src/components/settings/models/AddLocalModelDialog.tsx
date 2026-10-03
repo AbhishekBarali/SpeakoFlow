@@ -50,7 +50,6 @@ export const AddLocalModelDialog: React.FC<AddLocalModelDialogProps> = ({
     void refreshFolders();
   }, [isOpen, refreshFolders]);
 
-
   const handlePickFiles = async () => {
     setPickingFiles(true);
     try {

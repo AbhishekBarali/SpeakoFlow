@@ -167,12 +167,12 @@
       "tabs": {
         "dictate": "Diktování",
         "ask": "Asistent",
-        "call": "Hovor"
+        "call": "Konverzace"
       },
       "keys": {
         "hold": "Podržte a mluvte",
         "tap": "Stiskněte pro start, znovu pro stop",
-        "call": "Stiskněte pro zahájení, znovu pro zavěšení"
+        "call": "Stiskněte pro zahájení, znovu pro ukončení"
       },
       "steps": {
         "label": "Jak to funguje",
@@ -477,17 +477,13 @@
       "languages_few": "{{count}} jazyky",
       "languages_many": "{{count}} jazyka",
       "languages_other": "{{count}} jazyků",
-      "tags": {
-        "english": "Nejrychlejší",
-        "languages": "Rozpozná jazyk",
-        "small": "Nejmenší",
-        "accurate": "Nejpřesnější",
-        "widest": "Pomalejší"
+      "about": {
+        "english": "Rychlý a přesný, pro angličtinu.",
+        "languages": "Sám pozná, jakým jazykem mluvíte.",
+        "small": "Malý a rychlý. Vhodný pro starší počítače.",
+        "accurate": "Nejpřesnější, ale větší ke stažení a pomalejší.",
+        "widest": "Zvládá nejvíc jazyků, ale běží pomaleji."
       },
-      "more_one": "{{count}} další model",
-      "more_few": "{{count}} další modely",
-      "more_many": "{{count}} dalšího modelu",
-      "more_other": "{{count}} dalších modelů",
       "anytime": "Další modely můžete přidat kdykoli.",
       "download": "Stáhnout a pokračovat",
       "continue": "Pokračovat",
@@ -646,8 +642,8 @@
             "description": "Zeptejte se hlasem a přiložte svou obrazovku, aby asistent viděl, na co se díváte."
           },
           "assistant_call": {
-            "name": "Zahájit hovor",
-            "description": "Mluvte s asistentem bez použití rukou a poslouchejte jeho odpovědi. Dalším stisknutím zavěsíte."
+            "name": "Zahájit konverzaci",
+            "description": "Mluvte s asistentem bez použití rukou a poslouchejte jeho odpovědi. Dalším stisknutím ukončíte."
           }
         },
         "errors": {
@@ -1285,7 +1281,7 @@
         "recordings": "Diktování",
         "flow": "Flow",
         "asks": "Asistent",
-        "calls": "Hovory"
+        "calls": "Konverzace"
       },
       "openFolder": "Otevřít složku nahrávek",
       "loading": "Načítám historii…",
@@ -1293,11 +1289,11 @@
       "emptyRecordings": "Zatím žádná diktování.",
       "emptyFlow": "Zatím žádné generování pomocí Flow.",
       "emptyAsks": "Zatím žádné dotazy.",
-      "emptyCalls": "Zatím žádné hovory.",
+      "emptyCalls": "Zatím žádné konverzace.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Asistent",
-        "call": "Hovor"
+        "call": "Konverzace"
       },
       "flowTranscriptLabel": "Řekli jste",
       "originalTranscriptionLabel": "Původní přepis",
@@ -1966,8 +1962,7 @@
       "speakers_few": "{{count}} mluvčí",
       "speakers_many": "{{count}} mluvčího",
       "speakers_other": "{{count}} mluvčích",
-      "hasNotes": "Poznámky vytvořeny",
-      "notesBadge": "Poznámky"
+      "hasNotes": "Poznámky vytvořeny"
     },
     "status": {
       "recording": "Nahrává se",
@@ -1992,6 +1987,21 @@
       "transcript": "Přepis",
       "summary": "Shrnutí",
       "ask": "Dotazy"
+    },
+    "discuss": {
+      "button": "Probrat tuto schůzku",
+      "hint": "Proberte tuto schůzku s asistentem. Ví, co zaznělo, a umí dohledávat v přepisu.",
+      "whileRecording": "K dispozici po zastavení nahrávání.",
+      "nothingYet": "Zatím nebylo nic přepsáno.",
+      "failed": "Konverzaci se nepodařilo zahájit: {{error}}",
+      "earlier": "Dřívější diskuse",
+      "continue": "Pokračovat v této diskusi",
+      "untitled": "Diskuse bez názvu",
+      "messages_one": "{{count}} zpráva",
+      "messages_few": "{{count}} zprávy",
+      "messages_many": "{{count}} zprávy",
+      "messages_other": "{{count}} zpráv",
+      "more": "Další najdete v části Předchozí konverzace."
     },
     "myNotes": {
       "description": "Napište, co je pro vás důležité. Při vytváření poznámek se to spojí s přepisem.",
@@ -2212,7 +2222,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Hovor",
+      "title": "Konverzace",
       "newChat": "Nový chat",
       "type": "Napište zprávu",
       "backToVoice": "Zpět k hlasu",
@@ -2221,10 +2231,10 @@
       "speakerOn": "Číst odpovědi nahlas",
       "speakerOff": "Přestat číst odpovědi nahlas",
       "expand": "Otevřít konverzaci",
-      "collapse": "Zpět na lištu hovoru",
+      "collapse": "Sbalit",
       "historyOpen": "Předchozí konverzace",
       "historyClose": "Zpět k této konverzaci",
-      "end": "Ukončit hovor",
+      "end": "Ukončit konverzaci",
       "send": "Odeslat",
       "stop": "Zastavit odpověď",
       "placeholder": "Zpráva pro {{name}}",
@@ -2237,19 +2247,51 @@
       "preparingVoice": "Připravuji hlas… {{progress}} %",
       "history": {
         "title": "Předchozí konverzace",
-        "hint": "Vyberte jednu a pokračujte tam, kde jste skončili. Hovor zůstane spojený.",
+        "hint": "Vyberte jednu a pokračujte tam, kde jste skončili. Aktuální konverzace zůstane otevřená.",
         "empty": "Zatím žádné uložené konverzace.",
+        "noMatches": "Hledání nic neodpovídá.",
+        "noMeetings": "Zatím žádné konverzace o schůzkách. Otevřete schůzku a zvolte Probrat tuto schůzku.",
         "loading": "Načítání…",
         "failed": "Vaše konverzace se nepodařilo načíst.",
         "more": "Zobrazit další",
         "untitled": "Konverzace bez názvu",
         "current": "Právě otevřená",
+        "search": "Hledat v konverzacích",
+        "clearSearch": "Vymazat hledání",
+        "scopeLabel": "Které konverzace",
+        "scopes": {
+          "all": "Vše",
+          "meetings": "Schůzky"
+        },
+        "groups": {
+          "today": "Dnes",
+          "yesterday": "Včera",
+          "week": "Posledních 7 dní",
+          "earlier": "Dříve"
+        },
+        "matchCount_one": "{{count}} konverzace",
+        "matchCount_few": "{{count}} konverzace",
+        "matchCount_many": "{{count}} konverzace",
+        "matchCount_other": "{{count}} konverzací",
         "messages_one": "{{count}} zpráva",
         "messages_few": "{{count}} zprávy",
         "messages_many": "{{count}} zprávy",
         "messages_other": "{{count}} zpráv"
       },
-      "options": "Možnosti hovoru",
+      "meeting": {
+        "about": "O schůzce {{title}}",
+        "chipHint": "Asistent má poznámky z této schůzky a může prohledávat její přepis.",
+        "untitled": "Schůzka bez názvu",
+        "startTitle": "Pojďme probrat {{title}}",
+        "startHint": "Zeptejte se na cokoli, co se jí týká, nebo co dělat dál. Začněte mluvit, nebo si vyberte:",
+        "prompts": {
+          "recap": "Udělej mi rychlé shrnutí",
+          "next": "Co mám udělat dál?",
+          "followUp": "Napiš návrh navazující zprávy",
+          "missed": "Neuniklo mi něco?"
+        }
+      },
+      "options": "Možnosti konverzace",
       "pace": "Čas na domluvení",
       "paceHint": "Jak dlouho po vaší pauze čekat, než přijde odpověď.",
       "paces": {
@@ -2265,7 +2307,7 @@
         "high": "Vysoká — tichá místnost nebo sluchátka"
       },
       "phase": {
-        "off": "Hovor ukončen",
+        "off": "Konverzace ukončena",
         "starting": "Připojování…",
         "listening": "Poslouchám",
         "hearing": "Poslouchám…",
@@ -2274,7 +2316,7 @@
         "speaking": "Mluvím",
         "muted": "Mikrofon vypnutý",
         "held": "Pozastaveno kvůli diktování",
-        "error": "Hovor přerušen"
+        "error": "Konverzace přerušena"
       },
       "errors": {
         "microphone": "Mikrofon se nepodařilo otevřít. Povolte přístup k mikrofonu a zkontrolujte, že ho nepoužívá jiná aplikace.",
@@ -2344,6 +2386,8 @@
     "tool": {
       "search": "Hledám na webu",
       "screen": "Dívám se na vaši obrazovku…",
+      "meetingSearch": "Prohledávám schůzku",
+      "meetingRead": "Čtu schůzku",
       "working": "Pracuji na tom",
       "elapsed": "{{seconds}} s"
     },
@@ -2558,9 +2602,9 @@
         "what": "Ptejte se nahlas. Odpověď se zobrazí v plovoucím panelu."
       },
       "call": {
-        "title": "Zahájit hovor",
+        "title": "Zahájit konverzaci",
         "description": "Konverzace bez použití rukou s mluvenými odpověďmi.",
-        "what": "Povídejte si bez použití rukou. Dalším stiskem hovor ukončíte."
+        "what": "Povídejte si bez použití rukou. Dalším stiskem ukončíte."
       },
       "info": "Stiskněte je v jakékoli aplikaci. Kliknutím na klávesy je změníte.",
       "offHint": "Vypnuto",
@@ -2586,12 +2630,6 @@
       "trySuffixHold": "a držte, dokud mluvíte.",
       "trySuffixTap": "a mluvte. Až skončíte, stiskněte znovu.",
       "tryPlaceholder": "Tady se objeví vaše slova…"
-    },
-    "hero": {
-      "hold": "V jakékoli aplikaci podržte klávesy, mluvte a pusťte.",
-      "tap": "V jakékoli aplikaci stiskněte klávesy, mluvte a stiskněte znovu.",
-      "holdHint": "Podržte a mluvte",
-      "tapHint": "Stiskem spustit a zastavit"
     },
     "activity": {
       "title": "Posledních 30 dní",
@@ -2638,7 +2676,7 @@
       "meetings": "Schůzky",
       "cleanup": "Čištění pomocí AI",
       "meetingNotes": "Poznámky ze schůzek",
-      "calls": "Hovory",
+      "calls": "Konverzace",
       "flow": "Generovat s Flow",
       "spokenReplies": "Mluvené odpovědi"
     },
@@ -2660,7 +2698,7 @@
       },
       "assistant": {
         "name": "Asistent",
-        "description": "Odpovídá na vaše otázky, dívá se na vaši obrazovku a vede hovory.",
+        "description": "Odpovídá na vaše otázky, dívá se na vaši obrazovku a vede konverzace.",
         "openAssistant": "Otevřít asistenta",
         "offNotice": "Asistent je vypnutý. Generovat s Flow a záložní čištění tento model stále používají.",
         "catalogTitle": "Modely asistenta",
@@ -2745,15 +2783,6 @@
         "instructionPlaceholder": "Například: piš hovorově a malými písmeny a vyslovené názvy emoji převeď na emoji."
       }
     },
-    "hero": {
-      "title": "Řekněte to jakkoli. Dostanete to <em>čisté.</em>",
-      "before": "sejdeme se v deset, vlastně ne, radši v jedenáct, a vezmi ten rozpočet",
-      "after": "Sejdeme se v jedenáct a vezmi rozpočet.",
-      "offHint": "Pro použití této zkratky zapněte čištění pomocí AI",
-      "onHint": "Podržte, mluvte, pusťte. Vyčištěný text se napíše za vás.",
-      "onHintTap": "Stiskněte, mluvte, stiskněte znovu. Vyčištěný text se napíše za vás.",
-      "onDictationHint": "Každé diktování se vyčistí."
-    },
     "shortcut": {
       "title": "Zkratka",
       "info": "Dejte čištění vlastní zkratku, nebo nechte zkratku pro diktování čistit každé diktování, abyste si museli pamatovat jen jednu kombinaci kláves.",
@@ -2774,11 +2803,7 @@
       "title": "Náhrady",
       "description": "Řekněte frázi a dostanete jiný text, například z „můj e-mail“ se stane vaše adresa."
     },
-    "addWord": "Přidat slovo",
-    "hero": {
-      "title": "SpeakoFlow píše <em>tak jako vy.</em>",
-      "subtitle": "Přidejte jména a odborné výrazy, které stále píše špatně."
-    }
+    "addWord": "Přidat slovo"
   },
   "assistantPage": {
     "description": "Ptejte se hlasem na cokoli, z jakékoli aplikace. Asistent vidí vaši obrazovku, vyhledává na webu a pamatuje si, na čem vám záleží.",
@@ -2786,14 +2811,14 @@
     "hero": {
       "askHold": "Podržte, položte otázku, pusťte. Odpověď se zobrazí v plovoucím panelu.",
       "askTap": "Stiskněte, položte otázku, stiskněte znovu. Odpověď se zobrazí v plovoucím panelu.",
-      "call": "Povídejte si bez použití rukou. Dalším stiskem hovor ukončíte.",
+      "call": "Povídejte si bez použití rukou. Dalším stiskem ukončíte.",
       "title": "Ptejte se na cokoli, <em>odkudkoli.</em>",
       "ask": "Zeptat se",
-      "callLabel": "Hovor",
+      "callLabel": "Konverzace",
       "askHoldShort": "Podržte, ptejte se, pusťte",
       "askTapShort": "Stiskněte, ptejte se, stiskněte znovu",
-      "callShort": "Dalším stiskem hovor ukončíte",
-      "subtitle": "Položte otázku nahlas, nebo zahajte hovor a proberte to."
+      "callShort": "Dalším stiskem ukončíte",
+      "subtitle": "Položte otázku nahlas, nebo zahajte konverzaci a proberte to."
     },
     "models": {
       "title": "Pohání ho",
@@ -2933,14 +2958,14 @@
       },
       "screen": {
         "ask": "Zobrazení obrazovky u otázek",
-        "call": "Zobrazení obrazovky u hovorů"
+        "call": "Zobrazení obrazovky v konverzacích"
       }
     },
     "tips": {
       "thinksWith": "Model, který vám odpovídá. Čištění pomocí AI a poznámky ze schůzek ho používají také, pokud nemají vlastní.",
-      "speaks": "Během hovoru předčítá odpovědi nahlas.",
+      "speaks": "Během konverzace předčítá odpovědi nahlas.",
       "screenAsk": "Umožní asistentovi podívat se, když se otázka týká vaší obrazovky nebo když ho o to požádáte. Na otázky k označenému textu odpovídá z textu. Snímky obrazovky jdou jen k vašemu poskytovateli AI.",
-      "screenCall": "Umožní asistentovi během hovoru podívat se, když ho o to požádáte nebo když mluvíte o něčem na obrazovce.",
+      "screenCall": "Umožní asistentovi během konverzace podívat se, když ho o to požádáte nebo když mluvíte o něčem na obrazovce.",
       "captureTiming": "Zachytit obrazovku tak, jak vypadala, když jste se začali ptát, nebo když odešlete.",
       "webSearch": "Vyhledá informace online, když otázka vyžaduje aktuální fakta.",
       "depth": "Rychlé pro jednoduchá fakta, Hloubkové pro náročné otázky.",
@@ -3064,7 +3089,7 @@
     "recoverError": "Tento přepis se nepodařilo obnovit. Zkuste to znovu.",
     "more": "Další akce",
     "chat": {
-      "continueInCall": "Pokračovat v hovoru",
+      "continueInCall": "Pokračovat jako konverzace",
       "assistantOff": "Chcete-li v tomto chatu pokračovat, zapněte asistenta."
     }
   },

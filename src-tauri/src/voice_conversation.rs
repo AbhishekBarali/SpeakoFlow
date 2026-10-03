@@ -781,7 +781,7 @@ pub async fn assistant_conversation_text(
     }
     if text.chars().count() > MAX_TYPED_CHARS {
         return Err(format!(
-            "That message is too long to send in a call ({MAX_TYPED_CHARS} characters at most)."
+            "That message is too long to send in a conversation ({MAX_TYPED_CHARS} characters at most)."
         ));
     }
     let ticket = VoiceTicket { session, turn };

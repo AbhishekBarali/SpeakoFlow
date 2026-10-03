@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Check, ChevronDown, Download } from "lucide-react";
+import { ArrowRight, Check, Download } from "lucide-react";
 import type { ModelInfo } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { getModelBrand } from "@/components/icons/BrandLogos";
 import { useModelStore } from "@/stores/modelStore";
 import { formatModelSize } from "@/lib/utils/format";
-import { getModelCategory } from "@/lib/utils/modelCategory";
-import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
+import {
+  getTranslatedModelDescription,
+  getTranslatedModelName,
+} from "@/lib/utils/modelTranslation";
 import { OnboardingFrame, StepHeading } from "./OnboardingFrame";
 import {
   baseLanguages,
@@ -23,18 +25,25 @@ import { useHardwareFacts } from "./useHardwareFacts";
 interface Option {
   model: ModelInfo;
   name: string;
-  /** Which model of the family ("Medium"), or null when `name` says it all. */
-  variant: string | null;
-  /** `onboarding.speech.tags.*`, or null for a model setup has no word for. */
-  tag: (typeof SETUP_SPEECH_OPTIONS)[number]["tag"] | null;
-  primary: boolean;
+  /** The card's one sentence. */
+  about: string;
+  /** The model this computer already dictates with, when setup does not list
+   *  it. Shown so that Continue keeps it rather than replacing it. */
+  current: boolean;
 }
 
-/** The option's full name, for anything that shows it without the label. */
-const fullName = (option: Option) =>
-  option.variant ? `${option.name} ${option.variant}` : option.name;
-
-/** One model, as a choice: its mark, its name, a few words, its size. */
+/**
+ * One model, as a choice: its mark, its name with the languages it hears, and
+ * one sentence of why you would pick it. On the right, its size (or that it is
+ * installed) and the radio.
+ *
+ * That is all on purpose. The card used to carry a third line of facts —
+ * languages, live text, translation, five accuracy dots and five speed dots —
+ * and a first-run choice between five models read like a spec sheet. Each
+ * sentence already says what the model trades (fast, tiny, most accurate,
+ * most languages), the language count answers the one question that can rule
+ * a model out, and everything else is on the Models page.
+ */
 const ModelOption: React.FC<{
   option: Option;
   selected: boolean;
@@ -49,9 +58,6 @@ const ModelOption: React.FC<{
     languages.length <= 1
       ? t("onboarding.speech.english")
       : t("onboarding.speech.languages", { count: languages.length });
-  const line = option.tag
-    ? `${reach} · ${t(`onboarding.speech.tags.${option.tag}`)}`
-    : reach;
   return (
     <button
       type="button"
@@ -71,59 +77,63 @@ const ModelOption: React.FC<{
         {brand.icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-base font-semibold text-ink">
             {option.name}
           </span>
-          {option.variant && (
-            <span className="shrink-0 rounded-md border border-hairline-strong px-1.5 py-px text-[0.6875rem] font-medium tabular-nums text-muted">
-              {option.variant}
-            </span>
+          <span
+            className="shrink-0 text-[0.8125rem] text-muted"
+            // The language names are there for anyone who wants them, and
+            // cost nobody else a line of reading.
+            title={
+              languages.length > 1
+                ? languageNames(languages, i18n.language).join(", ")
+                : undefined
+            }
+          >
+            {reach}
+          </span>
+          {option.current ? (
+            <Badge variant="active">{t("modelSelector.active")}</Badge>
+          ) : (
+            recommended && (
+              <Badge variant="active">{t("onboarding.recommended")}</Badge>
+            )
           )}
-          {recommended && (
-            <Badge variant="active">{t("onboarding.recommended")}</Badge>
+        </span>
+        <span className="mt-0.5 block text-sm leading-snug text-body">
+          {option.about}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-4 self-center">
+        <span className="text-[0.8125rem] tabular-nums text-muted">
+          {model.is_downloaded ? (
+            <span className="inline-flex items-center gap-1 font-medium text-accent">
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("onboarding.setup.installed")}
+            </span>
+          ) : (
+            formatModelSize(Number(model.size_mb))
           )}
         </span>
         <span
-          className="mt-0.5 block truncate text-[0.8125rem] text-muted"
-          // The language names are there for anyone who wants them, and cost
-          // nobody else a line of reading.
-          title={
-            languages.length > 1
-              ? languageNames(languages, i18n.language).join(", ")
-              : undefined
-          }
+          aria-hidden="true"
+          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors ${
+            selected ? "border-accent bg-accent" : "border-hairline-strong"
+          }`}
         >
-          {line}
+          {selected && <span className="h-2 w-2 rounded-full bg-surface" />}
         </span>
-      </span>
-      <span className="shrink-0 text-[0.8125rem] tabular-nums text-muted">
-        {model.is_downloaded ? (
-          <span className="inline-flex items-center gap-1 font-medium text-accent">
-            <Check className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("onboarding.setup.installed")}
-          </span>
-        ) : (
-          formatModelSize(Number(model.size_mb))
-        )}
-      </span>
-      <span
-        aria-hidden="true"
-        className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors ${
-          selected ? "border-accent bg-accent" : "border-hairline-strong"
-        }`}
-      >
-        {selected && <span className="h-2 w-2 rounded-full bg-surface" />}
       </span>
     </button>
   );
 };
 
 /**
- * One decision: which speech model. It is a list of choices, not an
- * explanation: the two most people want (English, or any of 28 languages), the
- * rest one click away under "More models", and each card says only what tells
- * them apart. The model for this computer's language is picked already.
+ * One decision: which speech model. Five good choices, each saying in one
+ * sentence what it is for, and the languages it hears. The
+ * full catalog lives on the Models page. The model for this computer's
+ * language is picked already.
  */
 export function SetupStep({
   onContinue,
@@ -138,42 +148,38 @@ export function SetupStep({
   const initialized = useModelStore((s) => s.initialized);
   const loadModels = useModelStore((s) => s.loadModels);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showMore, setShowMore] = useState(false);
 
   const options = useMemo<Option[]>(() => {
-    const listed = SETUP_SPEECH_OPTIONS.flatMap((entry) => {
+    const listed: Option[] = SETUP_SPEECH_OPTIONS.flatMap((entry) => {
       const model = models.find((m) => m.id === entry.id);
       return model
         ? [
             {
               model,
               name: entry.name,
-              variant: entry.variant,
-              tag: entry.tag,
-              primary: entry.primary,
+              about: t(`onboarding.speech.about.${entry.about}`),
+              current: false,
             },
           ]
         : [];
     });
-    // A speech model already on this machine that setup does not list (a
-    // replay, or an upgrade from an older version) is still a choice.
-    const listedIds = new Set(listed.map((option) => option.model.id));
-    const installed = models
-      .filter(
-        (m) =>
-          m.is_downloaded &&
-          getModelCategory(m) === "stt" &&
-          !listedIds.has(m.id),
-      )
-      .map((model) => ({
-        model,
-        name: getTranslatedModelName(model, t),
-        variant: null,
-        tag: null,
-        primary: false,
-      }));
-    return [...listed, ...installed];
-  }, [models, t]);
+    // Someone replaying setup who dictates with a model setup does not list
+    // sees that one model too, so Continue can keep it. Only that one: every
+    // other installed model stays on the Models page, where its near-namesakes
+    // are told apart.
+    const current = models.find(
+      (m) => m.id === currentModel && m.is_downloaded,
+    );
+    if (current && !listed.some((option) => option.model.id === current.id)) {
+      listed.unshift({
+        model: current,
+        name: getTranslatedModelName(current, t),
+        about: getTranslatedModelDescription(current, t),
+        current: true,
+      });
+    }
+    return listed;
+  }, [models, currentModel, t]);
 
   const recommendedId = facts
     ? SETUP_MODELS.speech[recommend(facts).speech]
@@ -193,14 +199,7 @@ export function SetupStep({
   }, [installedCurrent, recommendedId, options, selectedId]);
 
   const selected = options.find((option) => option.model.id === selectedId);
-  // Opening on a model that lives under "More models" shows it.
-  useEffect(() => {
-    if (selected && !selected.primary) setShowMore(true);
-  }, [selected]);
-
   const failed = initialized && !loading && models.length === 0;
-  const primary = options.filter((option) => option.primary);
-  const more = options.filter((option) => !option.primary);
   const model = selected?.model;
   const ready = !!model && (model.is_downloaded || model.is_downloading);
 
@@ -210,7 +209,7 @@ export function SetupStep({
       {
         job: "stt",
         modelId: model.id,
-        label: fullName(selected),
+        label: selected.name,
         sizeMb: model.is_downloaded ? 0 : Number(model.size_mb),
         wiring: { kind: "stt" },
       },
@@ -275,16 +274,16 @@ export function SetupStep({
             {t("onboarding.setup.retry")}
           </Button>
         </div>
-      ) : primary.length === 0 ? (
+      ) : options.length === 0 ? (
         <div
           className="ob-gap space-y-2.5"
           role="status"
           aria-label={t("onboarding.speech.loading")}
         >
-          {[0, 1].map((i) => (
+          {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="h-[4.5rem] animate-pulse rounded-2xl border border-hairline bg-surface motion-reduce:animate-none"
+              className="h-[4.75rem] animate-pulse rounded-2xl border border-hairline bg-surface motion-reduce:animate-none"
             />
           ))}
         </div>
@@ -294,22 +293,7 @@ export function SetupStep({
           aria-label={t("onboarding.speech.title")}
           className="ob-gap space-y-2.5"
         >
-          {primary.map(renderOption)}
-          {more.length > 0 &&
-            (showMore ? (
-              <div className="ob-reveal space-y-2.5">
-                {more.map(renderOption)}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowMore(true)}
-                className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-[0.8125rem] font-medium text-muted transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              >
-                <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                {t("onboarding.speech.more", { count: more.length })}
-              </button>
-            ))}
+          {options.map(renderOption)}
         </div>
       )}
 

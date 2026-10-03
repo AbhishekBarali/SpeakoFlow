@@ -52,6 +52,16 @@ const fire = async (name: string, payload: unknown = null) => {
 };
 const rootClass = () =>
   renderer.root.findByProps({ dir: "ltr" }).props.className as string;
+/** The waveform(s) on screen. */
+const waves = () =>
+  renderer.root
+    .findAllByType("svg")
+    .filter((node) =>
+      String(node.props.className ?? "").includes("audio-waveform"),
+    );
+/** What announces a finished dictation to assistive tech. */
+const doneMarks = () =>
+  renderer.root.findAllByProps({ role: "img", "aria-label": "overlay.done" });
 /** The body, whichever of its two classes it has right now. */
 const cardBody = () =>
   renderer.root.find(
@@ -301,7 +311,7 @@ test("failed clipboard access offers retry without claiming success", async () =
   expect(button.props["aria-label"]).toBe("overlay.copied");
 });
 
-test("transcription and cleanup settle the same bars into a working ripple, then a check replaces them", async () => {
+test("transcription and cleanup fill the same bars, and the end is those bars, full", async () => {
   await fire("show-overlay", { state: "recording", streamingWindow: true });
   await fire("stream-text", {
     committed: "Keep these words visible.",
@@ -320,11 +330,11 @@ test("transcription and cleanup settle the same bars into a working ripple, then
     expect(working.props["aria-valuenow"]).toBeUndefined();
     expect(working.props["aria-label"]).toBe(`overlay.${state}`);
     // The same five bars, now in working mode — no dots, no sweeping bar.
-    const waves = renderer.root
-      .findAllByType("svg")
-      .filter((node) => node.props.className?.includes("audio-waveform"));
-    expect(waves).toHaveLength(1);
-    expect(waves[0].props.className).toContain("working");
+    const shown = waves();
+    expect(shown).toHaveLength(1);
+    expect(shown[0].props.className).toContain("working");
+    // An estimated fill, not the looping ripple.
+    expect(shown[0].props.className).toContain("progress");
     expect(renderer.root.findAllByType("line")).toHaveLength(5);
     expect(
       renderer.root.findAllByProps({ className: "overlay-working-dot" }),
@@ -332,9 +342,13 @@ test("transcription and cleanup settle the same bars into a working ripple, then
   }
   await fire("finish-overlay", { epoch: 9, text: "Keep these words visible." });
   expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(0);
-  const mark = renderer.root.findByProps({ className: "completion-mark" });
-  expect(mark.props["aria-label"]).toBe("overlay.done");
-  // The check stands alone; a visible "Done" word would only repeat it.
+  // Nothing replaces the bars: they run out to a full row, which is the
+  // ending. Screen readers still hear that it is done.
+  expect(waves()).toHaveLength(1);
+  expect(waves()[0].props.className).toContain("progress");
+  expect(renderer.root.findAllByType("line")).toHaveLength(5);
+  expect(doneMarks()).toHaveLength(1);
+  // No "Done" word beside the bars either.
   expect(
     renderer.root.findAllByProps({ className: "card-label" }),
   ).toHaveLength(0);
@@ -346,37 +360,32 @@ test("transcription and cleanup settle the same bars into a working ripple, then
   ).toHaveLength(0);
 });
 
-test("a completion straight from recording shows the same mark", async () => {
+test("a completion straight from recording ends the same way", async () => {
   // Streaming engines can finish without ever showing a transcribing state.
   await fire("show-overlay", { state: "recording", streamingWindow: true });
   await fire("stream-text", { committed: "Short one.", tentative: "" });
   await fire("finish-overlay", { epoch: 11, text: "Short one." });
-  expect(
-    renderer.root.findAllByProps({ className: "completion-mark" }),
-  ).toHaveLength(1);
-  expect(
-    renderer.root
-      .findAllByType("svg")
-      .some((node) => node.props.className?.includes("audio-waveform")),
-  ).toBe(false);
+  expect(doneMarks()).toHaveLength(1);
+  expect(waves()).toHaveLength(1);
+  expect(waves()[0].props.className).toContain("progress");
 });
 
-test("a quick compact result completes during hide; cancellation never claims completion", async () => {
-  const marks = () =>
-    renderer.root.findAllByProps({ className: "completion-mark" });
+test("a quick compact result keeps its full row through the hide; cancellation never claims completion", async () => {
   await fire("show-overlay", { state: "transcribing", streamingWindow: false });
   await fire("hide-overlay");
-  expect(marks()).toHaveLength(0);
+  expect(doneMarks()).toHaveLength(0);
   expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(1);
   await fire("show-overlay", { state: "transcribing", streamingWindow: false });
   await fire("finish-overlay", { epoch: 10, text: "" });
   await fire("hide-overlay");
   expect(rootClass()).toContain("native-window-hidden");
-  expect(marks()).toHaveLength(1);
-  expect(marks()[0].props["aria-label"]).toBe("overlay.done");
+  expect(doneMarks()).toHaveLength(1);
+  // Still drawn while the pill fades, rather than dropping to rest.
+  expect(waves()[0].props.className).not.toContain("is-idle");
   await fire("show-overlay", { state: "recording", streamingWindow: false });
-  expect(marks()).toHaveLength(0);
+  expect(doneMarks()).toHaveLength(0);
   expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(0);
+  expect(waves()[0].props.className).toContain("reactive");
 });
 
 test("releasing a selection copies it, but only where the card takes the pointer", async () => {

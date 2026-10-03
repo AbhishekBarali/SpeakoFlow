@@ -18,11 +18,11 @@ interface ShortcutRow {
 }
 
 /**
- * The other shortcuts, one line each: a name, an (i) for what it does, and the
- * keys — which are also the button that changes them. Dictation has the banner
- * above to itself. Hold-or-tap applies to every recording shortcut at once
- * (that is how the backend treats `push_to_talk`), so it is one switch in the
- * header rather than a setting repeated per row.
+ * Every shortcut, one line each: a name, an (i) for what it does, and the
+ * keys — which are also the button that changes them. Dictate comes first,
+ * because it is the one people press all day. Hold-or-tap applies to every
+ * recording shortcut at once (that is how the backend treats `push_to_talk`),
+ * so it is one switch in the header rather than a setting repeated per row.
  */
 export const ShortcutsCard: React.FC = () => {
   const { t } = useTranslation();
@@ -31,13 +31,24 @@ export const ShortcutsCard: React.FC = () => {
   const os = useOsType();
   const holdToTalk = getSetting("push_to_talk") ?? true;
   const cleanupOn = getSetting("post_process_enabled") ?? false;
-  // Cleanup that rides on the dictation shortcut has no keys of its own; the
-  // hero above already says "Dictate and clean up".
+  // Cleanup that rides on the dictation shortcut has no keys of its own, so
+  // the dictation row says "Dictate and clean up" instead of listing both.
   const cleanupOnDictation =
     cleanupOn && (getSetting("post_process_on_dictation") ?? false);
   const assistantOn = getSetting("assistant_enabled") ?? true;
 
   const rows: ShortcutRow[] = [
+    {
+      id: "transcribe",
+      title: cleanupOnDictation
+        ? t("home.shortcuts.cleanup.title")
+        : t("home.shortcuts.dictate.title"),
+      info: cleanupOnDictation
+        ? t("home.shortcuts.cleanup.what")
+        : holdToTalk
+          ? t("home.shortcuts.dictate.whatHold")
+          : t("home.shortcuts.dictate.whatTap"),
+    },
     ...(cleanupOnDictation
       ? []
       : [
@@ -77,7 +88,6 @@ export const ShortcutsCard: React.FC = () => {
         description={t("home.shortcuts.info")}
         action={
           <Segmented
-            size="sm"
             label={t("settings.general.pushToTalk.label")}
             value={holdToTalk ? "hold" : "tap"}
             onChange={(mode) =>
@@ -95,11 +105,11 @@ export const ShortcutsCard: React.FC = () => {
         {rows.map((row) => (
           <li
             key={row.id}
-            className="flex min-h-[3.25rem] items-center justify-between gap-3 px-4 py-2"
+            className="flex min-h-[3.5rem] items-center justify-between gap-3 px-5 py-3"
           >
             <span className="flex min-w-0 items-center gap-1">
               <span
-                className={`truncate text-sm ${row.off ? "text-muted" : "font-medium text-ink"}`}
+                className={`truncate text-[0.9375rem] ${row.off ? "text-muted" : "font-medium text-ink"}`}
               >
                 {row.title}
               </span>
@@ -117,7 +127,7 @@ export const ShortcutsCard: React.FC = () => {
               <ShortcutInput
                 shortcutId={row.id}
                 bare
-                size="sm"
+                size="md"
                 showReset="never"
               />
             )}

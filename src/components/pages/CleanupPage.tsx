@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
 import { isCleanupSpecialistModel } from "@/lib/utils/cleanupSpecialist";
@@ -9,7 +9,6 @@ import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
 import { Callout } from "@/components/ui/Callout";
 import { Dialog } from "@/components/ui/Dialog";
-import { Hero, HeroShortcut, HeroTitle } from "@/components/ui/Hero";
 import { Segmented } from "@/components/ui/Segmented";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { SettingContainer } from "@/components/ui/SettingContainer";
@@ -19,26 +18,6 @@ import { useNavigation } from "@/components/shell/navigation";
 import { useModelSlots } from "@/components/shell/useModelSlots";
 import { LlmModelPicker } from "@/components/shell/ModelPicker";
 import { WritingStyleCard } from "./cleanup/WritingStyle";
-
-/** "let's meet at ten, actually no, make that eleven" → the cleaned sentence.
- *  The feature explained by showing it, instead of a paragraph about it. */
-const BeforeAfter: React.FC = () => {
-  const { t } = useTranslation();
-  return (
-    <div className="max-w-[26rem]">
-      <p className="text-[0.9375rem] leading-relaxed text-hero-muted line-through decoration-hero-muted/60 text-pretty">
-        {t("cleanup.hero.before")}
-      </p>
-      <p className="mt-1.5 flex items-start gap-2 text-[0.9375rem] leading-relaxed text-hero-ink">
-        <ArrowRight
-          className="mt-[0.35rem] h-3.5 w-3.5 shrink-0 text-hero-muted rtl:rotate-180"
-          aria-hidden="true"
-        />
-        {t("cleanup.hero.after")}
-      </p>
-    </div>
-  );
-};
 
 /** The base cleanup prompt: long-form text, so it is edited in a window. */
 const InstructionsRow: React.FC = () => {
@@ -123,7 +102,6 @@ const ShortcutModeRow: React.FC = () => {
       grouped={true}
     >
       <Segmented
-        size="sm"
         label={t("cleanup.shortcut.title")}
         value={onDictation ? "dictation" : "separate"}
         onChange={(mode) =>
@@ -140,9 +118,44 @@ const ShortcutModeRow: React.FC = () => {
 };
 
 /**
+ * The keys that actually clean up: the dictation shortcut once cleanup rides
+ * on it, the separate one otherwise. Clicking them changes them, as on Home.
+ */
+const CleanupKeysRow: React.FC = () => {
+  const { t } = useTranslation();
+  const { getSetting } = useSettings();
+  const onDictation = getSetting("post_process_on_dictation") ?? false;
+  const shortcutId = onDictation
+    ? "transcribe"
+    : "transcribe_with_post_process";
+  return (
+    <SettingContainer
+      title={t("home.shortcuts.cleanup.title")}
+      description={t("home.shortcuts.cleanup.what")}
+      grouped={true}
+    >
+      <ShortcutInput
+        // Keyed so switching modes mounts a fresh editor instead of
+        // re-pointing one mid-edit at a different binding.
+        key={shortcutId}
+        shortcutId={shortcutId}
+        bare
+        size="md"
+        showReset="never"
+      />
+    </SettingContainer>
+  );
+};
+
+/**
  * AI cleanup: a switch, the shortcut that uses it (click the keys to change
  * them), the model, and the writing styles — all of them visible, with the one
  * you pick shown on a real sentence. Only the long base prompt opens a window.
+ *
+ * No banner: the one it had repeated the shortcut the rows below already show
+ * and drew a paragraph of word-bars that read as a loading skeleton. The
+ * writing-style card's "You say / It types" example explains the feature
+ * with a real sentence instead.
  */
 export const CleanupPage: React.FC = () => {
   const { t } = useTranslation();
@@ -150,10 +163,6 @@ export const CleanupPage: React.FC = () => {
   const { openModelSlot } = useNavigation();
   const summary = useModelSlots().cleanup;
   const enabled = getSetting("post_process_enabled") ?? false;
-  const holdToTalk = getSetting("push_to_talk") ?? true;
-  // The hero shows the keys that actually clean up: the dictation shortcut
-  // once cleanup rides on it, the separate one otherwise.
-  const onDictation = getSetting("post_process_on_dictation") ?? false;
 
   return (
     <Page>
@@ -177,51 +186,8 @@ export const CleanupPage: React.FC = () => {
         }
       />
 
-      <Hero
-        art="cleanup"
-        title={<HeroTitle i18nKey="cleanup.hero.title" />}
-        actions={
-          <HeroShortcut
-            label={
-              onDictation
-                ? t("home.shortcuts.dictate.title")
-                : t("home.shortcuts.cleanup.title")
-            }
-            // Off is a state the user has to act on, so it never folds away;
-            // how to use the keys is a tip.
-            status={enabled ? undefined : t("cleanup.hero.offHint")}
-            hint={
-              onDictation
-                ? t("cleanup.hero.onDictationHint")
-                : holdToTalk
-                  ? t("cleanup.hero.onHint")
-                  : t("cleanup.hero.onHintTap")
-            }
-          >
-            <span className={enabled ? undefined : "opacity-60"}>
-              <ShortcutInput
-                // Keyed so switching modes mounts a fresh editor instead of
-                // re-pointing one mid-edit at a different binding.
-                key={
-                  onDictation ? "transcribe" : "transcribe_with_post_process"
-                }
-                shortcutId={
-                  onDictation ? "transcribe" : "transcribe_with_post_process"
-                }
-                bare
-                finish="hero"
-                size="lg"
-                showReset="never"
-              />
-            </span>
-          </HeroShortcut>
-        }
-      >
-        <BeforeAfter />
-      </Hero>
-
       {enabled && !summary.ready && (
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-warning/25 bg-warning/[0.06] px-5 py-3.5">
+        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-warning/25 bg-warning/[0.06] px-5 py-3.5">
           <span className="h-2 w-2 shrink-0 rounded-full bg-warning" />
           <p className="min-w-0 flex-1 text-sm font-medium text-ink">
             {t("cleanup.needsModel.short")}
@@ -232,8 +198,9 @@ export const CleanupPage: React.FC = () => {
         </div>
       )}
 
-      <SettingsGroup className="mt-6">
+      <SettingsGroup>
         <ShortcutModeRow />
+        <CleanupKeysRow />
         <SettingContainer
           title={t("cleanup.model.title")}
           description={t("cleanup.model.info")}

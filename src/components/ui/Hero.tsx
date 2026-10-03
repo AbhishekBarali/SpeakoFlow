@@ -1,40 +1,59 @@
-import React, { createContext, useContext, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { Lightbulb } from "lucide-react";
-import homeArt from "@/assets/hero/home.webp";
+import { useResolvedTheme } from "@/hooks/useResolvedTheme";
 import assistantArt from "@/assets/hero/assistant.webp";
+import assistantArtLight from "@/assets/hero/assistant-light.webp";
 import meetingsArt from "@/assets/hero/meetings.webp";
-import cleanupArt from "@/assets/hero/cleanup.webp";
-import dictionaryArt from "@/assets/hero/dictionary.webp";
+import meetingsArtLight from "@/assets/hero/meetings-light.webp";
 
 /**
- * The banner at the top of a feature page: a dark stage with a photograph of
- * light on its right (rendered by `scripts/hero-art.py`), a serif headline,
- * and the one control that matters on that page — usually the shortcut, drawn
- * as keys you click to change.
+ * The banner at the top of a feature page: a stage with flat artwork on its
+ * right (rendered by `scripts/hero-art.py`), a serif headline, and the one
+ * control that matters on that page — the shortcut keys you click to change,
+ * or Start recording.
  *
- * The stage is dark in both themes on purpose. On the light theme it is the
- * one dark object on the page, which is what makes it read as a banner rather
- * than another card; on the dark theme it sits a step below the pane, like a
- * screen set into it. Its two earlier versions both failed at this: a teal
- * gradient that fought the brand teal on every control, then a flat grey card
- * that looked like every other card.
+ * Only pages whose banner carries that page's main action have one:
+ * Assistant (the ask and call keys) and Meetings (Start). Home, AI cleanup
+ * and Dictionary had one each and lost it, because there the banner was
+ * decoration above controls that a plain row holds just as well.
+ *
+ * The stage follows the theme. It used to be near-black in both, on the idea
+ * that the light theme's one dark object reads as a banner; in practice it
+ * was the highest-contrast thing on the page and pulled the eye off the
+ * content under it. On the light theme it is now a pale tinted surface with
+ * ink-on-paper art (the `-light` renders); the dark theme is unchanged.
  *
  * Instructions are tips, not furniture: anything wrapped in `HeroTip` (the
- * subtitle, a usage hint under a shortcut, an example) starts folded away,
- * and the lightbulb in the corner opens it. What always shows is the
- * headline, the art, and the controls.
+ * subtitle, a usage hint under a shortcut) starts folded away, and the
+ * lightbulb in the corner opens it. What always shows is the headline, the
+ * art, and the controls.
  */
 
 const ART = {
-  home: homeArt,
-  assistant: assistantArt,
-  meetings: meetingsArt,
-  cleanup: cleanupArt,
-  dictionary: dictionaryArt,
+  assistant: { dark: assistantArt, light: assistantArtLight },
+  meetings: { dark: meetingsArt, light: meetingsArtLight },
 } as const;
 
 export type HeroArtwork = keyof typeof ART;
+
+/** A banner's artwork for the theme on screen. */
+export const useHeroArt = (art: HeroArtwork): string =>
+  ART[art][useResolvedTheme()];
+
+/**
+ * Banners whose art has already made its entrance this session. The entrance
+ * is a hello, not a page transition: a page is suspended to display:none
+ * while hidden (see `Freeze`), which restarts any CSS animation still on it,
+ * so the class has to come off once it has played or every visit replays it.
+ */
+const entered = new Set<HeroArtwork>();
 
 const TipsOpen = createContext(true);
 
@@ -86,17 +105,34 @@ export const Hero: React.FC<{
   // screen every day, which is the thing this replaced.
   const [open, setOpen] = useState(false);
   const hasTips = Boolean(subtitle || children);
+  const [entering, setEntering] = useState(() => !entered.has(art));
+  const artRef = useRef<HTMLImageElement>(null);
+  const artSrc = useHeroArt(art);
+  useEffect(() => {
+    entered.add(art);
+    // Leaving the page mid-entrance cancels the animation instead of ending
+    // it, and it must not replay on the way back. React has no prop for
+    // `animationcancel`, so it is listened for directly.
+    const element = artRef.current;
+    if (!element) return;
+    const done = () => setEntering(false);
+    element.addEventListener("animationcancel", done);
+    return () => element.removeEventListener("animationcancel", done);
+  }, [art]);
 
   return (
     <TipsOpen.Provider value={open}>
       <section className={`hero-stage rounded-[1.25rem] ${className}`}>
         <img
-          src={ART[art]}
+          ref={artRef}
+          src={artSrc}
           alt=""
           aria-hidden="true"
           draggable={false}
           decoding="async"
-          className="hero-art"
+          data-art={art}
+          onAnimationEnd={() => setEntering(false)}
+          className={`hero-art ${entering ? "hero-art-enter" : ""}`}
         />
         <div className="relative flex min-h-[10.5rem] flex-col justify-center px-7 py-7 @3xl:max-w-[54%] @3xl:px-9 @3xl:py-8">
           <h2 className="hero-title pe-10 @3xl:pe-0">{title}</h2>

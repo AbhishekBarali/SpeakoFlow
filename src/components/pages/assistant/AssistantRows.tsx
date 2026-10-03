@@ -73,7 +73,6 @@ export const VisionRows: React.FC = () => {
           grouped
         >
           <Segmented
-            size="sm"
             label={t("settings.assistant.vision.timing.label")}
             value={timing}
             onChange={(next: VisionCaptureTiming) =>
@@ -319,7 +318,6 @@ export const WebSearchRows: React.FC = () => {
           grouped
         >
           <Segmented
-            size="sm"
             label={t("settings.assistant.webSearch.depthLabel")}
             value={settings?.assistant_search_depth ?? "medium"}
             onChange={(depth: AssistantSearchDepth) =>
@@ -618,7 +616,6 @@ export const RepliesRows: React.FC = () => {
         grouped
       >
         <Segmented
-          size="sm"
           label={t("assistantPage.rows.replyLength")}
           value={length}
           onChange={(next) =>

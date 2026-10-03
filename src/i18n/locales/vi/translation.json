@@ -164,12 +164,12 @@
       "tabs": {
         "dictate": "Đọc chính tả",
         "ask": "Trợ lý",
-        "call": "Cuộc gọi"
+        "call": "Trò chuyện"
       },
       "keys": {
         "hold": "Giữ để nói",
         "tap": "Nhấn để bắt đầu, nhấn để dừng",
-        "call": "Nhấn để bắt đầu, nhấn lần nữa để gác máy"
+        "call": "Nhấn để bắt đầu, nhấn lần nữa để kết thúc"
       },
       "steps": {
         "label": "Cách hoạt động",
@@ -471,14 +471,13 @@
       "body": "Chạy trên máy tính này. Hoạt động ngoại tuyến.",
       "english": "Tiếng Anh",
       "languages_other": "{{count}} ngôn ngữ",
-      "tags": {
-        "english": "Nhanh nhất",
-        "languages": "Tự nhận biết ngôn ngữ",
-        "small": "Nhỏ nhất",
-        "accurate": "Chính xác nhất",
-        "widest": "Chậm hơn"
+      "about": {
+        "english": "Nhanh và chính xác, dành cho tiếng Anh.",
+        "languages": "Tự nhận biết bạn đang nói ngôn ngữ nào.",
+        "small": "Nhỏ gọn và nhanh. Phù hợp với máy tính cũ.",
+        "accurate": "Chính xác nhất, nhưng tải xuống nặng hơn và chạy chậm hơn.",
+        "widest": "Hỗ trợ nhiều ngôn ngữ nhất, nhưng chạy chậm hơn."
       },
-      "more_other": "Thêm {{count}} mô hình",
       "anytime": "Bạn có thể thêm mô hình khác bất cứ lúc nào.",
       "download": "Tải xuống và tiếp tục",
       "continue": "Tiếp tục",
@@ -637,8 +636,8 @@
             "description": "Hỏi bằng giọng nói kèm màn hình của bạn để trợ lý thấy được thứ bạn đang xem."
           },
           "assistant_call": {
-            "name": "Bắt đầu cuộc gọi",
-            "description": "Trò chuyện rảnh tay với trợ lý và nghe câu trả lời. Nhấn lần nữa để gác máy."
+            "name": "Bắt đầu trò chuyện",
+            "description": "Trò chuyện rảnh tay với trợ lý và nghe câu trả lời. Nhấn lần nữa để kết thúc."
           }
         },
         "errors": {
@@ -894,9 +893,9 @@
         "title": "Phương thức dán",
         "description": "Cách văn bản đã chuyển đổi được chèn vào ứng dụng đang hoạt động.",
         "options": {
-          "clipboard": "Clipboard ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Clipboard (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "Clipboard (Shift+Insert)",
+          "clipboard": "Bảng nhớ tạm ({{modifier}}+V)",
+          "clipboardCtrlShiftV": "Bảng nhớ tạm (Ctrl+Shift+V)",
+          "clipboardShiftInsert": "Bảng nhớ tạm (Shift+Insert)",
           "direct": "Trực tiếp",
           "none": "Không có",
           "externalScript": "Script bên ngoài"
@@ -1264,7 +1263,7 @@
         "recordings": "Đọc chính tả",
         "flow": "Flow",
         "asks": "Trợ lý",
-        "calls": "Cuộc gọi"
+        "calls": "Cuộc trò chuyện"
       },
       "openFolder": "Mở thư mục ghi âm",
       "loading": "Đang tải lịch sử…",
@@ -1272,11 +1271,11 @@
       "emptyRecordings": "Chưa có nội dung đọc chính tả nào.",
       "emptyFlow": "Chưa có nội dung nào do Flow tạo.",
       "emptyAsks": "Chưa có câu hỏi nào.",
-      "emptyCalls": "Chưa có cuộc gọi nào.",
+      "emptyCalls": "Chưa có cuộc trò chuyện nào.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Trợ lý",
-        "call": "Cuộc gọi"
+        "call": "Trò chuyện"
       },
       "flowTranscriptLabel": "Bạn đã nói",
       "originalTranscriptionLabel": "Bản chuyển đổi gốc",
@@ -1933,8 +1932,7 @@
       "emptyHint": "Bắt đầu ghi âm trước cuộc gọi và SpeakoFlow sẽ lưu bản chép lời, chia theo người nói.",
       "loadMore": "Tải thêm",
       "speakers_other": "{{count}} người nói",
-      "hasNotes": "Đã tạo ghi chú",
-      "notesBadge": "Ghi chú"
+      "hasNotes": "Đã tạo ghi chú"
     },
     "status": {
       "recording": "Đang ghi âm",
@@ -1959,6 +1957,18 @@
       "transcript": "Bản chép lời",
       "summary": "Tóm tắt",
       "ask": "Hỏi"
+    },
+    "discuss": {
+      "button": "Thảo luận cuộc họp này",
+      "hint": "Trao đổi về cuộc họp này với trợ lý. Trợ lý biết những gì đã được nói và có thể tra cứu trong bản chép lời.",
+      "whileRecording": "Có thể dùng khi bản ghi dừng lại.",
+      "nothingYet": "Chưa có nội dung nào được chép lời.",
+      "failed": "Không thể bắt đầu cuộc trò chuyện: {{error}}",
+      "earlier": "Các cuộc thảo luận trước",
+      "continue": "Tiếp tục thảo luận này",
+      "untitled": "Thảo luận chưa đặt tên",
+      "messages_other": "{{count}} tin nhắn",
+      "more": "Xem thêm trong Các cuộc trò chuyện trước."
     },
     "myNotes": {
       "description": "Ghi lại những điều quan trọng với bạn. Chúng sẽ được kết hợp với bản chép lời khi tạo ghi chú.",
@@ -2170,7 +2180,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Cuộc gọi",
+      "title": "Trò chuyện",
       "newChat": "Trò chuyện mới",
       "type": "Nhập tin nhắn",
       "backToVoice": "Quay lại giọng nói",
@@ -2179,10 +2189,10 @@
       "speakerOn": "Đọc to câu trả lời",
       "speakerOff": "Ngừng đọc to câu trả lời",
       "expand": "Mở cuộc trò chuyện",
-      "collapse": "Quay lại thanh cuộc gọi",
+      "collapse": "Thu gọn",
       "historyOpen": "Các cuộc trò chuyện trước",
       "historyClose": "Quay lại cuộc trò chuyện này",
-      "end": "Kết thúc cuộc gọi",
+      "end": "Kết thúc trò chuyện",
       "send": "Gửi",
       "stop": "Dừng câu trả lời",
       "placeholder": "Nhắn cho {{name}}",
@@ -2195,16 +2205,45 @@
       "preparingVoice": "Đang chuẩn bị giọng nói… {{progress}}%",
       "history": {
         "title": "Các cuộc trò chuyện trước",
-        "hint": "Chọn một cuộc để tiếp tục từ chỗ bạn dừng. Cuộc gọi vẫn được giữ kết nối.",
+        "hint": "Chọn một cuộc để tiếp tục từ chỗ bạn dừng. Cuộc trò chuyện hiện tại vẫn được giữ mở.",
         "empty": "Chưa có cuộc trò chuyện nào được lưu.",
+        "noMatches": "Không có kết quả phù hợp.",
+        "noMeetings": "Chưa có cuộc trò chuyện nào về cuộc họp. Mở một cuộc họp và chọn Thảo luận cuộc họp này.",
         "loading": "Đang tải…",
         "failed": "Không thể tải các cuộc trò chuyện của bạn.",
         "more": "Xem thêm",
         "untitled": "Cuộc trò chuyện chưa đặt tên",
         "current": "Đang mở",
+        "search": "Tìm cuộc trò chuyện",
+        "clearSearch": "Xóa tìm kiếm",
+        "scopeLabel": "Cuộc trò chuyện nào",
+        "scopes": {
+          "all": "Tất cả",
+          "meetings": "Cuộc họp"
+        },
+        "groups": {
+          "today": "Hôm nay",
+          "yesterday": "Hôm qua",
+          "week": "7 ngày qua",
+          "earlier": "Trước đó"
+        },
+        "matchCount_other": "{{count}} cuộc trò chuyện",
         "messages_other": "{{count}} tin nhắn"
       },
-      "options": "Tùy chọn cuộc gọi",
+      "meeting": {
+        "about": "Về {{title}}",
+        "chipHint": "Trợ lý có ghi chú của cuộc họp này và có thể tìm trong bản chép lời.",
+        "untitled": "Cuộc họp chưa đặt tên",
+        "startTitle": "Cùng bàn về {{title}}",
+        "startHint": "Hỏi bất cứ điều gì về cuộc họp, hoặc nên làm gì tiếp theo. Hãy bắt đầu nói, hoặc chọn một gợi ý:",
+        "prompts": {
+          "recap": "Tóm tắt nhanh giúp tôi",
+          "next": "Tôi nên làm gì tiếp theo?",
+          "followUp": "Soạn tin nhắn theo dõi",
+          "missed": "Tôi có bỏ sót gì không?"
+        }
+      },
+      "options": "Tùy chọn trò chuyện",
       "pace": "Thời gian chờ bạn nói xong",
       "paceHint": "Chờ bao lâu sau khi bạn ngừng nói rồi mới trả lời.",
       "paces": {
@@ -2220,7 +2259,7 @@
         "high": "Cao — phòng yên tĩnh hoặc dùng tai nghe"
       },
       "phase": {
-        "off": "Cuộc gọi đã kết thúc",
+        "off": "Cuộc trò chuyện đã kết thúc",
         "starting": "Đang kết nối…",
         "listening": "Đang nghe",
         "hearing": "Đang nghe…",
@@ -2229,7 +2268,7 @@
         "speaking": "Đang nói",
         "muted": "Micrô đang tắt",
         "held": "Tạm dừng để đọc chính tả",
-        "error": "Cuộc gọi bị gián đoạn"
+        "error": "Cuộc trò chuyện bị gián đoạn"
       },
       "errors": {
         "microphone": "Không thể mở micrô của bạn. Hãy cho phép truy cập micrô và kiểm tra xem ứng dụng khác có đang dùng nó không.",
@@ -2293,6 +2332,8 @@
     "tool": {
       "search": "Đang tìm trên web",
       "screen": "Đang xem màn hình của bạn…",
+      "meetingSearch": "Đang tìm trong cuộc họp",
+      "meetingRead": "Đang đọc cuộc họp",
       "working": "Đang xử lý",
       "elapsed": "{{seconds}} giây"
     },
@@ -2498,7 +2539,7 @@
         "what": "Hỏi thành tiếng. Câu trả lời hiện trong một bảng nổi."
       },
       "call": {
-        "title": "Bắt đầu cuộc gọi",
+        "title": "Bắt đầu trò chuyện",
         "description": "Trò chuyện rảnh tay với câu trả lời bằng giọng nói.",
         "what": "Trò chuyện qua lại, rảnh tay. Nhấn lần nữa để kết thúc."
       },
@@ -2526,12 +2567,6 @@
       "trySuffixHold": "và giữ trong khi bạn nói.",
       "trySuffixTap": "và nói. Nhấn lại khi bạn nói xong.",
       "tryPlaceholder": "Lời bạn nói sẽ xuất hiện ở đây…"
-    },
-    "hero": {
-      "hold": "Giữ các phím trong bất kỳ ứng dụng nào, nói, rồi thả ra.",
-      "tap": "Nhấn các phím trong bất kỳ ứng dụng nào, nói, rồi nhấn lại.",
-      "holdHint": "Giữ để nói",
-      "tapHint": "Nhấn để bắt đầu và dừng"
     },
     "activity": {
       "title": "30 ngày qua",
@@ -2572,7 +2607,7 @@
       "meetings": "Cuộc họp",
       "cleanup": "Dọn dẹp bằng AI",
       "meetingNotes": "Ghi chú cuộc họp",
-      "calls": "Cuộc gọi",
+      "calls": "Trò chuyện",
       "flow": "Tạo bằng Flow",
       "spokenReplies": "Trả lời bằng giọng nói"
     },
@@ -2594,7 +2629,7 @@
       },
       "assistant": {
         "name": "Trợ lý",
-        "description": "Trả lời câu hỏi, xem màn hình của bạn và thực hiện cuộc gọi.",
+        "description": "Trả lời câu hỏi, xem màn hình của bạn và trò chuyện cùng bạn.",
         "openAssistant": "Mở Trợ lý",
         "offNotice": "Trợ lý đang tắt. Tạo bằng Flow và phương án dọn dẹp dự phòng vẫn dùng mô hình này.",
         "catalogTitle": "Mô hình trợ lý",
@@ -2679,15 +2714,6 @@
         "instructionPlaceholder": "Ví dụ: giữ giọng thoải mái, viết thường toàn bộ, và chuyển tên emoji được nói ra thành emoji."
       }
     },
-    "hero": {
-      "title": "Nói lộn xộn. Nhận văn bản <em>gọn gàng.</em>",
-      "before": "mình gặp lúc mười giờ nhé, à không, đổi thành mười một giờ đi, nhớ mang theo ngân sách",
-      "after": "Mình gặp lúc mười một giờ nhé, nhớ mang theo ngân sách.",
-      "offHint": "Bật Dọn dẹp bằng AI để dùng phím tắt này",
-      "onHint": "Giữ, nói, thả ra. Văn bản đã dọn dẹp được gõ sẵn cho bạn.",
-      "onHintTap": "Nhấn, nói, nhấn lại. Văn bản đã dọn dẹp được gõ sẵn cho bạn.",
-      "onDictationHint": "Mọi lần đọc chính tả đều được dọn dẹp."
-    },
     "shortcut": {
       "title": "Phím tắt",
       "info": "Cho việc dọn dẹp một phím tắt riêng, hoặc để phím tắt đọc chính tả dọn dẹp mọi lần đọc, như vậy bạn chỉ cần nhớ một bộ phím.",
@@ -2708,11 +2734,7 @@
       "title": "Thay thế",
       "description": "Nói một cụm từ và nhận văn bản khác, chẳng hạn “email của tôi” trở thành địa chỉ email của bạn."
     },
-    "addWord": "Thêm từ",
-    "hero": {
-      "title": "SpeakoFlow viết <em>đúng như cách bạn viết.</em>",
-      "subtitle": "Thêm những tên riêng và thuật ngữ nó hay viết sai."
-    }
+    "addWord": "Thêm từ"
   },
   "assistantPage": {
     "description": "Hỏi bất cứ điều gì bằng giọng nói, từ bất kỳ ứng dụng nào. Trợ lý có thể xem màn hình, tìm kiếm trên web và ghi nhớ những điều quan trọng với bạn.",
@@ -2723,11 +2745,11 @@
       "call": "Trò chuyện qua lại, rảnh tay. Nhấn lần nữa để kết thúc.",
       "title": "Hỏi bất cứ điều gì, từ <em>bất cứ đâu.</em>",
       "ask": "Hỏi",
-      "callLabel": "Gọi",
+      "callLabel": "Trò chuyện",
       "askHoldShort": "Giữ, hỏi, thả ra",
       "askTapShort": "Nhấn, hỏi, nhấn lại",
       "callShort": "Nhấn lần nữa để kết thúc",
-      "subtitle": "Đặt câu hỏi thành tiếng, hoặc bắt đầu một cuộc gọi và trao đổi kỹ hơn."
+      "subtitle": "Đặt câu hỏi thành tiếng, hoặc bắt đầu trò chuyện và trao đổi kỹ hơn."
     },
     "models": {
       "title": "Được vận hành bởi",
@@ -2858,14 +2880,14 @@
       },
       "screen": {
         "ask": "Xem màn hình khi hỏi",
-        "call": "Xem màn hình khi gọi"
+        "call": "Xem màn hình khi trò chuyện"
       }
     },
     "tips": {
       "thinksWith": "Mô hình trả lời bạn. Dọn dẹp bằng AI và ghi chú cuộc họp cũng dùng nó khi chúng không có mô hình riêng.",
-      "speaks": "Đọc to câu trả lời trong cuộc gọi.",
+      "speaks": "Đọc to câu trả lời trong khi trò chuyện.",
       "screenAsk": "Cho phép trợ lý xem màn hình khi câu hỏi liên quan đến màn hình của bạn, hoặc khi bạn yêu cầu. Câu hỏi về văn bản đã chọn sẽ được trả lời dựa trên chính văn bản đó. Ảnh chụp màn hình chỉ được gửi tới nhà cung cấp AI của bạn.",
-      "screenCall": "Cho phép trợ lý xem màn hình trong cuộc gọi khi bạn yêu cầu, hoặc khi bạn đang nói về thứ gì đó trên màn hình.",
+      "screenCall": "Cho phép trợ lý xem màn hình trong khi trò chuyện khi bạn yêu cầu, hoặc khi bạn đang nói về thứ gì đó trên màn hình.",
       "captureTiming": "Chụp màn hình tại thời điểm bạn bắt đầu hỏi, hoặc khi bạn gửi.",
       "webSearch": "Tra cứu trực tuyến khi câu hỏi cần thông tin cập nhật.",
       "depth": "Nhanh cho thông tin đơn giản, Sâu cho câu hỏi khó.",
@@ -2983,7 +3005,7 @@
     "recoverError": "Không thể khôi phục bản chép lời này. Hãy thử lại.",
     "more": "Thao tác khác",
     "chat": {
-      "continueInCall": "Tiếp tục trong cuộc gọi",
+      "continueInCall": "Tiếp tục dưới dạng trò chuyện",
       "assistantOff": "Bật trợ lý để tiếp tục cuộc trò chuyện này."
     }
   },

@@ -32,6 +32,12 @@
 .audio-waveform.working .wave-bar {
   opacity: 0.78;
 }
+/* The fill sets each bar's opacity every frame. A transition there restarts on
+   every frame and drags the brightness a third of a second behind the bars,
+   which is part of what made the fill look stepped rather than smooth. */
+.audio-waveform.progress .wave-bar {
+  transition: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .audio-waveform .wave-bar {
     transition: none;

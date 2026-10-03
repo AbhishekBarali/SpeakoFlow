@@ -3819,9 +3819,9 @@ pub fn get_default_settings() -> AppSettings {
         "assistant_call".to_string(),
         ShortcutBinding {
             id: "assistant_call".to_string(),
-            name: "Start or end a call".to_string(),
+            name: "Start or end a conversation".to_string(),
             description: "Open a hands-free conversation and talk to the assistant, replies \
-                 spoken aloud. Press again to hang up. This is the separate, longer-form \
+                 spoken aloud. Press again to end it. This is the separate, longer-form \
                  feature — the assistant shortcut above is for one quick question."
                 .to_string(),
             // Bound by default, unlike the panel toggle. A call with no key of its

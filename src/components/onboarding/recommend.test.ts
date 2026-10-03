@@ -5,10 +5,28 @@ import {
   pickGpu,
   prefersEnglish,
   recommend,
+  SETUP_MODELS,
+  SETUP_SPEECH_OPTIONS,
   voiceEngineFor,
   voiceModelId,
   type HardwareFacts,
 } from "./recommend";
+
+describe("setup's speech list", () => {
+  test("is a short list where no two cards share a name or a model", () => {
+    const names = SETUP_SPEECH_OPTIONS.map((option) => option.name);
+    const ids = SETUP_SPEECH_OPTIONS.map((option) => option.id);
+    expect(new Set(names).size).toBe(names.length);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(SETUP_SPEECH_OPTIONS.length).toBeLessThanOrEqual(6);
+  });
+
+  test("includes both models setup can recommend", () => {
+    const ids = SETUP_SPEECH_OPTIONS.map((option) => option.id);
+    expect(ids).toContain(SETUP_MODELS.speech.english);
+    expect(ids).toContain(SETUP_MODELS.speech.multilingual);
+  });
+});
 
 const base: HardwareFacts = {
   memoryGb: 16,

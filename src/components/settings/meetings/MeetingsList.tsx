@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import {
   AudioLines,
   ChevronRight,
-  FileText,
   MoreHorizontal,
   Trash2,
   Users,
@@ -46,9 +45,10 @@ const ICON_BUTTON =
 /**
  * Recorded meetings, newest first, grouped by day exactly like History: a
  * day heading, then one card of rows for that day. A row is the title and one
- * line of facts (time, length, who spoke, whether notes exist); opening it is
+ * line of facts (time, length, who spoke); opening it is
  * the whole row, and the rare actions sit behind a ⋯ that shows on hover.
- */
+ * There is no "Notes" marker: a meeting with notes already shows their summary
+ * as its title, so the marker only repeated what the row said. */
 export const MeetingsList: React.FC<MeetingsListProps> = ({
   meetings,
   speakerCounts,
@@ -249,15 +249,6 @@ const MeetingRow: React.FC<MeetingRowProps> = ({
               <span className="inline-flex items-center gap-1">
                 <Users width={11} height={11} aria-hidden="true" />
                 {t("meetings.list.speakers", { count: speakerCount })}
-              </span>
-            </>
-          )}
-          {meeting.notes && (
-            <>
-              <Dot />
-              <span className="inline-flex items-center gap-1">
-                <FileText width={11} height={11} aria-hidden="true" />
-                {t("meetings.list.notesBadge")}
               </span>
             </>
           )}

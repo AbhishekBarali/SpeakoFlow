@@ -2375,7 +2375,6 @@ impl ShortcutAction for TranscribeAction {
         let hm = Arc::clone(&app.state::<Arc<HistoryManager>>());
 
         change_tray_icon(app, TrayIconState::Transcribing);
-        show_transcribing_overlay(app);
 
         // Unmute before playing audio feedback so the stop sound is audible
         rm.remove_mute();
@@ -2391,6 +2390,7 @@ impl ShortcutAction for TranscribeAction {
             post_process: cleans_up(self.post_process, &get_settings(app)),
             flow_eligible: !self.post_process,
         };
+        show_transcribing_overlay(app, context.post_process);
         let flow_cancel_generation = crate::flow::cancellation_generation();
         // The coordinator runs this straight after this recording's own start,
         // so the current generation is this dictation's.
@@ -2876,6 +2876,16 @@ fn paste_final(
 ) {
     let ah = app.clone();
     let paste_time = Instant::now();
+    // The text is final: run the overlay's fill out now, while the paste is
+    // still on its way, so the two finish together. Not for Flow (its overlay
+    // has no fill) or a notice (that replaces the pill instead, and is not a
+    // wait worth learning from).
+    if !pending.flow
+        && pending.notice.is_none()
+        && !crate::flow::is_generation_cancelled(flow_cancel_generation)
+    {
+        utils::seal_working_overlay(&app);
+    }
     app.run_on_main_thread(move || {
         // A cancel can arrive after the text was ready but before this
         // main-thread closure runs.
@@ -3176,9 +3186,9 @@ async fn run_recovery(app: AppHandle, offer: Offer) {
     // have done something even while the row is still being written.
     change_tray_icon(&app, TrayIconState::Transcribing);
     match &remaining {
-        Remaining::Transcribe(_) => show_transcribing_overlay(&app),
+        Remaining::Transcribe(_) => show_transcribing_overlay(&app, context.post_process),
         Remaining::Deliver(_) if context.post_process => show_processing_overlay(&app),
-        Remaining::Deliver(_) => show_transcribing_overlay(&app),
+        Remaining::Deliver(_) => show_transcribing_overlay(&app, false),
         Remaining::Paste(_) => {}
     }
 

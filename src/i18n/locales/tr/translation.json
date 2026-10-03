@@ -165,12 +165,12 @@
       "tabs": {
         "dictate": "Dikte",
         "ask": "Asistan",
-        "call": "Görüşme"
+        "call": "Sohbet"
       },
       "keys": {
         "hold": "Konuşmak için basılı tutun",
         "tap": "Başlatmak için dokunun, durdurmak için yine dokunun",
-        "call": "Başlatmak için basın, kapatmak için yine basın"
+        "call": "Başlatmak için basın, bitirmek için yine basın"
       },
       "steps": {
         "label": "Nasıl çalışır",
@@ -473,15 +473,13 @@
       "english": "İngilizce",
       "languages_one": "{{count}} dil",
       "languages_other": "{{count}} dil",
-      "tags": {
-        "english": "En hızlı",
-        "languages": "Dili algılar",
-        "small": "En küçük",
-        "accurate": "En doğru",
-        "widest": "Daha yavaş"
+      "about": {
+        "english": "Hızlı ve doğru, İngilizce için.",
+        "languages": "Hangi dili konuştuğunuzu kendisi anlar.",
+        "small": "Küçük ve hızlı. Eski bilgisayarlar için uygun.",
+        "accurate": "En doğrusu, ancak indirmesi daha büyük ve daha yavaş.",
+        "widest": "En çok dili kapsar, ancak daha yavaş çalışır."
       },
-      "more_one": "{{count}} model daha",
-      "more_other": "{{count}} model daha",
       "anytime": "İstediğiniz zaman daha fazla model ekleyebilirsiniz.",
       "download": "İndir ve devam et",
       "continue": "Devam et",
@@ -640,8 +638,8 @@
             "description": "Ekranınız ekli olarak sesle sorun; böylece neye baktığınızı görebilir."
           },
           "assistant_call": {
-            "name": "Görüşme başlat",
-            "description": "Asistanla elleriniz serbest konuşun ve yanıtlarını dinleyin. Kapatmak için yine basın."
+            "name": "Sohbet başlat",
+            "description": "Asistanla elleriniz serbest konuşun ve yanıtlarını dinleyin. Bitirmek için yine basın."
           }
         },
         "errors": {
@@ -1271,7 +1269,7 @@
         "recordings": "Dikteler",
         "flow": "Flow",
         "asks": "Asistan",
-        "calls": "Görüşmeler"
+        "calls": "Sohbetler"
       },
       "openFolder": "Kayıtlar klasörünü aç",
       "loading": "Geçmiş yükleniyor…",
@@ -1279,11 +1277,11 @@
       "emptyRecordings": "Henüz dikte yok.",
       "emptyFlow": "Henüz Flow üretimi yok.",
       "emptyAsks": "Henüz soru sorulmadı.",
-      "emptyCalls": "Henüz görüşme yok.",
+      "emptyCalls": "Henüz sohbet yok.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Asistan",
-        "call": "Görüşme"
+        "call": "Sohbet"
       },
       "flowTranscriptLabel": "Söylediğiniz",
       "originalTranscriptionLabel": "Özgün transkripsiyon",
@@ -1944,8 +1942,7 @@
       "loadMore": "Daha fazla yükle",
       "speakers_one": "{{count}} konuşmacı",
       "speakers_other": "{{count}} konuşmacı",
-      "hasNotes": "Notlar oluşturuldu",
-      "notesBadge": "Notlar"
+      "hasNotes": "Notlar oluşturuldu"
     },
     "status": {
       "recording": "Kaydediliyor",
@@ -1970,6 +1967,19 @@
       "transcript": "Transkript",
       "summary": "Özet",
       "ask": "Sor"
+    },
+    "discuss": {
+      "button": "Bu toplantıyı konuş",
+      "hint": "Bu toplantıyı asistanla konuşun. Neler söylendiğini bilir ve transkriptte bilgi arayabilir.",
+      "whileRecording": "Kayıt durduğunda kullanılabilir.",
+      "nothingYet": "Henüz hiçbir şey yazıya dökülmedi.",
+      "failed": "Sohbet başlatılamadı: {{error}}",
+      "earlier": "Önceki konuşmalar",
+      "continue": "Bu konuşmaya devam et",
+      "untitled": "Adsız konuşma",
+      "messages_one": "{{count}} mesaj",
+      "messages_other": "{{count}} mesaj",
+      "more": "Daha fazlası Geçmiş sohbetler bölümünde."
     },
     "myNotes": {
       "description": "Sizin için önemli olanı yazın. Notlar oluşturulurken transkriptle birleştirilir.",
@@ -2184,7 +2194,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Görüşme",
+      "title": "Sohbet",
       "newChat": "Yeni sohbet",
       "type": "Bir mesaj yazın",
       "backToVoice": "Sese dön",
@@ -2193,10 +2203,10 @@
       "speakerOn": "Yanıtları sesli oku",
       "speakerOff": "Yanıtları sesli okumayı durdur",
       "expand": "Sohbeti aç",
-      "collapse": "Görüşme çubuğuna dön",
+      "collapse": "Daralt",
       "historyOpen": "Geçmiş sohbetler",
       "historyClose": "Bu sohbete dön",
-      "end": "Görüşmeyi bitir",
+      "end": "Sohbeti bitir",
       "send": "Gönder",
       "stop": "Yanıtı durdur",
       "placeholder": "Mesaj: {{name}}",
@@ -2209,17 +2219,47 @@
       "preparingVoice": "Ses hazırlanıyor… %{{progress}}",
       "history": {
         "title": "Geçmiş sohbetler",
-        "hint": "Kaldığınız yerden devam etmek için birini seçin. Görüşme bağlı kalır.",
+        "hint": "Kaldığınız yerden devam etmek için birini seçin. Mevcut sohbetiniz açık kalır.",
         "empty": "Henüz kayıtlı sohbet yok.",
+        "noMatches": "Bu aramayla eşleşen bir şey yok.",
+        "noMeetings": "Henüz toplantılarla ilgili sohbet yok. Bir toplantı açın ve Bu toplantıyı konuş'u seçin.",
         "loading": "Yükleniyor…",
         "failed": "Sohbetleriniz yüklenemedi.",
         "more": "Daha fazla göster",
         "untitled": "Adsız sohbet",
         "current": "Şu an açık",
+        "search": "Sohbetlerde ara",
+        "clearSearch": "Aramayı temizle",
+        "scopeLabel": "Hangi sohbetler",
+        "scopes": {
+          "all": "Tümü",
+          "meetings": "Toplantılar"
+        },
+        "groups": {
+          "today": "Bugün",
+          "yesterday": "Dün",
+          "week": "Son 7 gün",
+          "earlier": "Daha önce"
+        },
+        "matchCount_one": "{{count}} sohbet",
+        "matchCount_other": "{{count}} sohbet",
         "messages_one": "{{count}} mesaj",
         "messages_other": "{{count}} mesaj"
       },
-      "options": "Görüşme seçenekleri",
+      "meeting": {
+        "about": "Konu: {{title}}",
+        "chipHint": "Asistan bu toplantının notlarına sahip ve transkriptinde arama yapabilir.",
+        "untitled": "Adsız toplantı",
+        "startTitle": "{{title}} hakkında konuşalım",
+        "startHint": "Onunla ilgili ya da sırada ne yapmanız gerektiğiyle ilgili her şeyi sorun. Konuşmaya başlayın veya birini seçin:",
+        "prompts": {
+          "recap": "Kısaca özetle",
+          "next": "Sırada ne yapmalıyım?",
+          "followUp": "Bir takip mesajı taslağı yaz",
+          "missed": "Kaçırdığım bir şey var mı?"
+        }
+      },
+      "options": "Sohbet seçenekleri",
       "pace": "Sözünüzü bitirme süresi",
       "paceHint": "Siz duraksadıktan sonra yanıt vermeden önce ne kadar bekleneceği.",
       "paces": {
@@ -2235,7 +2275,7 @@
         "high": "Yüksek — sessiz oda veya kulaklık"
       },
       "phase": {
-        "off": "Görüşme sona erdi",
+        "off": "Sohbet sona erdi",
         "starting": "Bağlanıyor…",
         "listening": "Dinliyor",
         "hearing": "Dinliyor…",
@@ -2244,7 +2284,7 @@
         "speaking": "Konuşuyor",
         "muted": "Mikrofon kapalı",
         "held": "Dikte için duraklatıldı",
-        "error": "Görüşme kesildi"
+        "error": "Sohbet kesildi"
       },
       "errors": {
         "microphone": "Mikrofonunuz açılamadı. Mikrofon erişimine izin verin ve başka bir uygulama tarafından kullanılmadığını kontrol edin.",
@@ -2310,6 +2350,8 @@
     "tool": {
       "search": "Web'de aranıyor",
       "screen": "Ekranınıza bakılıyor…",
+      "meetingSearch": "Toplantıda aranıyor",
+      "meetingRead": "Toplantı okunuyor",
       "working": "Üzerinde çalışılıyor",
       "elapsed": "{{seconds}} sn"
     },
@@ -2518,9 +2560,9 @@
         "what": "Sesli sorun. Yanıt yüzen bir panelde görünür."
       },
       "call": {
-        "title": "Görüşme başlat",
+        "title": "Sohbet başlat",
         "description": "Sesli yanıtlarla, elleriniz serbest bir sohbet.",
-        "what": "Elleriniz serbest, karşılıklı konuşun. Kapatmak için yine basın."
+        "what": "Elleriniz serbest, karşılıklı konuşun. Bitirmek için yine basın."
       },
       "info": "Bunlara herhangi bir uygulamada basın. Değiştirmek için tuşlara tıklayın.",
       "offHint": "Kapalı",
@@ -2546,12 +2588,6 @@
       "trySuffixHold": "tuşuna basın ve konuşurken basılı tutun.",
       "trySuffixTap": "tuşuna basın ve konuşun. Bitirince yeniden basın.",
       "tryPlaceholder": "Sözleriniz burada görünecek…"
-    },
-    "hero": {
-      "hold": "Herhangi bir uygulamada tuşları basılı tutun, konuşun ve bırakın.",
-      "tap": "Herhangi bir uygulamada tuşlara dokunun, konuşun ve yeniden dokunun.",
-      "holdHint": "Konuşmak için basılı tutun",
-      "tapHint": "Başlatıp durdurmak için dokunun"
     },
     "activity": {
       "title": "Son 30 gün",
@@ -2594,7 +2630,7 @@
       "meetings": "Toplantılar",
       "cleanup": "Yapay zekâ temizleme",
       "meetingNotes": "Toplantı notları",
-      "calls": "Görüşmeler",
+      "calls": "Sohbetler",
       "flow": "Flow ile oluştur",
       "spokenReplies": "Sesli yanıtlar"
     },
@@ -2616,7 +2652,7 @@
       },
       "assistant": {
         "name": "Asistan",
-        "description": "Sorularınızı yanıtlar, ekranınıza bakar ve görüşme yapar.",
+        "description": "Sorularınızı yanıtlar, ekranınıza bakar ve sizinle sohbet eder.",
         "openAssistant": "Asistanı aç",
         "offNotice": "Asistan kapalı. Flow ile oluştur ve yedek temizleme bu modeli kullanmaya devam eder.",
         "catalogTitle": "Asistan modelleri",
@@ -2701,15 +2737,6 @@
         "instructionPlaceholder": "Örneğin: rahat ve küçük harfle yaz, söylenen emoji adlarını emojiye çevir."
       }
     },
-    "hero": {
-      "title": "Dağınık söyleyin, <em>tertemiz alın.</em>",
-      "before": "onda buluşalım, yok aslında on bir olsun, bir de bütçeyi getir",
-      "after": "On birde buluşalım, bütçeyi de getir.",
-      "offHint": "Bu kısayolu kullanmak için yapay zekâ temizlemeyi açın",
-      "onHint": "Basılı tutun, konuşun, bırakın. Temizlenen metin sizin için yazılır.",
-      "onHintTap": "Dokunun, konuşun, yeniden dokunun. Temizlenen metin sizin için yazılır.",
-      "onDictationHint": "Her dikte temizlenir."
-    },
     "shortcut": {
       "title": "Kısayol",
       "info": "Temizlemeye kendi kısayolunu verin ya da dikte kısayolunuzun her dikteyi temizlemesine izin verin; böylece hatırlamanız gereken tek bir tuş kombinasyonu olur.",
@@ -2730,11 +2757,7 @@
       "title": "Değiştirmeler",
       "description": "Bir ifade söyleyin, yerine başka bir metin gelsin; örneğin “e-postam” adresinize dönüşsün."
     },
-    "addWord": "Kelime ekle",
-    "hero": {
-      "title": "SpeakoFlow <em>sizin gibi yazar.</em>",
-      "subtitle": "Sürekli yanlış yazdığı adları ve jargonu ekleyin."
-    }
+    "addWord": "Kelime ekle"
   },
   "assistantPage": {
     "description": "Her uygulamadan sesle her şeyi sorun. Asistan ekranınızı görebilir, web'de arama yapabilir ve sizin için önemli olanı hatırlayabilir.",
@@ -2742,14 +2765,14 @@
     "hero": {
       "askHold": "Basılı tutun, sorunuzu sorun, bırakın. Yanıt yüzen bir panelde görünür.",
       "askTap": "Dokunun, sorunuzu sorun, yeniden dokunun. Yanıt yüzen bir panelde görünür.",
-      "call": "Elleriniz serbest, karşılıklı konuşun. Kapatmak için yeniden basın.",
+      "call": "Elleriniz serbest, karşılıklı konuşun. Bitirmek için yine basın.",
       "title": "Her şeyi <em>her yerden</em> sorun.",
       "ask": "Sor",
-      "callLabel": "Görüşme",
+      "callLabel": "Sohbet",
       "askHoldShort": "Basılı tutun, sorun, bırakın",
       "askTapShort": "Dokunun, sorun, yeniden dokunun",
-      "callShort": "Kapatmak için yeniden basın",
-      "subtitle": "Sorunuzu sesli sorun ya da bir görüşme başlatıp konuyu konuşarak çözün."
+      "callShort": "Bitirmek için yine basın",
+      "subtitle": "Sorunuzu sesli sorun ya da bir sohbet başlatıp konuyu konuşarak çözün."
     },
     "models": {
       "title": "Arkasındaki güç",
@@ -2883,14 +2906,14 @@
       },
       "screen": {
         "ask": "Sorular için ekran görüşü",
-        "call": "Görüşmeler için ekran görüşü"
+        "call": "Sohbetlerde ekran görüşü"
       }
     },
     "tips": {
       "thinksWith": "Size yanıt veren model. Kendi modelleri olmadığında yapay zekâ temizleme ve toplantı notları da bunu kullanır.",
-      "speaks": "Görüşme sırasında yanıtları sesli okur.",
+      "speaks": "Sohbet sırasında yanıtları sesli okur.",
       "screenAsk": "Soru ekranınızla ilgili olduğunda ya da siz istediğinizde asistanın ekrana bakmasını sağlar. Seçili metinle ilgili sorular metinden yanıtlanır. Ekran görüntüleri yalnızca yapay zekâ sağlayıcınıza gider.",
-      "screenCall": "Görüşme sırasında siz istediğinizde ya da ekranınızdaki bir şeyden bahsettiğinizde asistanın ekrana bakmasını sağlar.",
+      "screenCall": "Sohbet sırasında siz istediğinizde ya da ekranınızdaki bir şeyden bahsettiğinizde asistanın ekrana bakmasını sağlar.",
       "captureTiming": "Ekranı, sormaya başladığınız andaki ya da gönderdiğiniz andaki haliyle yakalar.",
       "webSearch": "Bir soru güncel bilgi gerektirdiğinde internette arama yapar.",
       "depth": "Basit bilgiler için Hızlı, zor sorular için Derin.",
@@ -3010,7 +3033,7 @@
     "recoverError": "Bu transkripsiyon kurtarılamadı. Tekrar deneyin.",
     "more": "Diğer işlemler",
     "chat": {
-      "continueInCall": "Görüşmede devam et",
+      "continueInCall": "Sesli sohbet olarak devam et",
       "assistantOff": "Bu sohbete devam etmek için asistanı açın."
     }
   },

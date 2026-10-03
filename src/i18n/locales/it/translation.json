@@ -166,12 +166,12 @@
       "tabs": {
         "dictate": "Dettatura",
         "ask": "Assistente",
-        "call": "Chiamata"
+        "call": "Conversazione"
       },
       "keys": {
         "hold": "Tieni premuto per parlare",
         "tap": "Tocca per iniziare, tocca per fermare",
-        "call": "Premi per iniziare, di nuovo per riagganciare"
+        "call": "Premi per iniziare, di nuovo per terminare"
       },
       "steps": {
         "label": "Come funziona",
@@ -475,16 +475,13 @@
       "languages_one": "{{count}} lingua",
       "languages_many": "{{count}} lingue",
       "languages_other": "{{count}} lingue",
-      "tags": {
-        "english": "Il più veloce",
-        "languages": "Rileva la lingua",
-        "small": "Il più piccolo",
-        "accurate": "Il più preciso",
-        "widest": "Più lento"
+      "about": {
+        "english": "Veloce e preciso, per l'inglese.",
+        "languages": "Capisce da solo quale lingua stai parlando.",
+        "small": "Piccolo e rapido. Adatto ai computer meno recenti.",
+        "accurate": "Il più preciso, ma il download è più grande ed è più lento.",
+        "widest": "Copre il maggior numero di lingue, ma è più lento."
       },
-      "more_one": "{{count}} altro modello",
-      "more_many": "{{count}} altri modelli",
-      "more_other": "{{count}} altri modelli",
       "anytime": "Puoi aggiungere altri modelli in qualsiasi momento.",
       "download": "Scarica e continua",
       "continue": "Continua",
@@ -643,8 +640,8 @@
             "description": "Chiedi a voce allegando il tuo schermo, così può vedere ciò che stai guardando."
           },
           "assistant_call": {
-            "name": "Avvia una chiamata",
-            "description": "Parla con l'assistente a mani libere e ascolta le sue risposte. Premi di nuovo per riagganciare."
+            "name": "Avvia una conversazione",
+            "description": "Parla con l'assistente a mani libere e ascolta le sue risposte. Premi di nuovo per terminare."
           }
         },
         "errors": {
@@ -1278,7 +1275,7 @@
         "recordings": "Dettature",
         "flow": "Flow",
         "asks": "Assistente",
-        "calls": "Chiamate"
+        "calls": "Conversazioni"
       },
       "openFolder": "Apri la cartella delle registrazioni",
       "loading": "Caricamento cronologia…",
@@ -1286,11 +1283,11 @@
       "emptyRecordings": "Nessuna dettatura.",
       "emptyFlow": "Nessuna generazione con Flow.",
       "emptyAsks": "Ancora nessuna domanda.",
-      "emptyCalls": "Ancora nessuna chiamata.",
+      "emptyCalls": "Ancora nessuna conversazione.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Assistente",
-        "call": "Chiamata"
+        "call": "Conversazione"
       },
       "flowTranscriptLabel": "Hai detto",
       "originalTranscriptionLabel": "Trascrizione originale",
@@ -1955,8 +1952,7 @@
       "speakers_one": "{{count}} interlocutore",
       "speakers_many": "{{count}} interlocutori",
       "speakers_other": "{{count}} interlocutori",
-      "hasNotes": "Appunti generati",
-      "notesBadge": "Appunti"
+      "hasNotes": "Appunti generati"
     },
     "status": {
       "recording": "In registrazione",
@@ -1981,6 +1977,20 @@
       "transcript": "Trascrizione",
       "summary": "Riepilogo",
       "ask": "Chiedi"
+    },
+    "discuss": {
+      "button": "Discuti questa riunione",
+      "hint": "Parla di questa riunione con l'assistente. Sa cosa è stato detto e può cercare informazioni nella trascrizione.",
+      "whileRecording": "Disponibile quando la registrazione si ferma.",
+      "nothingYet": "Non è stato ancora trascritto nulla.",
+      "failed": "Impossibile avviare la conversazione: {{error}}",
+      "earlier": "Discussioni precedenti",
+      "continue": "Continua questa discussione",
+      "untitled": "Discussione senza titolo",
+      "messages_one": "{{count}} messaggio",
+      "messages_many": "{{count}} messaggi",
+      "messages_other": "{{count}} messaggi",
+      "more": "Altre in «Conversazioni precedenti»."
     },
     "myNotes": {
       "description": "Scrivi ciò che conta per te. Viene unito alla trascrizione quando si generano gli appunti.",
@@ -2198,7 +2208,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Chiamata",
+      "title": "Conversazione",
       "newChat": "Nuova chat",
       "type": "Scrivi un messaggio",
       "backToVoice": "Torna alla voce",
@@ -2207,10 +2217,10 @@
       "speakerOn": "Leggi le risposte ad alta voce",
       "speakerOff": "Smetti di leggere le risposte ad alta voce",
       "expand": "Apri la conversazione",
-      "collapse": "Torna alla barra della chiamata",
+      "collapse": "Comprimi",
       "historyOpen": "Conversazioni precedenti",
       "historyClose": "Torna a questa conversazione",
-      "end": "Termina chiamata",
+      "end": "Termina conversazione",
       "send": "Invia",
       "stop": "Ferma la risposta",
       "placeholder": "Scrivi a {{name}}",
@@ -2223,18 +2233,49 @@
       "preparingVoice": "Preparazione della voce… {{progress}}%",
       "history": {
         "title": "Conversazioni precedenti",
-        "hint": "Scegline una per riprendere da dove avevi lasciato. La chiamata resta collegata.",
+        "hint": "Scegline una per riprendere da dove avevi lasciato. La conversazione attuale resta aperta.",
         "empty": "Ancora nessuna conversazione salvata.",
+        "noMatches": "Nessun risultato per questa ricerca.",
+        "noMeetings": "Ancora nessuna conversazione sulle riunioni. Apri una riunione e scegli «Discuti questa riunione».",
         "loading": "Caricamento…",
         "failed": "Impossibile caricare le tue conversazioni.",
         "more": "Mostra altre",
         "untitled": "Conversazione senza titolo",
         "current": "Aperta ora",
+        "search": "Cerca nelle conversazioni",
+        "clearSearch": "Cancella ricerca",
+        "scopeLabel": "Quali conversazioni",
+        "scopes": {
+          "all": "Tutte",
+          "meetings": "Riunioni"
+        },
+        "groups": {
+          "today": "Oggi",
+          "yesterday": "Ieri",
+          "week": "Ultimi 7 giorni",
+          "earlier": "Meno recenti"
+        },
+        "matchCount_one": "{{count}} conversazione",
+        "matchCount_many": "{{count}} conversazioni",
+        "matchCount_other": "{{count}} conversazioni",
         "messages_one": "{{count}} messaggio",
         "messages_many": "{{count}} messaggi",
         "messages_other": "{{count}} messaggi"
       },
-      "options": "Opzioni della chiamata",
+      "meeting": {
+        "about": "Su {{title}}",
+        "chipHint": "L'assistente ha le note di questa riunione e può cercare nella sua trascrizione.",
+        "untitled": "Riunione senza titolo",
+        "startTitle": "Parliamo di {{title}}",
+        "startHint": "Chiedi qualsiasi cosa al riguardo, o cosa fare dopo. Inizia a parlare, oppure scegli:",
+        "prompts": {
+          "recap": "Fammi un breve riepilogo",
+          "next": "Cosa dovrei fare adesso?",
+          "followUp": "Scrivi una bozza di messaggio di follow-up",
+          "missed": "C'è qualcosa che potrei essermi perso?"
+        }
+      },
+      "options": "Opzioni della conversazione",
       "pace": "Tempo per finire di parlare",
       "paceHint": "Quanto aspettare dopo una tua pausa prima di rispondere.",
       "paces": {
@@ -2250,7 +2291,7 @@
         "high": "Alta: stanza silenziosa o cuffie"
       },
       "phase": {
-        "off": "Chiamata terminata",
+        "off": "Conversazione terminata",
         "starting": "Connessione…",
         "listening": "In ascolto",
         "hearing": "In ascolto…",
@@ -2259,7 +2300,7 @@
         "speaking": "Sta parlando",
         "muted": "Microfono disattivato",
         "held": "In pausa per la dettatura",
-        "error": "Chiamata interrotta"
+        "error": "Conversazione interrotta"
       },
       "errors": {
         "microphone": "Impossibile aprire il microfono. Consenti l'accesso al microfono e verifica che non sia usato da un'altra app.",
@@ -2327,6 +2368,8 @@
     "tool": {
       "search": "Ricerca sul web",
       "screen": "Sto guardando lo schermo…",
+      "meetingSearch": "Ricerca nella riunione",
+      "meetingRead": "Lettura della riunione",
       "working": "Elaborazione in corso",
       "elapsed": "{{seconds}} s"
     },
@@ -2538,9 +2581,9 @@
         "what": "Chiedi a voce. La risposta compare in un pannello flottante."
       },
       "call": {
-        "title": "Avvia una chiamata",
+        "title": "Avvia una conversazione",
         "description": "Una conversazione a mani libere con risposte vocali.",
-        "what": "Parla e ascolta, a mani libere. Premi di nuovo per riattaccare."
+        "what": "Parla e ascolta, a mani libere. Premi di nuovo per terminare."
       },
       "info": "Premili in qualsiasi app. Fai clic sui tasti per cambiarli.",
       "offHint": "Disattivata",
@@ -2566,12 +2609,6 @@
       "trySuffixHold": "e tienilo premuto mentre parli.",
       "trySuffixTap": "e parla. Premilo di nuovo quando hai finito.",
       "tryPlaceholder": "Le tue parole appariranno qui…"
-    },
-    "hero": {
-      "hold": "Tieni premuti i tasti in qualsiasi app, parla e rilascia.",
-      "tap": "Tocca i tasti in qualsiasi app, parla e tocca di nuovo.",
-      "holdHint": "Tieni premuto per parlare",
-      "tapHint": "Tocca per avviare e fermare"
     },
     "activity": {
       "title": "Ultimi 30 giorni",
@@ -2616,7 +2653,7 @@
       "meetings": "Riunioni",
       "cleanup": "Pulizia IA",
       "meetingNotes": "Note delle riunioni",
-      "calls": "Chiamate",
+      "calls": "Conversazioni",
       "flow": "Genera con Flow",
       "spokenReplies": "Risposte vocali"
     },
@@ -2638,7 +2675,7 @@
       },
       "assistant": {
         "name": "Assistente",
-        "description": "Risponde alle tue domande, guarda il tuo schermo e sostiene chiamate.",
+        "description": "Risponde alle tue domande, guarda il tuo schermo e sostiene conversazioni.",
         "openAssistant": "Apri l'assistente",
         "offNotice": "L'assistente è disattivato. Genera con Flow e la pulizia di riserva usano comunque questo modello.",
         "catalogTitle": "Modelli per l'assistente",
@@ -2723,15 +2760,6 @@
         "instructionPlaceholder": "Per esempio: tieni un tono informale, tutto in minuscolo, e trasforma i nomi delle emoji pronunciati in emoji."
       }
     },
-    "hero": {
-      "title": "Dillo come viene. Ottienilo <em>pulito.</em>",
-      "before": "vediamoci alle dieci, anzi no, facciamo alle undici, e porta il budget",
-      "after": "Vediamoci alle undici e porta il budget.",
-      "offHint": "Attiva la pulizia IA per usare questa scorciatoia",
-      "onHint": "Tieni premuto, parla, rilascia. Il testo ripulito viene scritto per te.",
-      "onHintTap": "Tocca, parla, tocca di nuovo. Il testo ripulito viene scritto per te.",
-      "onDictationHint": "Ogni dettatura viene ripulita."
-    },
     "shortcut": {
       "title": "Scorciatoia",
       "info": "Dai alla pulizia una scorciatoia propria, oppure lascia che la scorciatoia di dettatura ripulisca ogni dettatura, così hai un'unica combinazione di tasti da ricordare.",
@@ -2752,11 +2780,7 @@
       "title": "Sostituzioni",
       "description": "Pronuncia una frase e ottieni un testo diverso, per esempio «la mia email» che diventa il tuo indirizzo."
     },
-    "addWord": "Aggiungi parola",
-    "hero": {
-      "title": "SpeakoFlow scrive <em>come scrivi tu.</em>",
-      "subtitle": "Aggiungi i nomi e i termini tecnici che continua a sbagliare."
-    }
+    "addWord": "Aggiungi parola"
   },
   "assistantPage": {
     "description": "Chiedi qualsiasi cosa a voce, da qualsiasi app. L'assistente può vedere il tuo schermo, cercare sul web e ricordare ciò che conta per te.",
@@ -2764,14 +2788,14 @@
     "hero": {
       "askHold": "Tieni premuto, fai la tua domanda, rilascia. La risposta compare in un pannello flottante.",
       "askTap": "Tocca, fai la tua domanda, tocca di nuovo. La risposta compare in un pannello flottante.",
-      "call": "Parla e ascolta, a mani libere. Premi di nuovo per riattaccare.",
+      "call": "Parla e ascolta, a mani libere. Premi di nuovo per terminare.",
       "title": "Chiedi qualsiasi cosa, <em>ovunque.</em>",
       "ask": "Chiedi",
-      "callLabel": "Chiamata",
+      "callLabel": "Conversazione",
       "askHoldShort": "Tieni premuto, chiedi, rilascia",
       "askTapShort": "Tocca, chiedi, tocca di nuovo",
-      "callShort": "Premi di nuovo per riattaccare",
-      "subtitle": "Fai una domanda a voce, oppure avvia una chiamata e parlane insieme."
+      "callShort": "Premi di nuovo per terminare",
+      "subtitle": "Fai una domanda a voce, oppure avvia una conversazione e parlane insieme."
     },
     "models": {
       "title": "Alimentato da",
@@ -2908,14 +2932,14 @@
       },
       "screen": {
         "ask": "Visione dello schermo per le domande",
-        "call": "Visione dello schermo per le chiamate"
+        "call": "Visione dello schermo nelle conversazioni"
       }
     },
     "tips": {
       "thinksWith": "Il modello che ti risponde. Anche la pulizia IA e le note delle riunioni lo usano quando non ne hanno uno proprio.",
-      "speaks": "Legge le risposte ad alta voce durante una chiamata.",
+      "speaks": "Legge le risposte ad alta voce durante una conversazione.",
       "screenAsk": "Consente all'assistente di guardare quando una domanda riguarda il tuo schermo o quando glielo chiedi. Alle domande sul testo selezionato risponde partendo dal testo. Gli screenshot vanno solo al tuo provider IA.",
-      "screenCall": "Consente all'assistente di guardare durante una chiamata quando glielo chiedi o quando parli di qualcosa sul tuo schermo.",
+      "screenCall": "Consente all'assistente di guardare durante una conversazione quando glielo chiedi o quando parli di qualcosa sul tuo schermo.",
       "captureTiming": "Cattura lo schermo com'era quando hai iniziato a chiedere, oppure al momento dell'invio.",
       "webSearch": "Cerca online quando una domanda richiede informazioni aggiornate.",
       "depth": "Rapida per i fatti semplici, Approfondita per le domande difficili.",
@@ -3037,7 +3061,7 @@
     "recoverError": "Impossibile recuperare questa trascrizione. Riprova.",
     "more": "Altre azioni",
     "chat": {
-      "continueInCall": "Continua in una chiamata",
+      "continueInCall": "Continua come conversazione",
       "assistantOff": "Attiva l'assistente per continuare questa chat."
     }
   },

@@ -106,7 +106,6 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
     return () => window.clearTimeout(id);
   }, [query, open, selectedRepo, runSearch]);
 
-
   const handleSelectRepo = async (repo: HfModelSummary) => {
     setSelectedRepo(repo);
     setRepoFiles(null);

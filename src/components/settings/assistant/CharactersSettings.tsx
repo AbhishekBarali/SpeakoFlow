@@ -727,7 +727,6 @@ export const CharactersSettings: React.FC = () => {
           >
             <div>
               <Segmented
-                size="sm"
                 label={t("assistantPage.profiles.lengthLabel")}
                 value={(selected.response_length ?? "inherit") as LengthChoice}
                 onChange={(value) =>

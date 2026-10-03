@@ -39,10 +39,10 @@ const scrollIntoView = (element: HTMLElement | null) =>
   element?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 /** A plain line of context above a tab's first card, or nothing. */
-const Note: React.FC<{ children: React.ReactNode; action?: React.ReactNode }> = ({
-  children,
-  action,
-}) => (
+const Note: React.FC<{
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}> = ({ children, action }) => (
   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-hairline bg-surface-muted px-5 py-3">
     <p className="min-w-0 flex-1 text-sm text-body">{children}</p>
     {action}

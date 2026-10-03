@@ -22,25 +22,33 @@
  *
  * Colour: ink is the primary action colour (dark buttons, like a pen); the
  * brand teal marks state — the page you are on, a switch that is on, the
- * selected option, a link. Feature banners are the exception: a dark stage
- * with a photograph of light, the one cinematic surface on a page.
- * Provider and model logos carry their own brand colours (ProviderLogos.tsx),
- * which is where the rest of the colour on a page comes from.
+ * selected option, a link. Feature banners (Assistant, Meetings) are a stage
+ * of their own: near-black on the dark theme, a pale tinted surface on the
+ * light one. Provider and model logos carry their own brand colours
+ * (ProviderLogos.tsx), which is where the rest of the colour on a page comes
+ * from.
  *
- * Every text pairing below was checked for WCAG AA: muted on canvas 5.2:1,
- * accent on surface 5.0:1, white on accent 5.0:1.
+ * The light theme is paper, not a lightbox: the pane is a soft off-white so
+ * the white cards on it are the brightest thing, and ink is a deep slate
+ * rather than near-black (15:1 on a card instead of 18:1). At the old values
+ * long passages such as the Recent list were stark enough to tire the eye,
+ * which is the same reason the dark theme's text is a step below white.
+ *
+ * Every text pairing below was checked for WCAG AA: ink on a card 15:1,
+ * muted on canvas 4.9:1 (on the chrome 4.6:1), accent on canvas 4.6:1, white
+ * on accent 5.0:1.
  */
 @theme {
   /* === Surfaces === */
-  --color-canvas: #f9fcfc; /* content pane */
-  --color-canvas-soft: #f0f4f5; /* chrome: title bar + sidebar */
+  --color-canvas: #f3f6f6; /* content pane */
+  --color-canvas-soft: #eaeff0; /* chrome: title bar + sidebar */
   --color-surface: #ffffff; /* cards */
   --color-surface-strong: #ebf0f1; /* fills, hover, badges */
   --color-surface-muted: #f5f8f8; /* quiet wells inside a card */
 
   /* === Ink / text === */
-  --color-ink: #0d181c;
-  --color-ink-soft: #1e2b2f;
+  --color-ink: #1b292e;
+  --color-ink-soft: #26353a;
   --color-body: #3d494d;
   --color-muted: #616d70; /* ≥4.8:1 on every surface above */
   --color-muted-soft: #99a4a6; /* decorative + disabled only */
@@ -49,7 +57,10 @@
   --color-hairline: #e3e8e8;
   --color-hairline-strong: #d1d8da;
 
-  /* === Feature banners: a dark stage in both themes === */
+  /* === Feature banners ===
+   * The dark stage. It is also the default for anything drawn with the hero
+   * tokens outside a banner (the onboarding tour's keys, on its dark faux
+   * desktop); the light theme overrides them on `.hero-stage` only. */
   --color-hero-surface: #0b0d0e; /* the art is rendered on exactly this */
   --color-hero-ink: #f6f2ec; /* warm white, 17:1 on the stage */
   --color-hero-muted: #aba7a0; /* 8.4:1 on the stage */
@@ -362,11 +373,12 @@
 }
 
 /* ============================================================================
- * Feature banners — a dark stage with a photograph of light
+ * Feature banners — a stage with one picture on it
  * ----------------------------------------------------------------------------
  * Layers, back to front: the stage colour, the art (masked away toward the
- * text so it never sits under a word), film grain, then the content. The art
- * is rendered on the stage colour itself, so the mask has no seam to hide.
+ * text so it never sits under a word), film grain (dark only), then the
+ * content. The art is rendered on the stage colour itself, one file per
+ * theme, so the mask has no seam to hide.
  * ==========================================================================*/
 .hero-stage {
   position: relative;
@@ -374,9 +386,6 @@
   overflow: hidden;
   color: var(--color-hero-ink);
   background-color: var(--color-hero-surface);
-  box-shadow:
-    0 1px 2px rgba(13, 24, 28, 0.06),
-    0 14px 32px -22px rgba(13, 24, 28, 0.38);
 }
 /* On the dark pane the stage sits a step below it, edged by a hairline of
  * light instead of a shadow that would not show. */
@@ -386,7 +395,7 @@
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
 /* Film grain, so the dark reads as a material rather than a flat fill. */
-.hero-stage::after {
+:root[data-theme="dark"] .hero-stage::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -395,6 +404,25 @@
   opacity: 0.1;
   mix-blend-mode: soft-light;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* The light stage: a pale, faintly teal surface between the pane and a card,
+ * edged by a hairline, with the art drawn as ink on it. It was near-black in
+ * both themes until it proved to be the most distracting thing in the light
+ * window. Every hero token is redefined here, so the utilities and controls
+ * on the stage (`text-hero-muted`, a shortcut being recorded, the switch's
+ * `onHero` tone) follow without a light variant of their own. Scoped to the
+ * stage rather than :root because the onboarding tour draws hero keys on a
+ * faux desktop that stays dark. `--color-hero-surface` must match
+ * `STAGE_LIGHT` in scripts/hero-art.py. */
+:root:not([data-theme="dark"]) .hero-stage {
+  --color-hero-surface: #e7eeec;
+  --color-hero-ink: var(--color-ink);
+  --color-hero-muted: #57625f; /* 5.4:1 on the stage */
+  --color-hero-border: rgba(13, 24, 28, 0.14);
+  --color-hero-control: #ffffff;
+  --color-hero-hover: rgba(13, 24, 28, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(13, 24, 28, 0.06);
 }
 
 /* Narrow pages: the art fills the stage behind the text, faded well down. */
@@ -447,20 +475,40 @@
   transform: scaleX(-1);
   transform-origin: left center;
 }
-/* The light comes up when the page opens: a one-time settle, not a loop. It
- * starts mostly visible, so a paused clock never leaves the stage dark. */
-@keyframes hero-art-in {
+/* The art's entrance: once per banner per session (see `Hero.tsx`, which
+ * removes `.hero-art-enter` when it is done), small, and shaped by what the
+ * picture is rather than one sweep for all of them. It used to hang off
+ * `.page-layer-active`, and a hidden page is suspended to display:none, so
+ * every return to a page restarted it. Individual `scale` / `translate` are
+ * used rather than `transform`, which the RTL mirror above already owns.
+ *
+ * A voice (Meetings): the bars rise from their centre line, as levels do
+ * when a recording starts. */
+@keyframes hero-art-levels {
   from {
-    opacity: 0.55;
-    scale: 1.035;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
+    opacity: 0.4;
+    scale: 1 0.82;
   }
 }
-.page-layer-active .hero-art {
-  animation: hero-art-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+/* The assistant: the orb grows into place. */
+@keyframes hero-art-orb {
+  from {
+    opacity: 0.5;
+    scale: 0.94;
+  }
+}
+.hero-art-enter[data-art="meetings"] {
+  animation: hero-art-levels 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* Grow about the orb itself (rendered at 74% across, mid-height), not the
+ * image's edge. RTL keeps its mirror's origin: moving it would shift the
+ * flipped image while the animation runs. */
+.hero-art-enter[data-art="assistant"] {
+  transform-origin: 74% 50%;
+  animation: hero-art-orb 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+[dir="rtl"] .hero-art-enter[data-art="assistant"] {
+  transform-origin: left center;
 }
 
 /* The headline. Instrument Serif has no italic weight to fake, so emphasis
@@ -682,6 +730,75 @@
   background: rgba(255, 255, 255, 0.16);
 }
 
+/* ---------- The same controls on the light stage ----------
+ * The tokens carry most of it; these are the surfaces that were drawn in
+ * white-on-dark glass directly. The primary action becomes the app's own:
+ * ink-filled, like every other primary button on a light page. */
+:root:not([data-theme="dark"]) .hero-stage {
+  & .hero-button {
+    background: var(--color-ink);
+    color: var(--color-on-ink);
+    box-shadow: 0 1px 2px rgba(13, 24, 28, 0.12);
+  }
+  & .hero-button:hover:not(:disabled) {
+    background: var(--color-ink-soft);
+  }
+  & .hero-glass {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(13, 24, 28, 0.12);
+  }
+  & .hero-glass:hover:not(:disabled) {
+    background: #ffffff;
+    border-color: rgba(13, 24, 28, 0.2);
+  }
+  & .hero-corner {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(13, 24, 28, 0.1);
+  }
+  & .hero-corner:hover {
+    background: #ffffff;
+  }
+  & .hero-corner[aria-pressed="true"] {
+    color: #8a4b00;
+    background: #fff1dc;
+    border-color: #f0cf9c;
+  }
+  & .hero-corner.hero-corner-plain[aria-pressed="true"],
+  & .hero-corner.hero-corner-plain[aria-pressed="true"]:hover {
+    color: var(--color-ink);
+    background: #ffffff;
+    border-color: rgba(13, 24, 28, 0.18);
+  }
+  & .rec-dot[data-paused="true"] {
+    box-shadow: 0 0 0 4px rgba(13, 24, 28, 0.06);
+  }
+  & .rec-side {
+    border-color: rgba(13, 24, 28, 0.1);
+    background: rgba(255, 255, 255, 0.6);
+  }
+  & .rec-side-light {
+    background: rgba(13, 24, 28, 0.2);
+  }
+  & .rec-side[data-active="true"] .rec-side-light {
+    background: var(--color-accent-fill);
+    box-shadow: 0 0 0 3px rgba(0, 150, 132, 0.18);
+  }
+  & .rec-side[data-captured="false"] {
+    color: var(--color-warning);
+    border-color: rgba(180, 83, 9, 0.3);
+    text-decoration-color: rgba(180, 83, 9, 0.55);
+  }
+  & .rec-side[data-captured="false"] .rec-side-light {
+    background: #d97706;
+  }
+  /* Paused fades the art toward the stage. Darkening it, as the dark stage
+   * does, or desaturating it would also shift the image's own background
+   * off the stage colour and show its edge as a faint rectangle. */
+  &[data-paused="true"] .hero-art {
+    filter: opacity(0.4);
+  }
+}
+
 /* Tips fold away: rows animate from their height to zero, content keeps its
  * size (so nothing rewraps mid-fold) and fades a little ahead of the fold. */
 .hero-fold {
@@ -734,6 +851,16 @@
     0 8px 18px -12px rgba(0, 0, 0, 0.9);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
+}
+/* On the light stage the keys are the app's ordinary keycaps. */
+:root:not([data-theme="dark"]) .hero-stage .keycap-hero {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f5 100%);
+  border-color: var(--color-hairline-strong);
+  box-shadow:
+    inset 0 -1.5px 0 rgba(13, 24, 28, 0.09),
+    0 1px 1.5px rgba(13, 24, 28, 0.05);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* ============================================================================
@@ -937,7 +1064,7 @@ input[type="range"] {
   .style-swap,
   .page-layer-active > .page-layer-content,
   .page-layer-active .heat-cell,
-  .page-layer-active .hero-art {
+  .hero-art-enter {
     animation: none;
   }
   .hero-fold {

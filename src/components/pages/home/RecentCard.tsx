@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Sparkles, Wand2 } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { commands, events, type HistoryEntry } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { Keycaps } from "@/components/ui/Keycaps";
@@ -9,9 +9,6 @@ import { useNavigation } from "@/components/shell/navigation";
 import { formatRelativeTime } from "@/utils/dateFormat";
 
 const RECENT_LIMIT = 5;
-
-/** Stable marker written by src-tauri/src/flow.rs on Flow generations. */
-const FLOW_HISTORY_MARKER = "Generate with Flow";
 
 /** What was actually pasted: the cleaned text when cleanup changed something. */
 export const finalTextOf = (entry: HistoryEntry): string => {
@@ -23,11 +20,6 @@ const RecentRow: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
   const { t, i18n } = useTranslation();
   const [copied, setCopied] = useState(false);
   const text = finalTextOf(entry);
-  const isFlow = entry.post_process_prompt === FLOW_HISTORY_MARKER;
-  const cleaned =
-    !isFlow &&
-    !!entry.post_processed_text?.trim() &&
-    entry.post_processed_text.trim() !== entry.transcription_text.trim();
 
   const copy = async () => {
     try {
@@ -45,36 +37,10 @@ const RecentRow: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
         <p className="line-clamp-2 select-text text-[0.9375rem] leading-relaxed text-ink">
           {text}
         </p>
-        <p className="mt-1 flex items-center text-xs text-muted">
+        {/* Just when. Whether cleanup or Flow touched it is History's ⋯ menu
+            ("Show original"); a marker on every cleaned row was noise. */}
+        <p className="mt-1 text-xs text-muted">
           {formatRelativeTime(String(entry.timestamp), i18n.language)}
-          {(cleaned || isFlow) && (
-            <>
-              <span aria-hidden="true" className="mx-1.5 text-muted-soft">
-                ·
-              </span>
-              {/* An icon rather than a caption, as on the History page. */}
-              <span
-                role="img"
-                aria-label={
-                  isFlow
-                    ? t("settings.history.flowLabel")
-                    : t("home.recent.cleaned")
-                }
-                title={
-                  isFlow
-                    ? t("settings.history.flowLabel")
-                    : t("home.recent.cleaned")
-                }
-                className="inline-flex text-accent"
-              >
-                {isFlow ? (
-                  <Sparkles className="h-3 w-3" aria-hidden="true" />
-                ) : (
-                  <Wand2 className="h-3 w-3" aria-hidden="true" />
-                )}
-              </span>
-            </>
-          )}
         </p>
       </div>
       <button

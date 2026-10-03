@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Mic, SquarePen, Volume2, X } from "lucide-react";
 import AudioWaveform from "@/components/shared/AudioWaveform";
 import { Keycaps } from "@/components/ui/Keycaps";
-import CompletionMark from "@/overlay/CompletionMark";
 import QuickAsk from "@/assistant/QuickAsk";
 import { VoiceOrb } from "@/assistant/VoiceOrb";
 import { FONT_SIZES } from "@/assistant/appearance";
@@ -11,6 +10,9 @@ import type { ConversationPhase } from "@/assistant/useVoiceConversation";
 import type { QuickAskPhase } from "@/assistant/quickAskState";
 import "@/overlay/RecordingOverlay.css";
 import "@/assistant/AssistantPanel.css";
+
+/** A finished dictation, as the overlay ends one: the fill at the end. */
+const FULL = () => 1;
 
 /*
  * The tour's three previews.
@@ -375,7 +377,16 @@ export const DictateScene: React.FC<
             <div className="overlay-pill">
               <div className="pill-wave">
                 {done ? (
-                  <CompletionMark label={t("overlay.done")} />
+                  <span className="overlay-wave">
+                    <AudioWaveform
+                      barCount={14}
+                      levels={levels}
+                      size="sm"
+                      active
+                      mode="working"
+                      progress={FULL}
+                    />
+                  </span>
                 ) : (
                   <span className="overlay-wave">
                     <AudioWaveform
@@ -397,7 +408,18 @@ export const DictateScene: React.FC<
                 <div className="card-status">
                   <div className="card-wave">
                     {done ? (
-                      <CompletionMark label={t("overlay.done")} />
+                      <span className="overlay-wave">
+                        <AudioWaveform
+                          barCount={5}
+                          pitch={5}
+                          barWidth={3}
+                          levels={levels}
+                          size="sm"
+                          active
+                          mode="working"
+                          progress={FULL}
+                        />
+                      </span>
                     ) : (
                       <span className="overlay-wave">
                         <AudioWaveform

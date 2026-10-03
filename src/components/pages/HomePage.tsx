@@ -1,11 +1,8 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight } from "lucide-react";
-import { Page } from "@/components/ui/Page";
+import { Page, PageHeader } from "@/components/ui/Page";
 import { Button } from "@/components/ui/Button";
-import { Hero, HeroShortcut } from "@/components/ui/Hero";
-import { ShortcutInput } from "@/components/settings/ShortcutInput";
-import { useSettings } from "@/hooks/useSettings";
 import { useNavigation } from "@/components/shell/navigation";
 import { useModelSlots } from "@/components/shell/useModelSlots";
 import { ShortcutsCard } from "./home/ShortcutsCard";
@@ -32,56 +29,28 @@ const NeedsSpeechModel: React.FC = () => {
 };
 
 /**
- * Home: the one shortcut that matters, what you have said, and how it is set
- * up.
+ * Home: the shortcuts, the models doing each job, and the last few things you
+ * said. Usage numbers live on Insights.
  *
- * The banner carries the dictation keys at the size of real keys — and they
- * are the button that changes them. How to use them is a tip that retires
- * after the first few days. Below it, the other shortcuts beside the models
- * doing each job; then the last few things you said. Usage numbers live on
- * Insights.
+ * There is no banner. Home used to open on a dark stage with a waveform and
+ * the dictation keys drawn large, and it was the most-visited decoration in
+ * the app: the art said nothing the keys did not, and on the light theme it
+ * was the darkest, highest-contrast thing on screen, so it pulled the eye off
+ * the content under it. Dictate is now the first row of the shortcuts list,
+ * beside the other three.
  */
 export const HomePage: React.FC = () => {
   const { t } = useTranslation();
-  const { getSetting } = useSettings();
   const slots = useModelSlots();
-  const holdToTalk = getSetting("push_to_talk") ?? true;
-  // With cleanup moved onto the dictation shortcut, these keys clean up too,
-  // so the banner says so instead of listing a second shortcut below.
-  const cleansUp =
-    (getSetting("post_process_enabled") ?? false) &&
-    (getSetting("post_process_on_dictation") ?? false);
   const greeting = t(`home.greeting.${partOfDay(new Date().getHours())}`);
 
   return (
     <Page>
+      <PageHeader title={greeting} />
+
       {!slots.stt.ready && <NeedsSpeechModel />}
 
-      <Hero
-        art="home"
-        title={greeting}
-        subtitle={holdToTalk ? t("home.hero.hold") : t("home.hero.tap")}
-        actions={
-          <HeroShortcut
-            label={
-              cleansUp
-                ? t("home.shortcuts.cleanup.title")
-                : t("home.shortcuts.dictate.title")
-            }
-            hint={holdToTalk ? t("home.hero.holdHint") : t("home.hero.tapHint")}
-          >
-            <ShortcutInput
-              shortcutId="transcribe"
-              bare
-              finish="hero"
-              size="lg"
-              showReset="never"
-            />
-          </HeroShortcut>
-        }
-      />
-
-      <div className="mt-8 grid grid-cols-1 gap-10 @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8">
+      <div className="grid grid-cols-1 gap-10 @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8">
         <ShortcutsCard />
         <ModelsCard />
       </div>

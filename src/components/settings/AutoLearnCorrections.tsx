@@ -131,68 +131,68 @@ export const AutoLearnCorrections: React.FC<AutoLearnProps> = ({
 
       {status.enabled && (
         <div className={grouped ? "px-5 pb-4" : undefined}>
-        <div className="rounded-xl border border-hairline bg-surface-muted px-3.5 py-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[12px] font-medium text-ink">
-              {t("settings.advanced.autoLearn.learnedTitle")}
-            </p>
-            {status.learned.length > 0 && (
-              <button
-                type="button"
-                onClick={clearAll}
-                className="shrink-0 cursor-pointer text-[11.5px] text-muted underline hover:text-ink"
-              >
-                {t("settings.advanced.autoLearn.clearAll")}
-              </button>
+          <div className="rounded-xl border border-hairline bg-surface-muted px-3.5 py-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[12px] font-medium text-ink">
+                {t("settings.advanced.autoLearn.learnedTitle")}
+              </p>
+              {status.learned.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="shrink-0 cursor-pointer text-[11.5px] text-muted underline hover:text-ink"
+                >
+                  {t("settings.advanced.autoLearn.clearAll")}
+                </button>
+              )}
+            </div>
+
+            {status.learned.length === 0 ? (
+              <p className="text-[11.5px] text-muted-soft">
+                {t("settings.advanced.autoLearn.learnedEmpty")}
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {status.learned.map((word) => (
+                    <span
+                      key={word}
+                      className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[12px] text-ink"
+                    >
+                      {word}
+                      <button
+                        type="button"
+                        onClick={() => keep(word)}
+                        title={t("settings.advanced.autoLearn.keep")}
+                        aria-label={t("settings.advanced.autoLearn.keep", {
+                          word,
+                        })}
+                        className="cursor-pointer rounded p-0.5 text-muted-soft transition-colors hover:bg-ink/6 hover:text-teal-600"
+                      >
+                        <Check size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(word)}
+                        title={t("settings.advanced.autoLearn.remove")}
+                        aria-label={t("settings.advanced.autoLearn.remove", {
+                          word,
+                        })}
+                        className="cursor-pointer rounded p-0.5 text-muted-soft transition-colors hover:bg-ink/6 hover:text-error"
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-muted-soft">
+                  {t("settings.advanced.autoLearn.reviewHint", {
+                    max: status.max_learned,
+                  })}
+                </p>
+              </>
             )}
           </div>
-
-          {status.learned.length === 0 ? (
-            <p className="text-[11.5px] text-muted-soft">
-              {t("settings.advanced.autoLearn.learnedEmpty")}
-            </p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-1.5">
-                {status.learned.map((word) => (
-                  <span
-                    key={word}
-                    className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[12px] text-ink"
-                  >
-                    {word}
-                    <button
-                      type="button"
-                      onClick={() => keep(word)}
-                      title={t("settings.advanced.autoLearn.keep")}
-                      aria-label={t("settings.advanced.autoLearn.keep", {
-                        word,
-                      })}
-                      className="cursor-pointer rounded p-0.5 text-muted-soft transition-colors hover:bg-ink/6 hover:text-teal-600"
-                    >
-                      <Check size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => remove(word)}
-                      title={t("settings.advanced.autoLearn.remove")}
-                      aria-label={t("settings.advanced.autoLearn.remove", {
-                        word,
-                      })}
-                      className="cursor-pointer rounded p-0.5 text-muted-soft transition-colors hover:bg-ink/6 hover:text-error"
-                    >
-                      <X size={11} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <p className="mt-2 text-[11px] text-muted-soft">
-                {t("settings.advanced.autoLearn.reviewHint", {
-                  max: status.max_learned,
-                })}
-              </p>
-            </>
-          )}
-        </div>
         </div>
       )}
     </div>

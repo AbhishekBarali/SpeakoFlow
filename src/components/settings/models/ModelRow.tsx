@@ -246,6 +246,32 @@ export const ModelRow: React.FC<{
   );
 };
 
+/** Accuracy or speed as five quiet dots: a comparison, not a number to read. */
+export const ScoreDots: React.FC<{ label: string; score: number }> = ({
+  label,
+  score,
+}) => {
+  const filled = Math.max(0, Math.min(5, Math.round(score * 5)));
+  return (
+    <span
+      className="inline-flex items-center gap-1.5"
+      role="img"
+      aria-label={`${label}: ${filled}/5`}
+      title={`${label}: ${filled}/5`}
+    >
+      <span className="capitalize">{label}</span>
+      <span aria-hidden="true" className="flex gap-[3px]">
+        {Array.from({ length: 5 }, (_, index) => (
+          <span
+            key={index}
+            className={`h-1.5 w-1.5 rounded-full ${index < filled ? "bg-ink/55" : "bg-ink/15"}`}
+          />
+        ))}
+      </span>
+    </span>
+  );
+};
+
 /** A quiet tag after a model's name: "Assistant", "Recommended", "Live". */
 export const ModelTag: React.FC<{
   tone?: "accent" | "neutral" | "success";

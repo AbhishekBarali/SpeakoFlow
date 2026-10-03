@@ -37,33 +37,7 @@ import { commands, type ModelInfo } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { AddCustomModelDialog } from "./AddCustomModelDialog";
 import { AddLocalModelDialog } from "./AddLocalModelDialog";
-import { ModelRow, ModelTag, type ModelRowAction } from "./ModelRow";
-
-/** Accuracy or speed as five quiet dots: a comparison, not a number to read. */
-const ScoreDots: React.FC<{ label: string; score: number }> = ({
-  label,
-  score,
-}) => {
-  const filled = Math.max(0, Math.min(5, Math.round(score * 5)));
-  return (
-    <span
-      className="inline-flex items-center gap-1.5"
-      role="img"
-      aria-label={`${label}: ${filled}/5`}
-      title={`${label}: ${filled}/5`}
-    >
-      <span className="capitalize">{label}</span>
-      <span aria-hidden="true" className="flex gap-[3px]">
-        {Array.from({ length: 5 }, (_, index) => (
-          <span
-            key={index}
-            className={`h-1.5 w-1.5 rounded-full ${index < filled ? "bg-ink/55" : "bg-ink/15"}`}
-          />
-        ))}
-      </span>
-    </span>
-  );
-};
+import { ModelRow, ModelTag, ScoreDots, type ModelRowAction } from "./ModelRow";
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {

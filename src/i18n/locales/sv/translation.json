@@ -165,12 +165,12 @@
       "tabs": {
         "dictate": "Diktering",
         "ask": "Assistent",
-        "call": "Samtal"
+        "call": "Konversation"
       },
       "keys": {
         "hold": "Håll ned för att tala",
         "tap": "Tryck för att starta, tryck för att stoppa",
-        "call": "Tryck för att starta, igen för att lägga på"
+        "call": "Tryck för att starta, igen för att avsluta"
       },
       "steps": {
         "label": "Så fungerar det",
@@ -473,15 +473,13 @@
       "english": "Engelska",
       "languages_one": "{{count}} språk",
       "languages_other": "{{count}} språk",
-      "tags": {
-        "english": "Snabbast",
-        "languages": "Känner igen språket",
-        "small": "Minst",
-        "accurate": "Mest noggrann",
-        "widest": "Långsammare"
+      "about": {
+        "english": "Snabb och exakt, för engelska.",
+        "languages": "Känner själv av vilket språk du talar.",
+        "small": "Liten och snabb. Bra för äldre datorer.",
+        "accurate": "Mest exakt, men en större nedladdning och långsammare.",
+        "widest": "Klarar flest språk, men är långsammare."
       },
-      "more_one": "{{count}} modell till",
-      "more_other": "{{count}} modeller till",
       "anytime": "Du kan lägga till fler modeller när som helst.",
       "download": "Ladda ner och fortsätt",
       "continue": "Fortsätt",
@@ -640,8 +638,8 @@
             "description": "Fråga med röst och bifoga skärmen så att den ser vad du tittar på."
           },
           "assistant_call": {
-            "name": "Starta ett samtal",
-            "description": "Prata med assistenten handsfree och hör dess svar. Tryck igen för att lägga på."
+            "name": "Starta en konversation",
+            "description": "Prata med assistenten handsfree och hör dess svar. Tryck igen för att avsluta."
           }
         },
         "errors": {
@@ -658,7 +656,7 @@
         "descriptionUnsupported": "Den här modellen känner av språket automatiskt.",
         "searchPlaceholder": "Sök språk…",
         "noResults": "Inga språk hittades",
-        "auto": "Auto"
+        "auto": "Automatiskt"
       },
       "pushToTalk": {
         "label": "Inspelningsbeteende",
@@ -850,7 +848,7 @@
         "gpuDevice": {
           "title": "GPU-enhet",
           "description": "Auto väljer den dedikerade GPU:n.",
-          "auto": "Auto"
+          "auto": "Automatiskt"
         }
       },
       "startHidden": {
@@ -1271,7 +1269,7 @@
         "recordings": "Dikteringar",
         "flow": "Flow",
         "asks": "Assistent",
-        "calls": "Samtal"
+        "calls": "Konversationer"
       },
       "openFolder": "Öppna mappen med inspelningar",
       "loading": "Laddar historik…",
@@ -1279,11 +1277,11 @@
       "emptyRecordings": "Inga dikteringar ännu.",
       "emptyFlow": "Inga Flow-genereringar ännu.",
       "emptyAsks": "Inga frågor ännu.",
-      "emptyCalls": "Inga samtal ännu.",
+      "emptyCalls": "Inga konversationer ännu.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Assistent",
-        "call": "Samtal"
+        "call": "Konversation"
       },
       "flowTranscriptLabel": "Du sa",
       "originalTranscriptionLabel": "Ursprunglig transkription",
@@ -1944,8 +1942,7 @@
       "loadMore": "Ladda fler",
       "speakers_one": "{{count}} talare",
       "speakers_other": "{{count}} talare",
-      "hasNotes": "Anteckningar skapade",
-      "notesBadge": "Anteckningar"
+      "hasNotes": "Anteckningar skapade"
     },
     "status": {
       "recording": "Spelar in",
@@ -1970,6 +1967,19 @@
       "transcript": "Transkription",
       "summary": "Sammanfattning",
       "ask": "Fråga"
+    },
+    "discuss": {
+      "button": "Diskutera mötet",
+      "hint": "Prata igenom mötet med assistenten. Den vet vad som sades och kan slå upp saker i transkriptionen.",
+      "whileRecording": "Tillgängligt när inspelningen har stoppats.",
+      "nothingYet": "Inget har transkriberats ännu.",
+      "failed": "Det gick inte att starta konversationen: {{error}}",
+      "earlier": "Tidigare diskussioner",
+      "continue": "Fortsätt diskussionen",
+      "untitled": "Namnlös diskussion",
+      "messages_one": "{{count}} meddelande",
+      "messages_other": "{{count}} meddelanden",
+      "more": "Fler under Tidigare konversationer."
     },
     "myNotes": {
       "description": "Skriv det som är viktigt för dig. Det slås ihop med transkriptionen när anteckningar skapas.",
@@ -2184,7 +2194,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Samtal",
+      "title": "Konversation",
       "newChat": "Ny chatt",
       "type": "Skriv ett meddelande",
       "backToVoice": "Tillbaka till röst",
@@ -2193,10 +2203,10 @@
       "speakerOn": "Läs upp svar",
       "speakerOff": "Sluta läsa upp svar",
       "expand": "Öppna konversationen",
-      "collapse": "Tillbaka till samtalsfältet",
+      "collapse": "Fäll in",
       "historyOpen": "Tidigare konversationer",
       "historyClose": "Tillbaka till den här konversationen",
-      "end": "Avsluta samtalet",
+      "end": "Avsluta konversationen",
       "send": "Skicka",
       "stop": "Stoppa svaret",
       "placeholder": "Skriv till {{name}}",
@@ -2209,17 +2219,47 @@
       "preparingVoice": "Förbereder rösten… {{progress}}%",
       "history": {
         "title": "Tidigare konversationer",
-        "hint": "Välj en för att fortsätta där du slutade. Samtalet förblir anslutet.",
+        "hint": "Välj en för att fortsätta där du slutade. Din pågående konversation förblir öppen.",
         "empty": "Inga sparade konversationer än.",
+        "noMatches": "Inget matchar sökningen.",
+        "noMeetings": "Inga konversationer om möten ännu. Öppna ett möte och välj Diskutera mötet.",
         "loading": "Laddar…",
         "failed": "Det gick inte att ladda dina konversationer.",
         "more": "Visa fler",
         "untitled": "Namnlös konversation",
         "current": "Öppen nu",
+        "search": "Sök i konversationer",
+        "clearSearch": "Rensa sökning",
+        "scopeLabel": "Vilka konversationer",
+        "scopes": {
+          "all": "Alla",
+          "meetings": "Möten"
+        },
+        "groups": {
+          "today": "Idag",
+          "yesterday": "Igår",
+          "week": "Senaste 7 dagarna",
+          "earlier": "Tidigare"
+        },
+        "matchCount_one": "{{count}} konversation",
+        "matchCount_other": "{{count}} konversationer",
         "messages_one": "{{count}} meddelande",
         "messages_other": "{{count}} meddelanden"
       },
-      "options": "Samtalsalternativ",
+      "meeting": {
+        "about": "Om {{title}}",
+        "chipHint": "Assistenten har mötets anteckningar och kan söka i dess transkription.",
+        "untitled": "Namnlöst möte",
+        "startTitle": "Nu pratar vi om {{title}}",
+        "startHint": "Fråga vad som helst om det, eller vad du ska göra härnäst. Börja prata eller välj ett förslag:",
+        "prompts": {
+          "recap": "Ge mig en snabb sammanfattning",
+          "next": "Vad bör jag göra härnäst?",
+          "followUp": "Skriv ett uppföljningsmeddelande",
+          "missed": "Har jag missat något?"
+        }
+      },
+      "options": "Konversationsalternativ",
       "pace": "Tid att tala klart",
       "paceHint": "Hur länge den väntar efter att du pausar innan den svarar.",
       "paces": {
@@ -2235,7 +2275,7 @@
         "high": "Hög — tyst rum eller hörlurar"
       },
       "phase": {
-        "off": "Samtalet avslutat",
+        "off": "Konversationen avslutad",
         "starting": "Ansluter…",
         "listening": "Lyssnar",
         "hearing": "Lyssnar…",
@@ -2244,7 +2284,7 @@
         "speaking": "Talar",
         "muted": "Mikrofonen är av",
         "held": "Pausad för diktering",
-        "error": "Samtalet avbröts"
+        "error": "Konversationen avbröts"
       },
       "errors": {
         "microphone": "Det gick inte att öppna mikrofonen. Tillåt mikrofonåtkomst och kontrollera att den inte används av en annan app.",
@@ -2310,6 +2350,8 @@
     "tool": {
       "search": "Söker på webben",
       "screen": "Tittar på din skärm…",
+      "meetingSearch": "Söker i mötet",
+      "meetingRead": "Läser mötet",
       "working": "Jobbar på det",
       "elapsed": "{{seconds}} s"
     },
@@ -2518,9 +2560,9 @@
         "what": "Fråga högt. Svaret visas i en flytande panel."
       },
       "call": {
-        "title": "Starta ett samtal",
+        "title": "Starta en konversation",
         "description": "En handsfree-konversation med talade svar.",
-        "what": "Prata fram och tillbaka, handsfree. Tryck igen för att lägga på."
+        "what": "Prata fram och tillbaka, handsfree. Tryck igen för att avsluta."
       },
       "info": "Tryck på dessa i valfri app. Klicka på tangenterna för att ändra dem.",
       "offHint": "Avstängt",
@@ -2546,12 +2588,6 @@
       "trySuffixHold": "och håll ned medan du pratar.",
       "trySuffixTap": "och prata. Tryck igen när du är klar.",
       "tryPlaceholder": "Dina ord visas här…"
-    },
-    "hero": {
-      "hold": "Håll ned tangenterna i valfri app, tala och släpp.",
-      "tap": "Tryck på tangenterna i valfri app, tala och tryck igen.",
-      "holdHint": "Håll ned för att tala",
-      "tapHint": "Tryck för att starta och stoppa"
     },
     "activity": {
       "title": "Senaste 30 dagarna",
@@ -2594,7 +2630,7 @@
       "meetings": "Möten",
       "cleanup": "AI-rensning",
       "meetingNotes": "Mötesanteckningar",
-      "calls": "Samtal",
+      "calls": "Konversationer",
       "flow": "Generera med Flow",
       "spokenReplies": "Upplästa svar"
     },
@@ -2616,7 +2652,7 @@
       },
       "assistant": {
         "name": "Assistent",
-        "description": "Svarar på dina frågor, tittar på din skärm och håller samtal.",
+        "description": "Svarar på dina frågor, tittar på din skärm och för konversationer.",
         "openAssistant": "Öppna assistenten",
         "offNotice": "Assistenten är avstängd. Generera med Flow och reservlösningen för rensning använder fortfarande den här modellen.",
         "catalogTitle": "Assistentmodeller",
@@ -2701,15 +2737,6 @@
         "instructionPlaceholder": "Till exempel: håll det ledigt och med små bokstäver, och gör om uttalade emojinamn till emojier."
       }
     },
-    "hero": {
-      "title": "Säg det rörigt. Få det <em>rent.</em>",
-      "before": "vi ses klockan tio, nej förresten, säg elva, och ta med budgeten",
-      "after": "Vi ses klockan elva, och ta med budgeten.",
-      "offHint": "Slå på AI-rensning för att använda det här kortkommandot",
-      "onHint": "Håll ned, tala, släpp. Upprensad text skrivs ut åt dig.",
-      "onHintTap": "Tryck, tala, tryck igen. Upprensad text skrivs ut åt dig.",
-      "onDictationHint": "Varje diktering rensas upp."
-    },
     "shortcut": {
       "title": "Kortkommando",
       "info": "Ge rensningen ett eget kortkommando, eller låt dikteringskortkommandot rensa upp varje diktering så att du bara har en tangentkombination att komma ihåg.",
@@ -2730,11 +2757,7 @@
       "title": "Ersättningar",
       "description": "Säg en fras och få en annan text, till exempel att ”min e-post” blir din adress."
     },
-    "addWord": "Lägg till ord",
-    "hero": {
-      "title": "SpeakoFlow stavar <em>som du gör.</em>",
-      "subtitle": "Lägg till namn och fackuttryck som den fortsätter att få fel."
-    }
+    "addWord": "Lägg till ord"
   },
   "assistantPage": {
     "description": "Fråga vad som helst med rösten, från vilken app som helst. Assistenten kan se din skärm, söka på webben och minnas det som är viktigt för dig.",
@@ -2742,14 +2765,14 @@
     "hero": {
       "askHold": "Håll ned, ställ din fråga, släpp. Svaret visas i en flytande panel.",
       "askTap": "Tryck, ställ din fråga, tryck igen. Svaret visas i en flytande panel.",
-      "call": "Prata fram och tillbaka handsfree. Tryck igen för att lägga på.",
+      "call": "Prata fram och tillbaka handsfree. Tryck igen för att avsluta.",
       "title": "Fråga vad som helst, <em>var som helst.</em>",
       "ask": "Fråga",
-      "callLabel": "Samtal",
+      "callLabel": "Konversation",
       "askHoldShort": "Håll ned, fråga, släpp",
       "askTapShort": "Tryck, fråga, tryck igen",
-      "callShort": "Tryck igen för att lägga på",
-      "subtitle": "Ställ en fråga högt, eller starta ett samtal och prata igenom det."
+      "callShort": "Tryck igen för att avsluta",
+      "subtitle": "Ställ en fråga högt, eller starta en konversation och prata igenom det."
     },
     "models": {
       "title": "Drivs av",
@@ -2883,14 +2906,14 @@
       },
       "screen": {
         "ask": "Skärmvisning för frågor",
-        "call": "Skärmvisning för samtal"
+        "call": "Skärmvisning i konversationer"
       }
     },
     "tips": {
       "thinksWith": "Modellen som svarar dig. AI-rensning och mötesanteckningar använder den också när de saknar en egen.",
-      "speaks": "Läser upp svar under ett samtal.",
+      "speaks": "Läser upp svar under en konversation.",
       "screenAsk": "Låter assistenten titta när en fråga gäller din skärm, eller när du ber den. Frågor om markerad text besvaras utifrån texten. Skärmbilder skickas bara till din AI-leverantör.",
-      "screenCall": "Låter assistenten titta under ett samtal när du ber den, eller när du pratar om något på skärmen.",
+      "screenCall": "Låter assistenten titta under en konversation när du ber den, eller när du pratar om något på skärmen.",
       "captureTiming": "Fånga skärmen som den såg ut när du började fråga, eller när du skickar.",
       "webSearch": "Söker på nätet när en fråga kräver aktuella fakta.",
       "depth": "Snabb för enkla fakta, Djup för svåra frågor.",
@@ -3010,7 +3033,7 @@
     "recoverError": "Kunde inte återställa den här transkriptionen. Försök igen.",
     "more": "Fler åtgärder",
     "chat": {
-      "continueInCall": "Fortsätt i ett samtal",
+      "continueInCall": "Fortsätt som konversation",
       "assistantOff": "Slå på assistenten för att fortsätta den här chatten."
     }
   },

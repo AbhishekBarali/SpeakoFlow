@@ -164,12 +164,12 @@
       "tabs": {
         "dictate": "語音輸入",
         "ask": "助理",
-        "call": "通話"
+        "call": "對話"
       },
       "keys": {
         "hold": "按住說話",
         "tap": "點按開始，再點按停止",
-        "call": "按一下開始，再按一下掛斷"
+        "call": "按一下開始，再按一下結束"
       },
       "steps": {
         "label": "使用方式",
@@ -471,14 +471,13 @@
       "body": "在這台電腦上執行，離線也能用。",
       "english": "英語",
       "languages_other": "{{count}} 種語言",
-      "tags": {
-        "english": "最快",
-        "languages": "自動偵測語言",
-        "small": "最小",
-        "accurate": "最準確",
-        "widest": "較慢"
+      "about": {
+        "english": "快速又準確，適用於英文。",
+        "languages": "自動判斷您說的是哪種語言。",
+        "small": "小巧快速，適合較舊的電腦。",
+        "accurate": "最準確，但下載檔案較大、速度較慢。",
+        "widest": "支援的語言最多，但執行較慢。"
       },
-      "more_other": "另外 {{count}} 個模型",
       "anytime": "您隨時都能再加入更多模型。",
       "download": "下載並繼續",
       "continue": "繼續",
@@ -637,8 +636,8 @@
             "description": "用語音提問並附上您的螢幕畫面，讓它看見您正在看的內容。"
           },
           "assistant_call": {
-            "name": "開始通話",
-            "description": "免動手與助理對話並聆聽它的回覆。再按一次即可掛斷。"
+            "name": "開始對話",
+            "description": "免動手與助理對話並聆聽它的回覆。再按一次即可結束。"
           }
         },
         "errors": {
@@ -1264,7 +1263,7 @@
         "recordings": "語音輸入",
         "flow": "Flow",
         "asks": "助理",
-        "calls": "通話"
+        "calls": "對話"
       },
       "openFolder": "開啟錄音資料夾",
       "loading": "載入歷史紀錄中…",
@@ -1272,11 +1271,11 @@
       "emptyRecordings": "還沒有語音輸入。",
       "emptyFlow": "還沒有 Flow 生成紀錄。",
       "emptyAsks": "還沒有提問紀錄。",
-      "emptyCalls": "還沒有通話。",
+      "emptyCalls": "還沒有對話。",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "助理",
-        "call": "通話"
+        "call": "對話"
       },
       "flowTranscriptLabel": "您說的話",
       "originalTranscriptionLabel": "原始轉錄",
@@ -1933,8 +1932,7 @@
       "emptyHint": "在通話前開始錄製，SpeakoFlow 就會保留依說話者分段的逐字稿。",
       "loadMore": "載入更多",
       "speakers_other": "{{count}} 位說話者",
-      "hasNotes": "已產生筆記",
-      "notesBadge": "筆記"
+      "hasNotes": "已產生筆記"
     },
     "status": {
       "recording": "錄製中",
@@ -1959,6 +1957,18 @@
       "transcript": "逐字稿",
       "summary": "摘要",
       "ask": "詢問"
+    },
+    "discuss": {
+      "button": "討論這場會議",
+      "hint": "和助理一起討論這場會議。它知道會中說了什麼，也能在逐字稿中查找內容。",
+      "whileRecording": "錄音停止後即可使用。",
+      "nothingYet": "尚未轉錄任何內容。",
+      "failed": "無法開始對話：{{error}}",
+      "earlier": "先前的討論",
+      "continue": "繼續這段討論",
+      "untitled": "未命名的討論",
+      "messages_other": "{{count}} 則訊息",
+      "more": "更多內容請見「過去的對話」。"
     },
     "myNotes": {
       "description": "寫下對您重要的事。產生筆記時會與逐字稿合併。",
@@ -2170,7 +2180,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "通話",
+      "title": "對話",
       "newChat": "新對話",
       "type": "輸入訊息",
       "backToVoice": "返回語音",
@@ -2179,10 +2189,10 @@
       "speakerOn": "朗讀回覆",
       "speakerOff": "停止朗讀回覆",
       "expand": "開啟對話",
-      "collapse": "返回通話列",
+      "collapse": "收合",
       "historyOpen": "過去的對話",
       "historyClose": "返回這段對話",
-      "end": "結束通話",
+      "end": "結束對話",
       "send": "傳送",
       "stop": "停止回覆",
       "placeholder": "傳訊息給 {{name}}",
@@ -2195,16 +2205,45 @@
       "preparingVoice": "正在準備語音… {{progress}}%",
       "history": {
         "title": "過去的對話",
-        "hint": "選擇一段對話，從上次中斷的地方繼續。通話會保持連線。",
+        "hint": "選擇一段對話，從上次中斷的地方繼續。目前的對話會保持開啟。",
         "empty": "還沒有已儲存的對話。",
+        "noMatches": "沒有符合搜尋條件的結果。",
+        "noMeetings": "還沒有關於會議的對話。開啟一場會議，然後選擇「討論這場會議」。",
         "loading": "載入中…",
         "failed": "無法載入您的對話。",
         "more": "顯示更多",
         "untitled": "未命名的對話",
         "current": "目前開啟",
+        "search": "搜尋對話",
+        "clearSearch": "清除搜尋",
+        "scopeLabel": "對話範圍",
+        "scopes": {
+          "all": "全部",
+          "meetings": "會議"
+        },
+        "groups": {
+          "today": "今天",
+          "yesterday": "昨天",
+          "week": "過去 7 天",
+          "earlier": "更早"
+        },
+        "matchCount_other": "{{count}} 段對話",
         "messages_other": "{{count}} 則訊息"
       },
-      "options": "通話選項",
+      "meeting": {
+        "about": "關於 {{title}}",
+        "chipHint": "助理握有這場會議的筆記，也能搜尋它的逐字稿。",
+        "untitled": "未命名的會議",
+        "startTitle": "來聊聊 {{title}}",
+        "startHint": "可以問任何相關問題，或下一步該做什麼。直接開口說，或選一個：",
+        "prompts": {
+          "recap": "幫我快速回顧一下",
+          "next": "我接下來該做什麼？",
+          "followUp": "草擬一則後續追蹤訊息",
+          "missed": "有什麼我可能漏掉的嗎？"
+        }
+      },
+      "options": "對話選項",
       "pace": "說完話的等待時間",
       "paceHint": "您停頓後，要等多久才開始回覆。",
       "paces": {
@@ -2220,7 +2259,7 @@
         "high": "高——安靜的環境或使用耳機"
       },
       "phase": {
-        "off": "通話已結束",
+        "off": "對話已結束",
         "starting": "連線中…",
         "listening": "聆聽中",
         "hearing": "聆聽中…",
@@ -2229,7 +2268,7 @@
         "speaking": "說話中",
         "muted": "麥克風已關閉",
         "held": "因語音輸入已暫停",
-        "error": "通話中斷"
+        "error": "對話中斷"
       },
       "errors": {
         "microphone": "無法開啟您的麥克風。請允許麥克風存取，並確認沒有其他應用程式正在使用它。",
@@ -2293,6 +2332,8 @@
     "tool": {
       "search": "正在搜尋網路",
       "screen": "正在查看您的螢幕…",
+      "meetingSearch": "正在搜尋會議",
+      "meetingRead": "正在閱讀會議",
       "working": "正在處理",
       "elapsed": "{{seconds}}秒"
     },
@@ -2498,9 +2539,9 @@
         "what": "直接開口問，答案會出現在浮動面板中。"
       },
       "call": {
-        "title": "開始通話",
+        "title": "開始對話",
         "description": "免動手的對話，助理會以語音回覆。",
-        "what": "免動手來回對話。再按一次即可掛斷。"
+        "what": "免動手來回對話。再按一次即可結束。"
       },
       "info": "在任何應用程式中都能按這些快捷鍵。點選按鍵即可變更。",
       "offHint": "已關閉",
@@ -2526,12 +2567,6 @@
       "trySuffixHold": "並在說話時按住不放。",
       "trySuffixTap": "開始說話，說完再按一次。",
       "tryPlaceholder": "您說的話會出現在這裡…"
-    },
-    "hero": {
-      "hold": "在任何應用程式中按住按鍵、說話，然後放開。",
-      "tap": "在任何應用程式中按一下按鍵、說話，再按一下。",
-      "holdHint": "按住說話",
-      "tapHint": "按一下開始與停止"
     },
     "activity": {
       "title": "過去 30 天",
@@ -2572,7 +2607,7 @@
       "meetings": "會議",
       "cleanup": "AI 整理",
       "meetingNotes": "會議筆記",
-      "calls": "通話",
+      "calls": "對話",
       "flow": "使用 Flow 生成",
       "spokenReplies": "語音回覆"
     },
@@ -2594,7 +2629,7 @@
       },
       "assistant": {
         "name": "助理",
-        "description": "回答您的問題、查看您的螢幕，也能與您通話。",
+        "description": "回答您的問題、查看您的螢幕，也能與您對話。",
         "openAssistant": "開啟助理",
         "offNotice": "助理已關閉。使用 Flow 生成與整理的備用模型仍會使用這個模型。",
         "catalogTitle": "助理模型",
@@ -2679,15 +2714,6 @@
         "instructionPlaceholder": "例如：保持輕鬆口語，並把口述的表情符號名稱轉成表情符號。"
       }
     },
-    "hero": {
-      "title": "說得凌亂，<em>寫得俐落。</em>",
-      "before": "我們十點見吧，啊不對，改成十一點好了，記得帶那個預算",
-      "after": "我們十一點見，記得帶預算。",
-      "offHint": "開啟 AI 整理即可使用這個快捷鍵",
-      "onHint": "按住、說話、放開。整理好的文字會自動輸入。",
-      "onHintTap": "按一下、說話，再按一下。整理好的文字會自動輸入。",
-      "onDictationHint": "每次語音輸入都會經過整理。"
-    },
     "shortcut": {
       "title": "快捷鍵",
       "info": "為整理設定專屬快捷鍵，或讓語音輸入快捷鍵整理每次語音輸入，只需記住一組按鍵。",
@@ -2708,11 +2734,7 @@
       "title": "文字替換",
       "description": "說出一個短語就得到不同的文字，例如說「我的電子郵件」就會變成您的信箱地址。"
     },
-    "addWord": "新增詞彙",
-    "hero": {
-      "title": "SpeakoFlow 會<em>照您的寫法</em>拼寫。",
-      "subtitle": "新增它老是寫錯的名稱與術語。"
-    }
+    "addWord": "新增詞彙"
   },
   "assistantPage": {
     "description": "在任何應用程式中，用語音問任何問題。助理可以查看您的螢幕、搜尋網路，還能記住對您重要的事。",
@@ -2720,14 +2742,14 @@
     "hero": {
       "askHold": "按住、提出問題、放開。答案會出現在浮動面板中。",
       "askTap": "按一下、提出問題，再按一下。答案會出現在浮動面板中。",
-      "call": "免動手來回對話。再按一次即可掛斷。",
+      "call": "免動手來回對話。再按一次即可結束。",
       "title": "隨處開口，<em>有問必答。</em>",
       "ask": "提問",
-      "callLabel": "通話",
+      "callLabel": "對話",
       "askHoldShort": "按住、提問、放開",
       "askTapShort": "按一下、提問，再按一下",
-      "callShort": "再按一次即可掛斷",
-      "subtitle": "大聲提出問題，或開始通話好好聊一聊。"
+      "callShort": "再按一次即可結束",
+      "subtitle": "大聲提出問題，或開始對話好好聊一聊。"
     },
     "models": {
       "title": "使用的模型",
@@ -2858,14 +2880,14 @@
       },
       "screen": {
         "ask": "提問時使用螢幕視覺",
-        "call": "通話時使用螢幕視覺"
+        "call": "對話時使用螢幕視覺"
       }
     },
     "tips": {
       "thinksWith": "負責回答您的模型。AI 整理與會議筆記若沒有自己的模型，也會使用它。",
-      "speaks": "在通話中朗讀回覆。",
+      "speaks": "在對話中朗讀回覆。",
       "screenAsk": "當問題與您的螢幕有關，或您要求時，讓助理查看螢幕。有關所選文字的問題會直接根據該文字回答。螢幕截圖只會傳送給您的 AI 供應商。",
-      "screenCall": "通話中當您要求，或您正在談論螢幕上的內容時，讓助理查看螢幕。",
+      "screenCall": "對話中當您要求，或您正在談論螢幕上的內容時，讓助理查看螢幕。",
       "captureTiming": "擷取您開始提問時的螢幕畫面，或送出時的畫面。",
       "webSearch": "當問題需要最新資訊時上網查詢。",
       "depth": "簡單的事實用「快速」，困難的問題用「深入」。",
@@ -2983,7 +3005,7 @@
     "recoverError": "無法復原這段轉錄，請再試一次。",
     "more": "更多動作",
     "chat": {
-      "continueInCall": "在通話中繼續",
+      "continueInCall": "以對話方式繼續",
       "assistantOff": "開啟助理即可繼續這段對話。"
     }
   },

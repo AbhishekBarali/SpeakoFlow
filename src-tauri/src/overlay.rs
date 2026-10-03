@@ -7,6 +7,8 @@ use crate::overlay_lifecycle::OverlayLifecycle;
 use crate::settings;
 use crate::settings::OverlayPosition;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
 
 /// Bumped on every overlay state change. The delayed hide behind a brief
@@ -172,9 +174,100 @@ fn scale_overlay_size((width, height): (f64, f64), text_scale: f64) -> (f64, f64
 /// long the linger is belongs to the user (`settings::OverlayLinger`).
 static OVERLAY_STREAMING: AtomicBool = AtomicBool::new(false);
 const OVERLAY_FADE_MS: u64 = 220;
+/// How long the compact pill stays after a successful dictation, counted from
+/// the moment its run-out began (`seal_working_overlay`): the webview's longest
+/// run-out to a full row (`SEAL_MS` in `src/overlay/workProgress.ts`, 260ms)
+/// plus a frame. Keep the two in step. Nothing is drawn after the fill, so
+/// nothing else is waited for.
+const PILL_SEAL_HOLD_MS: u64 = 280;
+/// The show whose working fill is on screen (a `transcribing` or `processing`
+/// show), so a seal is only sent when there is a fill to run out.
+static WORKING_EPOCH: AtomicU64 = AtomicU64::new(0);
+/// When the run-out began, and for which show. The compact pill's hold counts
+/// from here rather than from the end of the paste.
+static SEAL_STARTED: Mutex<Option<(u64, Instant)>> = Mutex::new(None);
+
+/// What is left of the compact pill's hold at `now`. A run-out that started for
+/// this show has already used part of it; anything else gets the whole hold,
+/// because the webview starts its run-out only when the finish arrives.
+fn remaining_seal_hold(started: Option<(u64, Instant)>, epoch: u64, now: Instant) -> Duration {
+    let full = Duration::from_millis(PILL_SEAL_HOLD_MS);
+    match started {
+        Some((sealed, at)) if sealed == epoch => {
+            full.saturating_sub(now.saturating_duration_since(at))
+        }
+        _ => full,
+    }
+}
+
+/// The dictation's text is ready and about to be delivered: run the working
+/// fill out now, so it lands with the text.
+///
+/// This used to wait for `finish_recording_overlay`, which runs after the paste
+/// has *returned*. The text lands in the target app at the keystroke, about
+/// `paste_delay_ms` in; the paste then holds the modifier for 100ms and waits
+/// 50ms more to restore the clipboard, so the fill only began its run-out some
+/// 150–200ms after the words had appeared and finished roughly half a second
+/// after them, on every dictation. Starting here also keeps the paste out of
+/// what the estimate learns.
+pub fn seal_working_overlay(app: &AppHandle) {
+    let epoch = OVERLAY_LIFECYCLE.current();
+    if WORKING_EPOCH.load(Ordering::SeqCst) != epoch {
+        return;
+    }
+    if let Ok(mut started) = SEAL_STARTED.lock() {
+        *started = Some((epoch, Instant::now()));
+    }
+    if let Some(window) = app.get_webview_window("recording_overlay") {
+        let _ = window.emit("seal-overlay", epoch);
+    }
+}
 
 pub fn set_overlay_hovered(hovered: bool) {
     OVERLAY_LIFECYCLE.set_hovered(hovered);
+}
+
+/// An opaque, stable name for a description of what does some work, so the
+/// overlay can keep timings per setup without being told (or storing) model
+/// names, file paths or provider URLs. FNV-1a, because `DefaultHasher` is not
+/// guaranteed to give the same answer from one Rust release to the next, and a
+/// changed fingerprint silently forgets everything learned for that setup.
+fn work_fingerprint(identity: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in identity.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// What will do the speech to text: a cloud service and model (and whether it
+/// streams, which changes the wait completely), or the local model with the
+/// accelerator it was told to use. Never interpreted: two setups only need to
+/// be told apart, and the timing itself is learned from real dictations.
+fn stt_setup_fingerprint(settings: &settings::AppSettings) -> String {
+    let identity = match crate::stt_cloud::resolve_cloud_stt(settings) {
+        Ok(cloud) => format!(
+            "cloud|{}|{}|{}",
+            cloud.provider.id,
+            cloud.model,
+            crate::stt_cloud::cloud_stt_streaming_active(settings)
+        ),
+        Err(_) => format!(
+            "local|{}|{:?}|{:?}",
+            settings.selected_model, settings.whisper_accelerator, settings.ort_accelerator
+        ),
+    };
+    work_fingerprint(&identity)
+}
+
+/// What will do the cleanup: the provider and model the cleanup pass resolves
+/// to (`resolve_post_process_config`, the same rule the pass itself uses), or
+/// nothing when no cleanup can run.
+fn cleanup_setup_fingerprint(settings: &settings::AppSettings) -> Option<String> {
+    settings::resolve_post_process_config(settings)
+        .ok()
+        .map(|config| work_fingerprint(&format!("{}|{}", config.provider.id, config.model)))
 }
 
 /// Payload of the "show-overlay" event. Carries the visual `state`
@@ -199,6 +292,21 @@ struct ShowOverlayPayload {
     /// way, so the pill can follow that model's `model-download-progress`.
     #[serde(skip_serializing_if = "Option::is_none")]
     download: Option<String>,
+    /// For `transcribing`: AI cleanup will run straight after it. The working
+    /// indicator is one forward-only fill across the whole wait, so it reserves
+    /// room for the cleanup instead of filling up and then starting over.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    cleanup_next: bool,
+    /// For `transcribing`: an opaque fingerprint of what does the speech to
+    /// text (`work_fingerprint`). The working fill learns each setup's timing
+    /// separately, on this computer, rather than one average across every model
+    /// and provider the user has tried.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stt_setup: Option<String>,
+    /// For `processing`, and `transcribing` with `cleanup_next`: the same for
+    /// the cleanup provider and model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cleanup_setup: Option<String>,
     /// The overlay lifetime this show began. The recovery pill hands it back
     /// with its click (`recover_dictation`), so a click meant for a pill that
     /// has since been replaced can never act on a different dictation.
@@ -950,7 +1058,7 @@ fn show_overlay_state_with_notice(
     state: &str,
     notice: Option<String>,
 ) -> Option<u64> {
-    show_overlay(app_handle, state, notice, None)
+    show_overlay(app_handle, state, notice, None, false)
 }
 
 fn show_overlay(
@@ -958,8 +1066,15 @@ fn show_overlay(
     state: &str,
     notice: Option<String>,
     download: Option<String>,
+    cleanup_next: bool,
 ) -> Option<u64> {
     let epoch = OVERLAY_LIFECYCLE.advance();
+    // Mirrors the webview: a working fill runs exactly while the latest show is
+    // one of these, so only then is there a fill for `seal_working_overlay` to
+    // run out.
+    if matches!(state, "transcribing" | "processing") {
+        WORKING_EPOCH.store(epoch, Ordering::SeqCst);
+    }
     // Check if overlay should be shown based on position setting
     let settings = settings::get_settings(app_handle);
 
@@ -1052,6 +1167,14 @@ fn show_overlay(
                 interactive,
                 notice,
                 download,
+                cleanup_next,
+                stt_setup: (state == "transcribing").then(|| stt_setup_fingerprint(&settings)),
+                cleanup_setup: if state == "processing" || (state == "transcribing" && cleanup_next)
+                {
+                    cleanup_setup_fingerprint(&settings)
+                } else {
+                    None
+                },
                 epoch,
             },
         );
@@ -1065,9 +1188,10 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "recording");
 }
 
-/// Shows the transcribing overlay window
-pub fn show_transcribing_overlay(app_handle: &AppHandle) {
-    show_overlay_state(app_handle, "transcribing");
+/// Shows the transcribing overlay window. `cleanup_next` says AI cleanup follows,
+/// so the working indicator can budget its fill across both waits.
+pub fn show_transcribing_overlay(app_handle: &AppHandle, cleanup_next: bool) {
+    show_overlay(app_handle, "transcribing", None, None, cleanup_next);
 }
 
 /// Shows the processing overlay window
@@ -1105,8 +1229,13 @@ pub fn show_overlay_notice(app_handle: &AppHandle, notice_key: &str) {
 /// voice shortcut pressed before the model has landed (see
 /// `speech_readiness`). Click-through and short-lived like a notice.
 pub fn show_speech_download_overlay(app_handle: &AppHandle, model_id: &str) {
-    let Some(epoch) = show_overlay(app_handle, "downloading", None, Some(model_id.to_string()))
-    else {
+    let Some(epoch) = show_overlay(
+        app_handle,
+        "downloading",
+        None,
+        Some(model_id.to_string()),
+        false,
+    ) else {
         return;
     };
     let app = app_handle.clone();
@@ -1251,20 +1380,31 @@ pub fn finish_recording_overlay(app: &AppHandle, text: &str, notice: Option<&str
     if !OVERLAY_STREAMING.load(Ordering::SeqCst) || text.trim().is_empty() {
         if let Some(notice) = notice {
             show_overlay_notice(app, notice);
-        } else {
-            if !text.trim().is_empty() {
-                // Let the compact progress bar finish during the existing hide
-                // transition. Pasting has already happened; no extra wait is
-                // added. An empty/cancelled recording never signals success.
-                if let Some(window) = app.get_webview_window("recording_overlay") {
-                    let _ = window.emit(
-                        "finish-overlay",
-                        serde_json::json!({
-                            "epoch": OVERLAY_LIFECYCLE.current(), "text": ""
-                        }),
-                    );
-                }
+        } else if !text.trim().is_empty() {
+            // The pill's working fill runs out to a full row, and then the pill
+            // leaves. Pasting has already happened,
+            // so this hold delays nothing the user is waiting on; hiding at once
+            // cut the fill off mid-way, which read as the wait being abandoned
+            // rather than finished. A new dictation in the meantime advances the
+            // lifecycle and keeps this from hiding it.
+            let epoch = OVERLAY_LIFECYCLE.current();
+            let started = SEAL_STARTED.lock().ok().and_then(|started| *started);
+            let hold = remaining_seal_hold(started, epoch, Instant::now());
+            if let Some(window) = app.get_webview_window("recording_overlay") {
+                let _ = window.emit(
+                    "finish-overlay",
+                    serde_json::json!({ "epoch": epoch, "text": "" }),
+                );
             }
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(hold).await;
+                if OVERLAY_LIFECYCLE.current() == epoch {
+                    hide_recording_overlay(&app);
+                }
+            });
+        } else {
+            // An empty/cancelled recording never signals success.
             hide_recording_overlay(app);
         }
         return;
@@ -1396,5 +1536,49 @@ mod text_scale_tests {
         assert_eq!(clamp_text_scale(1.25), 1.25);
         assert_eq!(clamp_text_scale(9.0), 2.25);
         assert_eq!(clamp_text_scale(f64::NAN), 1.0);
+    }
+}
+
+#[cfg(test)]
+mod seal_hold_tests {
+    use super::{remaining_seal_hold, work_fingerprint, PILL_SEAL_HOLD_MS};
+    use std::time::{Duration, Instant};
+
+    const FULL: Duration = Duration::from_millis(PILL_SEAL_HOLD_MS);
+
+    // The overlay keys what it has learned by this value, so it must not
+    // change between builds or releases: a different answer forgets it all.
+    #[test]
+    fn a_setup_fingerprint_is_stable_and_tells_setups_apart() {
+        assert_eq!(work_fingerprint(""), "cbf29ce484222325");
+        assert_eq!(work_fingerprint("a"), "af63dc4c8601ec8c");
+        assert_ne!(
+            work_fingerprint("local|parakeet|Auto|Auto"),
+            work_fingerprint("local|parakeet|Cpu|Auto")
+        );
+        assert_eq!(work_fingerprint("cloud|openai|whisper-1|false").len(), 16);
+    }
+
+    #[test]
+    fn a_run_out_that_began_with_the_text_counts_against_the_hold() {
+        let at = Instant::now();
+        let hold = remaining_seal_hold(Some((7, at)), 7, at + Duration::from_millis(220));
+        assert_eq!(hold, FULL - Duration::from_millis(220));
+    }
+
+    #[test]
+    fn a_run_out_long_since_finished_leaves_nothing_to_wait_for() {
+        let at = Instant::now();
+        let hold = remaining_seal_hold(Some((7, at)), 7, at + Duration::from_secs(2));
+        assert_eq!(hold, Duration::ZERO);
+    }
+
+    #[test]
+    fn a_seal_for_another_show_or_none_at_all_gets_the_whole_hold() {
+        let at = Instant::now();
+        // A recovered paste never showed a working fill: the webview runs its
+        // fill out only when the finish arrives, so it needs the full hold.
+        assert_eq!(remaining_seal_hold(Some((6, at)), 7, at), FULL);
+        assert_eq!(remaining_seal_hold(None, 7, at), FULL);
     }
 }

@@ -65,61 +65,37 @@ export const SETUP_MODELS = {
 } as const;
 
 /**
- * The speech models setup offers, in the order shown. The first two are the
- * choice most people make (English, or another language); the rest sit behind
- * "More models". Each carries one word of why you would pick it — the card's
- * only sentence — and a family name, because a catalog name ("Cohere Transcribe
- * 03-2026") is not what anyone calls it. Names are brands, not translated.
+ * The speech models setup offers, in the order shown, and the only ones it
+ * offers. Setup is a short list of good choices, not the catalog: the Models
+ * page has all of them. It used to append every other installed speech model
+ * as well, and the catalog holds several near-namesakes (an ONNX and a GGUF
+ * Canary 180M Flash, two Whisper Mediums, Parakeet V3 beside Parakeet 0.6B),
+ * so the list read as the same model offered twice.
  *
- * The family name alone is ambiguous, though: "Whisper" is a dozen models from
- * tiny to large, and "Canary" four. `variant` is which one this is, drawn as a
- * small label beside the name, so the card says which model it installs
- * without spelling out the whole catalog name.
+ * `name` is one plain name that says which model this is ("Whisper Medium",
+ * not "Whisper" plus a "Medium" label), because a catalog name ("Cohere
+ * Transcribe 03-2026") is not what anyone calls it. Names are brands, not
+ * translated. `about` keys the card's one sentence of why you would pick it.
  */
 export const SETUP_SPEECH_OPTIONS: ReadonlyArray<{
   id: string;
   name: string;
-  /** Which model of the family, e.g. "Medium" for Whisper. Not translated. */
-  variant: string;
-  /** `onboarding.speech.tags.*` */
-  tag: "english" | "languages" | "small" | "accurate" | "widest";
-  primary: boolean;
+  /** `onboarding.speech.about.*` */
+  about: "english" | "languages" | "small" | "accurate" | "widest";
 }> = [
-  {
-    id: SETUP_MODELS.speech.english,
-    name: "Parakeet",
-    variant: "0.6B",
-    tag: "english",
-    primary: true,
-  },
+  { id: SETUP_MODELS.speech.english, name: "Parakeet 0.6B", about: "english" },
   {
     id: SETUP_MODELS.speech.multilingual,
-    name: "Nemotron",
-    variant: "3.5",
-    tag: "languages",
-    primary: true,
+    name: "Nemotron 3.5",
+    about: "languages",
   },
-  {
-    id: "canary-180m-flash-gguf",
-    name: "Canary",
-    variant: "180M Flash",
-    tag: "small",
-    primary: false,
-  },
+  { id: "canary-180m-flash-gguf", name: "Canary 180M Flash", about: "small" },
   {
     id: "cohere-transcribe-03-2026-gguf",
-    name: "Cohere",
-    variant: "Transcribe",
-    tag: "accurate",
-    primary: false,
+    name: "Cohere Transcribe",
+    about: "accurate",
   },
-  {
-    id: "whisper-medium-gguf",
-    name: "Whisper",
-    variant: "Medium",
-    tag: "widest",
-    primary: false,
-  },
+  { id: "whisper-medium-gguf", name: "Whisper Medium", about: "widest" },
 ];
 
 /** Distinct languages in a model's list: `en-US` and `en-GB` are one. */

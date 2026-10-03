@@ -166,12 +166,12 @@
       "tabs": {
         "dictate": "Dictée",
         "ask": "Assistant",
-        "call": "Appel"
+        "call": "Conversation"
       },
       "keys": {
         "hold": "Maintenez pour parler",
         "tap": "Appuyez pour commencer, puis pour arrêter",
-        "call": "Appuyez pour appeler, puis pour raccrocher"
+        "call": "Appuyez pour commencer, puis à nouveau pour terminer"
       },
       "steps": {
         "label": "Comment ça marche",
@@ -475,16 +475,13 @@
       "languages_one": "{{count}} langue",
       "languages_many": "{{count}} langues",
       "languages_other": "{{count}} langues",
-      "tags": {
-        "english": "Le plus rapide",
-        "languages": "Détecte la langue",
-        "small": "Le plus léger",
-        "accurate": "Le plus précis",
-        "widest": "Plus lent"
+      "about": {
+        "english": "Rapide et précis, pour l'anglais.",
+        "languages": "Détecte la langue que vous parlez.",
+        "small": "Léger et rapide. Idéal pour les ordinateurs plus anciens.",
+        "accurate": "Le plus précis, mais plus lourd à télécharger et plus lent.",
+        "widest": "Couvre le plus de langues, mais il est plus lent."
       },
-      "more_one": "{{count}} autre modèle",
-      "more_many": "{{count}} autres modèles",
-      "more_other": "{{count}} autres modèles",
       "anytime": "Vous pouvez ajouter d'autres modèles à tout moment.",
       "download": "Télécharger et continuer",
       "continue": "Continuer",
@@ -643,8 +640,8 @@
             "description": "Posez votre question à la voix en joignant votre écran, pour qu'il voie ce que vous regardez."
           },
           "assistant_call": {
-            "name": "Lancer un appel",
-            "description": "Parlez avec l'assistant sans les mains et écoutez ses réponses. Appuyez à nouveau pour raccrocher."
+            "name": "Lancer une conversation",
+            "description": "Parlez avec l'assistant sans les mains et écoutez ses réponses. Appuyez à nouveau pour terminer."
           }
         },
         "errors": {
@@ -1278,7 +1275,7 @@
         "recordings": "Dictées",
         "flow": "Flow",
         "asks": "Assistant",
-        "calls": "Appels"
+        "calls": "Conversations"
       },
       "openFolder": "Ouvrir le dossier des enregistrements",
       "loading": "Chargement de l'historique…",
@@ -1286,11 +1283,11 @@
       "emptyRecordings": "Aucune dictée pour l'instant.",
       "emptyFlow": "Aucune génération Flow pour l'instant.",
       "emptyAsks": "Aucune question posée pour l'instant.",
-      "emptyCalls": "Aucun appel pour l'instant.",
+      "emptyCalls": "Aucune conversation pour l'instant.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Assistant",
-        "call": "Appel"
+        "call": "Conversation"
       },
       "flowTranscriptLabel": "Vous avez dit",
       "originalTranscriptionLabel": "Transcription originale",
@@ -1955,8 +1952,7 @@
       "speakers_one": "{{count}} intervenant",
       "speakers_many": "{{count}} intervenants",
       "speakers_other": "{{count}} intervenants",
-      "hasNotes": "Notes générées",
-      "notesBadge": "Notes"
+      "hasNotes": "Notes générées"
     },
     "status": {
       "recording": "Enregistrement",
@@ -1981,6 +1977,20 @@
       "transcript": "Transcription",
       "summary": "Résumé",
       "ask": "Questions"
+    },
+    "discuss": {
+      "button": "Discuter de cette réunion",
+      "hint": "Parlez de cette réunion avec l'assistant. Il sait ce qui a été dit et peut chercher des éléments dans la transcription.",
+      "whileRecording": "Disponible une fois l'enregistrement arrêté.",
+      "nothingYet": "Rien n'a encore été transcrit.",
+      "failed": "Impossible de lancer la conversation : {{error}}",
+      "earlier": "Discussions précédentes",
+      "continue": "Reprendre cette discussion",
+      "untitled": "Discussion sans titre",
+      "messages_one": "{{count}} message",
+      "messages_many": "{{count}} messages",
+      "messages_other": "{{count}} messages",
+      "more": "Voir la suite dans « Conversations précédentes »."
     },
     "myNotes": {
       "description": "Notez ce qui compte pour vous. Ce texte est fusionné avec la transcription lors de la génération des notes.",
@@ -2198,7 +2208,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Appel",
+      "title": "Conversation",
       "newChat": "Nouvelle discussion",
       "type": "Écrire un message",
       "backToVoice": "Revenir à la voix",
@@ -2207,10 +2217,10 @@
       "speakerOn": "Lire les réponses à voix haute",
       "speakerOff": "Ne plus lire les réponses à voix haute",
       "expand": "Ouvrir la conversation",
-      "collapse": "Revenir à la barre d'appel",
+      "collapse": "Réduire",
       "historyOpen": "Conversations précédentes",
       "historyClose": "Revenir à cette conversation",
-      "end": "Raccrocher",
+      "end": "Terminer la conversation",
       "send": "Envoyer",
       "stop": "Arrêter la réponse",
       "placeholder": "Écrire à {{name}}",
@@ -2223,18 +2233,49 @@
       "preparingVoice": "Préparation de la voix… {{progress}} %",
       "history": {
         "title": "Conversations précédentes",
-        "hint": "Choisissez-en une pour reprendre là où vous en étiez. L'appel reste connecté.",
+        "hint": "Choisissez-en une pour reprendre là où vous en étiez. Votre conversation actuelle reste ouverte.",
         "empty": "Aucune conversation enregistrée pour l'instant.",
+        "noMatches": "Aucun résultat pour cette recherche.",
+        "noMeetings": "Aucune conversation sur une réunion pour l'instant. Ouvrez une réunion et choisissez « Discuter de cette réunion ».",
         "loading": "Chargement…",
         "failed": "Impossible de charger vos conversations.",
         "more": "Afficher plus",
         "untitled": "Conversation sans titre",
         "current": "Ouverte",
+        "search": "Rechercher dans les conversations",
+        "clearSearch": "Effacer la recherche",
+        "scopeLabel": "Quelles conversations",
+        "scopes": {
+          "all": "Toutes",
+          "meetings": "Réunions"
+        },
+        "groups": {
+          "today": "Aujourd'hui",
+          "yesterday": "Hier",
+          "week": "7 derniers jours",
+          "earlier": "Plus ancien"
+        },
+        "matchCount_one": "{{count}} conversation",
+        "matchCount_many": "{{count}} conversations",
+        "matchCount_other": "{{count}} conversations",
         "messages_one": "{{count}} message",
         "messages_many": "{{count}} messages",
         "messages_other": "{{count}} messages"
       },
-      "options": "Options d'appel",
+      "meeting": {
+        "about": "À propos de {{title}}",
+        "chipHint": "L'assistant dispose des notes de cette réunion et peut chercher dans sa transcription.",
+        "untitled": "Réunion sans titre",
+        "startTitle": "Parlons de {{title}}",
+        "startHint": "Posez n'importe quelle question à son sujet, ou demandez quoi faire ensuite. Commencez à parler, ou choisissez :",
+        "prompts": {
+          "recap": "Fais-moi un récapitulatif rapide",
+          "next": "Que dois-je faire ensuite ?",
+          "followUp": "Rédige un message de suivi",
+          "missed": "Ai-je pu manquer quelque chose ?"
+        }
+      },
+      "options": "Options de la conversation",
       "pace": "Temps pour finir de parler",
       "paceHint": "Combien de temps attendre après une pause avant de répondre.",
       "paces": {
@@ -2250,7 +2291,7 @@
         "high": "Élevée — pièce calme ou casque"
       },
       "phase": {
-        "off": "Appel terminé",
+        "off": "Conversation terminée",
         "starting": "Connexion…",
         "listening": "À l'écoute",
         "hearing": "À l'écoute…",
@@ -2259,7 +2300,7 @@
         "speaking": "Parle",
         "muted": "Microphone coupé",
         "held": "En pause pour la dictée",
-        "error": "Appel interrompu"
+        "error": "Conversation interrompue"
       },
       "errors": {
         "microphone": "Impossible d'ouvrir votre microphone. Autorisez l'accès au microphone et vérifiez qu'il n'est pas utilisé par une autre application.",
@@ -2327,6 +2368,8 @@
     "tool": {
       "search": "Recherche sur le web",
       "screen": "Observation de votre écran…",
+      "meetingSearch": "Recherche dans la réunion",
+      "meetingRead": "Lecture de la réunion",
       "working": "Traitement en cours",
       "elapsed": "{{seconds}} s"
     },
@@ -2538,9 +2581,9 @@
         "what": "Demandez à voix haute. La réponse s'affiche dans un panneau flottant."
       },
       "call": {
-        "title": "Lancer un appel",
+        "title": "Lancer une conversation",
         "description": "Une conversation mains libres avec des réponses parlées.",
-        "what": "Échangez à voix haute, mains libres. Appuyez à nouveau pour raccrocher."
+        "what": "Échangez à voix haute, mains libres. Appuyez à nouveau pour terminer."
       },
       "info": "Utilisez-les dans n'importe quelle application. Cliquez sur les touches pour les modifier.",
       "offHint": "Désactivé",
@@ -2566,12 +2609,6 @@
       "trySuffixHold": "et maintenez pendant que vous parlez.",
       "trySuffixTap": "et parlez. Appuyez à nouveau quand vous avez terminé.",
       "tryPlaceholder": "Vos mots apparaîtront ici…"
-    },
-    "hero": {
-      "hold": "Maintenez les touches dans n'importe quelle application, parlez, puis relâchez.",
-      "tap": "Appuyez sur les touches dans n'importe quelle application, parlez, puis appuyez à nouveau.",
-      "holdHint": "Maintenir pour parler",
-      "tapHint": "Appuyer pour démarrer et arrêter"
     },
     "activity": {
       "title": "30 derniers jours",
@@ -2616,7 +2653,7 @@
       "meetings": "Réunions",
       "cleanup": "Nettoyage IA",
       "meetingNotes": "Notes de réunion",
-      "calls": "Appels",
+      "calls": "Conversations",
       "flow": "Générer avec Flow",
       "spokenReplies": "Réponses parlées"
     },
@@ -2638,7 +2675,7 @@
       },
       "assistant": {
         "name": "Assistant",
-        "description": "Répond à vos questions, regarde votre écran et mène les appels.",
+        "description": "Répond à vos questions, regarde votre écran et mène des conversations.",
         "openAssistant": "Ouvrir l'assistant",
         "offNotice": "L'assistant est désactivé. Générer avec Flow et le nettoyage de secours utilisent toujours ce modèle.",
         "catalogTitle": "Modèles de l'assistant",
@@ -2723,15 +2760,6 @@
         "instructionPlaceholder": "Par exemple : garder un ton décontracté, tout en minuscules, et transformer les noms d'emoji prononcés en emoji."
       }
     },
-    "hero": {
-      "title": "Dites-le en vrac. Obtenez-le <em>au propre.</em>",
-      "before": "on se voit à dix heures, enfin non, disons onze heures, et apporte le budget",
-      "after": "On se voit à onze heures, et apporte le budget.",
-      "offHint": "Activez le nettoyage IA pour utiliser ce raccourci",
-      "onHint": "Maintenez, parlez, relâchez. Le texte nettoyé s'écrit pour vous.",
-      "onHintTap": "Appuyez, parlez, appuyez à nouveau. Le texte nettoyé s'écrit pour vous.",
-      "onDictationHint": "Chaque dictée est nettoyée."
-    },
     "shortcut": {
       "title": "Raccourci",
       "info": "Donnez au nettoyage son propre raccourci, ou laissez votre raccourci de dictée nettoyer chaque dictée pour n'avoir qu'une seule combinaison à retenir.",
@@ -2752,11 +2780,7 @@
       "title": "Remplacements",
       "description": "Dites une expression et obtenez un autre texte, par exemple « mon e-mail » remplacé par votre adresse."
     },
-    "addWord": "Ajouter un mot",
-    "hero": {
-      "title": "SpeakoFlow écrit <em>comme vous.</em>",
-      "subtitle": "Ajoutez les noms et le jargon sur lesquels il se trompe souvent."
-    }
+    "addWord": "Ajouter un mot"
   },
   "assistantPage": {
     "description": "Posez n'importe quelle question à la voix, depuis n'importe quelle application. L'assistant peut voir votre écran, chercher sur le web et retenir ce qui compte pour vous.",
@@ -2764,14 +2788,14 @@
     "hero": {
       "askHold": "Maintenez, posez votre question, relâchez. La réponse s'affiche dans un panneau flottant.",
       "askTap": "Appuyez, posez votre question, appuyez à nouveau. La réponse s'affiche dans un panneau flottant.",
-      "call": "Échangez à voix haute, mains libres. Appuyez à nouveau pour raccrocher.",
+      "call": "Échangez à voix haute, mains libres. Appuyez à nouveau pour terminer.",
       "title": "Demandez tout, <em>de partout.</em>",
       "ask": "Demander",
-      "callLabel": "Appel",
+      "callLabel": "Conversation",
       "askHoldShort": "Maintenez, demandez, relâchez",
       "askTapShort": "Appuyez, demandez, appuyez à nouveau",
-      "callShort": "Appuyez à nouveau pour raccrocher",
-      "subtitle": "Posez une question à voix haute, ou lancez un appel pour en discuter."
+      "callShort": "Appuyez à nouveau pour terminer",
+      "subtitle": "Posez une question à voix haute, ou lancez une conversation pour en discuter."
     },
     "models": {
       "title": "Propulsé par",
@@ -2908,14 +2932,14 @@
       },
       "screen": {
         "ask": "Vision d'écran pour les questions",
-        "call": "Vision d'écran pour les appels"
+        "call": "Vision d'écran pendant les conversations"
       }
     },
     "tips": {
       "thinksWith": "Le modèle qui vous répond. Le nettoyage IA et les notes de réunion l'utilisent aussi lorsqu'ils n'en ont pas.",
-      "speaks": "Lit les réponses à voix haute pendant un appel.",
+      "speaks": "Lit les réponses à voix haute pendant une conversation.",
       "screenAsk": "Permet à l'assistant de regarder quand une question porte sur votre écran, ou quand vous le lui demandez. Les questions sur du texte sélectionné sont traitées à partir du texte. Les captures d'écran ne sont envoyées qu'à votre fournisseur d'IA.",
-      "screenCall": "Permet à l'assistant de regarder pendant un appel quand vous le lui demandez, ou quand vous parlez de quelque chose à l'écran.",
+      "screenCall": "Permet à l'assistant de regarder pendant une conversation quand vous le lui demandez, ou quand vous parlez de quelque chose à l'écran.",
       "captureTiming": "Capturer l'écran tel qu'il était quand vous avez commencé à parler, ou au moment de l'envoi.",
       "webSearch": "Cherche en ligne quand une question nécessite des informations à jour.",
       "depth": "Rapide pour les faits simples, Approfondie pour les questions difficiles.",
@@ -3037,7 +3061,7 @@
     "recoverError": "Impossible de récupérer cette transcription. Réessayez.",
     "more": "Plus d'actions",
     "chat": {
-      "continueInCall": "Continuer dans un appel",
+      "continueInCall": "Continuer en conversation",
       "assistantOff": "Activez l'assistant pour poursuivre cette conversation."
     }
   },

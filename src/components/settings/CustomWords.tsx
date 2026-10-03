@@ -77,9 +77,7 @@ export const CustomWords: React.FC<CustomWordsProps> = React.memo(
           />
           <Button
             type="submit"
-            disabled={
-              !newWord.trim() || newWord.trim().length > 50 || updating
-            }
+            disabled={!newWord.trim() || newWord.trim().length > 50 || updating}
             size="sm"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />

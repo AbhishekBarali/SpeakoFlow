@@ -4,7 +4,7 @@ You never needed other people. `audio_toolkit::audio::loopback` captures the
 default **render** endpoint — whatever your computer is playing. It has no idea
 whether those samples came from Zoom, a browser tab, or a WAV file. A scripted
 recording played through your speakers is not a simulation of a call; to
-everything downstream of the audio driver it *is* a call.
+everything downstream of the audio driver it _is_ a call.
 
 That one fact turns "I need three friends free at the same time" into a script
 you can run forty times an hour.
@@ -14,12 +14,12 @@ you can run forty times an hour.
 Each level catches a class of bug the one below it cannot. Spend your time at
 level 2 and touch the others rarely.
 
-| | What it tests | What it costs | How often |
-|---|---|---|---|
-| 1 | Pure decision logic — the chunker's boundaries, retention, the cluster linkage, DB round-trips | seconds | every save |
-| 2 | Diarization, notes, ask-about-this-meeting, on a fixed transcript and real audio | seconds | every change to those passes |
-| 3 | Live capture — loopback, chunker timing, transcription worker, level meters, the pill, WAV writers | one playthrough | before a release, or when capture changes |
-| 4 | Call detection, real network jitter, real voices, real crosstalk | a real call | once per release, and once with real humans ever |
+|     | What it tests                                                                                      | What it costs   | How often                                        |
+| --- | -------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------ |
+| 1   | Pure decision logic — the chunker's boundaries, retention, the cluster linkage, DB round-trips     | seconds         | every save                                       |
+| 2   | Diarization, notes, ask-about-this-meeting, on a fixed transcript and real audio                   | seconds         | every change to those passes                     |
+| 3   | Live capture — loopback, chunker timing, transcription worker, level meters, the pill, WAV writers | one playthrough | before a release, or when capture changes        |
+| 4   | Call detection, real network jitter, real voices, real crosstalk                                   | a real call     | once per release, and once with real humans ever |
 
 ### Level 1 — unit tests, which you already have
 
@@ -37,7 +37,7 @@ If a new bug is reproducible without audio, it belongs here and nowhere else.
 ### Level 2 — seed a fixture, run the pass, score it
 
 This is the loop that matters. Recording takes as long as the meeting, but the
-parts most likely to be wrong — diarization, notes, retrieval — all run *after*
+parts most likely to be wrong — diarization, notes, retrieval — all run _after_
 capture, on the stored WAV and the stored rows. So supply those directly:
 
 ```bash
@@ -114,7 +114,7 @@ WER system            14.30%
   otherwise renaming a correct clustering would score zero.
 - **unlabelled** is reported separately because it is not an error —
   `diarize_meeting` deliberately prefers no label to a wrong one below
-  `min_voiced_for_label_ms`. But a high value means the pass *declined* rather
+  `min_voiced_for_label_ms`. But a high value means the pass _declined_ rather
   than succeeded, which an error rate alone would hide.
 - **WER** is zero on a seeded meeting by construction. That is the point.
 
@@ -177,14 +177,14 @@ sapi` means "did this get worse than last time", which is usually what you want.
 
 ## Files
 
-| | |
-|---|---|
-| `script.json` | the dialogue: speakers, voices, turns. Edit this, not the code |
-| `make_fixture.py` | script → `fixture/{system,mic}.wav` + `truth.json` + `cues.txt` |
-| `seed_meeting.py` | insert a fixture as a meeting; `--reset`, `--list`, `--cleanup` |
-| `play_fixture.py` | play the call into the running app, with live cues |
-| `score_meeting.py` | grade a meeting against ground truth. Read-only |
-| `silence.ps1` | panic button: stop anything from this folder that is playing |
+|                    |                                                                 |
+| ------------------ | --------------------------------------------------------------- |
+| `script.json`      | the dialogue: speakers, voices, turns. Edit this, not the code  |
+| `make_fixture.py`  | script → `fixture/{system,mic}.wav` + `truth.json` + `cues.txt` |
+| `seed_meeting.py`  | insert a fixture as a meeting; `--reset`, `--list`, `--cleanup` |
+| `play_fixture.py`  | play the call into the running app, with live cues              |
+| `score_meeting.py` | grade a meeting against ground truth. Read-only                 |
+| `silence.ps1`      | panic button: stop anything from this folder that is playing    |
 
 `seed_meeting.py` copies `meetings.db` to `meetings.db.bak-<timestamp>` before
 every write, only ever inserts, and `--cleanup` refuses to delete a meeting whose

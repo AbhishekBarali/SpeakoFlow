@@ -128,6 +128,60 @@ export function workingWave(count: number, seconds: number): number[] {
   });
 }
 
+/** The working indicator when the wait has an estimate: the same light crest,
+ * but it travels once, left to right, at the pace of the work, and the bars it
+ * has passed stay raised behind it. So the row fills like a loading bar instead
+ * of sweeping and starting over, and when the work ends the last bars fill and
+ * it is visibly complete.
+ *
+ * `fill` is 0..1 (see `src/overlay/workProgress.ts`, which never lets it move
+ * backwards). `seconds` only adds life on top: a slow, shallow ripple along the
+ * filled bars and a breath in the crest, so a fill that is creeping through a
+ * longer-than-usual wait still looks like it is working rather than frozen.
+ *
+ * Returns each bar's height and how far the fill has covered it (0..1), which
+ * the waveform also uses to brighten bars as they fill. */
+const FILL_HEIGHT = 0.31;
+const FILL_CREST = 0.13;
+/** Crest width, in bars. */
+const FILL_CREST_WIDTH = 1.35;
+const FILL_RIPPLE = 0.025;
+const FILL_RIPPLE_PERIOD = 2.4;
+const FILL_BREATH_PERIOD = 1.8;
+
+export function progressWave(
+  count: number,
+  fill: number,
+  seconds: number,
+): { heights: number[]; covered: number[] } {
+  const f = Number.isFinite(fill) ? Math.max(0, Math.min(1, fill)) : 0;
+  const time = Number.isFinite(seconds) ? seconds : 0;
+  const front = f * count;
+  // The crest and the ripple both fade out over the last bars, so a finished
+  // row settles level instead of still moving when the check replaces it.
+  const remaining = count - front;
+  const crestScale =
+    Math.min(1, remaining / FILL_CREST_WIDTH) *
+    (0.88 + 0.12 * Math.sin((2 * Math.PI * time) / FILL_BREATH_PERIOD));
+  const rippleScale = Math.min(1, remaining / 2);
+  const covered: number[] = [];
+  const heights = Array.from({ length: count }, (_, index) => {
+    const u = count === 1 ? 0.5 : index / (count - 1);
+    const cover = Math.max(0, Math.min(1, front - index));
+    covered.push(cover);
+    const ripple =
+      FILL_RIPPLE *
+      rippleScale *
+      cover *
+      Math.sin(2 * Math.PI * (1.2 * u - time / FILL_RIPPLE_PERIOD));
+    const distance = (index + 0.5 - front) / FILL_CREST_WIDTH;
+    const crest =
+      FILL_CREST * Math.max(0, crestScale) * Math.exp(-distance * distance);
+    return WORK_FLOOR + (FILL_HEIGHT - WORK_FLOOR) * cover + ripple + crest;
+  });
+  return { heights, covered };
+}
+
 export interface Spring {
   position: number;
   velocity: number;

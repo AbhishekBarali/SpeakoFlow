@@ -393,7 +393,6 @@ const DetailRow: React.FC = () => {
     >
       <div className="ms-auto flex items-center gap-1.5">
         <Segmented
-          size="sm"
           label={t("settings.personalMemory.detail.label")}
           value={detail}
           onChange={(value: MemoryDetail) =>

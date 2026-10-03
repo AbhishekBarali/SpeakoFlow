@@ -165,12 +165,12 @@
       "tabs": {
         "dictate": "Dictation",
         "ask": "Assistant",
-        "call": "Call"
+        "call": "Conversation"
       },
       "keys": {
         "hold": "Hold to talk",
         "tap": "Tap to start, tap to stop",
-        "call": "Press to start, again to hang up"
+        "call": "Press to start, again to end"
       },
       "steps": {
         "label": "How it works",
@@ -473,15 +473,13 @@
       "english": "English",
       "languages_one": "{{count}} language",
       "languages_other": "{{count}} languages",
-      "tags": {
-        "english": "Fastest",
-        "languages": "Detects the language",
-        "small": "Smallest",
-        "accurate": "Most accurate",
-        "widest": "Slower"
+      "about": {
+        "english": "Fast and accurate, for English.",
+        "languages": "Works out which language you're speaking.",
+        "small": "Tiny and quick. Good for older computers.",
+        "accurate": "The most accurate, but a larger download and slower.",
+        "widest": "Covers the most languages, but runs slower."
       },
-      "more_one": "{{count}} more model",
-      "more_other": "{{count}} more models",
       "anytime": "You can add more models anytime.",
       "download": "Download and continue",
       "continue": "Continue",
@@ -640,8 +638,8 @@
             "description": "Ask by voice with your screen attached so it can see what you're looking at."
           },
           "assistant_call": {
-            "name": "Start a call",
-            "description": "Talk with the assistant hands-free and hear its replies. Press again to hang up."
+            "name": "Start a conversation",
+            "description": "Talk with the assistant hands-free and hear its replies. Press again to end."
           }
         },
         "errors": {
@@ -1271,7 +1269,7 @@
         "recordings": "Dictations",
         "flow": "Flow",
         "asks": "Assistant",
-        "calls": "Calls"
+        "calls": "Conversations"
       },
       "openFolder": "Open recordings folder",
       "loading": "Loading history…",
@@ -1279,11 +1277,11 @@
       "emptyRecordings": "No dictations yet.",
       "emptyFlow": "No Flow generations yet.",
       "emptyAsks": "No questions asked yet.",
-      "emptyCalls": "No calls yet.",
+      "emptyCalls": "No conversations yet.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Assistant",
-        "call": "Call"
+        "call": "Conversation"
       },
       "flowTranscriptLabel": "You said",
       "originalTranscriptionLabel": "Original transcription",
@@ -1944,8 +1942,7 @@
       "loadMore": "Load more",
       "speakers_one": "{{count}} speaker",
       "speakers_other": "{{count}} speakers",
-      "hasNotes": "Notes generated",
-      "notesBadge": "Notes"
+      "hasNotes": "Notes generated"
     },
     "status": {
       "recording": "Recording",
@@ -1972,17 +1969,17 @@
       "ask": "Ask"
     },
     "discuss": {
-      "button": "Discuss in a call",
+      "button": "Discuss this meeting",
       "hint": "Talk this meeting over with the assistant. It knows what was said and can look things up in the transcript.",
       "whileRecording": "Available once the recording stops.",
       "nothingYet": "Nothing was transcribed yet.",
-      "failed": "Couldn't start the call: {{error}}",
+      "failed": "Couldn't start the conversation: {{error}}",
       "earlier": "Earlier discussions",
-      "continue": "Continue this discussion in a call",
+      "continue": "Continue this discussion",
       "untitled": "Untitled discussion",
       "messages_one": "{{count}} message",
       "messages_other": "{{count}} messages",
-      "more": "More in the call's past conversations."
+      "more": "More under Past conversations."
     },
     "myNotes": {
       "description": "Type what matters to you. It is merged with the transcript when notes are generated.",
@@ -2197,7 +2194,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Call",
+      "title": "Conversation",
       "newChat": "New chat",
       "type": "Type a message",
       "backToVoice": "Back to voice",
@@ -2206,10 +2203,10 @@
       "speakerOn": "Read replies aloud",
       "speakerOff": "Stop reading replies aloud",
       "expand": "Open conversation",
-      "collapse": "Back to the call bar",
+      "collapse": "Collapse",
       "historyOpen": "Past conversations",
       "historyClose": "Back to this conversation",
-      "end": "End call",
+      "end": "End conversation",
       "send": "Send",
       "stop": "Stop the reply",
       "placeholder": "Message {{name}}",
@@ -2222,10 +2219,10 @@
       "preparingVoice": "Preparing the voice… {{progress}}%",
       "history": {
         "title": "Past conversations",
-        "hint": "Pick one to carry on where you left off. The call stays connected.",
+        "hint": "Pick one to carry on where you left off. Your current conversation stays open.",
         "empty": "No saved conversations yet.",
         "noMatches": "Nothing matches that search.",
-        "noMeetings": "No conversations about meetings yet. Open a meeting and choose Discuss in a call.",
+        "noMeetings": "No conversations about meetings yet. Open a meeting and choose Discuss this meeting.",
         "loading": "Loading…",
         "failed": "Couldn't load your conversations.",
         "more": "Show more",
@@ -2262,7 +2259,7 @@
           "missed": "Anything I might have missed?"
         }
       },
-      "options": "Call options",
+      "options": "Conversation options",
       "pace": "Time to finish speaking",
       "paceHint": "How long to wait after you pause before replying.",
       "paces": {
@@ -2278,7 +2275,7 @@
         "high": "High — quiet room or headphones"
       },
       "phase": {
-        "off": "Call ended",
+        "off": "Conversation ended",
         "starting": "Connecting…",
         "listening": "Listening",
         "hearing": "Listening…",
@@ -2287,7 +2284,7 @@
         "speaking": "Speaking",
         "muted": "Microphone off",
         "held": "Paused for dictation",
-        "error": "Call interrupted"
+        "error": "Conversation interrupted"
       },
       "errors": {
         "microphone": "Couldn't open your microphone. Allow microphone access and check that it isn't in use by another app.",
@@ -2563,9 +2560,9 @@
         "what": "Ask out loud. The answer appears in a floating panel."
       },
       "call": {
-        "title": "Start a call",
+        "title": "Start a conversation",
         "description": "A hands-free conversation with spoken replies.",
-        "what": "Talk back and forth, hands-free. Press again to hang up."
+        "what": "Talk back and forth, hands-free. Press again to end."
       },
       "info": "Press these in any app. Click the keys to change them.",
       "offHint": "Turned off",
@@ -2591,12 +2588,6 @@
       "trySuffixHold": "and hold it while you talk.",
       "trySuffixTap": "and talk. Press it again when you're done.",
       "tryPlaceholder": "Your words will appear here…"
-    },
-    "hero": {
-      "hold": "Hold the keys in any app, talk, and let go.",
-      "tap": "Tap the keys in any app, talk, and tap again.",
-      "holdHint": "Hold to talk",
-      "tapHint": "Tap to start and stop"
     },
     "activity": {
       "title": "Last 30 days",
@@ -2639,7 +2630,7 @@
       "meetings": "Meetings",
       "cleanup": "AI cleanup",
       "meetingNotes": "Meeting notes",
-      "calls": "Calls",
+      "calls": "Conversations",
       "flow": "Generate with Flow",
       "spokenReplies": "Spoken replies"
     },
@@ -2661,7 +2652,7 @@
       },
       "assistant": {
         "name": "Assistant",
-        "description": "Answers your questions, looks at your screen, and holds calls.",
+        "description": "Answers your questions, looks at your screen, and holds conversations.",
         "openAssistant": "Open Assistant",
         "offNotice": "The assistant is off. Generate with Flow and the cleanup fallback still use this model.",
         "catalogTitle": "Assistant models",
@@ -2746,15 +2737,6 @@
         "instructionPlaceholder": "For example: keep it casual and lowercase, and turn spoken emoji names into emoji."
       }
     },
-    "hero": {
-      "title": "Say it messy. Get it <em>clean.</em>",
-      "before": "let's meet at ten, actually no, make that eleven, and bring the budget",
-      "after": "Let's meet at eleven and bring the budget.",
-      "offHint": "Turn on AI cleanup to use this shortcut",
-      "onHint": "Hold, talk, let go. Cleaned text is typed for you.",
-      "onHintTap": "Tap, talk, tap again. Cleaned text is typed for you.",
-      "onDictationHint": "Every dictation is cleaned up."
-    },
     "shortcut": {
       "title": "Shortcut",
       "info": "Give cleanup its own shortcut, or let your dictation shortcut clean up every dictation so there is one set of keys to remember.",
@@ -2775,11 +2757,7 @@
       "title": "Replacements",
       "description": "Say a phrase and get different text, like \"my email\" becoming your address."
     },
-    "addWord": "Add word",
-    "hero": {
-      "title": "SpeakoFlow spells <em>the way you do.</em>",
-      "subtitle": "Add names and jargon it keeps getting wrong."
-    }
+    "addWord": "Add word"
   },
   "assistantPage": {
     "description": "Ask anything by voice, from any app. The assistant can see your screen, search the web, and remember what matters to you.",
@@ -2787,14 +2765,14 @@
     "hero": {
       "askHold": "Hold, ask your question, let go. The answer appears in a floating panel.",
       "askTap": "Tap, ask your question, tap again. The answer appears in a floating panel.",
-      "call": "Talk back and forth hands-free. Press again to hang up.",
+      "call": "Talk back and forth hands-free. Press again to end.",
       "title": "Ask anything, from <em>anywhere.</em>",
       "ask": "Ask",
-      "callLabel": "Call",
+      "callLabel": "Conversation",
       "askHoldShort": "Hold, ask, let go",
       "askTapShort": "Tap, ask, tap again",
-      "callShort": "Press again to hang up",
-      "subtitle": "Ask a question out loud, or start a call and talk it through."
+      "callShort": "Press again to end",
+      "subtitle": "Ask a question out loud, or start a conversation and talk it through."
     },
     "models": {
       "title": "Powered by",
@@ -2928,14 +2906,14 @@
       },
       "screen": {
         "ask": "Screen vision for questions",
-        "call": "Screen vision for calls"
+        "call": "Screen vision in conversations"
       }
     },
     "tips": {
       "thinksWith": "The model that answers you. AI cleanup and meeting notes use it too when they have none of their own.",
-      "speaks": "Reads replies aloud during a call.",
+      "speaks": "Reads replies aloud during a conversation.",
       "screenAsk": "Lets the assistant look when a question is about your screen, or when you ask it to. Questions about selected text are answered from the text. Screenshots go only to your AI provider.",
-      "screenCall": "Lets the assistant look during a call when you ask it to, or when you're talking about something on your screen.",
+      "screenCall": "Lets the assistant look during a conversation when you ask it to, or when you're talking about something on your screen.",
       "captureTiming": "Grab the screen as it was when you started asking, or when you send.",
       "webSearch": "Looks things up online when a question needs current facts.",
       "depth": "Quick for simple facts, Deep for hard questions.",
@@ -3055,7 +3033,7 @@
     "recoverError": "Couldn't recover this transcription. Try again.",
     "more": "More actions",
     "chat": {
-      "continueInCall": "Continue in a call",
+      "continueInCall": "Continue as a conversation",
       "assistantOff": "Turn the assistant on to continue this chat."
     }
   },

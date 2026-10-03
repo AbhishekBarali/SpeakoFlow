@@ -29,15 +29,15 @@ const SetupRow: React.FC<{ summary: SlotSummary }> = ({ summary }) => {
         type="button"
         onClick={() => openModelSlot(summary.slot)}
         title={tooltip || undefined}
-        className="group flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
+        className="group flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-start transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
       >
         <SlotLogo summary={summary} size="md" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs text-muted">
+          <span className="block truncate text-[0.8125rem] text-muted">
             {t(`modelsHub.slots.${summary.slot}.name`)}
           </span>
           <span
-            className={`flex items-center gap-1.5 truncate text-sm font-medium ${
+            className={`flex items-center gap-1.5 truncate text-[0.9375rem] font-medium ${
               attention
                 ? "text-warning"
                 : summary.active

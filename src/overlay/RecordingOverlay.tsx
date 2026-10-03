@@ -10,7 +10,13 @@ import { useTranslation } from "react-i18next";
 import { Check, Copy, RotateCcw, Undo2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import AudioWaveform from "../components/shared/AudioWaveform";
-import CompletionMark from "./CompletionMark";
+import {
+  WORK_STAGES,
+  browserTimingStore,
+  createWorkRun,
+  type WorkRun,
+  type WorkStage,
+} from "./workProgress";
 import { voiceEnergy } from "../components/shared/waveformSignal";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { preventBrowserContextMenu } from "@/lib/contextMenu";
@@ -57,6 +63,12 @@ type ShowOverlayPayload = {
   /** For `downloading`: the speech model on its way, whose
    * `model-download-progress` events the pill follows. */
   download?: string;
+  /** For `transcribing`: AI cleanup follows, so the fill leaves it room. */
+  cleanupNext?: boolean;
+  /** Opaque fingerprints of what does the transcription and the cleanup, so
+   * the fill learns each setup's timing separately (`workProgress.ts`). */
+  sttSetup?: string;
+  cleanupSetup?: string;
   /** The overlay lifetime this show began. The recovery pill sends it back
    * with its click, so a click on a pill that has since been replaced cannot
    * act on a different dictation. */
@@ -115,8 +127,8 @@ const LiveWaveform: React.FC<
   return <AudioWaveform {...waveform} levels={live ? levels : EMPTY_LEVELS} />;
 };
 
-/** The card's indicator slot is 23px: five 3px bars on a 5px pitch, the same
- * footprint as the check that replaces them, so a change of state moves
+/** The card's indicator slot is 23px: five 3px bars on a 5px pitch. The same
+ * bars carry listening, working and done, so a change of state moves
  * nothing. */
 const CARD_WAVE: WaveShape = { bars: 5, pitch: 5, barWidth: 3 };
 const PILL_WAVE: WaveShape = { bars: 14 };
@@ -266,6 +278,14 @@ const DownloadRing: React.FC<{ percent: number | null }> = ({ percent }) => (
 
 const RecordingOverlay: React.FC = () => {
   const { t } = useTranslation();
+  /** The working fill: one estimated run across transcription and cleanup.
+   * Outside React state, because it is read every frame by the waveform. */
+  const workRun = useRef<WorkRun | null>(null);
+  workRun.current ??= createWorkRun(browserTimingStore());
+  const run = workRun.current;
+  const readProgress = useRef(() => run.value(performance.now())).current;
+  /** When this dictation's recording began, to size the wait that follows. */
+  const recordingStartedAt = useRef<number | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [state, setState] = useState<OverlayState>("recording");
   const [notice, setNotice] = useState<string | null>(null);
@@ -443,6 +463,38 @@ const RecordingOverlay: React.FC = () => {
       pendingReplace.current = null;
       clearHoldTimer();
     };
+    /** Start, carry on, or drop the working fill for a new state. */
+    const trackWork = (payload: ShowOverlayPayload) => {
+      const now = performance.now();
+      const stage = WORK_STAGES.find((s) => s === payload.state) as
+        | WorkStage
+        | undefined;
+      if (payload.state === "recording") {
+        run.abandon();
+        recordingStartedAt.current = now;
+      } else if (stage) {
+        const started = recordingStartedAt.current;
+        recordingStartedAt.current = null;
+        run.begin(stage, now, {
+          // Only transcription knows the recording it follows; cleanup keeps
+          // what transcription was given. A recovered dictation has no
+          // recording on this pill, so its length is unknown.
+          recordingSec:
+            stage === "transcribing"
+              ? started === null
+                ? null
+                : (now - started) / 1000
+              : undefined,
+          cleanupNext: !!payload.cleanupNext,
+          setup:
+            stage === "transcribing" ? payload.sttSetup : payload.cleanupSetup,
+          cleanupSetup: payload.cleanupSetup,
+        });
+      } else {
+        run.abandon();
+        recordingStartedAt.current = null;
+      }
+    };
     // Register together so a slow registration cannot leave hide unobserved.
     void Promise.all([
       listen<ShowOverlayPayload>("show-overlay", ({ payload }) => {
@@ -455,6 +507,7 @@ const RecordingOverlay: React.FC = () => {
           : null;
         copyGeneration.current++;
         finished = false;
+        trackWork(payload);
         setRecovering(false);
         setCompleted(false);
         setFading(false);
@@ -492,6 +545,10 @@ const RecordingOverlay: React.FC = () => {
         copyGeneration.current++;
         finished = false;
         endPress();
+        // The fill keeps its last frame through the fade-out (the waveform
+        // freezes once completed and hidden); a new show starts a new run.
+        run.abandon();
+        recordingStartedAt.current = null;
         setRecovering(false);
         setFading(false);
         setHop(false);
@@ -515,6 +572,12 @@ const RecordingOverlay: React.FC = () => {
           copyGeneration.current++;
           recording = false;
           finished = true;
+          // Run the fill out to a full, still row. That is the whole ending:
+          // the text has already landed in the user's app, which is the real
+          // confirmation, so nothing replaces the bars to announce it. A notice
+          // means the work did not go the usual way (a cleanup that fell
+          // back), so it teaches the estimate nothing.
+          run.finish(performance.now(), { learn: !payload.notice });
           setCompleted(true);
           setFading(false);
           setMicLive(false);
@@ -533,6 +596,13 @@ const RecordingOverlay: React.FC = () => {
       ).then(register),
       listen<number>("fade-overlay", ({ payload }) => {
         if (completionEpoch.current === payload) setFading(true);
+      }).then(register),
+      // The text is ready and on its way into the user's app: run the fill out
+      // now so it lands with the words. The finish that follows the paste then
+      // finds the run-out under way and leaves it alone.
+      listen<number>("seal-overlay", ({ payload }) => {
+        if (!visible || payload !== showEpoch.current || !run.running()) return;
+        run.finish(performance.now());
       }).then(register),
       listen<number>("restore-overlay", ({ payload }) => {
         if (completionEpoch.current === payload) setFading(false);
@@ -791,20 +861,26 @@ const RecordingOverlay: React.FC = () => {
       <span className="transcript-tentative">{transcript.tentative}</span>
     </span>
   );
-  const indicator = (shape: WaveShape) =>
-    completed ? (
-      <CompletionMark label={cardLabel} />
-    ) : (
-      // One waveform for listening and for working, in the same element, so the
-      // bars the user spoke into settle into the working ripple instead of being
-      // swapped for a different indicator. Working carries the progressbar role
-      // (indeterminate: nothing here can report a fraction).
+  const indicator = (shape: WaveShape) => {
+    // Transcription and cleanup fill once, from an estimate, and a finished
+    // dictation shows that fill run out to a full, still row. Flow's writing
+    // and looking have nothing to estimate and keep the open-ended ripple.
+    const fills =
+      completed || (working && WORK_STAGES.some((s) => s === state));
+    const busy = working && !completed;
+    return (
+      // One waveform for listening, working and done, in the same element, so
+      // the bars the user spoke into settle into the fill instead of being
+      // swapped for a different indicator. The fill is an estimate, so it
+      // carries no aria-valuenow: a screen reader would be told a guess.
       <span
         className="overlay-wave"
-        role={working ? "progressbar" : undefined}
-        aria-label={working ? busyLabel : undefined}
-        aria-valuemin={working ? 0 : undefined}
-        aria-valuemax={working ? 100 : undefined}
+        role={busy ? "progressbar" : completed ? "img" : undefined}
+        aria-label={
+          busy || completed ? (completed ? cardLabel : busyLabel) : undefined
+        }
+        aria-valuemin={busy ? 0 : undefined}
+        aria-valuemax={busy ? 100 : undefined}
       >
         <LiveWaveform
           store={levels}
@@ -813,11 +889,16 @@ const RecordingOverlay: React.FC = () => {
           pitch={shape.pitch}
           barWidth={shape.barWidth}
           size="sm"
-          active={isVisible}
-          mode={working ? "working" : "reactive"}
+          // Kept running through the fade-out after a completion, frozen on
+          // the full row, so the pill does not drop its bars as it leaves.
+          active={isVisible || completed}
+          freeze={completed && !isVisible}
+          mode={working || completed ? "working" : "reactive"}
+          progress={fills ? readProgress : undefined}
         />
       </span>
     );
+  };
 
   return (
     <div

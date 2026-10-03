@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import { Page, PageHeader } from "@/components/ui/Page";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
-import { Hero, HeroTitle } from "@/components/ui/Hero";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { CustomWords } from "@/components/settings/CustomWords";
 import { AutoLearnCorrections } from "@/components/settings/AutoLearnCorrections";
@@ -16,8 +15,9 @@ const WORD_INPUT_ID = "dictionary-new-word";
 
 /**
  * Dictionary: the words SpeakoFlow should always get right, and the phrases
- * it should expand, as two tabs. The banner stays like every other page's;
- * its one line of how-to sits behind the lightbulb.
+ * it should expand, as two tabs. No banner: the list of your words is the
+ * page's picture, and the banner it had (a paragraph of word-bars with one
+ * lit) read as a loading skeleton above it.
  */
 export const DictionaryPage: React.FC = () => {
   const { t } = useTranslation();
@@ -41,13 +41,6 @@ export const DictionaryPage: React.FC = () => {
             {t("dictionary.addWord")}
           </Button>
         }
-      />
-
-      <Hero
-        art="dictionary"
-        className="mb-6"
-        title={<HeroTitle i18nKey="dictionary.hero.title" />}
-        subtitle={t("dictionary.hero.subtitle")}
       />
 
       <Tabs

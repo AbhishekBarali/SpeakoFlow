@@ -1022,7 +1022,7 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     );
   } else if (finalText !== null) {
     body = (
-      <p className="max-w-[75ch] cursor-text select-text whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
+      <p className="max-w-[75ch] cursor-text select-text whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed text-ink">
         {finalText}
       </p>
     );
@@ -1319,15 +1319,18 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
         aria-expanded={expanded}
         className="block w-full max-w-[75ch] cursor-pointer rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
+        {/* Collapsed, a row is one line of question and one of answer: enough
+            to recognise it, and no taller than a two-line dictation. Two lines
+            of each turned the Assistant list into a wall of text. */}
         <span
           className={`block break-words text-sm leading-relaxed text-ink ${
-            expanded ? "" : "line-clamp-2"
+            expanded ? "" : "line-clamp-1"
           }`}
         >
           {session.title.trim() || t("assistant.conversation.history.untitled")}
         </span>
         {!isCall && !expanded && session.preview && (
-          <span className="mt-0.5 line-clamp-2 block break-words text-[0.8125rem] leading-relaxed text-muted">
+          <span className="line-clamp-1 block break-words text-[0.8125rem] leading-relaxed text-muted">
             {session.preview}
           </span>
         )}

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { Eye, EyeOff, Pause, Play, Square } from "lucide-react";
-import meetingsArt from "@/assets/hero/meetings.webp";
+import { useHeroArt } from "@/components/ui/Hero";
 import { SectionTitle } from "@/components/ui/Page";
 import {
   MEETING_LEVEL_EVENT,
@@ -32,9 +32,9 @@ const SILENT_LEVEL = 0.02;
 /**
  * A meeting that is recording right now, in the main window.
  *
- * The page's banner becomes the recorder: the same dark stage and the same
- * light, now carrying the clock, which side is audible, and the two things you
- * can do (stop, pause). Starting a meeting used to replace the banner with a
+ * The page's banner becomes the recorder: the same stage and the same art,
+ * now carrying the clock, which side is audible, and the two things you can
+ * do (stop, pause). Starting a meeting used to replace the banner with a
  * plain white card, so the moment the page mattered most it looked least like
  * the rest of the app. The live transcript sits underneath as an ordinary
  * section.
@@ -56,6 +56,7 @@ export const RecorderCard: React.FC<RecorderCardProps> = ({
 }) => {
   const { t } = useTranslation();
   const indicator = useMeetingIndicator();
+  const meetingsArt = useHeroArt("meetings");
   const paused = state.paused;
 
   const anchor = useRef({ elapsed: state.elapsed_ms, at: Date.now() });

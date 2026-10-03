@@ -4,6 +4,7 @@ import {
   REST_HEIGHT,
   SPEECH_RELEASE_MS,
   WORK_REST_HEIGHT,
+  progressWave,
   speechWave,
   stepSpring,
   voiceEnergy,
@@ -27,6 +28,15 @@ export interface AudioWaveformProps {
   pitch?: number;
   /** Bar thickness, in the same units. */
   barWidth?: number;
+  /** In `working` mode, how far the work has got (0..1), read every frame.
+   * With it the bars fill once from left to right (`progressWave`); without it
+   * they show the looping ripple, for waits nothing can estimate. A getter
+   * rather than a value, so a fill that moves every frame re-renders only this
+   * component. */
+  progress?: () => number;
+  /** Hold the current frame still: no animation, and no return to rest while
+   * the window fades out. Thawing starts from rest. */
+  freeze?: boolean;
   className?: string;
 }
 
@@ -41,6 +51,8 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
   size = "sm",
   pitch = 4,
   barWidth = 2,
+  progress,
+  freeze = false,
   className = "",
 }) => {
   const count = Math.max(
@@ -60,6 +72,22 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
   const [heights, setHeights] = useState(() =>
     Array<number>(count).fill(REST_HEIGHT),
   );
+  /** How far the fill has covered each bar, for its brightness. Empty when the
+   * wave is not showing progress. */
+  const [covered, setCovered] = useState<number[]>([]);
+  /** Read through a ref so a new getter each render does not restart the
+   * animation loop. */
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
+  const showsProgress = mode === "working" && !!progress;
+  /** Whether the last run of the effect was frozen, so thawing can start the
+   * next use from rest instead of springing down from the frozen frame. */
+  const wasFrozen = useRef(false);
+  /** Read by a frame that was already queued when the freeze began: React
+   * commits the hidden window before the effect cleanup cancels that frame, and
+   * without this the frame would see the hidden window and park the bars. */
+  const freezeRef = useRef(freeze);
+  freezeRef.current = freeze;
 
   useEffect(() => {
     const rest = Array<number>(count).fill(REST_HEIGHT);
@@ -67,8 +95,13 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
       springs.current = restingSprings(count);
       setHeights(rest);
     };
-    // Only a new bar count or a stopped indicator starts over from rest.
-    if (springs.current.length !== count || !active) park();
+    const thawed = wasFrozen.current && !freeze;
+    wasFrozen.current = freeze;
+    // Hold the last frame exactly as drawn: no clock, no parking.
+    if (freeze) return;
+    // Only a new bar count, a stopped indicator, or the end of a freeze starts
+    // over from rest.
+    if (thawed || springs.current.length !== count || !active) park();
     speaking.current = false;
     lastSpeech.current = 0;
     if (!active || typeof requestAnimationFrame !== "function") return;
@@ -80,6 +113,7 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
     let phase = 0;
     const step = (now: number) => {
       frame = null;
+      if (freezeRef.current) return;
       if (svgRef.current?.closest(".native-window-hidden")) {
         park();
         return;
@@ -101,13 +135,24 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
       // The wave keeps travelling through the release, so speech that resumes
       // after a syllable gap does not restart from the identical crest.
       if (!reducedMotion) phase += Math.min(dt, 0.05);
-      const target = working
-        ? reducedMotion
-          ? workRest
-          : workingWave(count, phase)
-        : speechActive
-          ? speechWave(count, phase)
-          : rest;
+      const fill = working ? progressRef.current?.() : undefined;
+      let fillCover: number[] | null = null;
+      let target: number[];
+      if (fill !== undefined) {
+        // Progress is information, not decoration, so it still fills under
+        // reduced motion; only the ripple riding on it is dropped.
+        const wave = progressWave(count, fill, reducedMotion ? 0 : phase);
+        target = wave.heights;
+        fillCover = wave.covered;
+      } else {
+        target = working
+          ? reducedMotion
+            ? workRest
+            : workingWave(count, phase)
+          : speechActive
+            ? speechWave(count, phase)
+            : rest;
+      }
       if (!speechActive) speaking.current = false;
       let changed = false,
         settled = true;
@@ -118,9 +163,25 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
         return next;
       });
       if (changed) setHeights(springs.current.map((spring) => spring.position));
+      if (fillCover) {
+        const next = fillCover;
+        setCovered((previous) =>
+          previous.length === next.length &&
+          previous.every((value, index) => Math.abs(value - next[index]) < 0.01)
+            ? previous
+            : next,
+        );
+      }
       // Keep smoothing while speech arrives or work is under way, then release
-      // and park completely. An idle microphone does not run an animation loop.
-      if (!settled || speechActive || (working && !reducedMotion))
+      // and park completely. An idle microphone does not run an animation loop,
+      // and neither does a finished fill once its bars have settled.
+      const filling = fill !== undefined && fill < 1;
+      if (
+        !settled ||
+        speechActive ||
+        filling ||
+        (working && fill === undefined && !reducedMotion)
+      )
         frame = requestAnimationFrame(step);
     };
     const start = () => {
@@ -144,7 +205,12 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
       if (frame !== null) cancelAnimationFrame(frame);
       wake.current = null;
     };
-  }, [active, mode, count, reducedMotion]);
+  }, [active, mode, count, reducedMotion, showsProgress, freeze]);
+
+  // Leaving the fill drops its per-bar brightness with it.
+  useEffect(() => {
+    if (!showsProgress) setCovered([]);
+  }, [showsProgress]);
 
   useEffect(() => {
     if (mode !== "reactive" || !active) return;
@@ -161,7 +227,7 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
   return (
     <svg
       ref={svgRef}
-      className={`audio-waveform ${size} ${mode} ${active ? "" : "is-idle"} ${className}`}
+      className={`audio-waveform ${size} ${mode} ${showsProgress ? "progress" : ""} ${active ? "" : "is-idle"} ${className}`}
       viewBox={`0 0 ${width} 24`}
       aria-hidden="true"
       focusable="false"
@@ -181,10 +247,16 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
       </defs>
       {Array.from({ length: count }, (_, index) => {
         const height = active ? (heights[index] ?? REST_HEIGHT) : REST_HEIGHT;
+        const cover = covered[index];
         return (
           <line
             key={index}
             className="wave-bar"
+            // Bars ahead of the fill sit dimmer, so the filled part reads as
+            // done at a glance even where its heights are level.
+            style={
+              cover === undefined ? undefined : { opacity: 0.42 + 0.58 * cover }
+            }
             x1={barWidth / 2 + index * pitch}
             x2={barWidth / 2 + index * pitch}
             y1={12 - height * 10}

@@ -165,12 +165,12 @@
       "tabs": {
         "dictate": "Diktat",
         "ask": "Assistent",
-        "call": "Anruf"
+        "call": "Gespräch"
       },
       "keys": {
         "hold": "Zum Sprechen halten",
         "tap": "Antippen zum Starten, antippen zum Stoppen",
-        "call": "Drücken zum Starten, erneut zum Auflegen"
+        "call": "Drücken zum Starten, erneut zum Beenden"
       },
       "steps": {
         "label": "So funktioniert's",
@@ -473,15 +473,13 @@
       "english": "Englisch",
       "languages_one": "{{count}} Sprache",
       "languages_other": "{{count}} Sprachen",
-      "tags": {
-        "english": "Am schnellsten",
-        "languages": "Erkennt die Sprache",
-        "small": "Am kleinsten",
-        "accurate": "Am genauesten",
-        "widest": "Langsamer"
+      "about": {
+        "english": "Schnell und genau, für Englisch.",
+        "languages": "Erkennt selbst, welche Sprache du sprichst.",
+        "small": "Winzig und flott. Gut für ältere Computer.",
+        "accurate": "Am genauesten, aber ein größerer Download und langsamer.",
+        "widest": "Deckt die meisten Sprachen ab, läuft aber langsamer."
       },
-      "more_one": "{{count}} weiteres Modell",
-      "more_other": "{{count}} weitere Modelle",
       "anytime": "Du kannst jederzeit weitere Modelle hinzufügen.",
       "download": "Herunterladen und weiter",
       "continue": "Weiter",
@@ -640,8 +638,8 @@
             "description": "Frage per Stimme mit angehängtem Bildschirm, damit der Assistent sieht, was du gerade ansiehst."
           },
           "assistant_call": {
-            "name": "Anruf starten",
-            "description": "Sprich freihändig mit dem Assistenten und hör seine Antworten. Erneut drücken zum Auflegen."
+            "name": "Gespräch starten",
+            "description": "Sprich freihändig mit dem Assistenten und hör seine Antworten. Zum Beenden erneut drücken."
           }
         },
         "errors": {
@@ -1271,7 +1269,7 @@
         "recordings": "Diktate",
         "flow": "Flow",
         "asks": "Assistent",
-        "calls": "Anrufe"
+        "calls": "Gespräche"
       },
       "openFolder": "Aufnahmeordner öffnen",
       "loading": "Verlauf wird geladen…",
@@ -1279,11 +1277,11 @@
       "emptyRecordings": "Noch keine Diktate.",
       "emptyFlow": "Noch keine Flow-Ergebnisse.",
       "emptyAsks": "Noch keine Fragen gestellt.",
-      "emptyCalls": "Noch keine Anrufe.",
+      "emptyCalls": "Noch keine Gespräche.",
       "flowLabel": "Flow",
       "kinds": {
         "ask": "Assistent",
-        "call": "Anruf"
+        "call": "Gespräch"
       },
       "flowTranscriptLabel": "Du hast gesagt",
       "originalTranscriptionLabel": "Ursprüngliche Transkription",
@@ -1944,8 +1942,7 @@
       "loadMore": "Mehr laden",
       "speakers_one": "{{count}} Sprecher",
       "speakers_other": "{{count}} Sprecher",
-      "hasNotes": "Notizen erstellt",
-      "notesBadge": "Notizen"
+      "hasNotes": "Notizen erstellt"
     },
     "status": {
       "recording": "Aufnahme läuft",
@@ -1970,6 +1967,19 @@
       "transcript": "Transkript",
       "summary": "Zusammenfassung",
       "ask": "Fragen"
+    },
+    "discuss": {
+      "button": "Meeting besprechen",
+      "hint": "Sprich dieses Meeting mit dem Assistenten durch. Er weiß, was gesagt wurde, und kann im Transkript nachsehen.",
+      "whileRecording": "Verfügbar, sobald die Aufnahme beendet ist.",
+      "nothingYet": "Es wurde noch nichts transkribiert.",
+      "failed": "Gespräch konnte nicht gestartet werden: {{error}}",
+      "earlier": "Frühere Besprechungen",
+      "continue": "Besprechung fortsetzen",
+      "untitled": "Besprechung ohne Titel",
+      "messages_one": "{{count}} Nachricht",
+      "messages_other": "{{count}} Nachrichten",
+      "more": "Weitere unter „Frühere Gespräche“."
     },
     "myNotes": {
       "description": "Schreib auf, was dir wichtig ist. Es wird beim Erstellen der Notizen mit dem Transkript zusammengeführt.",
@@ -2184,7 +2194,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Anruf",
+      "title": "Gespräch",
       "newChat": "Neuer Chat",
       "type": "Nachricht eingeben",
       "backToVoice": "Zurück zur Stimme",
@@ -2193,10 +2203,10 @@
       "speakerOn": "Antworten vorlesen",
       "speakerOff": "Antworten nicht mehr vorlesen",
       "expand": "Gespräch öffnen",
-      "collapse": "Zurück zur Anrufleiste",
+      "collapse": "Einklappen",
       "historyOpen": "Frühere Gespräche",
       "historyClose": "Zurück zu diesem Gespräch",
-      "end": "Auflegen",
+      "end": "Gespräch beenden",
       "send": "Senden",
       "stop": "Antwort stoppen",
       "placeholder": "Nachricht an {{name}}",
@@ -2209,17 +2219,47 @@
       "preparingVoice": "Stimme wird vorbereitet… {{progress}} %",
       "history": {
         "title": "Frühere Gespräche",
-        "hint": "Wähle eines, um dort weiterzumachen, wo du aufgehört hast. Der Anruf bleibt verbunden.",
+        "hint": "Wähle eines, um dort weiterzumachen, wo du aufgehört hast. Dein aktuelles Gespräch bleibt offen.",
         "empty": "Noch keine gespeicherten Gespräche.",
+        "noMatches": "Keine Treffer für diese Suche.",
+        "noMeetings": "Noch keine Gespräche über Meetings. Öffne ein Meeting und wähle „Meeting besprechen“.",
         "loading": "Wird geladen…",
         "failed": "Deine Gespräche konnten nicht geladen werden.",
         "more": "Mehr anzeigen",
         "untitled": "Gespräch ohne Titel",
         "current": "Gerade geöffnet",
+        "search": "Gespräche durchsuchen",
+        "clearSearch": "Suche löschen",
+        "scopeLabel": "Welche Gespräche",
+        "scopes": {
+          "all": "Alle",
+          "meetings": "Meetings"
+        },
+        "groups": {
+          "today": "Heute",
+          "yesterday": "Gestern",
+          "week": "Letzte 7 Tage",
+          "earlier": "Früher"
+        },
+        "matchCount_one": "{{count}} Gespräch",
+        "matchCount_other": "{{count}} Gespräche",
         "messages_one": "{{count}} Nachricht",
         "messages_other": "{{count}} Nachrichten"
       },
-      "options": "Anrufoptionen",
+      "meeting": {
+        "about": "Über {{title}}",
+        "chipHint": "Der Assistent kennt die Notizen dieses Meetings und kann das Transkript durchsuchen.",
+        "untitled": "Meeting ohne Titel",
+        "startTitle": "Lass uns über {{title}} sprechen",
+        "startHint": "Frag alles dazu oder was als Nächstes zu tun ist. Fang an zu sprechen oder wähle eins:",
+        "prompts": {
+          "recap": "Gib mir eine kurze Zusammenfassung",
+          "next": "Was sollte ich als Nächstes tun?",
+          "followUp": "Entwirf eine Follow-up-Nachricht",
+          "missed": "Habe ich etwas verpasst?"
+        }
+      },
+      "options": "Gesprächsoptionen",
       "pace": "Zeit zum Ausreden",
       "paceHint": "Wie lange nach einer Pause gewartet wird, bevor geantwortet wird.",
       "paces": {
@@ -2235,7 +2275,7 @@
         "high": "Hoch – ruhiger Raum oder Kopfhörer"
       },
       "phase": {
-        "off": "Anruf beendet",
+        "off": "Gespräch beendet",
         "starting": "Wird verbunden…",
         "listening": "Hört zu",
         "hearing": "Hört zu…",
@@ -2244,7 +2284,7 @@
         "speaking": "Spricht",
         "muted": "Mikrofon aus",
         "held": "Pausiert fürs Diktat",
-        "error": "Anruf unterbrochen"
+        "error": "Gespräch unterbrochen"
       },
       "errors": {
         "microphone": "Dein Mikrofon konnte nicht geöffnet werden. Erlaube den Mikrofonzugriff und prüfe, ob es nicht von einer anderen App verwendet wird.",
@@ -2310,6 +2350,8 @@
     "tool": {
       "search": "Sucht im Web",
       "screen": "Schaut auf deinen Bildschirm…",
+      "meetingSearch": "Durchsucht das Meeting",
+      "meetingRead": "Liest das Meeting",
       "working": "Arbeitet daran",
       "elapsed": "{{seconds}} s"
     },
@@ -2518,9 +2560,9 @@
         "what": "Frag laut. Die Antwort erscheint in einem schwebenden Panel."
       },
       "call": {
-        "title": "Anruf starten",
+        "title": "Gespräch starten",
         "description": "Ein freihändiges Gespräch mit gesprochenen Antworten.",
-        "what": "Sprich im Wechsel, freihändig. Erneut drücken zum Auflegen."
+        "what": "Sprich im Wechsel, freihändig. Zum Beenden erneut drücken."
       },
       "info": "Drück sie in einer beliebigen App. Klicke auf die Tasten, um sie zu ändern.",
       "offHint": "Ausgeschaltet",
@@ -2546,12 +2588,6 @@
       "trySuffixHold": "und halte die Tasten gedrückt, während du sprichst.",
       "trySuffixTap": "und sprich. Drücke sie noch einmal, wenn du fertig bist.",
       "tryPlaceholder": "Deine Worte erscheinen hier…"
-    },
-    "hero": {
-      "hold": "Halte die Tasten in jeder App gedrückt, sprich und lass los.",
-      "tap": "Drücke in jeder App kurz die Tasten, sprich und drücke erneut.",
-      "holdHint": "Zum Sprechen halten",
-      "tapHint": "Kurz drücken zum Starten und Stoppen"
     },
     "activity": {
       "title": "Letzte 30 Tage",
@@ -2594,7 +2630,7 @@
       "meetings": "Meetings",
       "cleanup": "KI-Bereinigung",
       "meetingNotes": "Meeting-Notizen",
-      "calls": "Anrufe",
+      "calls": "Gespräche",
       "flow": "Mit Flow generieren",
       "spokenReplies": "Gesprochene Antworten"
     },
@@ -2616,7 +2652,7 @@
       },
       "assistant": {
         "name": "Assistent",
-        "description": "Beantwortet deine Fragen, sieht sich deinen Bildschirm an und führt Anrufe.",
+        "description": "Beantwortet deine Fragen, sieht sich deinen Bildschirm an und führt Gespräche.",
         "openAssistant": "Assistent öffnen",
         "offNotice": "Der Assistent ist aus. „Mit Flow generieren“ und die Ersatz-Bereinigung nutzen dieses Modell trotzdem.",
         "catalogTitle": "Assistenzmodelle",
@@ -2701,15 +2737,6 @@
         "instructionPlaceholder": "Zum Beispiel: locker und in Kleinbuchstaben halten und gesprochene Emoji-Namen in Emojis umwandeln."
       }
     },
-    "hero": {
-      "title": "Sag es chaotisch. Erhalte es <em>sauber.</em>",
-      "before": "lass uns um zehn treffen, äh nein, sagen wir um elf, und bring das budget mit",
-      "after": "Lass uns um elf treffen, und bring das Budget mit.",
-      "offHint": "Schalte die KI-Bereinigung ein, um dieses Tastenkürzel zu nutzen",
-      "onHint": "Halten, sprechen, loslassen. Bereinigter Text wird für dich geschrieben.",
-      "onHintTap": "Kurz drücken, sprechen, erneut drücken. Bereinigter Text wird für dich geschrieben.",
-      "onDictationHint": "Jedes Diktat wird bereinigt."
-    },
     "shortcut": {
       "title": "Tastenkürzel",
       "info": "Gib der Bereinigung ein eigenes Tastenkürzel, oder lass dein Diktier-Tastenkürzel jedes Diktat bereinigen, damit du dir nur eine Tastenkombination merken musst.",
@@ -2730,11 +2757,7 @@
       "title": "Ersetzungen",
       "description": "Sag eine Wortfolge und erhalte einen anderen Text, etwa „meine E-Mail“, das zu deiner Adresse wird."
     },
-    "addWord": "Wort hinzufügen",
-    "hero": {
-      "title": "SpeakoFlow schreibt <em>so wie du.</em>",
-      "subtitle": "Füge Namen und Fachbegriffe hinzu, die es immer wieder falsch schreibt."
-    }
+    "addWord": "Wort hinzufügen"
   },
   "assistantPage": {
     "description": "Frag per Stimme alles, aus jeder App. Der Assistent kann deinen Bildschirm sehen, im Web suchen und sich merken, was dir wichtig ist.",
@@ -2742,14 +2765,14 @@
     "hero": {
       "askHold": "Halten, Frage stellen, loslassen. Die Antwort erscheint in einem schwebenden Panel.",
       "askTap": "Kurz drücken, Frage stellen, erneut drücken. Die Antwort erscheint in einem schwebenden Panel.",
-      "call": "Freihändig hin und her sprechen. Zum Auflegen erneut drücken.",
+      "call": "Freihändig hin und her sprechen. Zum Beenden erneut drücken.",
       "title": "Frag alles, von <em>überall.</em>",
       "ask": "Fragen",
-      "callLabel": "Anruf",
+      "callLabel": "Gespräch",
       "askHoldShort": "Halten, fragen, loslassen",
       "askTapShort": "Kurz drücken, fragen, erneut drücken",
-      "callShort": "Zum Auflegen erneut drücken",
-      "subtitle": "Stell eine Frage laut, oder starte einen Anruf und sprich die Sache durch."
+      "callShort": "Zum Beenden erneut drücken",
+      "subtitle": "Stell eine Frage laut oder starte ein Gespräch und sprich die Sache durch."
     },
     "models": {
       "title": "Angetrieben von",
@@ -2883,14 +2906,14 @@
       },
       "screen": {
         "ask": "Bildschirmansicht bei Fragen",
-        "call": "Bildschirmansicht bei Anrufen"
+        "call": "Bildschirmansicht in Gesprächen"
       }
     },
     "tips": {
       "thinksWith": "Das Modell, das dir antwortet. Die KI-Bereinigung und Meeting-Notizen nutzen es ebenfalls, wenn sie kein eigenes haben.",
-      "speaks": "Liest Antworten während eines Anrufs laut vor.",
+      "speaks": "Liest Antworten während eines Gesprächs laut vor.",
       "screenAsk": "Lässt den Assistenten hinschauen, wenn es in einer Frage um deinen Bildschirm geht oder du ihn darum bittest. Fragen zu markiertem Text werden anhand des Textes beantwortet. Screenshots gehen nur an deinen KI-Anbieter.",
-      "screenCall": "Lässt den Assistenten während eines Anrufs hinschauen, wenn du ihn darum bittest oder über etwas auf deinem Bildschirm sprichst.",
+      "screenCall": "Lässt den Assistenten während eines Gesprächs hinschauen, wenn du ihn darum bittest oder über etwas auf deinem Bildschirm sprichst.",
       "captureTiming": "Erfasse den Bildschirm so, wie er war, als du mit der Frage begonnen hast, oder beim Senden.",
       "webSearch": "Sucht online, wenn eine Frage aktuelle Fakten braucht.",
       "depth": "Schnell für einfache Fakten, Tief für schwierige Fragen.",
@@ -3010,7 +3033,7 @@
     "recoverError": "Diese Transkription konnte nicht wiederhergestellt werden. Bitte erneut versuchen.",
     "more": "Weitere Aktionen",
     "chat": {
-      "continueInCall": "In einem Anruf fortsetzen",
+      "continueInCall": "Als Gespräch fortsetzen",
       "assistantOff": "Schalte den Assistenten ein, um diesen Chat fortzusetzen."
     }
   },

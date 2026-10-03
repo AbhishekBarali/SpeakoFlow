@@ -172,7 +172,7 @@
       "keys": {
         "hold": "Przytrzymaj, aby mówić",
         "tap": "Stuknij, aby zacząć, stuknij, aby zakończyć",
-        "call": "Naciśnij, aby zacząć, i ponownie, aby się rozłączyć"
+        "call": "Naciśnij, aby zacząć, i ponownie, aby zakończyć"
       },
       "steps": {
         "label": "Jak to działa",
@@ -477,17 +477,13 @@
       "languages_few": "{{count}} języki",
       "languages_many": "{{count}} języków",
       "languages_other": "{{count}} języka",
-      "tags": {
-        "english": "Najszybszy",
-        "languages": "Wykrywa język",
-        "small": "Najmniejszy",
-        "accurate": "Najdokładniejszy",
-        "widest": "Wolniejszy"
+      "about": {
+        "english": "Szybki i dokładny, do języka angielskiego.",
+        "languages": "Sam rozpoznaje, w jakim języku mówisz.",
+        "small": "Mały i szybki. Dobry dla starszych komputerów.",
+        "accurate": "Najdokładniejszy, ale większy do pobrania i wolniejszy.",
+        "widest": "Obsługuje najwięcej języków, ale działa wolniej."
       },
-      "more_one": "Jeszcze {{count}} model",
-      "more_few": "Jeszcze {{count}} modele",
-      "more_many": "Jeszcze {{count}} modeli",
-      "more_other": "Jeszcze {{count}} modelu",
       "anytime": "Kolejne modele możesz dodać w każdej chwili.",
       "download": "Pobierz i kontynuuj",
       "continue": "Kontynuuj",
@@ -646,8 +642,8 @@
             "description": "Zapytaj głosem z dołączonym ekranem, aby asystent widział to, na co patrzysz."
           },
           "assistant_call": {
-            "name": "Rozpocznij rozmowę głosową",
-            "description": "Rozmawiaj z asystentem bez użycia rąk i słuchaj jego odpowiedzi. Naciśnij ponownie, aby się rozłączyć."
+            "name": "Rozpocznij rozmowę",
+            "description": "Rozmawiaj z asystentem bez użycia rąk i słuchaj jego odpowiedzi. Naciśnij ponownie, aby zakończyć."
           }
         },
         "errors": {
@@ -664,7 +660,7 @@
         "descriptionUnsupported": "Ten model automatycznie wykrywa język.",
         "searchPlaceholder": "Szukaj języka…",
         "noResults": "Nie znaleziono języków",
-        "auto": "Auto"
+        "auto": "Automatycznie"
       },
       "pushToTalk": {
         "label": "Sposób nagrywania",
@@ -864,7 +860,7 @@
         "gpuDevice": {
           "title": "Urządzenie GPU",
           "description": "Auto wybiera dedykowany GPU.",
-          "auto": "Auto"
+          "auto": "Automatycznie"
         }
       },
       "startHidden": {
@@ -1966,8 +1962,7 @@
       "speakers_few": "{{count}} mówców",
       "speakers_many": "{{count}} mówców",
       "speakers_other": "{{count}} mówcy",
-      "hasNotes": "Notatki wygenerowane",
-      "notesBadge": "Notatki"
+      "hasNotes": "Notatki wygenerowane"
     },
     "status": {
       "recording": "Nagrywanie",
@@ -1992,6 +1987,21 @@
       "transcript": "Transkrypcja",
       "summary": "Podsumowanie",
       "ask": "Zapytaj"
+    },
+    "discuss": {
+      "button": "Omów to spotkanie",
+      "hint": "Omów to spotkanie z asystentem. Wie, co zostało powiedziane, i może sprawdzać szczegóły w transkrypcji.",
+      "whileRecording": "Dostępne po zakończeniu nagrywania.",
+      "nothingYet": "Nic jeszcze nie zostało przetranskrybowane.",
+      "failed": "Nie udało się rozpocząć rozmowy: {{error}}",
+      "earlier": "Wcześniejsze dyskusje",
+      "continue": "Kontynuuj tę dyskusję",
+      "untitled": "Dyskusja bez tytułu",
+      "messages_one": "{{count}} wiadomość",
+      "messages_few": "{{count}} wiadomości",
+      "messages_many": "{{count}} wiadomości",
+      "messages_other": "{{count}} wiadomości",
+      "more": "Więcej w sekcji Poprzednie rozmowy."
     },
     "myNotes": {
       "description": "Zapisz to, co jest dla Ciebie ważne. Zostanie połączone z transkrypcją podczas generowania notatek.",
@@ -2212,7 +2222,7 @@
   },
   "assistant": {
     "conversation": {
-      "title": "Rozmowa głosowa",
+      "title": "Rozmowa",
       "newChat": "Nowy czat",
       "type": "Napisz wiadomość",
       "backToVoice": "Wróć do głosu",
@@ -2221,7 +2231,7 @@
       "speakerOn": "Czytaj odpowiedzi na głos",
       "speakerOff": "Przestań czytać odpowiedzi na głos",
       "expand": "Otwórz rozmowę",
-      "collapse": "Wróć do paska rozmowy",
+      "collapse": "Zwiń",
       "historyOpen": "Poprzednie rozmowy",
       "historyClose": "Wróć do tej rozmowy",
       "end": "Zakończ rozmowę",
@@ -2237,17 +2247,49 @@
       "preparingVoice": "Przygotowywanie głosu… {{progress}}%",
       "history": {
         "title": "Poprzednie rozmowy",
-        "hint": "Wybierz jedną, aby kontynuować od miejsca, w którym skończyłeś. Połączenie pozostaje aktywne.",
+        "hint": "Wybierz jedną, aby kontynuować od miejsca, w którym skończyłeś. Bieżąca rozmowa pozostaje otwarta.",
         "empty": "Brak zapisanych rozmów.",
+        "noMatches": "Nic nie pasuje do wyszukiwania.",
+        "noMeetings": "Nie ma jeszcze rozmów o spotkaniach. Otwórz spotkanie i wybierz Omów to spotkanie.",
         "loading": "Wczytywanie…",
         "failed": "Nie udało się wczytać Twoich rozmów.",
         "more": "Pokaż więcej",
         "untitled": "Rozmowa bez tytułu",
         "current": "Otwarta teraz",
+        "search": "Szukaj rozmów",
+        "clearSearch": "Wyczyść wyszukiwanie",
+        "scopeLabel": "Które rozmowy",
+        "scopes": {
+          "all": "Wszystkie",
+          "meetings": "Spotkania"
+        },
+        "groups": {
+          "today": "Dzisiaj",
+          "yesterday": "Wczoraj",
+          "week": "Ostatnie 7 dni",
+          "earlier": "Wcześniej"
+        },
+        "matchCount_one": "{{count}} rozmowa",
+        "matchCount_few": "{{count}} rozmowy",
+        "matchCount_many": "{{count}} rozmów",
+        "matchCount_other": "{{count}} rozmowy",
         "messages_one": "{{count}} wiadomość",
         "messages_few": "{{count}} wiadomości",
         "messages_many": "{{count}} wiadomości",
         "messages_other": "{{count}} wiadomości"
+      },
+      "meeting": {
+        "about": "O spotkaniu: {{title}}",
+        "chipHint": "Asystent ma notatki z tego spotkania i może przeszukiwać jego transkrypcję.",
+        "untitled": "Spotkanie bez tytułu",
+        "startTitle": "Porozmawiajmy o: {{title}}",
+        "startHint": "Zapytaj o cokolwiek na jego temat albo o to, co dalej. Zacznij mówić lub wybierz jedno:",
+        "prompts": {
+          "recap": "Podsumuj krótko",
+          "next": "Co mam zrobić dalej?",
+          "followUp": "Napisz wiadomość z podsumowaniem",
+          "missed": "Czy coś mi umknęło?"
+        }
       },
       "options": "Opcje rozmowy",
       "pace": "Czas na dokończenie wypowiedzi",
@@ -2344,6 +2386,8 @@
     "tool": {
       "search": "Szukam w sieci",
       "screen": "Patrzę na Twój ekran…",
+      "meetingSearch": "Przeszukuję spotkanie",
+      "meetingRead": "Czytam spotkanie",
       "working": "Pracuję nad tym",
       "elapsed": "{{seconds}} s"
     },
@@ -2560,7 +2604,7 @@
       "call": {
         "title": "Rozpocznij rozmowę",
         "description": "Rozmowa bez użycia rąk z odpowiedziami na głos.",
-        "what": "Rozmawiaj swobodnie, bez użycia rąk. Naciśnij ponownie, aby się rozłączyć."
+        "what": "Rozmawiaj swobodnie, bez użycia rąk. Naciśnij ponownie, aby zakończyć."
       },
       "info": "Używaj ich w dowolnej aplikacji. Kliknij klawisze, aby je zmienić.",
       "offHint": "Wyłączony",
@@ -2586,12 +2630,6 @@
       "trySuffixHold": "i przytrzymaj, gdy mówisz.",
       "trySuffixTap": "i mów. Gdy skończysz, naciśnij ponownie.",
       "tryPlaceholder": "Tu pojawią się Twoje słowa…"
-    },
-    "hero": {
-      "hold": "Przytrzymaj klawisze w dowolnej aplikacji, mów i puść.",
-      "tap": "Stuknij klawisze w dowolnej aplikacji, mów i stuknij ponownie.",
-      "holdHint": "Przytrzymaj, aby mówić",
-      "tapHint": "Stuknij, aby zacząć i zakończyć"
     },
     "activity": {
       "title": "Ostatnie 30 dni",
@@ -2745,15 +2783,6 @@
         "instructionPlaceholder": "Na przykład: pisz swobodnie i małymi literami, a wypowiedziane nazwy emoji zamieniaj na emoji."
       }
     },
-    "hero": {
-      "title": "Mów byle jak. Otrzymaj <em>czysty tekst.</em>",
-      "before": "spotkajmy się o dziesiątej, a nie, jednak o jedenastej, i przynieś budżet",
-      "after": "Spotkajmy się o jedenastej i przynieś budżet.",
-      "offHint": "Włącz czyszczenie AI, aby korzystać z tego skrótu",
-      "onHint": "Przytrzymaj, mów, puść. Oczyszczony tekst wpisze się sam.",
-      "onHintTap": "Stuknij, mów, stuknij ponownie. Oczyszczony tekst wpisze się sam.",
-      "onDictationHint": "Każde dyktowanie jest oczyszczane."
-    },
     "shortcut": {
       "title": "Skrót",
       "info": "Daj czyszczeniu osobny skrót albo pozwól, by skrót dyktowania czyścił każde dyktowanie – wtedy masz do zapamiętania jeden zestaw klawiszy.",
@@ -2774,11 +2803,7 @@
       "title": "Zamiany",
       "description": "Powiedz frazę i otrzymaj inny tekst, np. „mój e-mail” zamienia się w Twój adres."
     },
-    "addWord": "Dodaj słowo",
-    "hero": {
-      "title": "SpeakoFlow pisze <em>tak jak Ty.</em>",
-      "subtitle": "Dodaj nazwy i żargon, które wciąż zapisuje błędnie."
-    }
+    "addWord": "Dodaj słowo"
   },
   "assistantPage": {
     "description": "Pytaj o wszystko głosem, z dowolnej aplikacji. Asystent może zobaczyć Twój ekran, szukać w sieci i pamiętać to, co dla Ciebie ważne.",
@@ -2786,13 +2811,13 @@
     "hero": {
       "askHold": "Przytrzymaj, zadaj pytanie, puść. Odpowiedź pojawi się w pływającym panelu.",
       "askTap": "Stuknij, zadaj pytanie, stuknij ponownie. Odpowiedź pojawi się w pływającym panelu.",
-      "call": "Rozmawiaj swobodnie, bez użycia rąk. Naciśnij ponownie, aby się rozłączyć.",
+      "call": "Rozmawiaj swobodnie, bez użycia rąk. Naciśnij ponownie, aby zakończyć.",
       "title": "Pytaj o wszystko, <em>skądkolwiek.</em>",
       "ask": "Zapytaj",
       "callLabel": "Rozmowa",
       "askHoldShort": "Przytrzymaj, zapytaj, puść",
       "askTapShort": "Stuknij, zapytaj, stuknij ponownie",
-      "callShort": "Naciśnij ponownie, aby się rozłączyć",
+      "callShort": "Naciśnij ponownie, aby zakończyć",
       "subtitle": "Zadaj pytanie na głos albo rozpocznij rozmowę i omów sprawę."
     },
     "models": {
@@ -2940,7 +2965,7 @@
       "thinksWith": "Model, który Ci odpowiada. Czyszczenie AI i notatki ze spotkań też z niego korzystają, gdy nie mają własnego.",
       "speaks": "Czyta odpowiedzi na głos podczas rozmowy.",
       "screenAsk": "Pozwala asystentowi spojrzeć, gdy pytanie dotyczy Twojego ekranu albo gdy go o to poprosisz. Na pytania o zaznaczony tekst odpowiada na podstawie tego tekstu. Zrzuty ekranu trafiają tylko do Twojego dostawcy AI.",
-      "screenCall": "Pozwala asystentowi spojrzeć podczas rozmowy, gdy go o to poprosisz albo gdy mówisz o czymś na ekranie.",
+      "screenCall": "Pozwala asystentowi spojrzeć na ekran podczas rozmowy, gdy go o to poprosisz albo gdy mówisz o czymś na ekranie.",
       "captureTiming": "Zapisz ekran w chwili, gdy zaczynasz pytać, albo gdy wysyłasz pytanie.",
       "webSearch": "Szuka w internecie, gdy pytanie wymaga aktualnych faktów.",
       "depth": "Szybkie przy prostych faktach, dogłębne przy trudnych pytaniach.",
@@ -3064,7 +3089,7 @@
     "recoverError": "Nie udało się przywrócić tej transkrypcji. Spróbuj ponownie.",
     "more": "Więcej działań",
     "chat": {
-      "continueInCall": "Kontynuuj w rozmowie",
+      "continueInCall": "Kontynuuj w formie rozmowy",
       "assistantOff": "Włącz asystenta, aby kontynuować tę rozmowę."
     }
   },
