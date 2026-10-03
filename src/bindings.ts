@@ -4930,11 +4930,14 @@ export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm
  */
 export type OverlayLinger = 
 /**
- * Gone almost at once: a glance, then out of the way.
+ * Gone almost at once: a glance, then out of the way. The default: the
+ * text has already been pasted where the user is looking, so the card
+ * only needs to confirm it, and hovering holds it for anyone who wants to
+ * read or copy.
  */
 "quick" | 
 /**
- * The long-standing behaviour.
+ * The long-standing behaviour, and the default until 1 second replaced it.
  */
 "standard" | "long" | "extended"
 export type OverlayPosition = "none" | "top" | "bottom" | 
