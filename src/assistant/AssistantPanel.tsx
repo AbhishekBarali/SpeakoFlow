@@ -21,7 +21,12 @@ import {
   Loader2,
   TextSelect,
 } from "lucide-react";
-import { commands, type AppSettings, type MeetingAttachment } from "@/bindings";
+import {
+  commands,
+  type AppSettings,
+  type MeetingAttachment,
+  type Reminder,
+} from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
 import { FONT_SIZES, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
@@ -107,6 +112,26 @@ const EMPTY_ASK_DISMISS_MS = 350;
 
 /** How long a voice ask's error stays on screen when nobody is pointing at it. */
 const ERROR_DISMISS_MS = 9000;
+
+/** How long a quick ask that only set a reminder stays: long enough to read the
+ *  time and reach Undo, then it is out of the way like any confirmation. */
+const REMINDER_DISMISS_MS = 6000;
+
+/** Longer than this, the answer is more than a confirmation (an ask that set a
+ *  reminder *and* wrote something), so the card stays until it is closed. */
+const REMINDER_CONFIRMATION_MAX_CHARS = 280;
+
+/** A reminder's time as the card shows it: the time today, or with the day. */
+function reminderWhen(reminder: Reminder): string {
+  const due = new Date(reminder.due_at);
+  if (Number.isNaN(due.getTime())) return reminder.due_at;
+  const sameDay = due.toDateString() === new Date().toDateString();
+  return due.toLocaleString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    ...(sameDay ? {} : { weekday: "short", day: "numeric", month: "short" }),
+  });
+}
 
 function toDisplay(raw: {
   role: string;
@@ -408,6 +433,9 @@ const AssistantPanel: React.FC = () => {
   // Characters of selected text the current recording picked up, reported while
   // the user is still speaking. The message itself carries the count once sent.
   const [selectionCaptured, setSelectionCaptured] = useState(0);
+  // Reminders this quick ask set. The card says so (the time, and Undo) instead
+  // of offering to Insert "Done, I'll remind you at 2:30" into the user's app.
+  const [askReminders, setAskReminders] = useState<Reminder[]>([]);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
@@ -842,6 +870,7 @@ const AssistantPanel: React.FC = () => {
           setError(null);
           setNotice(null);
           setSelectionCaptured(0);
+          setAskReminders([]);
           setInput("");
           setHovered(false);
           // A voice ask, whatever opened the window before it (a call, the
@@ -856,6 +885,32 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen<number>("assistant-selection-captured", (e) => {
           setSelectionCaptured(typeof e.payload === "number" ? e.payload : 0);
+        }),
+      );
+
+      // The model set a reminder during this turn. A call speaks its own
+      // confirmation, so only the quick ask keeps it.
+      track(
+        await listen<Reminder>("assistant-reminder-set", (e) => {
+          if (voiceRef.current.open || !e.payload?.id) return;
+          const reminder = e.payload;
+          setAskReminders((current) =>
+            current.some((r) => r.id === reminder.id)
+              ? current
+              : [...current, reminder],
+          );
+        }),
+      );
+      // Cancelled in the same turn, from Settings, or from the popup: the card
+      // must not keep confirming something that no longer exists.
+      track(
+        await listen<Reminder[]>("reminders-changed", (e) => {
+          const live = new Set((e.payload ?? []).map((r) => r.id));
+          setAskReminders((current) =>
+            current.every((r) => live.has(r.id))
+              ? current
+              : current.filter((r) => live.has(r.id)),
+          );
         }),
       );
 
@@ -931,6 +986,7 @@ const AssistantPanel: React.FC = () => {
           setNotice(null);
           setInput("");
           setSelectionCaptured(0);
+          setAskReminders([]);
           setHovered(false);
           resetStream();
         }),
@@ -1216,6 +1272,31 @@ const AssistantPanel: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [phase, userOpened, hovered, voice.open]);
 
+  // A quick ask that only set a reminder is a confirmation, and goes away like
+  // one once it has been read, unless the pointer is on it (reaching for Undo).
+  // An answer with more in it than "it's set" stays until it is closed.
+  const answerText = stream || finishedAnswer;
+  const reminderOnly =
+    askReminders.length > 0 &&
+    answerText.trim().length <= REMINDER_CONFIRMATION_MAX_CHARS;
+  useEffect(() => {
+    if (phase !== "done" || !reminderOnly || hovered || voice.open) return;
+    const timer = window.setTimeout(
+      () => void commands.hideAssistantPanel(),
+      REMINDER_DISMISS_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [phase, reminderOnly, hovered, voice.open]);
+
+  const undoReminders = useCallback(async () => {
+    const ids = askReminders.map((reminder) => reminder.id);
+    setAskReminders([]);
+    for (const id of ids) {
+      await commands.completeReminder(id).catch(() => null);
+    }
+    await commands.hideAssistantPanel();
+  }, [askReminders]);
+
   // Escape puts the quick ask away — cancelling whatever is in flight first —
   // whenever the panel has the keyboard. The call owns Escape while it runs.
   useEffect(() => {
@@ -1433,9 +1514,15 @@ const AssistantPanel: React.FC = () => {
           status={status}
           levels={listening ? micLevels : undefined}
           question={question}
-          answer={stream || finishedAnswer}
+          answer={answerText}
           markdown={MD_COMPONENTS}
           selectionChars={selectionChars}
+          reminder={
+            askReminders.length > 0
+              ? { when: reminderWhen(askReminders[0]) }
+              : null
+          }
+          onUndoReminder={() => void undoReminders()}
           // The model looked, or is looking: the tool is running, or the
           // question already carries the screenshot marker it left behind.
           screen={

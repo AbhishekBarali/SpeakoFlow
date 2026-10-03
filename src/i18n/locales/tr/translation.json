@@ -885,7 +885,11 @@
         "options": {
           "none": "Yok",
           "bottom": "Alt",
-          "top": "Üst"
+          "top": "Üst",
+          "topleft": "Sol üst",
+          "topright": "Sağ üst",
+          "bottomleft": "Sol alt",
+          "bottomright": "Sağ alt"
         }
       },
       "pasteMethod": {

@@ -897,7 +897,11 @@
         "options": {
           "none": "Нет",
           "bottom": "Снизу",
-          "top": "Сверху"
+          "top": "Сверху",
+          "topleft": "Сверху слева",
+          "topright": "Сверху справа",
+          "bottomleft": "Снизу слева",
+          "bottomright": "Снизу справа"
         }
       },
       "pasteMethod": {

@@ -909,7 +909,11 @@
         "options": {
           "none": "بلا",
           "bottom": "أسفل",
-          "top": "أعلى"
+          "top": "أعلى",
+          "topleft": "أعلى اليسار",
+          "topright": "أعلى اليمين",
+          "bottomleft": "أسفل اليسار",
+          "bottomright": "أسفل اليمين"
         }
       },
       "pasteMethod": {

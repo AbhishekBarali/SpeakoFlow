@@ -16,6 +16,7 @@ import {
   baseLanguages,
   languageNames,
   recommend,
+  RECOMMENDED_SETUP_SPEECH,
   SETUP_MODELS,
   SETUP_SPEECH_OPTIONS,
 } from "./recommend";
@@ -223,7 +224,8 @@ export function SetupStep({
       option={option}
       selected={option.model.id === selectedId}
       recommended={
-        option.model.id === recommendedId && !option.model.is_downloaded
+        RECOMMENDED_SETUP_SPEECH.has(option.model.id) &&
+        !option.model.is_downloaded
       }
       onSelect={() => setSelectedId(option.model.id)}
     />

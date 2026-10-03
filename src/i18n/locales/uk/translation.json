@@ -897,7 +897,11 @@
         "options": {
           "none": "Немає",
           "bottom": "Внизу",
-          "top": "Вгорі"
+          "top": "Вгорі",
+          "topleft": "Вгорі ліворуч",
+          "topright": "Вгорі праворуч",
+          "bottomleft": "Внизу ліворуч",
+          "bottomright": "Внизу праворуч"
         }
       },
       "pasteMethod": {

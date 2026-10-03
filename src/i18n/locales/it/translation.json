@@ -891,7 +891,11 @@
         "options": {
           "none": "Nessuna",
           "bottom": "In basso",
-          "top": "In alto"
+          "top": "In alto",
+          "topleft": "In alto a sinistra",
+          "topright": "In alto a destra",
+          "bottomleft": "In basso a sinistra",
+          "bottomright": "In basso a destra"
         }
       },
       "pasteMethod": {

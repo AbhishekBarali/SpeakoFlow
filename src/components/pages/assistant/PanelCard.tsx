@@ -7,6 +7,7 @@ import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { Segmented } from "@/components/ui/Segmented";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { InfoTip } from "@/components/ui/InfoTip";
+import { ScreenPositionMap } from "@/components/ui/ScreenPositionMap";
 import { PanelPreview } from "@/components/settings/assistant/AssistantSettings";
 import {
   askDisplayOptions,
@@ -73,45 +74,17 @@ const PositionMap: React.FC<{
 }> = ({ value, onChange, className = "" }) => {
   const { t } = useTranslation();
   return (
-    <div
-      role="radiogroup"
-      aria-label={t("assistantPage.panel.where")}
-      className={`relative aspect-video overflow-hidden rounded-xl border border-hairline-strong bg-surface-muted ${className}`}
-    >
-      {/* The top edge of a window, so it reads as a screen, not a grid. */}
-      <span
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-[6%] bg-ink/[0.06]"
-      />
-      {ZONES.map((zone) => {
-        const active = zone.value === value;
-        const label = t(`settings.assistant.appearance.askAnchors.${zone.key}`);
-        return (
-          <button
-            key={zone.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={label}
-            title={label}
-            onClick={() => {
-              if (!active) onChange(zone.value);
-            }}
-            style={{
-              left: `${zone.box.left}%`,
-              top: `${zone.box.top}%`,
-              width: `${zone.box.width}%`,
-              height: `${zone.box.height}%`,
-            }}
-            className={`absolute cursor-pointer rounded-[5px] border transition-[background-color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-              active
-                ? "border-accent-fill bg-accent-fill shadow-[0_4px_12px_-4px_rgb(0_150_132/0.55)]"
-                : "border-dashed border-ink/20 bg-surface/50 hover:border-accent/60 hover:bg-accent/10"
-            }`}
-          />
-        );
-      })}
-    </div>
+    <ScreenPositionMap
+      spots={ZONES.map((zone) => ({
+        value: zone.value,
+        label: t(`settings.assistant.appearance.askAnchors.${zone.key}`),
+        box: zone.box,
+      }))}
+      value={value}
+      onChange={onChange}
+      label={t("assistantPage.panel.where")}
+      className={className}
+    />
   );
 };
 
@@ -156,11 +129,11 @@ export const PanelCard: React.FC = () => {
   const fontSize = settings?.assistant_font_size ?? "medium";
   const stored = settings?.assistant_panel_opacity ?? 1;
   const [opacity, setOpacity] = useState(stored);
-  const storedAnchor: AskAnchor = settings?.assistant_ask_anchor ?? "center";
-  // "Where I left it" is no longer offered; it reads as the middle, as the
-  // backend treats it.
+  const storedAnchor: AskAnchor = settings?.assistant_ask_anchor ?? "topcenter";
+  // "Where I left it" is no longer offered; it reads as the default (the top),
+  // as the backend treats it.
   const anchor: PanelAnchor =
-    storedAnchor === "custom" ? "center" : storedAnchor;
+    storedAnchor === "custom" ? "topcenter" : storedAnchor;
 
   useEffect(() => setOpacity(stored), [stored]);
 

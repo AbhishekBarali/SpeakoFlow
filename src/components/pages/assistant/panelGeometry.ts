@@ -146,14 +146,16 @@ export const anchorPosition = (
   const centreY = (displayHeight - height) / 2 - CENTRE_LIFT;
   const right = displayWidth - width - PANEL_MARGIN;
   const bottom = displayHeight - height - PANEL_MARGIN - TASKBAR_CLEARANCE;
+  // The legacy free position reads as the default, the top.
+  const zone = anchor === "custom" ? "topcenter" : anchor;
   const [x, y] =
-    anchor === "topcenter"
+    zone === "topcenter"
       ? [centreX, PANEL_MARGIN]
-      : anchor === "bottomcenter"
+      : zone === "bottomcenter"
         ? [centreX, bottom]
-        : anchor === "left"
+        : zone === "left"
           ? [PANEL_MARGIN, centreY]
-          : anchor === "right"
+          : zone === "right"
             ? [right, centreY]
             : [centreX, centreY];
   // Never let an anchor push the card off its own display.

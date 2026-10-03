@@ -617,6 +617,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     progress: kokoroProgress,
     error: kokoroError,
   } = kokoroTest;
+  // Kokoro is downloading (or loading) inside this page. Test voice waits for
+  // it: the row above already shows the progress, and a test pressed mid-way
+  // could only queue behind the same download.
+  const kokoroDownloading =
+    ttsEngine === "kokoro" && !kokoroOnProcessor && kokoroStatus === "loading";
   // "q8-cpu" is the q8 graph with WebGPU disabled, so it downloads and caches
   // exactly the same weights file. Strip the suffix before anything that keys
   // off the precision, or switching to it would re-prompt a download that has
@@ -1972,7 +1977,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     onClick={handleTestTts}
                     disabled={
                       !settings?.assistant_tts_enabled ||
-                      testState === "testing"
+                      testState === "testing" ||
+                      kokoroDownloading
                     }
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
                   >
@@ -2315,12 +2321,12 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                 },
                 // "Where I left it" is deliberately absent: the quick ask opens at
                 // its dock zone every time, and a stored `custom` from an older
-                // version reads as Centre.
+                // version reads as the default (the top).
               ]}
               selectedValue={
                 settings?.assistant_ask_anchor === "custom"
-                  ? "center"
-                  : (settings?.assistant_ask_anchor ?? "center")
+                  ? "topcenter"
+                  : (settings?.assistant_ask_anchor ?? "topcenter")
               }
               onSelect={(anchor) =>
                 setAndRefresh(

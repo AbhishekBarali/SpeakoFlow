@@ -736,6 +736,10 @@ pub fn change_overlay_position_setting(app: AppHandle, position: String) -> Resu
         "none" => OverlayPosition::None,
         "top" => OverlayPosition::Top,
         "bottom" => OverlayPosition::Bottom,
+        "topleft" => OverlayPosition::TopLeft,
+        "topright" => OverlayPosition::TopRight,
+        "bottomleft" => OverlayPosition::BottomLeft,
+        "bottomright" => OverlayPosition::BottomRight,
         other => {
             warn!("Invalid overlay position '{}', defaulting to bottom", other);
             OverlayPosition::Bottom

@@ -60,8 +60,8 @@ describe("anchorPosition", () => {
     });
   });
 
-  test("the old free position reads as the middle", () => {
-    expect(at("custom")).toEqual(at("center"));
+  test("the old free position reads as the default, the top", () => {
+    expect(at("custom")).toEqual(at("topcenter"));
   });
 
   test("a card wider than the screen still starts on it", () => {

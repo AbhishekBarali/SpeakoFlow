@@ -885,7 +885,11 @@
         "options": {
           "none": "Ingen",
           "bottom": "Nederst",
-          "top": "Överst"
+          "top": "Överst",
+          "topleft": "Uppe till vänster",
+          "topright": "Uppe till höger",
+          "bottomleft": "Nere till vänster",
+          "bottomright": "Nere till höger"
         }
       },
       "pasteMethod": {

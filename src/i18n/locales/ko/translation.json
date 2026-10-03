@@ -879,7 +879,11 @@
         "options": {
           "none": "없음",
           "bottom": "하단",
-          "top": "상단"
+          "top": "상단",
+          "topleft": "왼쪽 상단",
+          "topright": "오른쪽 상단",
+          "bottomleft": "왼쪽 하단",
+          "bottomright": "오른쪽 하단"
         }
       },
       "pasteMethod": {

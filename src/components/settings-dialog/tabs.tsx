@@ -237,9 +237,6 @@ export const ShortcutsTab: React.FC = () => {
 export const AudioTab: React.FC = () => {
   const { t } = useTranslation();
   const { audioFeedbackEnabled } = useSettings();
-  // Only the Live card lingers after a dictation, so its linger is only a
-  // choice while Live is the overlay in use.
-  const liveOverlay = useResolvedOverlayStyle() === "live";
   return (
     <>
       <SettingsGroup title={t("settingsDialog.audio.microphone")}>
@@ -265,7 +262,20 @@ export const AudioTab: React.FC = () => {
         />
         <VolumeSlider disabled={!audioFeedbackEnabled} />
       </SettingsGroup>
+    </>
+  );
+};
 
+export const DictationTab: React.FC = () => {
+  const { t } = useTranslation();
+  // Only the Live card lingers after a dictation, so its linger is only a
+  // choice while Live is the overlay in use.
+  const liveOverlay = useResolvedOverlayStyle() === "live";
+  return (
+    <>
+      {/* The dictation window: how it looks and where it sits. It lived under
+          Audio, where nobody looking for "move the dictation pill to the top"
+          thought to look. */}
       <SettingsGroup
         title={t("settings.general.groups.overlay")}
         description={t("settingsDialog.audio.overlayHint")}
@@ -276,14 +286,7 @@ export const AudioTab: React.FC = () => {
         )}
         <ShowOverlay descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
-    </>
-  );
-};
 
-export const DictationTab: React.FC = () => {
-  const { t } = useTranslation();
-  return (
-    <>
       <SettingsGroup title={t("settingsDialog.dictation.output")}>
         <PasteMethodSetting grouped={true} />
         <TypingToolSetting grouped={true} />

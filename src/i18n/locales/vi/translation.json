@@ -879,7 +879,11 @@
         "options": {
           "none": "Không có",
           "bottom": "Dưới",
-          "top": "Trên"
+          "top": "Trên",
+          "topleft": "Trên bên trái",
+          "topright": "Trên bên phải",
+          "bottomleft": "Dưới bên trái",
+          "bottomright": "Dưới bên phải"
         }
       },
       "pasteMethod": {

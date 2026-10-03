@@ -891,7 +891,11 @@
         "options": {
           "none": "ללא",
           "bottom": "למטה",
-          "top": "למעלה"
+          "top": "למעלה",
+          "topleft": "למעלה משמאל",
+          "topright": "למעלה מימין",
+          "bottomleft": "למטה משמאל",
+          "bottomright": "למטה מימין"
         }
       },
       "pasteMethod": {

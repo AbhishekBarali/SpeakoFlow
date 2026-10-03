@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ArrowUp,
+  BellRing,
   Check,
   Copy,
   CornerDownLeft,
@@ -9,6 +10,7 @@ import {
   RotateCcw,
   Square,
   TextSelect,
+  Undo2,
   X,
 } from "lucide-react";
 import { type Components } from "react-markdown";
@@ -59,6 +61,14 @@ export interface QuickAskProps {
   selectionChars: number;
   /** The screen was looked at for this ask. */
   screen: boolean;
+  /**
+   * The reminder this ask set, by its time (the first, if it set several). The
+   * card then confirms it, offers Undo in place of Insert, and drops Retry,
+   * which would set the same reminder a second time.
+   */
+  reminder?: { when: string } | null;
+  /** Cancel the reminders this ask set. */
+  onUndoReminder?: () => void;
   /** A failure to show in place of the answer. */
   error: string | null;
   /** A quiet heads-up about the answer, e.g. web search found nothing. */
@@ -145,6 +155,8 @@ const QuickAsk: React.FC<QuickAskProps> = ({
   markdown,
   selectionChars,
   screen,
+  reminder = null,
+  onUndoReminder,
   error,
   notice,
   canRetry,
@@ -196,6 +208,12 @@ const QuickAsk: React.FC<QuickAskProps> = ({
         <span className="qa-chip">
           <Eye size={11} strokeWidth={2} aria-hidden="true" />
           <span>{t("assistant.screenAttached")}</span>
+        </span>
+      )}
+      {reminder && (
+        <span className="qa-chip">
+          <BellRing size={11} strokeWidth={2} aria-hidden="true" />
+          <span>{t("reminders.settings.dueAt", { when: reminder.when })}</span>
         </span>
       )}
     </>
@@ -332,7 +350,7 @@ const QuickAsk: React.FC<QuickAskProps> = ({
               )
             ) : (
               <>
-                {canRetry && (
+                {canRetry && !reminder && (
                   <button
                     type="button"
                     className="qa-icon-btn"
@@ -361,32 +379,45 @@ const QuickAsk: React.FC<QuickAskProps> = ({
                     {copied ? t("assistant.quick.copied") : t("assistant.copy")}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className="qa-btn primary"
-                  onClick={insert}
-                  onMouseDown={stopDrag}
-                  title={
-                    replace
-                      ? t("assistant.insertReplace")
-                      : t("assistant.insert")
-                  }
-                >
-                  {inserted ? (
-                    <Check size={13} strokeWidth={2.4} aria-hidden="true" />
-                  ) : (
-                    <CornerDownLeft
-                      size={13}
-                      strokeWidth={2.2}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span>
-                    {replace
-                      ? t("assistant.insertReplaceShort")
-                      : t("assistant.insertShort")}
-                  </span>
-                </button>
+                {reminder ? (
+                  <button
+                    type="button"
+                    className="qa-btn primary"
+                    onClick={onUndoReminder}
+                    onMouseDown={stopDrag}
+                    title={t("reminders.settings.cancel")}
+                  >
+                    <Undo2 size={13} strokeWidth={2.2} aria-hidden="true" />
+                    <span>{t("shortcutEditor.undo")}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="qa-btn primary"
+                    onClick={insert}
+                    onMouseDown={stopDrag}
+                    title={
+                      replace
+                        ? t("assistant.insertReplace")
+                        : t("assistant.insert")
+                    }
+                  >
+                    {inserted ? (
+                      <Check size={13} strokeWidth={2.4} aria-hidden="true" />
+                    ) : (
+                      <CornerDownLeft
+                        size={13}
+                        strokeWidth={2.2}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>
+                      {replace
+                        ? t("assistant.insertReplaceShort")
+                        : t("assistant.insertShort")}
+                    </span>
+                  </button>
+                )}
               </>
             )}
           </div>

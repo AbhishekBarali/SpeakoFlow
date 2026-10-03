@@ -879,7 +879,11 @@
         "options": {
           "none": "無",
           "bottom": "底部",
-          "top": "頂部"
+          "top": "頂部",
+          "topleft": "左上角",
+          "topright": "右上角",
+          "bottomleft": "左下角",
+          "bottomright": "右下角"
         }
       },
       "pasteMethod": {

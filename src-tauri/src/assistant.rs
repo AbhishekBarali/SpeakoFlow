@@ -291,9 +291,9 @@ struct AskPlacement {
 fn ask_placement_on(display: DisplayBounds, anchor: crate::settings::AskAnchor) -> AskPlacement {
     use crate::settings::AskAnchor;
     // `Custom` is the legacy value written by an old drag handler; there is no
-    // remembered position any more, so it reads as the default.
+    // remembered position any more, so it reads as the default (the top).
     let anchor = match anchor {
-        AskAnchor::Custom => AskAnchor::Center,
+        AskAnchor::Custom => AskAnchor::TopCenter,
         anchor => anchor,
     };
     let (width, height) = ask_size_for_display(display.width, display.height, anchor);
@@ -3648,6 +3648,9 @@ async fn run_text_tool(
                 args.note,
             ) {
                 Ok(reminder) => {
+                    // The quick ask shows this as a confirmation (the time, and
+                    // Undo) rather than as an ordinary answer with Insert under it.
+                    let _ = app.emit_to(PANEL_LABEL, "assistant-reminder-set", &reminder);
                     let when = reminder
                         .due_at
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -6226,7 +6229,7 @@ mod tests {
     /// Where the quick ask opens depends on the dock zone and the display, and
     /// nothing else — no stored coordinate, no previous drag. This is
     /// the fix for "it opens in a random place". `Custom`, the legacy value an old
-    /// drag handler wrote, opens exactly where Centre does.
+    /// drag handler wrote, opens exactly where the default (the top) does.
     #[test]
     fn the_quick_ask_frame_depends_only_on_its_settings_and_display() {
         use crate::settings::AskAnchor;
@@ -6245,9 +6248,20 @@ mod tests {
             }
             assert_eq!(
                 ask_placement_on(display, AskAnchor::Custom),
-                ask_placement_on(display, AskAnchor::Center)
+                ask_placement_on(display, AskAnchor::TopCenter)
             );
         }
+    }
+
+    /// A first run opens the quick ask along the top of the screen. In the
+    /// middle, someone who had never seen it took it for something that had
+    /// popped up over their work.
+    #[test]
+    fn the_quick_ask_opens_at_the_top_by_default() {
+        assert_eq!(
+            crate::settings::get_default_settings().assistant_ask_anchor,
+            crate::settings::AskAnchor::TopCenter
+        );
     }
 
     /// The frame is flush with the edge it is docked to, so the pill — pinned to

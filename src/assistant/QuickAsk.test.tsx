@@ -192,6 +192,35 @@ test("a finished answer offers Copy and Insert, and the way out is Close", () =>
   ]);
 });
 
+// "Remind me in a minute" used to end on an ordinary answer card whose primary
+// action was to Insert "Done, I'll remind you" into the user's app.
+test("an ask that set a reminder confirms it and offers Undo, not Insert", () => {
+  let undone = 0;
+  render(
+    <QuickAsk
+      {...base}
+      phase="done"
+      question="Remind me to stretch in a minute"
+      answer="Done, I'll remind you at 2:31 PM."
+      canRetry
+      reminder={{ when: "2:31 PM" }}
+      onUndoReminder={() => (undone += 1)}
+    />,
+  );
+  // No Retry: it would set the same reminder twice.
+  expect(labels()).toEqual([
+    "common.close",
+    "assistant.copy",
+    "reminders.settings.cancel",
+  ]);
+  expect(classNames().filter((c) => c === "qa-chip")).toHaveLength(1);
+  const undo = renderer!.root
+    .findAllByType("button")
+    .find((button) => button.props.title === "reminders.settings.cancel")!;
+  act(() => undo.props.onClick());
+  expect(undone).toBe(1);
+});
+
 test("an answer about a selection offers to replace it", () => {
   render(
     <QuickAsk

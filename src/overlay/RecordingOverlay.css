@@ -85,6 +85,20 @@
   pointer-events: none;
 }
 
+/* In a corner the window sits against that side of the screen, so the pill
+ * hugs the same side of the window instead of floating in its middle. Auto
+ * margins rather than flex-start/end, which follow the UI language's `dir`:
+ * the window is on the left of the screen in Arabic too. The scale-in grows
+ * out of that side for the same reason. */
+.overlay-root[data-justify="left"] > * {
+  margin-right: auto;
+  transform-origin: left center;
+}
+.overlay-root[data-justify="right"] > * {
+  margin-left: auto;
+  transform-origin: right center;
+}
+
 /* ── Compact pill (default) ─────────────────────────────────────────────────
  * Hugs its content and sits centered in the transparent frame, so the recording
  * → transcribing → cleanup sequence never changes size: only what moves inside

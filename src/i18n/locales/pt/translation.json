@@ -891,7 +891,11 @@
         "options": {
           "none": "Nenhum",
           "bottom": "Inferior",
-          "top": "Superior"
+          "top": "Superior",
+          "topleft": "Superior esquerdo",
+          "topright": "Superior direito",
+          "bottomleft": "Inferior esquerdo",
+          "bottomright": "Inferior direito"
         }
       },
       "pasteMethod": {

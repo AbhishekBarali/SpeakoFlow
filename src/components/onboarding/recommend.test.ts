@@ -5,6 +5,7 @@ import {
   pickGpu,
   prefersEnglish,
   recommend,
+  RECOMMENDED_SETUP_SPEECH,
   SETUP_MODELS,
   SETUP_SPEECH_OPTIONS,
   voiceEngineFor,
@@ -25,6 +26,14 @@ describe("setup's speech list", () => {
     const ids = SETUP_SPEECH_OPTIONS.map((option) => option.id);
     expect(ids).toContain(SETUP_MODELS.speech.english);
     expect(ids).toContain(SETUP_MODELS.speech.multilingual);
+  });
+
+  // Whichever is preselected, both carry the badge: badging only Parakeet made
+  // Nemotron read as the lesser choice on every English system.
+  test("badges Parakeet and Nemotron, and only those", () => {
+    expect([...RECOMMENDED_SETUP_SPEECH].sort()).toEqual(
+      [SETUP_MODELS.speech.english, SETUP_MODELS.speech.multilingual].sort(),
+    );
   });
 });
 

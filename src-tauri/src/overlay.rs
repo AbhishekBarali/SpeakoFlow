@@ -1,7 +1,7 @@
 use crate::input;
 use crate::overlay_follow::{
-    display_under, hop_destination, placement_on, rect_contains, DisplayFollower, Edge,
-    MonitorBounds, Point, FOLLOW_POLL, HOP_FADE_OUT,
+    display_under, hop_destination, placement_at, rect_contains, DisplayFollower, Edge,
+    MonitorBounds, Point, Side, FOLLOW_POLL, HOP_FADE_OUT,
 };
 use crate::overlay_lifecycle::OverlayLifecycle;
 use crate::settings;
@@ -286,6 +286,9 @@ struct ShowOverlayPayload {
     /// text selection when it does, so it never shows a control that a
     /// click-through window would pass straight to the app underneath.
     interactive: bool,
+    /// Which side of the window the pill hugs (`overlay_justify`): the start or
+    /// end in a corner, the middle otherwise.
+    justify: OverlayJustify,
     #[serde(skip_serializing_if = "Option::is_none")]
     notice: Option<String>,
     /// For the `downloading` state: the catalog id of the speech model on its
@@ -357,17 +360,22 @@ fn update_gtk_layer_shell_anchors(overlay_window: &tauri::webview::WebviewWindow
     let _ = overlay_window.run_on_main_thread(move || {
         // Try to get the GTK window from the Tauri webview
         if let Ok(gtk_window) = window_clone.gtk_window() {
-            let settings = settings::get_settings(window_clone.app_handle());
-            match settings.overlay_position {
-                OverlayPosition::Top => {
-                    gtk_window.set_anchor(LayerEdge::Top, true);
-                    gtk_window.set_anchor(LayerEdge::Bottom, false);
-                }
-                OverlayPosition::Bottom | OverlayPosition::None => {
-                    gtk_window.set_anchor(LayerEdge::Bottom, true);
-                    gtk_window.set_anchor(LayerEdge::Top, false);
-                }
-            }
+            let position = settings::get_settings(window_clone.app_handle()).overlay_position;
+            let top = position.is_top();
+            gtk_window.set_anchor(LayerEdge::Top, top);
+            gtk_window.set_anchor(LayerEdge::Bottom, !top);
+            // Anchored to neither side, the compositor centres the surface
+            // along its edge; anchored to one, it sits in that corner.
+            let side = overlay_side(position);
+            let (left, right) = (
+                matches!(side, Side::Left(_)),
+                matches!(side, Side::Right(_)),
+            );
+            gtk_window.set_anchor(LayerEdge::Left, left);
+            gtk_window.set_anchor(LayerEdge::Right, right);
+            let margin = OVERLAY_SIDE_MARGIN as i32;
+            gtk_window.set_layer_shell_margin(LayerEdge::Left, if left { margin } else { 0 });
+            gtk_window.set_layer_shell_margin(LayerEdge::Right, if right { margin } else { 0 });
         }
     });
 }
@@ -674,13 +682,52 @@ fn monitor_bounds(monitor: &tauri::Monitor) -> MonitorBounds {
 /// A call docks its bar at the bottom centre too. Dictation used to hang the
 /// call up, so the two never met; now that dictation runs beside a call, a
 /// bottom overlay rises above the call's bar and bubble instead of covering
-/// them (`call_on_screen`).
+/// them (`call_on_screen`). The corners rise as well: the call's bubble can be
+/// dragged anywhere, and a pill that never covers it is worth a few points of
+/// height for the length of a call.
 fn overlay_edge(position: OverlayPosition, call_on_screen: bool) -> Edge {
+    if position.is_top() {
+        Edge::Top(OVERLAY_TOP_OFFSET)
+    } else {
+        Edge::Bottom(bottom_overlay_offset(call_on_screen))
+    }
+}
+
+/// How far in from the side of the display a corner overlay sits, in logical
+/// px. Closer than the bottom offset, which also has to clear a taskbar.
+const OVERLAY_SIDE_MARGIN: f64 = 16.0;
+
+/// Where along its edge the overlay sits for a position.
+fn overlay_side(position: OverlayPosition) -> Side {
     match position {
-        OverlayPosition::Top => Edge::Top(OVERLAY_TOP_OFFSET),
-        OverlayPosition::Bottom | OverlayPosition::None => {
-            Edge::Bottom(bottom_overlay_offset(call_on_screen))
+        OverlayPosition::TopLeft | OverlayPosition::BottomLeft => Side::Left(OVERLAY_SIDE_MARGIN),
+        OverlayPosition::TopRight | OverlayPosition::BottomRight => {
+            Side::Right(OVERLAY_SIDE_MARGIN)
         }
+        OverlayPosition::Top | OverlayPosition::Bottom | OverlayPosition::None => Side::Center,
+    }
+}
+
+/// Which side of its window the pill hugs, sent with every show. The window is
+/// larger than the pill in most states, and a pill centred inside a frame that
+/// sits in a corner would float the frame's slack away from that corner — a
+/// short label in the 300-wide labelled frame would land 100 points in.
+///
+/// Physical sides, not start/end: the overlay's root carries the UI language's
+/// `dir`, and the window is on the left of the screen whatever the language.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+enum OverlayJustify {
+    Left,
+    Center,
+    Right,
+}
+
+fn overlay_justify(position: OverlayPosition) -> OverlayJustify {
+    match overlay_side(position) {
+        Side::Left(_) => OverlayJustify::Left,
+        Side::Right(_) => OverlayJustify::Right,
+        Side::Center => OverlayJustify::Center,
     }
 }
 
@@ -702,10 +749,11 @@ fn placement_for(
     position: OverlayPosition,
     call_on_screen: bool,
 ) -> Point {
-    placement_on(
+    placement_at(
         monitor_bounds(monitor),
         (width, height),
         overlay_edge(position, call_on_screen),
+        overlay_side(position),
         PLACE_IN_PHYSICAL,
     )
 }
@@ -766,10 +814,9 @@ fn start_overlay_follow(
     let Some(placed_on) = placed_on else {
         return;
     };
-    let edge = overlay_edge(
-        settings::get_settings(app_handle).overlay_position,
-        crate::voice_conversation::is_active(app_handle),
-    );
+    let position = settings::get_settings(app_handle).overlay_position;
+    let edge = overlay_edge(position, crate::voice_conversation::is_active(app_handle));
+    let side = overlay_side(position);
     let app = app_handle.clone();
     std::thread::spawn(move || {
         let alive = || OVERLAY_FOLLOW.load(Ordering::SeqCst) == generation;
@@ -800,7 +847,7 @@ fn start_overlay_follow(
             // indefinitely.
             if OVERLAY_LIFECYCLE.is_hovered() {
                 if CURSOR_SHARES_PLACEMENT_SPACE {
-                    let origin = placement_on(current, size, edge, PLACE_IN_PHYSICAL);
+                    let origin = placement_at(current, size, edge, side, PLACE_IN_PHYSICAL);
                     let extent = if PLACE_IN_PHYSICAL {
                         (size.0 * current.scale, size.1 * current.scale)
                     } else {
@@ -841,7 +888,7 @@ fn start_overlay_follow(
                 if let Some(destination) = hop_destination(current, target, now_under) {
                     set_overlay_placement(
                         &window,
-                        placement_on(destination, size, edge, PLACE_IN_PHYSICAL),
+                        placement_at(destination, size, edge, side, PLACE_IN_PHYSICAL),
                     );
                     current = destination;
                 }
@@ -1165,6 +1212,7 @@ fn show_overlay(
                 state: state.to_string(),
                 streaming_window,
                 interactive,
+                justify: overlay_justify(settings.overlay_position),
                 notice,
                 download,
                 cleanup_next,
@@ -1515,6 +1563,73 @@ pub fn emit_levels(app_handle: &AppHandle, levels: &Vec<f32>) {
     // in windows without one. This replaces the old pair of `.emit()` calls that
     // delivered the event to the overlay twice per frame.
     let _ = app_handle.emit("mic-level", levels);
+}
+
+#[cfg(test)]
+mod position_tests {
+    use super::{overlay_edge, overlay_justify, overlay_side, OverlayJustify, Side};
+    use crate::overlay_follow::Edge;
+    use crate::settings::OverlayPosition;
+
+    const ALL: [OverlayPosition; 6] = [
+        OverlayPosition::Top,
+        OverlayPosition::TopLeft,
+        OverlayPosition::TopRight,
+        OverlayPosition::Bottom,
+        OverlayPosition::BottomLeft,
+        OverlayPosition::BottomRight,
+    ];
+
+    #[test]
+    fn every_position_sits_on_the_edge_its_name_says() {
+        for position in ALL {
+            let top = matches!(overlay_edge(position, false), Edge::Top(_));
+            assert_eq!(top, position.is_top(), "{position:?}");
+        }
+    }
+
+    // The pill hugs the side of its window that faces the corner, or the gap
+    // the window leaves around it would float it away from that corner.
+    #[test]
+    fn a_corner_pill_hugs_the_side_of_its_window_facing_that_corner() {
+        for position in ALL {
+            let expected = match overlay_side(position) {
+                Side::Left(_) => OverlayJustify::Left,
+                Side::Right(_) => OverlayJustify::Right,
+                Side::Center => OverlayJustify::Center,
+            };
+            assert_eq!(overlay_justify(position), expected, "{position:?}");
+        }
+        assert_eq!(
+            overlay_justify(OverlayPosition::BottomLeft),
+            OverlayJustify::Left
+        );
+        assert_eq!(
+            overlay_justify(OverlayPosition::TopRight),
+            OverlayJustify::Right
+        );
+        assert_eq!(
+            overlay_justify(OverlayPosition::Bottom),
+            OverlayJustify::Center
+        );
+    }
+
+    // The webview matches on these, and the settings store them.
+    #[test]
+    fn positions_use_the_names_the_frontend_sends() {
+        for (position, name) in [
+            (OverlayPosition::TopLeft, "topleft"),
+            (OverlayPosition::TopRight, "topright"),
+            (OverlayPosition::BottomLeft, "bottomleft"),
+            (OverlayPosition::BottomRight, "bottomright"),
+        ] {
+            assert_eq!(serde_json::to_value(position).unwrap(), name);
+        }
+        assert_eq!(
+            serde_json::to_value(overlay_justify(OverlayPosition::TopLeft)).unwrap(),
+            "left"
+        );
+    }
 }
 
 #[cfg(test)]

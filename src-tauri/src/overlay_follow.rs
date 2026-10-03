@@ -104,6 +104,14 @@ pub(crate) enum Edge {
     Bottom(f64),
 }
 
+/// Where along that edge: centred, or in a corner with a margin in logical px.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Side {
+    Center,
+    Left(f64),
+    Right(f64),
+}
+
 /// Top-left of an overlay of logical `size`, centred on `bounds` against `edge`.
 ///
 /// `physical` picks the coordinate space of the answer, and it has to match the
@@ -113,10 +121,24 @@ pub(crate) enum Edge {
 /// about to move to a monitor with a different scale — the old code computed a
 /// point in the target's logical space and had it rescaled by the source's.
 /// On macOS the native space is points, so logical is exact there.
+#[cfg(test)]
 pub(crate) fn placement_on(
     bounds: MonitorBounds,
     size: (f64, f64),
     edge: Edge,
+    physical: bool,
+) -> Point {
+    placement_at(bounds, size, edge, Side::Center, physical)
+}
+
+/// [`placement_on`], with the overlay in a corner of that edge when `side`
+/// asks for one. The margin scales with the display exactly as the edge offset
+/// does, so a corner overlay keeps the same distance from both edges.
+pub(crate) fn placement_at(
+    bounds: MonitorBounds,
+    size: (f64, f64),
+    edge: Edge,
+    side: Side,
     physical: bool,
 ) -> Point {
     // Everything is converted into one space before any arithmetic: the
@@ -129,7 +151,11 @@ pub(crate) fn placement_on(
     let (mx, my) = (bounds.x * from_physical, bounds.y * from_physical);
     let (mw, mh) = (bounds.width * from_physical, bounds.height * from_physical);
     let (w, h) = (size.0 * to_space, size.1 * to_space);
-    let x = mx + (mw - w) / 2.0;
+    let x = match side {
+        Side::Center => mx + (mw - w) / 2.0,
+        Side::Left(margin) => mx + margin * to_space,
+        Side::Right(margin) => mx + mw - w - margin * to_space,
+    };
     let y = match edge {
         Edge::Top(offset) => my + offset * to_space,
         Edge::Bottom(offset) => my + mh - h - offset * to_space,
@@ -290,6 +316,41 @@ mod tests {
             placement_on(LEFT, size, Edge::Bottom(40.0), true),
             placement_on(LEFT, size, Edge::Bottom(40.0), false)
         );
+    }
+
+    #[test]
+    fn a_corner_keeps_its_margin_from_the_side_edge() {
+        // 1920x1080 at 150%: 1280x720 logical, starting at 1920 physical.
+        let bounds = MonitorBounds {
+            x: 1920.0,
+            y: 0.0,
+            width: 1920.0,
+            height: 1080.0,
+            scale: 1.5,
+        };
+        let size = (96.0, 44.0);
+        let (left, top) = placement_at(bounds, size, Edge::Top(4.0), Side::Left(16.0), false);
+        assert_eq!((left, top), (1280.0 + 16.0, 4.0));
+        let (right, bottom) =
+            placement_at(bounds, size, Edge::Bottom(40.0), Side::Right(16.0), false);
+        assert_eq!(right, 1280.0 + 1280.0 - 96.0 - 16.0);
+        assert_eq!(bottom, 720.0 - 44.0 - 40.0);
+        // In physical pixels the margin scales with the display, like the offset.
+        let (left, _) = placement_at(bounds, size, Edge::Top(4.0), Side::Left(16.0), true);
+        assert_eq!(left, 1920.0 + 24.0);
+        let (right, _) = placement_at(bounds, size, Edge::Top(4.0), Side::Right(16.0), true);
+        assert_eq!(right, 1920.0 + 1920.0 - 144.0 - 24.0);
+    }
+
+    #[test]
+    fn centred_is_what_it_always_was() {
+        let size = (400.0, 120.0);
+        for physical in [true, false] {
+            assert_eq!(
+                placement_at(RIGHT, size, Edge::Bottom(40.0), Side::Center, physical),
+                placement_on(RIGHT, size, Edge::Bottom(40.0), physical)
+            );
+        }
     }
 
     #[test]

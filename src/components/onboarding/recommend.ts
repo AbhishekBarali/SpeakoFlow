@@ -98,6 +98,18 @@ export const SETUP_SPEECH_OPTIONS: ReadonlyArray<{
   { id: "whisper-medium-gguf", name: "Whisper Medium", about: "widest" },
 ];
 
+/**
+ * The setup cards that carry a "Recommended" badge: Parakeet for English and
+ * Nemotron for everything else. Both, whichever is preselected, because they
+ * are the two equally good starting points and the language beside each name
+ * says which one is for whom. Badging only the preselected one made Nemotron
+ * look like a lesser choice to everyone on an English system.
+ */
+export const RECOMMENDED_SETUP_SPEECH: ReadonlySet<string> = new Set([
+  SETUP_MODELS.speech.english,
+  SETUP_MODELS.speech.multilingual,
+]);
+
 /** Distinct languages in a model's list: `en-US` and `en-GB` are one. */
 export function baseLanguages(codes: ReadonlyArray<string>): string[] {
   return [

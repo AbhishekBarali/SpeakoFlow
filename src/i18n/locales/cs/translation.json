@@ -897,7 +897,11 @@
         "options": {
           "none": "Žádné",
           "bottom": "Dole",
-          "top": "Nahoře"
+          "top": "Nahoře",
+          "topleft": "Vlevo nahoře",
+          "topright": "Vpravo nahoře",
+          "bottomleft": "Vlevo dole",
+          "bottomright": "Vpravo dole"
         }
       },
       "pasteMethod": {

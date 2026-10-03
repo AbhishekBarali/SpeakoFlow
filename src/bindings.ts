@@ -3948,10 +3948,13 @@ main_window_width?: number | null; main_window_height?: number | null }
  */
 export type AskAnchor = 
 /**
- * Middle of the display the cursor is on. The default: easiest to read, and
- * impossible to lose.
+ * Middle of the display the cursor is on.
  */
-"center" | "topcenter" | "bottomcenter" | "left" | "right" | 
+"center" | 
+/**
+ * Along the top edge, centred. The default (`default_ask_anchor`).
+ */
+"topcenter" | "bottomcenter" | "left" | "right" | 
 /**
  * Wherever the user last dragged it.
  */
@@ -4934,7 +4937,13 @@ export type OverlayLinger =
  * The long-standing behaviour.
  */
 "standard" | "long" | "extended"
-export type OverlayPosition = "none" | "top" | "bottom"
+export type OverlayPosition = "none" | "top" | "bottom" | 
+/**
+ * The corners. Centred along an edge is the default and suits most people;
+ * a corner is for someone whose work sits under the middle of that edge
+ * (a chat box at the bottom, a tab bar at the top).
+ */
+"topleft" | "topright" | "bottomleft" | "bottomright"
 /**
  * How the recording / assistant overlay presents itself while active.
  * `Auto` follows the model: Live when the selected model supports live

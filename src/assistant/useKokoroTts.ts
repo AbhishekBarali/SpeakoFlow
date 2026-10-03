@@ -216,6 +216,13 @@ export function useKokoroTts(
    *  guard meant the timer rescheduled itself forever and the weights were
    *  never released. */
   const loadInFlightRef = useRef(false);
+  /** Bumped by every `from_pretrained` attempt, including the processor
+   *  fallback inside one load. Only the newest attempt may move the progress
+   *  bar: a dropped download is not aborted (transformers.js fetches without a
+   *  signal) and keeps reporting until its file is in, so with an ungated
+   *  callback two downloads wrote the same state in turn and the bar swung
+   *  between their percentages on every chunk. */
+  const attemptRef = useRef(0);
   const cancelIdleUnload = useCallback(() => {
     if (idleTimerRef.current !== null) {
       clearTimeout(idleTimerRef.current);
@@ -321,15 +328,31 @@ export function useKokoroTts(
           !useGpu && (baseDtype === "fp32" || baseDtype === "fp16")
             ? "q8"
             : baseDtype;
-        // Track download progress of the (largest) onnx weights file.
-        const progress_callback = (event: ProgressEvent) => {
-          if (
-            event.status === "progress" &&
-            event.file?.endsWith(".onnx") &&
-            typeof event.progress === "number"
-          ) {
-            setProgress(Math.round(event.progress));
-          }
+        // Track download progress of the (largest) onnx weights file. Each
+        // attempt gets its own callback, ignored once a newer attempt or a drop
+        // has superseded it, and it only moves forward.
+        const makeProgressCallback = () => {
+          const attempt = ++attemptRef.current;
+          let shown = 0;
+          return (event: ProgressEvent) => {
+            if (
+              attempt !== attemptRef.current ||
+              loadEpoch !== loadEpochRef.current
+            ) {
+              return;
+            }
+            if (
+              event.status === "progress" &&
+              event.file?.endsWith(".onnx") &&
+              typeof event.progress === "number"
+            ) {
+              const next = Math.min(100, Math.round(event.progress));
+              if (next > shown) {
+                shown = next;
+                setProgress(next);
+              }
+            }
+          };
         };
         type LoadOptions = Parameters<typeof KokoroTTS.from_pretrained>[1];
         let model: unknown;
@@ -338,7 +361,7 @@ export function useKokoroTts(
           model = await KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
             dtype: chosenDtype,
             device: useGpu ? "webgpu" : "wasm",
-            progress_callback,
+            progress_callback: makeProgressCallback(),
           } as unknown as LoadOptions);
           console.info(
             `[Kokoro TTS] loaded on ${useGpu ? "webgpu" : "wasm/CPU"} (${chosenDtype})`,
@@ -363,10 +386,13 @@ export function useKokoroTts(
             if (deviceRef.current === "auto") markGpuBroken();
             reportWebGpu(false);
           }
+          // The fallback is a different file, so the bar starts over once,
+          // deliberately; the abandoned attempt can no longer move it.
+          if (loadEpoch === loadEpochRef.current) setProgress(0);
           model = await KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
             dtype: fallbackDtype,
             device: "wasm",
-            progress_callback,
+            progress_callback: makeProgressCallback(),
           } as unknown as LoadOptions);
           console.info(
             `[Kokoro TTS] loaded on wasm/CPU (${fallbackDtype}) fallback`,
@@ -415,7 +441,13 @@ export function useKokoroTts(
       ensureLoaded().catch(() => {});
     } else if (!enabled) {
       setError(null);
-      setStatus((s) => (s === "speaking" || s === "ready" ? "off" : s));
+      // "loading" too: the load is dropped below, and a status left on
+      // "loading" kept the progress bar up for a download nothing would finish,
+      // so the next Test or Download started a second one beside it.
+      setStatus((s) =>
+        s === "speaking" || s === "ready" || s === "loading" ? "off" : s,
+      );
+      setProgress(0);
       // Turned off: free the model so its ONNX/WebGPU memory isn't pinned for
       // the WebView's lifetime. It reloads on demand if re-enabled.
       cancelIdleUnload();

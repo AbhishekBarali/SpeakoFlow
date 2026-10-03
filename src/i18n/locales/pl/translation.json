@@ -897,7 +897,11 @@
         "options": {
           "none": "Brak",
           "bottom": "Dół",
-          "top": "Góra"
+          "top": "Góra",
+          "topleft": "Lewy górny róg",
+          "topright": "Prawy górny róg",
+          "bottomleft": "Lewy dolny róg",
+          "bottomright": "Prawy dolny róg"
         }
       },
       "pasteMethod": {

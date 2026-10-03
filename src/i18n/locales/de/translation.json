@@ -885,7 +885,11 @@
         "options": {
           "none": "Keine",
           "bottom": "Unten",
-          "top": "Oben"
+          "top": "Oben",
+          "topleft": "Oben links",
+          "topright": "Oben rechts",
+          "bottomleft": "Unten links",
+          "bottomright": "Unten rechts"
         }
       },
       "pasteMethod": {

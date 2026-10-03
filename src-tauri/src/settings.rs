@@ -646,6 +646,20 @@ pub enum OverlayPosition {
     None,
     Top,
     Bottom,
+    /// The corners. Centred along an edge is the default and suits most people;
+    /// a corner is for someone whose work sits under the middle of that edge
+    /// (a chat box at the bottom, a tab bar at the top).
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl OverlayPosition {
+    /// Against the top edge of the display rather than the bottom.
+    pub fn is_top(self) -> bool {
+        matches!(self, Self::Top | Self::TopLeft | Self::TopRight)
+    }
 }
 
 /// Where the assistant's Ask card opens on screen.
@@ -662,9 +676,9 @@ pub enum OverlayPosition {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "lowercase")]
 pub enum AskAnchor {
-    /// Middle of the display the cursor is on. The default: easiest to read, and
-    /// impossible to lose.
+    /// Middle of the display the cursor is on.
     Center,
+    /// Along the top edge, centred. The default (`default_ask_anchor`).
     TopCenter,
     BottomCenter,
     Left,
@@ -1793,10 +1807,13 @@ fn default_overlay_position() -> OverlayPosition {
     return OverlayPosition::Bottom;
 }
 
-/// The Ask card opens centred. Deliberately not a corner: a corner is where the
-/// old panel got lost, and the card exists to be read the moment it appears.
+/// The Ask card opens along the top edge, centred. Deliberately not a corner: a
+/// corner is where the old panel got lost. It used to open in the middle of the
+/// screen, which on a first run reads as something that appeared on top of your
+/// work rather than a bar you summoned; at the top it is where a command bar is
+/// expected and covers the least.
 fn default_ask_anchor() -> AskAnchor {
-    AskAnchor::Center
+    AskAnchor::TopCenter
 }
 
 /// The quick ask opens on the display the cursor is on — the screen the user is

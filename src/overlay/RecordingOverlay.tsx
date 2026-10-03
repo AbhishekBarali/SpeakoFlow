@@ -59,6 +59,9 @@ type ShowOverlayPayload = {
    * platform (`live_card_takes_pointer` in overlay.rs): only where the window
    * cannot take keyboard focus, so a click can never steal the paste target. */
   interactive?: boolean;
+  /** Which side of the window the pill hugs: left or right when the overlay
+   * sits in a corner (`overlay_justify` in overlay.rs), otherwise the middle. */
+  justify?: OverlayJustify;
   notice?: string;
   /** For `downloading`: the speech model on its way, whose
    * `model-download-progress` events the pill follows. */
@@ -75,6 +78,12 @@ type ShowOverlayPayload = {
   epoch?: number;
 };
 type WaveShape = { bars: number; pitch?: number; barWidth?: number };
+type OverlayJustify = "left" | "center" | "right";
+
+/** An unknown or missing value is the middle, which is where the overlay was
+ *  before corners existed. */
+const parseJustify = (value: unknown): OverlayJustify =>
+  value === "left" || value === "right" ? value : "center";
 
 const EMPTY_LEVELS: number[] = [];
 const EMPTY_TRANSCRIPT: Transcript = {
@@ -301,6 +310,7 @@ const RecordingOverlay: React.FC = () => {
   const [transcript, setTranscript] = useState<Transcript>(EMPTY_TRANSCRIPT);
   const [streamingWindow, setStreamingWindow] = useState(false);
   const [interactive, setInteractive] = useState(false);
+  const [justify, setJustify] = useState<OverlayJustify>("center");
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -524,6 +534,7 @@ const RecordingOverlay: React.FC = () => {
         downloadId.current = nextDownload;
         setStreamingWindow(payload.streamingWindow);
         setInteractive(!!payload.interactive);
+        setJustify(parseJustify(payload.justify));
         if (recording) {
           endPress();
           follow.current = true;
@@ -904,6 +915,7 @@ const RecordingOverlay: React.FC = () => {
     <div
       dir={getLanguageDirection(i18n.language)}
       className={`overlay-root ${isVisible ? "fade-in" : "native-window-hidden"}${fading ? " is-fading" : ""}${hopping ? " is-hopping" : ""}`}
+      data-justify={justify}
       onContextMenu={preventBrowserContextMenu}
     >
       {streamingWindow && !recovery ? (

@@ -885,7 +885,11 @@
         "options": {
           "none": "Няма",
           "bottom": "Долу",
-          "top": "Горе"
+          "top": "Горе",
+          "topleft": "Горе вляво",
+          "topright": "Горе вдясно",
+          "bottomleft": "Долу вляво",
+          "bottomright": "Долу вдясно"
         }
       },
       "pasteMethod": {
