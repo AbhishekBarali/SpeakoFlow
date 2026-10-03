@@ -50,7 +50,7 @@ const CALL_MS = 1300 + 2600 + 1000 + 3400 + 900 + 600;
 const BINDINGS: Record<SceneId, string> = {
   dictate: "ctrl_left+super",
   ask: "ctrl_left+alt_left",
-  call: "ctrl+shift+c",
+  call: "ctrl_left+alt_left+c",
 };
 const ICONS = { dictate: Mic, ask: MessageCircle, call: PhoneCall } as const;
 const ALL_SCENES: SceneId[] = ["dictate", "ask", "call"];

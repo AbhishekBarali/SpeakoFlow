@@ -11,6 +11,8 @@
  *            &tab=stt|cleanup|assistant|voice   &settings=<tab>
  *            &stt=device|cloud   &theme=light|dark   &lang=<locale>
  *            &fresh=1 (no history)
+ *            &readme=1 (the README screenshots: everyday dictations, a
+ *                       generic meeting, Kokoro already downloaded)
  *            &memory=on (assistant memory switched on)
  *            &voice=<engine id> (the voice engine in use; default elevenlabs)
  *            &update=1 (a newer version is available)   &feedback=1 (dialog open)
@@ -35,9 +37,24 @@ const newInstall =
   params.get("installed") === "0" ||
   (!!params.get("onboarding") && params.get("installed") !== "1");
 const fresh = params.get("fresh") === "1" || newInstall;
+const readme = params.get("readme") === "1" && !fresh;
 const voiceEngine =
   params.get("voice") ?? (newInstall ? "kokoro" : "elevenlabs");
 const onEleven = voiceEngine === "elevenlabs";
+
+// `?readme=1`: Kokoro's weights "in the cache", which is how the voice page
+// decides the model is on this device. Settles long before that page mounts.
+if (readme && typeof caches !== "undefined") {
+  void caches
+    .open("transformers-cache")
+    .then((cache) =>
+      cache.put(
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model.onnx",
+        new Response(""),
+      ),
+    )
+    .catch(() => {});
+}
 
 (window as unknown as Record<string, unknown>).__TAURI_OS_PLUGIN_INTERNALS__ = {
   platform: "windows",
@@ -53,37 +70,89 @@ const now = Math.floor(Date.now() / 1000);
 
 type Json = Record<string, unknown>;
 
-/** About six months of plausible, deterministic daily activity. */
+/**
+ * Six months of plausible, deterministic daily activity: someone who dictates
+ * on weekdays, now and then on a Sunday, took two weeks off in early summer,
+ * and has slowly started using it more. Deliberately an ordinary user rather
+ * than a power user, so the Insights page reads calm: most days sit in the
+ * middle of the scale, Saturdays stay empty, and only recent weeks are bright.
+ */
 const recentDays = (): Json[] => {
   const pad = (value: number) => String(value).padStart(2, "0");
   const today = new Date();
   const days: Json[] = [];
-  const span = 190;
+  const span = 182;
   for (let index = 0; index < span; index += 1) {
-    // Rest days and a quiet stretch: the backend only sends days that had a
-    // dictation.
-    if (index % 6 === 2 || index % 11 === 4) continue;
-    if (index > 40 && index < 58) continue;
     const date = new Date(
       today.getFullYear(),
       today.getMonth(),
       today.getDate() - (span - 1 - index),
     );
-    const ramp = 0.35 + (0.65 * index) / span;
-    const words = Math.round(
-      ramp *
-        (120 +
-          560 * Math.abs(Math.sin(index * 1.7)) +
-          (index % 7 === 5 ? 650 : 0)),
-    );
+    const isToday = index === span - 1;
+    const weekday = date.getDay();
+    // The backend only sends days that had a dictation. Today always has a
+    // little, so the streak reads as alive whatever day the preview runs on.
+    if (!isToday) {
+      if (weekday === 6) continue;
+      if (weekday === 0 && index % 3 !== 0) continue;
+      if (index >= 52 && index < 66) continue;
+      if (index % 17 === 5) continue;
+    }
+    const ramp = 0.55 + (0.45 * index) / span;
+    const wave =
+      0.8 + 0.2 * Math.sin(index * 0.9) + 0.12 * Math.sin(index * 2.3);
+    let words = Math.round(ramp * 360 * wave);
+    // A long-dictation day every few weeks sets the top of the colour scale,
+    // so ordinary days read as mid-tone instead of all lighting up.
+    if (weekday !== 0 && index % 19 === 7) words = Math.round(words * 2.1);
+    if (weekday === 0 || weekday === 6) words = Math.round(words * 0.35);
+    if (isToday) words = 186;
     days.push({
       day: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-      dictations: Math.max(1, Math.round(words / 45)),
+      dictations: Math.max(1, Math.round(words / 26)),
       words,
-      audio_seconds: Math.round(words / 2.6),
+      audio_seconds: Math.round(words / 2.3),
     });
   }
   return days;
+};
+
+/** `get_usage_stats` derived from `recentDays()`, so the cards, the grid and
+ *  the streaks all agree, the way the backend's numbers do. */
+const usageStats = (): Json => {
+  const days = recentDays() as Array<{
+    day: string;
+    dictations: number;
+    words: number;
+    audio_seconds: number;
+  }>;
+  const sum = (key: "dictations" | "words" | "audio_seconds") =>
+    days.reduce((total, day) => total + day[key], 0);
+  // Consecutive calendar days, as `history::compute_streaks` counts them.
+  const dayNumber = (key: string) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
+  };
+  const numbers = days.map((day) => dayNumber(day.day));
+  let longest = 0;
+  let run = 0;
+  numbers.forEach((value, index) => {
+    run = index > 0 && value === numbers[index - 1] + 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+  });
+  const today = days[days.length - 1];
+  return {
+    total_dictations: sum("dictations"),
+    total_words: sum("words"),
+    timed_words: sum("words"),
+    total_audio_seconds: sum("audio_seconds"),
+    today_words: today.words,
+    today_dictations: today.dictations,
+    current_streak_days: run,
+    longest_streak_days: longest,
+    active_days: days.length,
+    recent_days: days,
+  };
 };
 
 const model = (overrides: Json): Json => ({
@@ -441,14 +510,15 @@ const binding = (id: string, current: string): Json => ({
 });
 
 const settings: Json = {
+  // The Windows defaults from `settings::get_default_settings`.
   bindings: {
-    transcribe: binding("transcribe", "ctrl_left+super_left"),
+    transcribe: binding("transcribe", "ctrl_left+super"),
     transcribe_with_post_process: binding(
       "transcribe_with_post_process",
-      "ctrl+shift+space",
+      "ctrl_left+super+shift",
     ),
     assistant: binding("assistant", "ctrl_left+alt_left"),
-    assistant_call: binding("assistant_call", "ctrl+shift+c"),
+    assistant_call: binding("assistant_call", "ctrl_left+alt_left+c"),
     cancel: binding("cancel", "escape"),
   },
   push_to_talk: true,
@@ -721,14 +791,24 @@ const cloudProviders: Json[] = [
 
 const history = fresh
   ? []
-  : [
-      "Dit is de lijn, and then the rest of the sentence came through in English.",
-      "I see the problem is basically simple. I'm using small models, especially older ones, and not having access to the new models is probably the problem.",
-      "Right now I'm going to use another DeepSeek model. That will give you one more example to see how good it really is.",
-      "I don't think the outfit was anywhere good.",
-      "Can you send the invoice to Sara before the call on Friday?",
-      "Remind me to review the pull request after lunch.",
-    ].map((text, index) => ({
+  : (readme
+      ? [
+          "Thanks for the quick turnaround. I've left two comments on the draft, both small. Happy for it to go out once those are in.",
+          "The import fails because the config path is relative. Let's resolve it against the project root and add a test for a folder with a space in its name.",
+          "Can you send the invoice to Sara before the call on Friday?",
+          "Moving our one-on-one to Thursday at ten works for me.",
+          "Picking up coffee and printer paper on the way in tomorrow.",
+          "Remind me to review the pull request after lunch.",
+        ]
+      : [
+          "Dit is de lijn, and then the rest of the sentence came through in English.",
+          "I see the problem is basically simple. I'm using small models, especially older ones, and not having access to the new models is probably the problem.",
+          "Right now I'm going to use another DeepSeek model. That will give you one more example to see how good it really is.",
+          "I don't think the outfit was anywhere good.",
+          "Can you send the invoice to Sara before the call on Friday?",
+          "Remind me to review the pull request after lunch.",
+        ]
+    ).map((text, index) => ({
       id: 100 - index,
       file_name: `rec-${index}.wav`,
       timestamp: now - (index + 1) * 5400 - (index > 2 ? 86400 * 2 : 0),
@@ -764,7 +844,11 @@ const assistantSessions = fresh
       ],
       meeting_id: index === 1 ? 40 : null,
       meeting_title:
-        index === 1 ? "The meeting was an informal technical discussion" : null,
+        index === 1
+          ? readme
+            ? "Website relaunch planning"
+            : "The meeting was an informal technical discussion"
+          : null,
     }));
 
 /* ── Meetings ──
@@ -777,7 +861,7 @@ const liveMeeting =
     : false;
 const LIVE_MEETING_ID = 41;
 
-const MEETING_NOTES = `## Summary
+const RELEASE_NOTES = `## Summary
 
 A planning call for the 1.6 release. The team agreed to ship the meetings feature as a beta behind its own switch, and to hold the Linux overlay fix for a patch release so it does not block the date.
 
@@ -810,13 +894,50 @@ The diarization model is accurate on two or three voices and drifts on larger ca
 - [ ] **Marco** — Record the meetings demo for the site (before Friday)
 `;
 
+/** `?readme=1`: a meeting any reader recognises, rather than one about this
+ *  app's own release. */
+const RELAUNCH_NOTES = `## Summary
+
+A planning call for the website relaunch. The team kept the launch on Friday the 14th and agreed to ship the new pricing page a week later, once legal has reviewed the refund wording.
+
+## Key takeaways
+
+- The relaunch stays on **Friday the 14th**.
+- The new pricing page follows **a week later**.
+- All 140 blog posts are migrated, and redirects are tested for the top fifty.
+- Old URLs with no traffic go to the archive page instead of a 404.
+
+## Topics
+
+### Launch scope
+
+Priya walked through the tracker. Everything for launch is done except the pricing page, whose copy needs a rewrite and a legal review.
+
+### Redirects
+
+Marco moved all 140 posts. The fifty most-visited URLs are tested; the rest fall back to the archive page.
+
+## Decisions
+
+- Launch on the 14th without the new pricing page (agreed by everyone).
+- Ship the pricing page a week later, after legal review (Priya).
+
+## Next steps
+
+- [x] **You** — Draft the launch announcement (Wednesday)
+- [ ] **Priya** — Get legal sign-off on the refund wording (Thursday)
+- [ ] **Marco** — Test the next hundred redirects (before Friday)
+`;
+
+const MEETING_NOTES = readme ? RELAUNCH_NOTES : RELEASE_NOTES;
+
 type Turn = [
   speaker: string,
   source: "mic" | "system",
   at: number,
   text: string,
 ];
-const MEETING_TURNS: Turn[] = [
+const RELEASE_TURNS: Turn[] = [
   [
     "me",
     "mic",
@@ -891,6 +1012,73 @@ const MEETING_TURNS: Turn[] = [
   ],
 ];
 
+const RELAUNCH_TURNS: Turn[] = [
+  [
+    "me",
+    "mic",
+    4,
+    "Okay, I think everyone's here. The main thing today is the website relaunch and whether we can still hit the 14th.",
+  ],
+  [
+    "spk_1",
+    "system",
+    12,
+    "I went through the tracker this morning. Everything for launch is done except the new pricing page. The design is signed off, but the copy still reads like a feature list, and legal hasn't seen the refund wording.",
+  ],
+  [
+    "spk_1",
+    "system",
+    21,
+    "Everything else is in. Marco finished the blog migration yesterday.",
+  ],
+  [
+    "me",
+    "mic",
+    33,
+    "Can the pricing page make the 14th, or is that a stretch?",
+  ],
+  [
+    "spk_1",
+    "system",
+    40,
+    "Honestly, I'd rather not rush it. Legal needs a few days with the refund section.",
+  ],
+  [
+    "spk_2",
+    "system",
+    52,
+    "Then let's launch without it and ship pricing a week later. The current page is fine for one more week.",
+  ],
+  ["me", "mic", 64, "Agreed. Marco, where are we on redirects?"],
+  [
+    "spk_2",
+    "system",
+    75,
+    "All 140 posts are moved. Redirects are tested for the top fifty URLs by traffic.",
+  ],
+  [
+    "spk_1",
+    "system",
+    88,
+    "And anything with no traffic goes to the archive page instead of a 404.",
+  ],
+  [
+    "me",
+    "mic",
+    99,
+    "Good. Then the 14th stands. I'll draft the launch announcement.",
+  ],
+  [
+    "spk_2",
+    "system",
+    110,
+    "I'll test the next hundred redirects before Friday.",
+  ],
+  ["me", "mic", 121, "Perfect. Thanks, everyone."],
+];
+
+const MEETING_TURNS = readme ? RELAUNCH_TURNS : RELEASE_TURNS;
+
 const segmentsFor = (meetingId: number): Json[] =>
   MEETING_TURNS.map(([speaker, source, at, text], index) => ({
     id: meetingId * 100 + index,
@@ -910,7 +1098,9 @@ const meetings: Json[] = fresh
   : (
       [
         [
-          "Planning the 1.6 release and the meetings beta",
+          readme
+            ? "Website relaunch planning"
+            : "Planning the 1.6 release and the meetings beta",
           2 * 3600,
           1834,
           "complete",
@@ -931,14 +1121,18 @@ const meetings: Json[] = fresh
           false,
         ],
         [
-          "A brief technical check focused on verifying the build",
+          readme
+            ? "Quick check-in with Sara"
+            : "A brief technical check focused on verifying the build",
           3 * day,
           61,
           "complete",
           false,
         ],
         [
-          "Reviewing the performance of the new cleanup model",
+          readme
+            ? "Quarterly budget review"
+            : "Reviewing the performance of the new cleanup model",
           4 * day,
           463,
           "interrupted",
@@ -956,7 +1150,9 @@ const meetings: Json[] = fresh
       system_file: index === 3 ? null : "system.wav",
       my_notes:
         index === 0
-          ? "Ask Marco about the demo length.\nCheck the 27 MB figure."
+          ? readme
+            ? "Ask Marco for the redirect list.\nCheck when legal can review."
+            : "Ask Marco about the demo length.\nCheck the 27 MB figure."
           : "",
       notes:
         notes || index === 0
@@ -1178,18 +1374,7 @@ const handlers: Record<string, (args: Json) => unknown> = {
           active_days: 0,
           recent_days: [],
         }
-      : {
-          total_dictations: 1832,
-          total_words: 28912,
-          timed_words: 28400,
-          total_audio_seconds: 10560,
-          today_words: 412,
-          today_dictations: 9,
-          current_streak_days: 6,
-          longest_streak_days: 21,
-          active_days: 64,
-          recent_days: recentDays(),
-        },
+      : usageStats(),
   list_meetings: () => ({ meetings, has_more: false }),
   get_meeting: ({ meetingId }) =>
     structuredClone(meetings.find((entry) => entry.id === meetingId) ?? null),
