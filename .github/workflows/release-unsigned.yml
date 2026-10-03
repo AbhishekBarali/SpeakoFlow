@@ -120,11 +120,14 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
+            // target_commitish: the tag is created on Publish from this
+            // field, which otherwise defaults to the default branch.
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: `v${{ steps.get-version.outputs.version }}`,
               name: `v${{ steps.get-version.outputs.version }}`,
+              target_commitish: context.sha,
               draft: true,
               prerelease: ${{ inputs.prerelease }},
               generate_release_notes: true
@@ -163,6 +166,31 @@ jobs:
             if [ "${DRAFT}" != "true" ]; then
               echo "ERROR: release ${SUPPLIED_ID} is already published; refusing to overwrite its assets" >&2
               exit 1
+            fi
+            # A draft's tag does not exist until Publish, and GitHub then
+            # creates it from target_commitish, which `gh release create`
+            # sets to the default branch unless given --target. Left alone,
+            # a release built from another branch is tagged on main, and its
+            # "Source code" downloads stop matching its installers. Pin it to
+            # the commit being built. A draft already pinned to a different
+            # commit means its other installers came from that commit, so
+            # this run would mix the two; refuse rather than guess.
+            TARGET="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${SUPPLIED_ID}" --jq .target_commitish)"
+            if TAG_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${TAG}" --jq .sha 2>/dev/null)"; then
+              if [ "${TAG_SHA}" != "${GITHUB_SHA}" ]; then
+                echo "ERROR: tag ${TAG} already exists at ${TAG_SHA}, but this run builds ${GITHUB_SHA}" >&2
+                exit 1
+              fi
+            elif [[ "${TARGET}" =~ ^[0-9a-f]{40}$ ]]; then
+              if [ "${TARGET}" != "${GITHUB_SHA}" ]; then
+                echo "ERROR: release ${SUPPLIED_ID} is pinned to ${TARGET}, but this run builds ${GITHUB_SHA}" >&2
+                echo "       Its installers would come from two different commits. Create a new draft for this commit." >&2
+                exit 1
+              fi
+            else
+              echo "Pinning release ${SUPPLIED_ID} to ${GITHUB_SHA} (it targeted '${TARGET}')"
+              gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${SUPPLIED_ID}" \
+                -f target_commitish="${GITHUB_SHA}" > /dev/null
             fi
             echo "id=${SUPPLIED_ID}" >> "$GITHUB_OUTPUT"
           else
@@ -245,6 +273,10 @@ jobs:
       asset-prefix: "speakoflow"
       upload-artifacts: false
       release-id: ${{ needs.create-release.outputs.release-id }}
+      # The dispatched commit, not the branch: build.yml otherwise checks out
+      # the branch head when each job starts, so a push mid-release would give
+      # each platform different code.
+      ref: ${{ github.sha }}
       # Releases always build from scratch — never restore a possibly-stale cache.
       no-cache: true
     secrets: inherit
