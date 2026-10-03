@@ -144,11 +144,10 @@ export const TourStep: React.FC<{
       step="tour"
       width="wide"
       footer={
+        // No skip: the tour is three scenes, shown once per install, and
+        // Next is the only way through. The buttons stay on the trailing edge.
         <>
-          <Button variant="ghost" size="lg" onClick={onDone}>
-            {t("onboarding.tour.skip")}
-          </Button>
-          <div className="flex items-center gap-3">
+          <div className="ms-auto flex items-center gap-3">
             {index > 0 && (
               <Button
                 variant="secondary"

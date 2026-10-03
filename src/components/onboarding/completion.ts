@@ -1,14 +1,21 @@
 /**
  * Whether this install has been through first-run setup.
  *
+ * This flag is the only thing that decides whether onboarding shows: it is not
+ * skipped for someone who already has a model or dictates in the cloud. Every
+ * install sees it once.
+ *
  * `localStorage`, like the app's other "already seen" flags
  * (`useDismissibleNotice`): it describes this window, not configuration, and it
- * should not travel in a settings export. Losing it costs one extra look at
- * setup, and only on a machine with no speech model on it.
+ * should not travel in a settings export. Losing it costs one more pass through
+ * onboarding.
  */
 const KEY = "speakoflow.onboarding.completed";
-/** Bumped if a future setup is different enough to be worth showing again. */
-const VERSION = "2";
+/**
+ * Bumped when onboarding changes enough to be worth showing everyone again.
+ * "3" is the redesigned setup and tour, so existing installs see it once.
+ */
+const VERSION = "3";
 
 export function hasCompletedOnboarding(): boolean {
   try {

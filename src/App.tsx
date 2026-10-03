@@ -42,9 +42,9 @@ type OnboardingStep = "welcome" | "accessibility" | "setup" | "tour" | "done";
 // Force the full onboarding flow on every launch so it can be tested
 // repeatedly. This is intentionally gated to dev builds only
 // (`import.meta.env.DEV`): during `tauri dev` the wizard shows every launch
-// for easy iteration, while compiled/release builds fall back to the real
-// first-run detection in `checkOnboardingStatus` (show onboarding only when
-// no model is installed yet and setup has never been finished).
+// for easy iteration, while compiled/release builds fall back to
+// `checkOnboardingStatus`, which shows onboarding once per install: until the
+// completion flag (`completion.ts`) is set, whatever is already installed.
 const FORCE_ONBOARDING = import.meta.env.DEV;
 
 function App() {
@@ -233,22 +233,16 @@ function App() {
         setOnboardingStep("welcome");
         return;
       }
-      // Anyone who can already dictate is a returning user: a local speech
-      // model on disk, speech set to a cloud service, or setup finished
-      // before (models chosen for later). Only a machine with none of these
-      // is new, which also keeps an upgrade from sending a cloud user through
-      // setup and switching their providers to on-device models.
-      const result = await commands.hasAnyModelsAvailable();
-      const hasModels = result.status === "ok" && result.data;
-      const settingsResult = hasModels
-        ? null
-        : await commands.getAppSettings().catch(() => null);
-      const dictatesInCloud =
-        settingsResult?.status === "ok" &&
-        settingsResult.data.stt_engine_mode === "cloud";
+      // Everyone goes through onboarding once, including people who already
+      // have a model or dictate in the cloud: setup shows an installed model
+      // as installed (Continue keeps it) and "Set up later" leaves the choice
+      // alone, so there is nothing to detect. Choosing a local model there
+      // never switches a cloud user's dictation to on-device. The completion
+      // flag alone decides; bumping its version shows the flow to everyone
+      // again.
       const currentPlatform = platform();
 
-      if (hasModels || dictatesInCloud || hasCompletedOnboarding()) {
+      if (hasCompletedOnboarding()) {
         // Returning user - check if they need to grant permissions first
         setIsReturningUser(true);
 
@@ -289,8 +283,12 @@ function App() {
 
         setOnboardingStep("done");
       } else {
-        // New user - start full onboarding
+        // Not onboarded yet: the full flow, once. Show the window even when
+        // the app was launched hidden, because shortcuts are only registered
+        // once onboarding is done; a hidden onboarding would leave an updated
+        // user's hotkeys dead with nothing on screen to explain why.
         setIsReturningUser(false);
+        await revealMainWindowForPermissions();
         setOnboardingStep("welcome");
       }
     } catch (error) {
