@@ -473,8 +473,40 @@ Var AppStartMenuFolder
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_FINISH
 
+Var LaunchArgs
+
 Function RunMainBinary
-  nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""
+  StrCpy $LaunchArgs ""
+  Call LaunchApp
+FunctionEnd
+
+; Starts the installed app: from the finish page's checkbox, and after an
+; in-app update (the updater passes /R).
+;
+; A per-user install does not use nsis_tauri_utils::RunAsUser. When this
+; installer runs elevated, which it does whenever the app that launched it was
+; started as administrator (an admin terminal, "Run as administrator"),
+; RunAsUser does not just start the exe: it takes Explorer's token and calls
+; CreateProcessWithTokenW to drop the rights again. Replaying an update that
+; way (installer /P /R /UPDATE /ARGS, elevated) installed the new version and
+; started nothing, every time, and the plugin's result was never checked. A
+; per-user installer never raises its own rights, so starting the app with the
+; installer's rights starts it exactly as it was running before the update,
+; elevated or not.
+Function LaunchApp
+  ClearErrors
+  !if "${INSTALLMODE}" == "currentUser"
+    Exec '"$INSTDIR\${MAINBINARYNAME}.exe" $LaunchArgs'
+  !else
+    nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" "$LaunchArgs"
+    Pop $1
+    ${If} $1 <> 0
+      SetErrors
+    ${EndIf}
+  !endif
+  ${If} ${Errors}
+    ExecShell "open" "$INSTDIR\${MAINBINARYNAME}.exe" "$LaunchArgs"
+  ${EndIf}
 FunctionEnd
 
 ; Uninstaller Pages
@@ -853,8 +885,8 @@ Function .onInstSuccess
   ${OrIf} ${Silent}
     ${GetOptions} $CMDLINE "/R" $R0
     ${IfNot} ${Errors}
-      ${GetOptions} $CMDLINE "/ARGS" $R0
-      nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" "$R0"
+      ${GetOptions} $CMDLINE "/ARGS" $LaunchArgs
+      Call LaunchApp
     ${EndIf}
   ${EndIf}
 FunctionEnd
