@@ -267,7 +267,7 @@ Data leaves your computer only for things you set up yourself:
   ask about it.
 - **Web search**, if you turn it on. The search provider receives the query.
 - **Feedback**, if you send it from the app. It sends exactly what the dialog
-  shows you.
+  shows you, to a private issue tracker only the developer can read.
 
 API keys live in your system keychain. Memory is off until you turn it on, and
 it stays on your computer where you can view, edit, or erase it. More detail is
@@ -279,6 +279,10 @@ Download the latest build from the
 [Releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) page. On
 first launch you pick a speech model, and a short tour shows the shortcuts
 while it downloads.
+
+Already on 1.4 or earlier? Those versions can't update themselves to 1.5, so
+download 1.5 once from Releases and install it over the old one. Your settings
+and history are kept. From 1.5 on, updates install from inside the app.
 
 ### Windows
 
