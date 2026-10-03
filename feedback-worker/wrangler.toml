@@ -47,28 +47,44 @@ routes = [{ pattern = "feedback.speakoflow.com", custom_domain = true }]
 [vars]
 FEEDBACK_REPO = "AbhishekBarali/speakoflow-feedback"
 
+# Rate limits are counted per Cloudflare location, not worldwide, and the
+# period can only be 10 or 60 seconds. The budget they protect is GitHub's:
+# at most 500 content-creating API calls an hour per credential, after which
+# every report fails until the hour is up. A report is one call for the issue
+# plus one per screenshot (up to three), so in one location the worst case is
+# GLOBAL + 3 × ATTACHMENT calls a minute: 4 + 3 × 1 = 7, or 420 an hour.
+# Real feedback arrives a few times a day; anyone over a limit is told to try
+# again in a minute and keeps their draft.
+
 # Per client address: a person reporting several things in a row is fine, a
-# loop is not. Counted per Cloudflare location, which is plenty here.
+# loop is not.
 [[ratelimits]]
 name = "PER_CLIENT_LIMIT"
 namespace_id = "7301"
 simple = { limit = 5, period = 60 }
 
-# Everyone together: keeps a flood well inside GitHub's API quota and stops a
-# burst from burying real reports.
+# Everyone together: keeps a flood inside GitHub's quota and stops a burst
+# from burying real reports.
 [[ratelimits]]
 name = "GLOBAL_LIMIT"
 namespace_id = "7302"
-simple = { limit = 60, period = 60 }
+simple = { limit = 4, period = 60 }
 
 # Reports that carry screenshots, everyone together. Screenshots are what grow
-# the repository (each is capped at 1 MB and usually a few hundred KB), so
-# they get a tighter budget than text. Over it, the report is still filed and
-# the issue notes the missing images.
+# the repository (each is capped at 1 MB and usually a few hundred KB) and
+# cost one API call each, so they get the tightest budget. Over it, the report
+# is still filed and the issue notes the missing images.
 [[ratelimits]]
 name = "ATTACHMENT_LIMIT"
 namespace_id = "7303"
-simple = { limit = 10, period = 60 }
+simple = { limit = 1, period = 60 }
 
 [observability]
 enabled = true
+
+# Keep the Worker's own log lines (issue number, kind, failures) but not the
+# per-request invocation log, which would store every sender's IP address and
+# request headers in Cloudflare for days. The privacy policy says the IP is
+# not kept; this is what makes that true.
+[observability.logs]
+invocation_logs = false
