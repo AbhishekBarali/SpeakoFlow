@@ -161,7 +161,6 @@
     "tour": {
       "features": "Co potrafi SpeakoFlow",
       "count": "{{current}} z {{total}}",
-      "skip": "Pomiń prezentację",
       "next": "Dalej",
       "finish": "Otwórz SpeakoFlow",
       "tabs": {
@@ -667,12 +666,6 @@
         "description": "Przytrzymanie: nagrywanie trwa, dopóki trzymasz skrót nagrywania. Naciśnięcie: jedno naciśnięcie zaczyna, następne kończy. Dotyczy wszystkich skrótów nagrywania.",
         "hold": "Przytrzymanie",
         "tap": "Naciśnięcie"
-      },
-      "tapToLock": {
-        "label": "Naciśnij, aby zablokować",
-        "info": "Trzymając skrót nagrywania, naciśnij ten klawisz, aby zablokować nagrywanie bez trzymania — możesz wtedy puścić klawisze i mówić dalej. Wybierz dowolny klawisz, który nie wchodzi w skład skrótu nagrywania, albo wyczyść pole, aby to wyłączyć.",
-        "off": "Wyłączone",
-        "clear": "Wyczyść"
       }
     },
     "models": {
@@ -1514,12 +1507,6 @@
       "subpages": {
         "profilesCaption": "Zmień imię, rolę i osobowość asystenta.",
         "memoryCaption": "Co asystent pamięta o Tobie między rozmowami."
-      },
-      "tapToLock": {
-        "label": "Naciśnij, aby zablokować",
-        "info": "Trzymając skrót asystenta, naciśnij ten klawisz, aby zablokować nagrywanie bez trzymania — możesz wtedy puścić klawisze i mówić dalej. Wybierz klawisz, który nie wchodzi w skład skrótu asystenta (pokrywający się jest ignorowany), albo wyczyść pole, aby to wyłączyć.",
-        "off": "Wyłączone",
-        "clear": "Wyczyść"
       },
       "provider": {
         "title": "Dostawca asystenta",
@@ -2615,6 +2602,10 @@
       "cancel": {
         "title": "Anuluj",
         "what": "Zatrzymaj nagrywanie albo czytaną na głos odpowiedź."
+      },
+      "globe": {
+        "hint": "macOS też reaguje na klawisz 🌐. Ustaw „Naciśnij klawisz 🌐, aby” na „Nic nie rób”, żeby służył tylko do dyktowania.",
+        "open": "Ustawienia klawiatury"
       }
     },
     "setup": {
@@ -3178,7 +3169,10 @@
   },
   "shortcutEditor": {
     "change": "Zmień skrót: {{name}}",
-    "reset": "Przywróć domyślny skrót: {{name}}"
+    "useDefault": "Domyślny",
+    "turnOff": "Wyłącz",
+    "turnedOff": "Skrót {{name}} wyłączony",
+    "undo": "Cofnij"
   },
   "memoryManager": {
     "status": {

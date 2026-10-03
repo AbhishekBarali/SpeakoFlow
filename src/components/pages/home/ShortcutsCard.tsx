@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { commands } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { useOsType } from "@/hooks/useOsType";
 import { SectionTitle } from "@/components/ui/Page";
@@ -81,6 +82,39 @@ export const ShortcutsCard: React.FC = () => {
     });
   }
 
+  // On a Mac the dictation default is the globe key, which macOS also acts on
+  // unless "Press 🌐 key to" is Do Nothing. Checked again when the window
+  // regains focus, which is when someone comes back from System Settings.
+  const bindings = getSetting("bindings") ?? {};
+  const usesGlobe =
+    os === "macos" &&
+    rows.some(
+      (row) =>
+        !row.off &&
+        (bindings[row.id]?.current_binding ?? "")
+          .split("+")
+          .some((part) => part.trim().toLowerCase() === "fn"),
+    );
+  const [globeBusy, setGlobeBusy] = useState(false);
+  useEffect(() => {
+    if (!usesGlobe) {
+      setGlobeBusy(false);
+      return;
+    }
+    let live = true;
+    const check = () =>
+      void commands
+        .globeKeyHasOwnAction()
+        .then((busy) => live && setGlobeBusy(busy))
+        .catch(() => {});
+    check();
+    window.addEventListener("focus", check);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", check);
+    };
+  }, [usesGlobe]);
+
   return (
     <section>
       <SectionTitle
@@ -124,15 +158,24 @@ export const ShortcutsCard: React.FC = () => {
                 {t("home.shortcuts.turnOn")}
               </button>
             ) : (
-              <ShortcutInput
-                shortcutId={row.id}
-                bare
-                size="md"
-                showReset="never"
-              />
+              <ShortcutInput shortcutId={row.id} bare size="md" />
             )}
           </li>
         ))}
+        {globeBusy && (
+          <li className="flex min-h-[3.5rem] items-center justify-between gap-3 px-5 py-3">
+            <span className="min-w-0 text-[0.8125rem] text-muted">
+              {t("home.shortcuts.globe.hint")}
+            </span>
+            <button
+              type="button"
+              onClick={() => void commands.openKeyboardSettings()}
+              className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-[0.8125rem] font-medium text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              {t("home.shortcuts.globe.open")}
+            </button>
+          </li>
+        )}
       </ul>
     </section>
   );

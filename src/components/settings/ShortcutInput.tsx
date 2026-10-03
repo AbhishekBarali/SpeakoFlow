@@ -16,7 +16,6 @@ interface ShortcutInputProps {
   bare?: boolean;
   finish?: ShortcutFinish;
   size?: ShortcutSize;
-  showReset?: "always" | "changed" | "never";
 }
 
 /**

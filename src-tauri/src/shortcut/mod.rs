@@ -31,10 +31,6 @@ use crate::tray;
 
 // Note: Commands are accessed via shortcut::handy_keys:: in lib.rs
 
-// Each recording shortcut has a Shift variant that selects the opposite
-// hold/toggle mode (see transcription_coordinator::recording_mode). The former
-// mid-recording tap-to-lock watcher is retired; no extra raw listener is needed.
-
 /// Initialize shortcuts using the configured implementation
 pub fn init_shortcuts(app: &AppHandle) {
     let user_settings = settings::load_or_create_app_settings(app);
@@ -135,9 +131,10 @@ pub fn change_binding(
     id: String,
     binding: String,
 ) -> Result<BindingResponse, String> {
-    // Reject empty bindings — every shortcut should have a value. Exception:
-    // the cancel binding may be empty, which disables it (its default).
-    if binding.trim().is_empty() && id != "cancel" {
+    // Only an optional shortcut may be left without a key; an empty binding
+    // means "removed" and registers nothing.
+    let removing = binding.trim().is_empty();
+    if removing && !settings::is_optional_binding(&id) {
         return Err("Binding cannot be empty".to_string());
     }
 
@@ -189,10 +186,13 @@ pub fn change_binding(
     // used to happen *after* the unregister and return without undoing it, so a
     // rejected combo — including Reset to a default this engine cannot register —
     // left the action with no hotkey at all while Settings still showed one.
-    if let Err(e) = validate_shortcut_for_implementation(&binding, settings.keyboard_implementation)
-    {
-        warn!("change_binding validation error: {}", e);
-        return Err(e);
+    if !removing {
+        if let Err(e) =
+            validate_shortcut_for_implementation(&binding, settings.keyboard_implementation)
+        {
+            warn!("change_binding validation error: {}", e);
+            return Err(e);
+        }
     }
 
     // Unregister the existing binding
@@ -360,6 +360,59 @@ pub fn get_keyboard_implementation(app: AppHandle) -> String {
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => "tauri".to_string(),
         KeyboardImplementation::HandyKeys => "handy_keys".to_string(),
+    }
+}
+
+/// Whether the Fn (globe) key still does something of its own on this Mac.
+///
+/// Fn is the macOS dictation default, and macOS acts on a globe press itself
+/// unless System Settings → Keyboard → "Press 🌐 key to" is Do Nothing: the
+/// emoji picker or an input-source switch would appear on every dictation.
+/// `AppleFnUsageType` is that setting (0 = Do Nothing). Absent means it was
+/// never changed, and the shipped value is not Do Nothing. Always false off
+/// macOS.
+#[tauri::command]
+#[specta::specta]
+pub fn globe_key_has_own_action() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("/usr/bin/defaults")
+            .args(["read", "com.apple.HIToolbox", "AppleFnUsageType"])
+            .output();
+        match output {
+            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim() != "0",
+            // The key does not exist until the setting is first changed.
+            Ok(_) => true,
+            Err(e) => {
+                warn!("Could not read the globe key setting: {e}");
+                false
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
+/// Open System Settings → Keyboard, where "Press 🌐 key to" lives.
+#[tauri::command]
+#[specta::specta]
+pub fn open_keyboard_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
+            .status()
+            .map_err(|e| format!("Could not open Keyboard settings: {e}"))?;
+        if !status.success() {
+            return Err(format!("Could not open Keyboard settings: {status}"));
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Keyboard settings are only opened on macOS".to_string())
     }
 }
 
@@ -551,46 +604,6 @@ fn initialize_handy_keys_with_rollback(app: &AppHandle) -> Result<bool, String> 
 pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.push_to_talk = enabled;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
-/// Toggle the "tap to lock a hold recording hands-free" gesture. When off,
-/// holding the hotkey never arms the lock-key watcher, so a stray tap can't
-/// convert an in-progress recording to hands-free.
-#[tauri::command]
-#[specta::specta]
-pub fn change_tap_to_lock_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.tap_to_lock = enabled;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
-/// Set the key that a tap converts a hold recording to hands-free (the "Tap to
-/// Lock" gesture). Accepts a modifier ("shift", "ctrl", "alt", "super"/"cmd")
-/// or a plain key name ("tab", "f8", …). Persisted; takes effect on the next
-/// recording (the watcher reads it fresh each time it arms).
-#[tauri::command]
-#[specta::specta]
-pub fn change_tap_to_lock_key_setting(app: AppHandle, key: String) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.tap_to_lock_key = key;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
-/// Set the key that a tap converts a hold **assistant** recording to hands-free.
-/// Separate from the dictation lock key so the assistant can use a different
-/// combo (defaults to Shift). Accepts a modifier or a plain key name; empty
-/// disables it. A key that overlaps the assistant record shortcut is ignored at
-/// arm time. Persisted; takes effect on the next assistant recording (the
-/// watcher reads it fresh each time it arms).
-#[tauri::command]
-#[specta::specta]
-pub fn change_assistant_tap_to_lock_key_setting(app: AppHandle, key: String) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.assistant_tap_to_lock_key = key;
     settings::write_settings(&app, settings);
     Ok(())
 }

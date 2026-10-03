@@ -21,8 +21,7 @@ use tokio::sync::Notify;
 pub const PANEL_LABEL: &str = "assistant_panel";
 
 /// The shortcut bindings that belong to the assistant, and so are switched off
-/// with it: the quick ask and the call. (Their auto-derived Shift `.lock`
-/// variants resolve to these ids, so checking the base id covers both.)
+/// with it: the quick ask and the call.
 pub const ASSISTANT_BINDINGS: [&str; 2] = ["assistant", "assistant_call"];
 
 /// Does this shortcut belong to the assistant?
@@ -5939,15 +5938,6 @@ mod tests {
         assert!(!is_assistant_binding("transcribe"));
         assert!(!is_assistant_binding("transcribe_with_post_process"));
         assert!(!is_assistant_binding("cancel"));
-        // The Shift "lock" variants are matched by their base id: callers strip
-        // `LOCK_SUFFIX` before asking (see `shortcut::handler`), so the raw
-        // suffixed id is deliberately not a match on its own.
-        assert!(!is_assistant_binding("assistant.lock"));
-        assert!(is_assistant_binding(
-            "assistant.lock"
-                .strip_suffix(crate::transcription_coordinator::LOCK_SUFFIX)
-                .unwrap()
-        ));
     }
 
     /// The expanded call is mostly text, so its default size must be a real

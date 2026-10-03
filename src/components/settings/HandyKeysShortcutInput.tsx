@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { formatKeyCombination } from "../../lib/utils/keyboard";
-import { ResetButton } from "../ui/ResetButton";
 import { SettingContainer } from "../ui/SettingContainer";
 import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
@@ -11,7 +10,10 @@ import { commands } from "@/bindings";
 import { toast } from "sonner";
 import {
   RecordingKeys,
+  ShortcutEditActions,
   ShortcutKeysButton,
+  announceTurnedOff,
+  isOptionalShortcut,
   type ShortcutFinish,
   type ShortcutSize,
 } from "./ShortcutControl";
@@ -23,12 +25,10 @@ interface HandyKeysShortcutInputProps {
   disabled?: boolean;
   icon?: SettingIcon;
   tone?: SettingTone;
-  /** Only the keys and their reset, without the settings row around them. */
+  /** Only the keys, without the settings row around them. */
   bare?: boolean;
   finish?: ShortcutFinish;
   size?: ShortcutSize;
-  /** When to offer "back to the default". Rows always; bare only if changed. */
-  showReset?: "always" | "changed" | "never";
 }
 
 interface HandyKeysEvent {
@@ -48,7 +48,6 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
   bare = false,
   finish = "default",
   size,
-  showReset,
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateBinding, resetBinding, isUpdating, isLoading } =
@@ -284,17 +283,61 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
     binding.description,
   );
 
-  const resetMode = showReset ?? (bare ? "changed" : "always");
-  const changed = binding.current_binding !== binding.default_binding;
+  const optional = isOptionalShortcut(shortcutId);
+  const busy = isUpdating(`binding_${shortcutId}`);
+
+  // Leave the editor without restoring anything: the action that follows
+  // decides what the shortcut becomes.
+  const leaveEditor = async () => {
+    if (unlistenRef.current) {
+      unlistenRef.current();
+      unlistenRef.current = null;
+    }
+    await commands.stopHandyKeysRecording().catch(console.error);
+    setIsRecording(false);
+    setCurrentKeys("");
+    currentKeysRef.current = "";
+    setOriginalBinding("");
+  };
+  const useDefault = async () => {
+    await leaveEditor();
+    await resetBinding(shortcutId);
+  };
+  const turnOff = async () => {
+    const previous = originalBinding;
+    await leaveEditor();
+    try {
+      await updateBinding(shortcutId, "");
+      announceTurnedOff(t, translatedName, () => {
+        void updateBinding(shortcutId, previous).catch(console.error);
+      });
+    } catch (error) {
+      console.error("Failed to turn off binding:", error);
+      toast.error(
+        t("settings.general.shortcut.errors.set", { error: String(error) }),
+      );
+    }
+  };
+
   const control = (
     <div className="flex items-center gap-1">
       {isRecording ? (
-        <RecordingKeys
-          ref={shortcutRef}
-          text={formatCurrentKeys()}
-          finish={finish}
-          size={size ?? "md"}
-        />
+        <div ref={shortcutRef} className="flex flex-col items-end gap-0.5">
+          <RecordingKeys
+            text={formatCurrentKeys()}
+            finish={finish}
+            size={size ?? "md"}
+          />
+          <ShortcutEditActions
+            current={originalBinding}
+            defaultBinding={binding.default_binding}
+            optional={optional}
+            finish={finish}
+            disabled={busy}
+            onUseDefault={() => void useDefault()}
+            onTurnOff={() => void turnOff()}
+          />
+        </div>
       ) : (
         <ShortcutKeysButton
           binding={binding.current_binding}
@@ -302,19 +345,8 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
           finish={finish}
           size={size}
           disabled={disabled}
+          emptyLabel={optional ? t("common.off") : undefined}
           onClick={() => void startRecording()}
-        />
-      )}
-      {(resetMode === "always" || (resetMode === "changed" && changed)) && (
-        <ResetButton
-          onClick={() => resetBinding(shortcutId)}
-          disabled={isUpdating(`binding_${shortcutId}`)}
-          ariaLabel={t("shortcutEditor.reset", { name: translatedName })}
-          className={
-            finish === "hero"
-              ? "text-hero-muted! hover:text-hero-ink! hover:bg-hero-hover! focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-ink"
-              : ""
-          }
         />
       )}
     </div>

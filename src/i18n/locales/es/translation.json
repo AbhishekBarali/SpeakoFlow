@@ -160,7 +160,6 @@
     "tour": {
       "features": "Lo que hace SpeakoFlow",
       "count": "{{current}} de {{total}}",
-      "skip": "Saltar el recorrido",
       "next": "Siguiente",
       "finish": "Abrir SpeakoFlow",
       "tabs": {
@@ -665,12 +664,6 @@
         "description": "Mantener: se graba mientras mantienes pulsado un atajo de grabación. Tocar: una pulsación empieza y la siguiente detiene. Se aplica a todos los atajos de grabación.",
         "hold": "Mantener presionado",
         "tap": "Tocar"
-      },
-      "tapToLock": {
-        "label": "Toca para fijar",
-        "info": "Mientras mantienes pulsado el atajo de grabación, toca esta tecla para fijar la grabación con manos libres y así poder soltar y seguir hablando. Elige cualquier tecla que no forme parte de tu atajo de grabación, o bórrala para desactivar esta opción.",
-        "off": "Desactivado",
-        "clear": "Borrar"
       }
     },
     "models": {
@@ -1505,12 +1498,6 @@
       "subpages": {
         "profilesCaption": "Cambia el nombre, el rol y la personalidad del asistente.",
         "memoryCaption": "Lo que el asistente recuerda de ti entre chats."
-      },
-      "tapToLock": {
-        "label": "Toca para fijar",
-        "info": "Mientras mantienes pulsado el atajo del asistente, toca esta tecla para fijar el modo manos libres y así poder soltar y seguir hablando. Elige una tecla que no forme parte de tu atajo del asistente (si coincide, se ignora), o bórrala para desactivar esta opción.",
-        "off": "Desactivado",
-        "clear": "Borrar"
       },
       "provider": {
         "title": "Proveedor del asistente",
@@ -2594,6 +2581,10 @@
       "cancel": {
         "title": "Cancelar",
         "what": "Detén una grabación o una respuesta que se está leyendo en voz alta."
+      },
+      "globe": {
+        "hint": "macOS también usa la tecla 🌐. Ajusta «Pulsar la tecla 🌐 para» en «No hacer nada» para que solo dicte.",
+        "open": "Ajustes de teclado"
       }
     },
     "setup": {
@@ -3150,7 +3141,10 @@
   },
   "shortcutEditor": {
     "change": "Cambiar el atajo de {{name}}",
-    "reset": "Restablecer {{name}} a su valor predeterminado"
+    "useDefault": "Usar predeterminado",
+    "turnOff": "Desactivar",
+    "turnedOff": "Atajo de {{name}} desactivado",
+    "undo": "Deshacer"
   },
   "memoryManager": {
     "status": {

@@ -161,7 +161,6 @@
     "tour": {
       "features": "Co SpeakoFlow umí",
       "count": "{{current}} z {{total}}",
-      "skip": "Přeskočit prohlídku",
       "next": "Další",
       "finish": "Otevřít SpeakoFlow",
       "tabs": {
@@ -667,12 +666,6 @@
         "description": "Podržení: nahrává se, dokud držíte zkratku pro nahrávání. Stisknutí: jeden stisk spustí, další zastaví. Platí pro všechny zkratky pro nahrávání.",
         "hold": "Podržení",
         "tap": "Stisknutí"
-      },
-      "tapToLock": {
-        "label": "Klepnutím uzamknout",
-        "info": "Když držíte zkratku pro nahrávání, klepnutím na tuto klávesu uzamknete nahrávání bez držení, takže můžete klávesy pustit a mluvit dál. Vyberte jakoukoli klávesu, která není součástí vaší zkratky pro nahrávání, nebo ji vymažte a funkci tím vypněte.",
-        "off": "Vypnuto",
-        "clear": "Vymazat"
       }
     },
     "models": {
@@ -1514,12 +1507,6 @@
       "subpages": {
         "profilesCaption": "Přepněte jméno, roli a osobnost asistenta.",
         "memoryCaption": "Co si o vás asistent pamatuje mezi chaty."
-      },
-      "tapToLock": {
-        "label": "Klepnutím uzamknout",
-        "info": "Když držíte zkratku asistenta, klepnutím na tuto klávesu uzamknete nahrávání bez držení, takže můžete klávesy pustit a mluvit dál. Vyberte klávesu, která není součástí zkratky asistenta (překrývající se klávesa se ignoruje), nebo ji vymažte a funkci tím vypněte.",
-        "off": "Vypnuto",
-        "clear": "Vymazat"
       },
       "provider": {
         "title": "Poskytovatel asistenta",
@@ -2615,6 +2602,10 @@
       "cancel": {
         "title": "Zrušit",
         "what": "Zastaví nahrávání nebo předčítanou odpověď."
+      },
+      "globe": {
+        "hint": "macOS na klávesu 🌐 také reaguje. Nastavte „Stisknutím klávesy 🌐“ na „Nedělat nic“, aby sloužila jen k diktování.",
+        "open": "Nastavení klávesnice"
       }
     },
     "setup": {
@@ -3178,7 +3169,10 @@
   },
   "shortcutEditor": {
     "change": "Změnit zkratku {{name}}",
-    "reset": "Obnovit výchozí zkratku {{name}}"
+    "useDefault": "Výchozí",
+    "turnOff": "Vypnout",
+    "turnedOff": "Zkratka {{name}} je vypnutá",
+    "undo": "Zpět"
   },
   "memoryManager": {
     "status": {

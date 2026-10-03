@@ -10,7 +10,7 @@ use tauri::{AppHandle, Manager};
 use crate::actions::ACTION_MAP;
 use crate::managers::audio::AudioRecordingManager;
 use crate::settings::get_settings;
-use crate::transcription_coordinator::{is_transcribe_binding, recording_mode, LOCK_SUFFIX};
+use crate::transcription_coordinator::{is_transcribe_binding, recording_mode};
 use crate::TranscriptionCoordinator;
 
 /// Handle a shortcut event from either implementation.
@@ -19,8 +19,7 @@ use crate::TranscriptionCoordinator;
 /// - Looking up the action in ACTION_MAP
 /// - Handling the cancel binding (only fires when recording)
 /// - Routing transcribe/assistant bindings to the coordinator, resolving the
-///   recording mode (push-to-talk hold vs hands-free lock) from the setting and
-///   whether the fired shortcut is the Shift "lock" variant
+///   recording mode (push-to-talk hold vs tap to toggle) from the setting
 ///
 /// # Arguments
 /// * `app` - The Tauri app handle
@@ -33,25 +32,16 @@ pub fn handle_shortcut_event(
     hotkey_string: &str,
     is_pressed: bool,
 ) {
-    // Recording shortcuts have an auto-derived Shift "lock" variant whose
-    // binding id carries a `.lock` suffix (e.g. "transcribe.lock"). Strip it to
-    // recover the real action id, and remember it was the hands-free variant.
-    let (base_id, is_lock_variant) = match binding_id.strip_suffix(LOCK_SUFFIX) {
-        Some(base) => (base, true),
-        None => (binding_id, false),
-    };
+    let base_id = binding_id;
 
     // The assistant is switched off: its hotkeys do nothing. They are also
     // unregistered at the OS level when the setting changes, so this is the
-    // belt-and-braces path (a shortcut that was already in flight, or an engine
-    // that keeps its own derived variants registered).
+    // belt-and-braces path for a shortcut that was already in flight.
     if crate::assistant::is_assistant_binding(base_id) && !get_settings(app).assistant_enabled {
         return;
     }
 
-    // Transcribe/assistant bindings are handled by the coordinator. The base
-    // shortcut uses the default mode (push-to-talk hold by default); tapping the
-    // lock key on top converts a hold to hands-free mid-recording.
+    // Transcribe/assistant bindings are handled by the coordinator.
     if is_transcribe_binding(base_id) {
         // The assistant's own shortcut is a quick ask, which takes the window
         // over, so it ends a call. Dictation does not: it holds the call's
@@ -69,9 +59,7 @@ pub fn handle_shortcut_event(
             // and the assistant — follows the single Push-to-talk setting:
             //   • Push-to-talk ON  → hold the shortcut to record, release to stop.
             //   • Push-to-talk OFF → tap once to start, tap again to stop.
-            // Escape cancels. There is no separate tap-to-lock; this is the
-            // simple Handy-style model.
-            let mode = recording_mode(get_settings(app).push_to_talk, is_lock_variant);
+            let mode = recording_mode(get_settings(app).push_to_talk);
             coordinator.send_input(base_id, hotkey_string, is_pressed, mode);
         } else {
             warn!("TranscriptionCoordinator is not initialized");
@@ -127,5 +115,22 @@ pub fn handle_shortcut_event(
         action.start(app, base_id, hotkey_string);
     } else {
         action.stop(app, base_id, hotkey_string);
+    }
+}
+
+/// A modifier-only shortcut that fired a moment ago was withdrawn by the
+/// hotkey engine: another key followed, so the modifiers were the start of a
+/// different shortcut (`Ctrl+Win+→` to switch desktops while dictation is
+/// `Ctrl+Win`). Throw away the recording that press started.
+///
+/// Only recording shortcuts can be withdrawn this way in practice — every other
+/// action ships on a combo with a main key, which the engine never withdraws —
+/// so anything else has nothing to undo.
+pub fn handle_shortcut_cancelled(app: &AppHandle, binding_id: &str) {
+    if !is_transcribe_binding(binding_id) {
+        return;
+    }
+    if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
+        coordinator.notify_abort(binding_id);
     }
 }

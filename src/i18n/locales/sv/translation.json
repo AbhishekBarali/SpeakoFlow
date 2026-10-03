@@ -159,7 +159,6 @@
     "tour": {
       "features": "Vad SpeakoFlow gör",
       "count": "{{current}} av {{total}}",
-      "skip": "Hoppa över rundturen",
       "next": "Nästa",
       "finish": "Öppna SpeakoFlow",
       "tabs": {
@@ -663,12 +662,6 @@
         "description": "Håll: inspelningen pågår medan du håller ned ett inspelningskortkommando. Tryck: en tryckning startar, nästa stoppar. Gäller alla inspelningskortkommandon.",
         "hold": "Håll",
         "tap": "Tryck"
-      },
-      "tapToLock": {
-        "label": "Tryck för att låsa",
-        "info": "Medan du håller ned ditt inspelningskortkommando trycker du på den här tangenten för att låsa handsfree-inspelning, så att du kan släppa och fortsätta tala. Välj en tangent som inte ingår i ditt inspelningskortkommando, eller rensa den för att stänga av funktionen.",
-        "off": "Av",
-        "clear": "Rensa"
       }
     },
     "models": {
@@ -1496,12 +1489,6 @@
       "subpages": {
         "profilesCaption": "Byt assistentens namn, roll och personlighet.",
         "memoryCaption": "Vad assistenten minns om dig mellan chattarna."
-      },
-      "tapToLock": {
-        "label": "Tryck för att låsa",
-        "info": "Medan du håller ned assistentkortkommandot trycker du på den här tangenten för att låsa handsfree, så att du kan släppa och fortsätta tala. Välj en tangent som inte ingår i ditt assistentkortkommando (en som överlappar ignoreras), eller rensa den för att stänga av funktionen.",
-        "off": "Av",
-        "clear": "Rensa"
       },
       "provider": {
         "title": "Assistentleverantör",
@@ -2573,6 +2560,10 @@
       "cancel": {
         "title": "Avbryt",
         "what": "Stoppa en inspelning eller ett svar som läses upp."
+      },
+      "globe": {
+        "hint": "macOS reagerar också på 🌐-tangenten. Ställ in ”Tryck på 🌐-tangenten för att” på ”Gör ingenting” så att den bara dikterar.",
+        "open": "Tangentbordsinställningar"
       }
     },
     "setup": {
@@ -3122,7 +3113,10 @@
   },
   "shortcutEditor": {
     "change": "Ändra kortkommandot för {{name}}",
-    "reset": "Återställ {{name}} till standard"
+    "useDefault": "Använd standard",
+    "turnOff": "Stäng av",
+    "turnedOff": "Kortkommandot för {{name}} är avstängt",
+    "undo": "Ångra"
   },
   "memoryManager": {
     "status": {

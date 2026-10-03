@@ -52,6 +52,29 @@ pub fn redact_text(text: &str) -> Redacted<'_> {
 /// Centralized cancellation function that can be called from anywhere in the app.
 /// Handles cancelling both recording and transcription operations and updates UI state.
 pub fn cancel_current_operation(app: &AppHandle) {
+    cancel_operation(app, CancelOrigin::User);
+}
+
+/// Throw away a recording whose shortcut press turned out to be the first keys
+/// of some other application's shortcut (`Ctrl+Alt+↑` while the ask key is
+/// `Ctrl+Alt`). Called by the coordinator itself, which has already returned
+/// to idle — so, unlike a cancel, it is not told about it again: that queued
+/// notice would land after the shortcut the press gave way to had started its
+/// own recording, and reset it. Nothing is offered back either; the user never
+/// meant to record.
+pub fn discard_aborted_recording(app: &AppHandle) {
+    cancel_operation(app, CancelOrigin::AbortedPress);
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CancelOrigin {
+    /// Esc, the pill's stop button, `--cancel`, a recovery after a panic.
+    User,
+    /// A hotkey press withdrawn by the hotkey engine.
+    AbortedPress,
+}
+
+fn cancel_operation(app: &AppHandle, origin: CancelOrigin) {
     info!("Initiating operation cancellation...");
 
     // Unregister the cancel shortcut asynchronously
@@ -130,9 +153,10 @@ pub fn cancel_current_operation(app: &AppHandle) {
 
     // A dictation cancelled mid-recording is kept (History, marked dismissed)
     // and offered back on the pill for a few seconds, which replaces the hide.
-    let offered = cancelled
-        .map(|recording| crate::actions::keep_cancelled_recording(app, recording))
-        .unwrap_or(false);
+    let offered = origin == CancelOrigin::User
+        && cancelled
+            .map(|recording| crate::actions::keep_cancelled_recording(app, recording))
+            .unwrap_or(false);
 
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
@@ -153,9 +177,12 @@ pub fn cancel_current_operation(app: &AppHandle) {
     tm.cancel_stream();
     tm.maybe_unload_immediately("cancellation");
 
-    // Notify coordinator so it can keep lifecycle state coherent.
-    if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
-        coordinator.notify_cancel(recording_was_active);
+    // Notify coordinator so it can keep lifecycle state coherent. An aborted
+    // press comes from the coordinator, which is already idle.
+    if origin == CancelOrigin::User {
+        if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
+            coordinator.notify_cancel(recording_was_active);
+        }
     }
 
     info!("Operation cancellation completed - returned to idle state");

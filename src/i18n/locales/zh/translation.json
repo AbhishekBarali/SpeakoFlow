@@ -158,7 +158,6 @@
     "tour": {
       "features": "SpeakoFlow 能做什么",
       "count": "{{current}} / {{total}}",
-      "skip": "跳过导览",
       "next": "下一步",
       "finish": "打开 SpeakoFlow",
       "tabs": {
@@ -661,12 +660,6 @@
         "description": "按住：按住录制快捷键期间持续录制。点按：按一下开始，再按一下停止。适用于所有录制快捷键。",
         "hold": "按住",
         "tap": "点按"
-      },
-      "tapToLock": {
-        "label": "轻按锁定",
-        "info": "按住录制快捷键时轻按此键，即可锁定免持录制，松手后仍可继续说话。请选择任意不属于录制快捷键的按键，或清空以关闭此功能。",
-        "off": "关闭",
-        "clear": "清空"
       }
     },
     "models": {
@@ -1487,12 +1480,6 @@
       "subpages": {
         "profilesCaption": "切换助手的名称、定位和性格。",
         "memoryCaption": "助手在多次聊天之间记住的关于您的内容。"
-      },
-      "tapToLock": {
-        "label": "轻按锁定",
-        "info": "按住助手快捷键时轻按此键，即可锁定免持模式，松手后仍可继续说话。请选择不属于助手快捷键的按键（重叠的按键会被忽略），或清空以关闭此功能。",
-        "off": "关闭",
-        "clear": "清空"
       },
       "provider": {
         "title": "助手提供商",
@@ -2552,6 +2539,10 @@
       "cancel": {
         "title": "取消",
         "what": "停止录音，或停止正在朗读的回复。"
+      },
+      "globe": {
+        "hint": "macOS 也会响应 🌐 键。将“按下 🌐 键时”设为“不执行任何操作”，它就只用于听写。",
+        "open": "键盘设置"
       }
     },
     "setup": {
@@ -3094,7 +3085,10 @@
   },
   "shortcutEditor": {
     "change": "更改“{{name}}”快捷键",
-    "reset": "将“{{name}}”重置为默认值"
+    "useDefault": "使用默认值",
+    "turnOff": "关闭",
+    "turnedOff": "已关闭{{name}}快捷键",
+    "undo": "撤销"
   },
   "memoryManager": {
     "status": {

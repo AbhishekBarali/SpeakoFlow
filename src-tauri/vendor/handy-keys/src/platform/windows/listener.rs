@@ -14,7 +14,10 @@ use windows::Win32::System::RemoteDesktop::{
     WTSRegisterSessionNotification, WTSUnRegisterSessionNotification,
 };
 use windows::Win32::System::Threading::{CreateEventW, INFINITE};
-use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, MapVirtualKeyW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT,
+    KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC, VIRTUAL_KEY,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     MsgWaitForMultipleObjects, PeekMessageW, RegisterClassW, SetWindowsHookExW, TranslateMessage,
@@ -57,6 +60,87 @@ const RECONCILABLE: Modifiers = Modifiers::CMD
     .union(Modifiers::SHIFT)
     .union(Modifiers::CTRL)
     .union(Modifiers::OPT);
+
+/// `dwExtraInfo` stamped on every keystroke this hook injects itself, so the
+/// hook can let its own replays straight through. ("HKEY" in ASCII.)
+const OWN_INJECTION_MARKER: usize = 0x484B_4559;
+
+/// An unassigned virtual-key code, tapped to "mask" a Win or Alt press so that
+/// releasing it does not open the Start menu or activate a menu bar. The same
+/// default AutoHotkey uses (`#MenuMaskKey vkE8`), chosen because no layout or
+/// application assigns it.
+const VK_MENU_MASK: u16 = 0xE8;
+
+/// Win and Alt: the modifiers that do something on their own when released
+/// with nothing pressed in between.
+const MENU_MODIFIERS: Modifiers = Modifiers::CMD.union(Modifiers::OPT);
+
+/// Modifier virtual-key codes that need the extended-key flag when injected.
+fn is_extended_modifier(vk: u16) -> bool {
+    matches!(vk, 0x5B | 0x5C | 0xA3 | 0xA5) // LWIN, RWIN, RCONTROL, RMENU
+}
+
+fn key_input(vk: u16, scan: u16, extended: bool, up: bool) -> INPUT {
+    let mut flags = KEYBD_EVENT_FLAGS(0);
+    if extended {
+        flags |= KEYEVENTF_EXTENDEDKEY;
+    }
+    if up {
+        flags |= KEYEVENTF_KEYUP;
+    }
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(vk),
+                wScan: scan,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: OWN_INJECTION_MARKER,
+            },
+        },
+    }
+}
+
+fn inject(inputs: &[INPUT]) {
+    // Queued behind the event being handled, and delivered back through this
+    // hook later, where the marker lets them pass untouched.
+    unsafe {
+        SendInput(inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Press a modifier on the OS's behalf, the one this hook kept from it.
+fn modifier_press(vk: u16) -> INPUT {
+    let scan = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) } as u16;
+    key_input(vk, scan, is_extended_modifier(vk), false)
+}
+
+/// A modifier-only hotkey's last modifier was kept from Windows, and then a
+/// key nobody registered went down on top of it: the user was typing another
+/// shortcut (`Ctrl+Alt+↑`, `Ctrl+Win+→`, or `Ctrl+Alt+Q` for `@` on a German
+/// layout). Give Windows the modifiers it never saw, then the key, so the
+/// focused application receives exactly what was pressed. Without this it got
+/// `Ctrl+↑` — or, for the `@`, a `Ctrl+Q` that closes windows.
+fn replay_chord(withheld: &[u16], vk: u16, scan: u16, extended: bool) {
+    let mut inputs: Vec<INPUT> = withheld.iter().map(|&m| modifier_press(m)).collect();
+    inputs.push(key_input(vk, scan, extended, false));
+    inject(&inputs);
+}
+
+/// Tap the mask key, so a Win or Alt the OS saw go down does not open the
+/// Start menu or a menu bar when it comes back up.
+fn send_menu_mask() {
+    inject(&[
+        key_input(VK_MENU_MASK, 0, false, false),
+        key_input(VK_MENU_MASK, 0, false, true),
+    ]);
+}
+
+/// The modifiers Windows knows are down: tracked, minus the ones withheld.
+fn modifiers_seen_by_os(ctx: &HookContext) -> Modifiers {
+    ctx.current_modifiers & !blocked_modifiers(&ctx.blocked_keys)
+}
 
 /// Thread-local state for the keyboard hook callback.
 ///
@@ -480,9 +564,14 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
         return CallNextHookEx(None, code, wparam, lparam);
     }
 
-    let mut should_block = false;
+    // Our own replays and mask taps: already accounted for, pass straight on.
+    // Checked before touching the context, so a hook call that arrived while
+    // this one was still running could never contend for it.
+    if (*(lparam.0 as *const KBDLLHOOKSTRUCT)).dwExtraInfo == OWN_INJECTION_MARKER {
+        return CallNextHookEx(None, code, wparam, lparam);
+    }
 
-    // Process the keyboard event
+    let mut should_block = false;
     HOOK_CONTEXT.with(|ctx_cell| {
         let mut ctx_ref = ctx_cell.borrow_mut();
         if let Some(ctx) = ctx_ref.as_mut() {
@@ -526,6 +615,12 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
                             should_block_hotkey(&ctx.blocking_hotkeys, ctx.current_modifiers, None);
                         if should_block {
                             ctx.blocked_keys.insert(vk_code);
+                            // A Win or Alt that went down first reached
+                            // Windows; released with nothing in between it
+                            // would open the Start menu or a menu bar.
+                            if modifiers_seen_by_os(ctx).intersects(MENU_MODIFIERS) {
+                                send_menu_mask();
+                            }
                         }
                     }
                 } else {
@@ -567,6 +662,29 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
                         );
                         if should_block {
                             ctx.blocked_keys.insert(vk_code);
+                        } else {
+                            let withheld: Vec<u16> = ctx
+                                .blocked_keys
+                                .iter()
+                                .copied()
+                                .filter(|vk| vk_to_modifier(*vk).is_some())
+                                .collect();
+                            if !withheld.is_empty() {
+                                // Windows sees the modifiers from now on, so
+                                // their real key-ups must reach it too.
+                                for vk in &withheld {
+                                    ctx.blocked_keys.remove(vk);
+                                }
+                                replay_chord(
+                                    &withheld,
+                                    vk_code,
+                                    kb_struct.scanCode as u16,
+                                    is_extended,
+                                );
+                                // The replay stands in for this key-down. Its
+                                // repeats and key-up pass as usual.
+                                should_block = true;
+                            }
                         }
                     }
                 } else {
@@ -861,5 +979,22 @@ mod tests {
     #[test]
     fn release_events_empty_when_nothing_stale() {
         assert!(release_events(Modifiers::CMD_LEFT, Modifiers::empty()).is_empty());
+    }
+
+    #[test]
+    fn injected_keys_carry_the_marker_and_their_flags() {
+        let win_down = modifier_press(0x5B);
+        let ki = unsafe { win_down.Anonymous.ki };
+        assert_eq!(ki.wVk, VIRTUAL_KEY(0x5B));
+        assert_eq!(ki.dwExtraInfo, OWN_INJECTION_MARKER);
+        assert!(ki.dwFlags.contains(KEYEVENTF_EXTENDEDKEY));
+        assert!(!ki.dwFlags.contains(KEYEVENTF_KEYUP));
+
+        let alt_down = unsafe { modifier_press(0xA4).Anonymous.ki };
+        assert!(!alt_down.dwFlags.contains(KEYEVENTF_EXTENDEDKEY));
+
+        let mask_up = unsafe { key_input(VK_MENU_MASK, 0, false, true).Anonymous.ki };
+        assert!(mask_up.dwFlags.contains(KEYEVENTF_KEYUP));
+        assert_eq!(mask_up.dwExtraInfo, OWN_INJECTION_MARKER);
     }
 }

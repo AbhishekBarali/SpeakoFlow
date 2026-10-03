@@ -90,10 +90,6 @@ impl Deadline {
     }
 }
 
-/// Suffix marking the auto-derived "Shift" variant of a recording binding — the
-/// hands-free counterpart of a hold shortcut (e.g. `transcribe` → `transcribe.lock`).
-pub const LOCK_SUFFIX: &str = ".lock";
-
 /// How a recording is driven.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RecordingMode {
@@ -104,18 +100,11 @@ pub enum RecordingMode {
     Lock,
 }
 
-/// Resolve the recording mode for a shortcut event. The base shortcut uses the
-/// user's default mode; its Shift variant uses the opposite. With push-to-talk
-/// on (default) the base shortcut holds and Shift locks hands-free; with it off
-/// the base shortcut locks and Shift holds.
-pub fn recording_mode(push_to_talk_default: bool, is_lock_variant: bool) -> RecordingMode {
-    let base_holds = push_to_talk_default;
-    let holds = if is_lock_variant {
-        !base_holds
-    } else {
-        base_holds
-    };
-    if holds {
+/// The recording mode a shortcut press asks for. There is one setting for
+/// every recording shortcut: Push-to-talk on means hold to record, off means
+/// tap to start and tap to stop.
+pub fn recording_mode(push_to_talk: bool) -> RecordingMode {
+    if push_to_talk {
         RecordingMode::Hold
     } else {
         RecordingMode::Lock
@@ -135,6 +124,13 @@ enum Command {
     Commit,
     Cancel {
         recording_was_active: bool,
+    },
+    /// The press that started `binding_id`'s recording turned out to be the
+    /// start of another application's shortcut (see handy-keys'
+    /// `HotkeyState::Cancelled`). Throws that recording away without a trace.
+    Abort {
+        binding_id: String,
+        done: Sender<()>,
     },
     /// Fired by the coordinator's receive deadline when [`MAX_RECORDING_DURATION`] elapses.
     /// Auto-finalizes the recording iff `generation` still matches the active
@@ -336,6 +332,24 @@ impl TranscriptionCoordinator {
                                 stage = Stage::Idle;
                             }
                         }
+                        Command::Abort { binding_id, done } => {
+                            // Only the recording this press started. Anything
+                            // else (an earlier hands-free recording, a pipeline
+                            // already processing) belongs to someone else.
+                            let ours = matches!(
+                                &stage,
+                                Stage::Recording { binding_id: id, .. } if id == &binding_id
+                            );
+                            if ours {
+                                debug!("Discarding '{binding_id}': its press was another shortcut");
+                                crate::utils::discard_aborted_recording(&app);
+                                stage = Stage::Idle;
+                                // The shortcut it gave way to may be pressed
+                                // within the debounce window.
+                                last_press = None;
+                            }
+                            let _ = done.send(());
+                        }
                         Command::MaxDuration { generation: g } => {
                             let is_recording = matches!(stage, Stage::Recording { .. });
                             if max_duration_should_stop(g, generation, is_recording) {
@@ -483,6 +497,31 @@ impl TranscriptionCoordinator {
             .is_err()
         {
             warn!("Transcription coordinator channel closed");
+        }
+    }
+
+    /// Throw away the recording `binding_id`'s press started, if it is still
+    /// the one recording: the press was the start of another shortcut.
+    ///
+    /// Waits (briefly) until it is done, because the shortcut the press gave
+    /// way to is handled right after this returns. Ctrl+Alt+C pressed slowly
+    /// first starts an ask and then the call; if the ask's teardown ran
+    /// afterwards, it would hide the panel the call had just opened.
+    pub fn notify_abort(&self, binding_id: &str) {
+        let (done, finished) = mpsc::channel();
+        if self
+            .tx
+            .send(Command::Abort {
+                binding_id: binding_id.to_string(),
+                done,
+            })
+            .is_err()
+        {
+            warn!("Transcription coordinator channel closed");
+            return;
+        }
+        if finished.recv_timeout(Duration::from_secs(2)).is_err() {
+            warn!("Discarding '{binding_id}' did not finish in time");
         }
     }
 

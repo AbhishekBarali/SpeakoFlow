@@ -159,7 +159,6 @@
     "tour": {
       "features": "What SpeakoFlow does",
       "count": "{{current}} of {{total}}",
-      "skip": "Skip tour",
       "next": "Next",
       "finish": "Open SpeakoFlow",
       "tabs": {
@@ -663,12 +662,6 @@
         "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Applies to every recording shortcut.",
         "hold": "Hold",
         "tap": "Tap"
-      },
-      "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
       }
     },
     "models": {
@@ -1496,12 +1489,6 @@
       "subpages": {
         "profilesCaption": "Switch the assistant's name, role, and personality.",
         "memoryCaption": "What the assistant remembers about you between chats."
-      },
-      "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
       },
       "provider": {
         "title": "Assistant provider",
@@ -2573,6 +2560,10 @@
       "cancel": {
         "title": "Cancel",
         "what": "Stop a recording, or a reply being read aloud."
+      },
+      "globe": {
+        "hint": "macOS also acts on the 🌐 key. Set “Press 🌐 key to” to Do Nothing so it only dictates.",
+        "open": "Keyboard settings"
       }
     },
     "setup": {
@@ -3122,7 +3113,10 @@
   },
   "shortcutEditor": {
     "change": "Change the {{name}} shortcut",
-    "reset": "Reset {{name}} to its default"
+    "useDefault": "Use default",
+    "turnOff": "Turn off",
+    "turnedOff": "{{name}} shortcut turned off",
+    "undo": "Undo"
   },
   "memoryManager": {
     "status": {

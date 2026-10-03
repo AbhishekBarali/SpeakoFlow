@@ -160,7 +160,6 @@
     "tour": {
       "features": "O que o SpeakoFlow faz",
       "count": "{{current}} de {{total}}",
-      "skip": "Pular tour",
       "next": "Próximo",
       "finish": "Abrir SpeakoFlow",
       "tabs": {
@@ -665,12 +664,6 @@
         "description": "Segurar: grava enquanto você mantém um atalho de gravação pressionado. Tocar: um toque começa, o próximo para. Vale para todos os atalhos de gravação.",
         "hold": "Segurar",
         "tap": "Toque"
-      },
-      "tapToLock": {
-        "label": "Toque para travar",
-        "info": "Enquanto segura o atalho de gravação, toque nesta tecla para travar a gravação mãos livres e continuar falando depois de soltar. Escolha qualquer tecla que não faça parte do seu atalho de gravação ou limpe o campo para desativar.",
-        "off": "Desativado",
-        "clear": "Limpar"
       }
     },
     "models": {
@@ -1505,12 +1498,6 @@
       "subpages": {
         "profilesCaption": "Troque o nome, o papel e a personalidade do assistente.",
         "memoryCaption": "O que o assistente lembra sobre você entre as conversas."
-      },
-      "tapToLock": {
-        "label": "Toque para travar",
-        "info": "Enquanto segura o atalho do assistente, toque nesta tecla para travar o modo mãos livres e continuar falando depois de soltar. Escolha uma tecla que não faça parte do seu atalho do assistente (uma que coincida é ignorada) ou limpe o campo para desativar.",
-        "off": "Desativado",
-        "clear": "Limpar"
       },
       "provider": {
         "title": "Provedor do assistente",
@@ -2594,6 +2581,10 @@
       "cancel": {
         "title": "Cancelar",
         "what": "Para uma gravação ou uma resposta sendo lida em voz alta."
+      },
+      "globe": {
+        "hint": "O macOS também usa a tecla 🌐. Defina «Pressionar a tecla 🌐 para» como «Não fazer nada» para que ela só dite.",
+        "open": "Ajustes de teclado"
       }
     },
     "setup": {
@@ -3150,7 +3141,10 @@
   },
   "shortcutEditor": {
     "change": "Alterar o atalho {{name}}",
-    "reset": "Redefinir {{name}} para o padrão"
+    "useDefault": "Usar padrão",
+    "turnOff": "Desativar",
+    "turnedOff": "Atalho de {{name}} desativado",
+    "undo": "Desfazer"
   },
   "memoryManager": {
     "status": {

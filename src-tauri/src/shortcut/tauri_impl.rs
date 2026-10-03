@@ -100,7 +100,22 @@ pub fn normalize_for_tauri(raw: &str) -> String {
 /// hotkey. Resetting to the default could not help, because the default is the
 /// offending value.
 pub fn tauri_safe_binding(raw: &str) -> String {
-    let normalized = normalize_for_tauri(raw);
+    // Fn is not a key this engine knows, and the macOS defaults are built on
+    // it. It becomes Option, which turns each of them back into the default it
+    // replaced (Fn → Option+Space, Fn+Ctrl+C → Option+Ctrl+C). Dropping it
+    // instead would have made Fn+Ctrl+C a global Ctrl+C.
+    let mut parts: Vec<String> = Vec::new();
+    for part in raw.split('+') {
+        let part = part.trim().to_lowercase();
+        let part = match part.as_str() {
+            "fn" | "function" => "alt".to_string(),
+            _ => part,
+        };
+        if !part.is_empty() && !parts.contains(&part) {
+            parts.push(part);
+        }
+    }
+    let normalized = normalize_for_tauri(&parts.join("+"));
     if normalized.trim().is_empty() {
         return normalized;
     }
@@ -357,7 +372,16 @@ mod tests {
     fn a_modifier_only_combo_gains_a_main_key_and_then_validates() {
         assert_eq!(tauri_safe_binding("ctrl_left+alt_left"), "ctrl+alt+space");
         assert_eq!(tauri_safe_binding("ctrl_left+super"), "ctrl+super+space");
-        for combo in ["ctrl_left+super", "ctrl_left+alt_left"] {
+        assert_eq!(tauri_safe_binding("fn"), "alt+space");
+        assert_eq!(tauri_safe_binding("fn+ctrl"), "alt+ctrl+space");
+        assert_eq!(tauri_safe_binding("fn+ctrl+c"), "alt+ctrl+c");
+        for combo in [
+            "ctrl_left+super",
+            "ctrl_left+alt_left",
+            "ctrl_left+super+shift",
+            "fn",
+            "fn+shift",
+        ] {
             let safe = tauri_safe_binding(combo);
             assert!(
                 validate_shortcut(&safe).is_ok(),

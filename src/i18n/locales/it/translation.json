@@ -160,7 +160,6 @@
     "tour": {
       "features": "Cosa fa SpeakoFlow",
       "count": "{{current}} di {{total}}",
-      "skip": "Salta il tour",
       "next": "Avanti",
       "finish": "Apri SpeakoFlow",
       "tabs": {
@@ -665,12 +664,6 @@
         "description": "Tieni premuto: registri finché tieni premuta una scorciatoia di registrazione. Tocca: una pressione avvia, la successiva ferma. Vale per tutte le scorciatoie di registrazione.",
         "hold": "Tieni premuto",
         "tap": "Tocca"
-      },
-      "tapToLock": {
-        "label": "Tocca per bloccare",
-        "info": "Mentre tieni premuta la scorciatoia di registrazione, tocca questo tasto per bloccare la registrazione a mani libere: puoi rilasciare e continuare a parlare. Scegli un tasto che non faccia parte della scorciatoia di registrazione, oppure cancellalo per disattivare la funzione.",
-        "off": "Disattivato",
-        "clear": "Cancella"
       }
     },
     "models": {
@@ -1505,12 +1498,6 @@
       "subpages": {
         "profilesCaption": "Cambia nome, ruolo e personalità dell'assistente.",
         "memoryCaption": "Ciò che l'assistente ricorda di te tra una chat e l'altra."
-      },
-      "tapToLock": {
-        "label": "Tocca per bloccare",
-        "info": "Mentre tieni premuta la scorciatoia dell'assistente, tocca questo tasto per bloccare la modalità a mani libere: puoi rilasciare e continuare a parlare. Scegli un tasto che non faccia parte della scorciatoia dell'assistente (un tasto in comune viene ignorato), oppure cancellalo per disattivare la funzione.",
-        "off": "Disattivato",
-        "clear": "Cancella"
       },
       "provider": {
         "title": "Provider dell'assistente",
@@ -2594,6 +2581,10 @@
       "cancel": {
         "title": "Annulla",
         "what": "Ferma una registrazione o una risposta letta ad alta voce."
+      },
+      "globe": {
+        "hint": "Anche macOS usa il tasto 🌐. Imposta «Premi il tasto 🌐 per» su «Non fare nulla» perché serva solo a dettare.",
+        "open": "Impostazioni tastiera"
       }
     },
     "setup": {
@@ -3150,7 +3141,10 @@
   },
   "shortcutEditor": {
     "change": "Cambia la scorciatoia {{name}}",
-    "reset": "Ripristina {{name}} al valore predefinito"
+    "useDefault": "Usa predefinita",
+    "turnOff": "Disattiva",
+    "turnedOff": "Scorciatoia {{name}} disattivata",
+    "undo": "Annulla"
   },
   "memoryManager": {
     "status": {

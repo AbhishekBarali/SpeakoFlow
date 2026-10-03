@@ -141,7 +141,6 @@ const CleanupKeysRow: React.FC = () => {
         shortcutId={shortcutId}
         bare
         size="md"
-        showReset="never"
       />
     </SettingContainer>
   );

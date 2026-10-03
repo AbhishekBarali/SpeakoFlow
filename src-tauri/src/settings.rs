@@ -1199,30 +1199,6 @@ impl fmt::Debug for SecretString {
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
     pub push_to_talk: bool,
-    /// While a push-to-talk (hold) recording is active, a quick tap of the
-    /// configured lock key (see `tap_to_lock_key`) converts it to hands-free
-    /// (locked) mode so you can let go of the hotkey and keep talking. On by
-    /// default; turn off if a stray tap keeps locking your recordings. Only
-    /// relevant while push-to-talk is on.
-    #[serde(default = "default_tap_to_lock")]
-    pub tap_to_lock: bool,
-    /// The key you tap (while holding a push-to-talk recording) to lock it
-    /// hands-free. Defaults to Shift. Pick a key that isn't part of your record
-    /// shortcut and that you won't press by accident. Accepts a modifier
-    /// ("shift", "ctrl", "alt", "super"/"cmd") or a plain key name ("tab", "f8",
-    /// …). Only relevant while push-to-talk and Tap to Lock are on.
-    #[serde(default = "default_tap_to_lock_key")]
-    pub tap_to_lock_key: String,
-    /// The key you tap while holding a push-to-talk **assistant** recording to
-    /// lock it hands-free, so you can release the hotkey and keep talking to the
-    /// assistant. Separate from the dictation `tap_to_lock_key` so it can be a
-    /// different combo (defaults to Shift). Accepts a modifier ("shift", "ctrl",
-    /// …) or a plain key name ("tab", "f8", …). Pick a key that isn't part of
-    /// your assistant record shortcut — one that overlaps (e.g. Space while the
-    /// shortcut is ctrl+alt+space) is ignored, since the held key would instantly
-    /// lock the recording. Clear it (empty) to disable.
-    #[serde(default = "default_assistant_tap_to_lock_key")]
-    pub assistant_tap_to_lock_key: String,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -1907,6 +1883,81 @@ pub fn cleanup_binding_active(settings: &AppSettings) -> bool {
 
 /// Binding id of the separate cleanup shortcut.
 pub const CLEANUP_BINDING_ID: &str = "transcribe_with_post_process";
+
+/// Shortcuts the user may remove entirely, leaving them unbound. Dictation and
+/// the quick ask are the app's two front doors and always keep a key; the
+/// cleanup shortcut is turned off with its own switch on the cleanup page.
+/// Cancel is here because a global Esc, even one only registered while
+/// something is running, is one some people would rather not have at all.
+pub const OPTIONAL_BINDINGS: [&str; 2] = ["cancel", "assistant_call"];
+
+/// Whether a shortcut may be left without a key.
+pub fn is_optional_binding(id: &str) -> bool {
+    OPTIONAL_BINDINGS.contains(&id)
+}
+
+/// Move bindings an older release shipped as its default onto the current
+/// default. A binding the user changed is left alone, though its reset target
+/// (`default_binding`) is refreshed either way. Returns whether anything
+/// changed.
+///
+/// An emptied optional binding is a change, not a default: before Esc became
+/// Cancel's default the stored default was empty, so an install upgraded from
+/// then moves to Esc once. After that the stored default is Esc, and a Cancel
+/// the user removed stays removed.
+pub fn migrate_binding_defaults(
+    stored: &mut HashMap<String, ShortcutBinding>,
+    defaults: &HashMap<String, ShortcutBinding>,
+) -> bool {
+    let mut changed = false;
+    for (key, code_default) in defaults {
+        let Some(binding) = stored.get_mut(key) else {
+            continue;
+        };
+        if binding.default_binding == code_default.default_binding {
+            continue;
+        }
+        if binding.current_binding == binding.default_binding
+            && !keeps_previous_default(key, &binding.default_binding)
+        {
+            debug!(
+                "Migrating '{}' binding default: '{}' -> '{}'",
+                key, binding.default_binding, code_default.default_binding
+            );
+            binding.current_binding = code_default.default_binding.clone();
+        }
+        binding.default_binding = code_default.default_binding.clone();
+        changed = true;
+    }
+    changed
+}
+
+/// An old default an existing install keeps even though new installs ship
+/// something else.
+///
+/// macOS moved from Option+Space to the Fn (globe) key. The Fn key only works
+/// as a hotkey once "Press 🌐 key to" is set to Do Nothing in System Settings,
+/// and external keyboards often have no Fn key the system can see, so moving a
+/// working Option+Space dictation onto it with an update could leave someone
+/// with a dictation key that opens the emoji picker. Their keys stay; Reset
+/// offers the new ones. Elsewhere every untouched old default moves.
+fn keeps_previous_default(id: &str, previous_default: &str) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        matches!(
+            (id, previous_default),
+            ("transcribe", "option+space")
+                | ("transcribe_with_post_process", "option+shift+space")
+                | ("assistant", "option+ctrl+space")
+                | ("assistant_call", "option+ctrl+c")
+        )
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (id, previous_default);
+        false
+    }
+}
 
 /// Default seconds before dictation post-processing gives up and pastes the raw
 /// transcription instead. Keeps a stalled LLM from ever holding up the paste.
@@ -3187,31 +3238,6 @@ fn default_assistant_panel_opacity() -> f64 {
     1.0
 }
 
-fn default_tap_to_lock() -> bool {
-    true
-}
-
-fn default_tap_to_lock_key() -> String {
-    // Windows: Space — the record shortcuts are modifier-only (ctrl_left+super
-    // / ctrl_left+alt), so Space is free and is the most natural "lock it" tap.
-    #[cfg(target_os = "windows")]
-    return "space".to_string();
-    #[cfg(not(target_os = "windows"))]
-    "shift".to_string()
-}
-
-fn default_assistant_tap_to_lock_key() -> String {
-    // Windows: Space (see default_tap_to_lock_key — record combos are
-    // modifier-only there, so Space can't overlap the held shortcut).
-    #[cfg(target_os = "windows")]
-    return "space".to_string();
-    // Elsewhere: Shift, not Space — the default assistant shortcut (e.g.
-    // option+ctrl+space) already holds Space, and a lock key that overlaps the
-    // record shortcut can't work (the held key would instantly lock it).
-    #[cfg(not(target_os = "windows"))]
-    "shift".to_string()
-}
-
 fn default_assistant_font_size() -> String {
     "medium".to_string()
 }
@@ -3717,13 +3743,21 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
 pub fn get_default_settings() -> AppSettings {
-    // Windows: modifier-only push-to-talk (hold Left Ctrl + Win to dictate,
-    // tap Space to lock hands-free). Keeps letter/space keys free and can't
-    // collide with in-app text shortcuts.
+    // Shortcut defaults. One idea on every platform: two keys to dictate, two
+    // to ask; the same keys plus Shift dictate and clean up, the ask keys plus
+    // C start a call, and Esc cancels.
+    //
+    // Windows: Left Ctrl + Win, Wispr Flow's default, so a switcher keeps it.
+    // Modifier-only, so no letter or Space is taken from any app.
+    // macOS: Fn (the globe key), Wispr's default too. Option+Space typed a
+    // non-breaking space and is Alfred's and ChatGPT's launcher.
+    // Linux: Ctrl+Space. The default engine there (Tauri's plugin, which needs
+    // no permissions) cannot register a modifier-only combo, and Ctrl+Space is
+    // what Handy ships, so it is also what a Handy user already knows.
     #[cfg(target_os = "windows")]
     let default_shortcut = "ctrl_left+super";
     #[cfg(target_os = "macos")]
-    let default_shortcut = "option+space";
+    let default_shortcut = "fn";
     #[cfg(target_os = "linux")]
     let default_shortcut = "ctrl+space";
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
@@ -3741,10 +3775,12 @@ pub fn get_default_settings() -> AppSettings {
             current_binding: default_shortcut.to_string(),
         },
     );
+    // The dictation keys plus Shift. Only registered while cleanup is on and
+    // set to its own shortcut.
     #[cfg(target_os = "windows")]
-    let default_post_process_shortcut = "ctrl+shift+space";
+    let default_post_process_shortcut = "ctrl_left+super+shift";
     #[cfg(target_os = "macos")]
-    let default_post_process_shortcut = "option+shift+space";
+    let default_post_process_shortcut = "fn+shift";
     #[cfg(target_os = "linux")]
     let default_post_process_shortcut = "ctrl+shift+space";
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
@@ -3767,33 +3803,40 @@ pub fn get_default_settings() -> AppSettings {
             id: "cancel".to_string(),
             name: "Cancel".to_string(),
             description: "Cancels the current recording.".to_string(),
-            // Disabled by default: a global Esc cancel swallows Esc presses
-            // meant for other apps (closing dialogs/menus) whenever a recording
-            // or assistant reply is active. Users can record a key to enable it.
-            default_binding: "".to_string(),
-            current_binding: "".to_string(),
+            // Only registered while something is running (a recording, an
+            // assistant reply, a Flow generation), so it takes Esc from other
+            // apps only at those moments. Removable for anyone who would
+            // rather never lose an Esc to it (`OPTIONAL_BINDINGS`).
+            default_binding: "escape".to_string(),
+            current_binding: "escape".to_string(),
         },
     );
 
+    // Windows: Left Ctrl + Left Alt. Left-side keys specifically: AltGr on
+    // international layouts reports as Left Ctrl + Right Alt, which must not
+    // start the assistant. It has to include Ctrl, too: the ask copies the
+    // selection with a synthetic Ctrl+C while the keys are still held, which
+    // works because Ctrl is part of that combo and the other key is withheld
+    // from Windows. With Win+Alt the copy would arrive as Win+Alt+Ctrl+C.
+    // macOS: Fn+Ctrl, Wispr's command-mode key. Not Ctrl+Option, which is
+    // VoiceOver's modifier (Ctrl+Option+Space is its "click").
     #[cfg(target_os = "macos")]
-    let default_assistant_shortcut = "option+ctrl+space";
-    // Windows: modifier-only hold (Left Ctrl + Left Alt), tap Space to go
-    // hands-free. Left-side keys specifically: AltGr on international layouts
-    // reports as Left Ctrl + Right Alt, which must NOT start the assistant.
+    let default_assistant_shortcut = "fn+ctrl";
     #[cfg(target_os = "windows")]
     let default_assistant_shortcut = "ctrl_left+alt_left";
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let default_assistant_shortcut = "ctrl+alt+space";
 
-    // The call's own key. `c` for call, and a letter rather than a modifier-only
-    // combo because this one is a deliberate tap, not a hold — nothing about it
-    // needs to be reachable without looking.
+    // The call is the ask keys plus C. A deliberate tap, so it can have a
+    // letter. The hotkey engine holds the ask back while its keys could still
+    // become the call's (`handy_keys::CHORD_GRACE`), so pressing all three
+    // starts a call and never an ask. Left-side on Windows for the same AltGr
+    // reason: AltGr+C types ć on a Polish keyboard. Ctrl+Shift+C, the previous
+    // Windows default, was copy in every terminal and DevTools in browsers.
     #[cfg(target_os = "macos")]
-    let default_assistant_call_shortcut = "option+ctrl+c";
-    // Ctrl+Alt+C first presses the modifier-only Assistant shortcut on Windows,
-    // so starting a call also started a recording and failed its setup check.
+    let default_assistant_call_shortcut = "fn+ctrl+c";
     #[cfg(target_os = "windows")]
-    let default_assistant_call_shortcut = "ctrl+shift+c";
+    let default_assistant_call_shortcut = "ctrl_left+alt_left+c";
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let default_assistant_call_shortcut = "ctrl+alt+c";
 
@@ -3811,9 +3854,8 @@ pub fn get_default_settings() -> AppSettings {
     );
 
     // Note: there's intentionally no dedicated "Assistant + Screen" shortcut.
-    // Ctrl/Cmd+Alt+Shift+Space is reserved as the assistant's hands-free (lock)
-    // variant. With screen access on, the assistant looks when a question needs
-    // it, so a key that forces a screenshot has nothing left to add.
+    // With screen access on, the assistant looks when a question needs it, so
+    // a key that forces a screenshot has nothing left to add.
 
     bindings.insert(
         "assistant_call".to_string(),
@@ -3835,9 +3877,6 @@ pub fn get_default_settings() -> AppSettings {
     AppSettings {
         bindings,
         push_to_talk: true,
-        tap_to_lock: default_tap_to_lock(),
-        tap_to_lock_key: default_tap_to_lock_key(),
-        assistant_tap_to_lock_key: default_assistant_tap_to_lock_key(),
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),
@@ -4941,40 +4980,9 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
 
         let default_settings = get_default_settings();
 
-        // Migrate bindings still sitting on an older release's default
-        // to the current default. Customized bindings are left alone,
-        // but their "reset" target (default_binding) is refreshed.
-        // Covers the Esc-cancel removal and the Windows modifier-only
-        // remap (transcribe/assistant/panel toggle).
-        for (key, code_default) in &default_settings.bindings {
-            if let Some(stored) = settings.bindings.get_mut(key) {
-                if stored.default_binding != code_default.default_binding {
-                    if stored.current_binding == stored.default_binding {
-                        debug!(
-                            "Migrating '{}' binding default: '{}' -> '{}'",
-                            key, stored.default_binding, code_default.default_binding
-                        );
-                        stored.current_binding = code_default.default_binding.clone();
-                    }
-                    stored.default_binding = code_default.default_binding.clone();
-                    updated = true;
-                }
-            }
+        if migrate_binding_defaults(&mut settings.bindings, &default_settings.bindings) {
+            updated = true;
         }
-        // The Windows tap-to-lock default moved from Shift to Space
-        // alongside the modifier-only record combos.
-        #[cfg(target_os = "windows")]
-        {
-            if settings.tap_to_lock_key == "shift" {
-                settings.tap_to_lock_key = "space".to_string();
-                updated = true;
-            }
-            if settings.assistant_tap_to_lock_key == "shift" {
-                settings.assistant_tap_to_lock_key = "space".to_string();
-                updated = true;
-            }
-        }
-
         // "Offer to record calls" and the meeting indicator became opt-in.
         // See `meeting_opt_in_defaults_applied`.
         if apply_meeting_opt_in_defaults(&mut settings) {
@@ -5184,6 +5192,115 @@ pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn binding(id: &str, default: &str, current: &str) -> ShortcutBinding {
+        ShortcutBinding {
+            id: id.to_string(),
+            name: id.to_string(),
+            description: String::new(),
+            default_binding: default.to_string(),
+            current_binding: current.to_string(),
+        }
+    }
+
+    #[test]
+    fn an_untouched_old_default_moves_and_a_customised_one_stays() {
+        let defaults = get_default_settings().bindings;
+        let new_call = defaults["assistant_call"].default_binding.clone();
+        let mut stored = HashMap::from([
+            (
+                "assistant_call".to_string(),
+                binding("assistant_call", "an+old+default", "an+old+default"),
+            ),
+            (
+                "assistant".to_string(),
+                binding("assistant", "an+old+default", "ctrl+f9"),
+            ),
+        ]);
+        assert!(migrate_binding_defaults(&mut stored, &defaults));
+        assert_eq!(stored["assistant_call"].current_binding, new_call);
+        assert_eq!(stored["assistant"].current_binding, "ctrl+f9");
+        // Reset now leads to the new default.
+        assert_eq!(
+            stored["assistant"].default_binding,
+            defaults["assistant"].default_binding
+        );
+        // A second pass has nothing left to do.
+        assert!(!migrate_binding_defaults(&mut stored, &defaults));
+    }
+
+    #[test]
+    fn cancel_becomes_esc_once_and_a_removed_cancel_stays_removed() {
+        let defaults = get_default_settings().bindings;
+        assert_eq!(defaults["cancel"].default_binding, "escape");
+        // Upgraded from when Cancel shipped unbound.
+        let mut stored = HashMap::from([("cancel".to_string(), binding("cancel", "", ""))]);
+        assert!(migrate_binding_defaults(&mut stored, &defaults));
+        assert_eq!(stored["cancel"].current_binding, "escape");
+        // The user removes it: that must survive every later launch.
+        stored.get_mut("cancel").unwrap().current_binding = String::new();
+        assert!(!migrate_binding_defaults(&mut stored, &defaults));
+        assert_eq!(stored["cancel"].current_binding, "");
+    }
+
+    #[test]
+    fn only_cancel_and_the_call_can_be_left_unbound() {
+        assert!(is_optional_binding("cancel"));
+        assert!(is_optional_binding("assistant_call"));
+        assert!(!is_optional_binding("transcribe"));
+        assert!(!is_optional_binding("assistant"));
+        assert!(!is_optional_binding(CLEANUP_BINDING_ID));
+    }
+
+    /// Cleanup's own key is the dictation keys plus Shift, and the call is the
+    /// ask keys plus C — the whole scheme, checked on whichever OS runs this.
+    #[test]
+    fn the_longer_shortcuts_extend_the_shorter_ones() {
+        let defaults = get_default_settings().bindings;
+        let parts = |id: &str| -> std::collections::BTreeSet<String> {
+            defaults[id]
+                .default_binding
+                .split('+')
+                .map(str::to_string)
+                .collect()
+        };
+        let dictate = parts("transcribe");
+        let cleanup = parts(CLEANUP_BINDING_ID);
+        let ask = parts("assistant");
+        let call = parts("assistant_call");
+        assert!(dictate.is_subset(&cleanup));
+        assert!(cleanup.contains("shift"));
+        assert!(call.contains("c"));
+        // Linux needs a main key in every combo (Tauri's engine), so its ask is
+        // Ctrl+Alt+Space and its call Ctrl+Alt+C: same modifiers, other key.
+        if cfg!(target_os = "linux") {
+            assert!(ask.contains("space"));
+        } else {
+            assert!(ask.is_subset(&call));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_never_takes_copy_or_altgr_for_the_call() {
+        let call = &get_default_settings().bindings["assistant_call"].default_binding;
+        assert_ne!(call, "ctrl+shift+c");
+        // Left-side: AltGr reports as Left Ctrl + Right Alt.
+        assert!(call.contains("alt_left"), "{call}");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn an_existing_mac_install_keeps_its_option_space_dictation() {
+        let defaults = get_default_settings().bindings;
+        let mut stored = HashMap::from([(
+            "transcribe".to_string(),
+            binding("transcribe", "option+space", "option+space"),
+        )]);
+        assert!(migrate_binding_defaults(&mut stored, &defaults));
+        assert_eq!(stored["transcribe"].current_binding, "option+space");
+        assert_eq!(stored["transcribe"].default_binding, "fn");
+    }
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()

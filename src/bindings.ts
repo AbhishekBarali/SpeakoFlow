@@ -29,49 +29,6 @@ async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-/**
- * Toggle the "tap to lock a hold recording hands-free" gesture. When off,
- * holding the hotkey never arms the lock-key watcher, so a stray tap can't
- * convert an in-progress recording to hands-free.
- */
-async changeTapToLockSetting(enabled: boolean) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("change_tap_to_lock_setting", { enabled }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Set the key that a tap converts a hold recording to hands-free (the "Tap to
- * Lock" gesture). Accepts a modifier ("shift", "ctrl", "alt", "super"/"cmd")
- * or a plain key name ("tab", "f8", …). Persisted; takes effect on the next
- * recording (the watcher reads it fresh each time it arms).
- */
-async changeTapToLockKeySetting(key: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("change_tap_to_lock_key_setting", { key }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Set the key that a tap converts a hold **assistant** recording to hands-free.
- * Separate from the dictation lock key so the assistant can use a different
- * combo (defaults to Shift). Accepts a modifier or a plain key name; empty
- * disables it. A key that overlaps the assistant record shortcut is ignored at
- * arm time. Persisted; takes effect on the next assistant recording (the
- * watcher reads it fresh each time it arms).
- */
-async changeAssistantTapToLockKeySetting(key: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("change_assistant_tap_to_lock_key_setting", { key }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async changeAudioFeedbackSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_audio_feedback_setting", { enabled }) };
@@ -655,6 +612,30 @@ async changeKeyboardImplementationSetting(implementation: string) : Promise<Resu
  */
 async getKeyboardImplementation() : Promise<string> {
     return await TAURI_INVOKE("get_keyboard_implementation");
+},
+/**
+ * Whether the Fn (globe) key still does something of its own on this Mac.
+ * 
+ * Fn is the macOS dictation default, and macOS acts on a globe press itself
+ * unless System Settings → Keyboard → "Press 🌐 key to" is Do Nothing: the
+ * emoji picker or an input-source switch would appear on every dictation.
+ * `AppleFnUsageType` is that setting (0 = Do Nothing). Absent means it was
+ * never changed, and the shipped value is not Do Nothing. Always false off
+ * macOS.
+ */
+async globeKeyHasOwnAction() : Promise<boolean> {
+    return await TAURI_INVOKE("globe_key_has_own_action");
+},
+/**
+ * Open System Settings → Keyboard, where "Press 🌐 key to" lives.
+ */
+async openKeyboardSettings() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_keyboard_settings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 async changeShowTrayIconSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
@@ -3466,34 +3447,7 @@ historyUpdatePayload: "history-update-payload"
  * broken field can never reset the rest of the user's configuration
  * (backport of Handy #1631).
  */
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
-/**
- * While a push-to-talk (hold) recording is active, a quick tap of the
- * configured lock key (see `tap_to_lock_key`) converts it to hands-free
- * (locked) mode so you can let go of the hotkey and keep talking. On by
- * default; turn off if a stray tap keeps locking your recordings. Only
- * relevant while push-to-talk is on.
- */
-tap_to_lock?: boolean; 
-/**
- * The key you tap (while holding a push-to-talk recording) to lock it
- * hands-free. Defaults to Shift. Pick a key that isn't part of your record
- * shortcut and that you won't press by accident. Accepts a modifier
- * ("shift", "ctrl", "alt", "super"/"cmd") or a plain key name ("tab", "f8",
- * …). Only relevant while push-to-talk and Tap to Lock are on.
- */
-tap_to_lock_key?: string; 
-/**
- * The key you tap while holding a push-to-talk **assistant** recording to
- * lock it hands-free, so you can release the hotkey and keep talking to the
- * assistant. Separate from the dictation `tap_to_lock_key` so it can be a
- * different combo (defaults to Shift). Accepts a modifier ("shift", "ctrl",
- * …) or a plain key name ("tab", "f8", …). Pick a key that isn't part of
- * your assistant record shortcut — one that overlaps (e.g. Space while the
- * shortcut is ctrl+alt+space) is ignored, since the held key would instantly
- * lock the recording. Clear it (empty) to disable.
- */
-assistant_tap_to_lock_key?: string; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
 /**
  * Opt-in live/streaming transcription: while recording, feed audio into a
  * streaming transcriber and paste the merged running result at the end

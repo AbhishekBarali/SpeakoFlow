@@ -255,6 +255,10 @@ pub enum HotkeyState {
     Pressed,
     /// The hotkey was just released
     Released,
+    /// A modifier-only hotkey that fired a moment ago turned out to be the
+    /// start of a different shortcut (another key followed within the chord
+    /// window). Undo whatever the press started; no `Released` follows.
+    Cancelled,
 }
 
 /// Event emitted when a hotkey is pressed or released

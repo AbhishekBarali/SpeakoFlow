@@ -159,7 +159,6 @@
     "tour": {
       "features": "Was SpeakoFlow kann",
       "count": "{{current}} von {{total}}",
-      "skip": "Tour überspringen",
       "next": "Weiter",
       "finish": "SpeakoFlow öffnen",
       "tabs": {
@@ -663,12 +662,6 @@
         "description": "Halten: Die Aufnahme läuft, solange du ein Aufnahme-Tastenkürzel gedrückt hältst. Antippen: Ein Druck startet, der nächste stoppt. Gilt für alle Aufnahme-Tastenkürzel.",
         "hold": "Halten",
         "tap": "Antippen"
-      },
-      "tapToLock": {
-        "label": "Zum Feststellen antippen",
-        "info": "Tippe diese Taste an, während du dein Aufnahme-Tastenkürzel hältst, um die freihändige Aufnahme festzustellen — dann kannst du loslassen und weitersprechen. Wähle eine Taste, die nicht Teil deines Aufnahme-Tastenkürzels ist, oder lösche sie, um das abzuschalten.",
-        "off": "Aus",
-        "clear": "Löschen"
       }
     },
     "models": {
@@ -1496,12 +1489,6 @@
       "subpages": {
         "profilesCaption": "Wechsle Name, Rolle und Persönlichkeit des Assistenten.",
         "memoryCaption": "Was sich der Assistent über Chats hinweg über dich merkt."
-      },
-      "tapToLock": {
-        "label": "Zum Feststellen antippen",
-        "info": "Tippe diese Taste an, während du das Assistenten-Tastenkürzel hältst, um freihändig festzustellen — dann kannst du loslassen und weitersprechen. Wähle eine Taste, die nicht Teil deines Assistenten-Tastenkürzels ist (eine überlappende wird ignoriert), oder lösche sie, um das abzuschalten.",
-        "off": "Aus",
-        "clear": "Löschen"
       },
       "provider": {
         "title": "Assistenz-Anbieter",
@@ -2573,6 +2560,10 @@
       "cancel": {
         "title": "Abbrechen",
         "what": "Beendet eine Aufnahme oder eine Antwort, die vorgelesen wird."
+      },
+      "globe": {
+        "hint": "macOS reagiert ebenfalls auf die 🌐-Taste. Stelle „🌐-Taste drücken, um“ auf „Keine Aktion“, damit sie nur diktiert.",
+        "open": "Tastatureinstellungen"
       }
     },
     "setup": {
@@ -3122,7 +3113,10 @@
   },
   "shortcutEditor": {
     "change": "Tastenkürzel für {{name}} ändern",
-    "reset": "{{name}} auf den Standard zurücksetzen"
+    "useDefault": "Standard",
+    "turnOff": "Ausschalten",
+    "turnedOff": "Tastenkürzel für {{name}} ausgeschaltet",
+    "undo": "Rückgängig"
   },
   "memoryManager": {
     "status": {

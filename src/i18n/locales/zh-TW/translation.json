@@ -158,7 +158,6 @@
     "tour": {
       "features": "SpeakoFlow 能做什麼",
       "count": "{{current}} / {{total}}",
-      "skip": "略過導覽",
       "next": "下一步",
       "finish": "開啟 SpeakoFlow",
       "tabs": {
@@ -661,12 +660,6 @@
         "description": "按住：按住錄音快捷鍵期間持續錄音。點按：按一下開始，再按一下停止。適用於所有錄音快捷鍵。",
         "hold": "按住",
         "tap": "點按"
-      },
-      "tapToLock": {
-        "label": "輕按鎖定",
-        "info": "按住錄製快捷鍵時輕按這個鍵，即可鎖定免持錄製，放開手也能繼續說話。請選擇不屬於錄製快捷鍵的任一按鍵，或清除以關閉此功能。",
-        "off": "關閉",
-        "clear": "清除"
       }
     },
     "models": {
@@ -1487,12 +1480,6 @@
       "subpages": {
         "profilesCaption": "切換助理的名稱、身分與個性。",
         "memoryCaption": "助理在不同對話之間記住的關於您的內容。"
-      },
-      "tapToLock": {
-        "label": "輕按鎖定",
-        "info": "按住助理快捷鍵時輕按這個鍵，即可鎖定免持模式，放開手也能繼續說話。請選擇不屬於助理快捷鍵的按鍵（重疊的按鍵會被忽略），或清除以關閉此功能。",
-        "off": "關閉",
-        "clear": "清除"
       },
       "provider": {
         "title": "助理供應商",
@@ -2552,6 +2539,10 @@
       "cancel": {
         "title": "取消",
         "what": "停止錄音，或停止正在朗讀的回覆。"
+      },
+      "globe": {
+        "hint": "macOS 也會回應 🌐 鍵。將「按下 🌐 鍵來」設為「不執行任何動作」，它就只用於聽寫。",
+        "open": "鍵盤設定"
       }
     },
     "setup": {
@@ -3094,7 +3085,10 @@
   },
   "shortcutEditor": {
     "change": "變更「{{name}}」快捷鍵",
-    "reset": "將「{{name}}」重設為預設值"
+    "useDefault": "使用預設值",
+    "turnOff": "關閉",
+    "turnedOff": "已關閉{{name}}快速鍵",
+    "undo": "復原"
   },
   "memoryManager": {
     "status": {

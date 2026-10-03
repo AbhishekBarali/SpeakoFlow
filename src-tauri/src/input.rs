@@ -304,7 +304,7 @@ pub fn conflicting_modifier_held() -> bool {
 
 #[cfg(not(target_os = "windows"))]
 pub fn conflicting_modifier_held() -> bool {
-    // macOS copies with Cmd+C while its default hotkey is Option+Space, so the
+    // macOS copies with Cmd+C while its default hotkeys use Fn and Ctrl, so the
     // two cannot collide. On Linux the X11 tools pass `--clearmodifiers`, which
     // solves this at the tool level, and the preferred X11 route reads the PRIMARY
     // selection without sending any keystroke at all.

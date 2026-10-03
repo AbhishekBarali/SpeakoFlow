@@ -159,7 +159,6 @@
     "tour": {
       "features": "SpeakoFlow neler yapar",
       "count": "{{current}}/{{total}}",
-      "skip": "Turu atla",
       "next": "İleri",
       "finish": "SpeakoFlow'u aç",
       "tabs": {
@@ -663,12 +662,6 @@
         "description": "Basılı tut: bir kayıt kısayolunu basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki basış durdurur. Tüm kayıt kısayollarına uygulanır.",
         "hold": "Basılı tut",
         "tap": "Dokun"
-      },
-      "tapToLock": {
-        "label": "Dokun ve kilitle",
-        "info": "Kayıt kısayolunuzu basılı tutarken bu tuşa dokunarak eller serbest kaydı kilitleyin; böylece tuşu bırakıp konuşmaya devam edebilirsiniz. Kayıt kısayolunuzun parçası olmayan herhangi bir tuşu seçin veya kapatmak için temizleyin.",
-        "off": "Kapalı",
-        "clear": "Temizle"
       }
     },
     "models": {
@@ -1496,12 +1489,6 @@
       "subpages": {
         "profilesCaption": "Asistanın adını, rolünü ve kişiliğini değiştirin.",
         "memoryCaption": "Asistanın sohbetler arasında sizinle ilgili hatırladıkları."
-      },
-      "tapToLock": {
-        "label": "Dokun ve kilitle",
-        "info": "Asistan kısayolunu basılı tutarken bu tuşa dokunarak eller serbest modu kilitleyin; böylece tuşu bırakıp konuşmaya devam edebilirsiniz. Asistan kısayolunuzun parçası olmayan bir tuş seçin (çakışan bir tuş yok sayılır) veya kapatmak için temizleyin.",
-        "off": "Kapalı",
-        "clear": "Temizle"
       },
       "provider": {
         "title": "Asistan sağlayıcısı",
@@ -2573,6 +2560,10 @@
       "cancel": {
         "title": "İptal",
         "what": "Bir kaydı ya da sesli okunan bir yanıtı durdurun."
+      },
+      "globe": {
+        "hint": "macOS da 🌐 tuşuna tepki verir. Yalnızca dikte etmesi için “🌐 tuşuna basınca” ayarını “Hiçbir Şey Yapma” yapın.",
+        "open": "Klavye ayarları"
       }
     },
     "setup": {
@@ -3122,7 +3113,10 @@
   },
   "shortcutEditor": {
     "change": "{{name}} kısayolunu değiştir",
-    "reset": "{{name}} kısayolunu varsayılana sıfırla"
+    "useDefault": "Varsayılanı kullan",
+    "turnOff": "Kapat",
+    "turnedOff": "{{name}} kısayolu kapatıldı",
+    "undo": "Geri al"
   },
   "memoryManager": {
     "status": {

@@ -40,7 +40,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::settings::{self, get_settings, ShortcutBinding};
 
-use super::handler::handle_shortcut_event;
+use super::handler::{handle_shortcut_cancelled, handle_shortcut_event};
 
 /// How long a caller waits for the manager thread to answer a register /
 /// unregister request. The channel wakes the thread immediately unless it is
@@ -148,8 +148,15 @@ impl HandyKeysState {
                             "handy-keys event: binding={}, hotkey={}, state={:?}",
                             binding_id, hotkey_string, event.state
                         );
-                        let is_pressed = event.state == HotkeyState::Pressed;
-                        handle_shortcut_event(&app, binding_id, hotkey_string, is_pressed);
+                        match event.state {
+                            HotkeyState::Pressed | HotkeyState::Released => handle_shortcut_event(
+                                &app,
+                                binding_id,
+                                hotkey_string,
+                                event.state == HotkeyState::Pressed,
+                            ),
+                            HotkeyState::Cancelled => handle_shortcut_cancelled(&app, binding_id),
+                        }
                     }
                 }
                 ManagerCommand::Register {

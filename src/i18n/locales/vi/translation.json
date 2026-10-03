@@ -158,7 +158,6 @@
     "tour": {
       "features": "SpeakoFlow làm được gì",
       "count": "{{current}}/{{total}}",
-      "skip": "Bỏ qua phần giới thiệu",
       "next": "Tiếp",
       "finish": "Mở SpeakoFlow",
       "tabs": {
@@ -661,12 +660,6 @@
         "description": "Giữ: ghi âm trong khi bạn giữ phím tắt ghi âm. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng. Áp dụng cho mọi phím tắt ghi âm.",
         "hold": "Giữ",
         "tap": "Nhấn"
-      },
-      "tapToLock": {
-        "label": "Nhấn để khóa",
-        "info": "Trong khi giữ phím tắt ghi âm, hãy nhấn phím này để khóa ghi âm rảnh tay, nhờ đó bạn có thể thả tay ra mà vẫn nói tiếp. Chọn phím nào không thuộc phím tắt ghi âm của bạn, hoặc xóa trống để tắt tính năng này.",
-        "off": "Tắt",
-        "clear": "Xóa"
       }
     },
     "models": {
@@ -1487,12 +1480,6 @@
       "subpages": {
         "profilesCaption": "Đổi tên, vai trò và tính cách của trợ lý.",
         "memoryCaption": "Những gì trợ lý ghi nhớ về bạn giữa các cuộc trò chuyện."
-      },
-      "tapToLock": {
-        "label": "Nhấn để khóa",
-        "info": "Trong khi giữ phím tắt trợ lý, hãy nhấn phím này để khóa chế độ rảnh tay, nhờ đó bạn có thể thả tay ra mà vẫn nói tiếp. Chọn phím nào không thuộc phím tắt trợ lý của bạn (phím bị trùng sẽ bị bỏ qua), hoặc xóa trống để tắt tính năng này.",
-        "off": "Tắt",
-        "clear": "Xóa"
       },
       "provider": {
         "title": "Nhà cung cấp cho trợ lý",
@@ -2552,6 +2539,10 @@
       "cancel": {
         "title": "Hủy",
         "what": "Dừng ghi âm, hoặc dừng câu trả lời đang được đọc to."
+      },
+      "globe": {
+        "hint": "macOS cũng phản hồi phím 🌐. Đặt “Nhấn phím 🌐 để” thành “Không làm gì” để phím chỉ dùng cho đọc chính tả.",
+        "open": "Cài đặt bàn phím"
       }
     },
     "setup": {
@@ -3094,7 +3085,10 @@
   },
   "shortcutEditor": {
     "change": "Đổi phím tắt {{name}}",
-    "reset": "Đặt lại {{name}} về mặc định"
+    "useDefault": "Dùng mặc định",
+    "turnOff": "Tắt",
+    "turnedOff": "Đã tắt phím tắt {{name}}",
+    "undo": "Hoàn tác"
   },
   "memoryManager": {
     "status": {

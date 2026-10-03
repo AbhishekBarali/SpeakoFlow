@@ -160,7 +160,6 @@
     "tour": {
       "features": "Ce que fait SpeakoFlow",
       "count": "{{current}} sur {{total}}",
-      "skip": "Passer la visite",
       "next": "Suivant",
       "finish": "Ouvrir SpeakoFlow",
       "tabs": {
@@ -665,12 +664,6 @@
         "description": "Maintenir : l'enregistrement dure tant que vous maintenez un raccourci d'enregistrement. Appuyer : une pression lance l'enregistrement, la suivante l'arrête. S'applique à tous les raccourcis d'enregistrement.",
         "hold": "Maintenir",
         "tap": "Appuyer"
-      },
-      "tapToLock": {
-        "label": "Appuyer pour verrouiller",
-        "info": "Pendant que vous maintenez votre raccourci d'enregistrement, appuyez sur cette touche pour verrouiller l'enregistrement mains libres : vous pouvez alors relâcher et continuer à parler. Choisissez n'importe quelle touche qui ne fait pas partie de votre raccourci d'enregistrement, ou effacez-la pour désactiver cette option.",
-        "off": "Désactivé",
-        "clear": "Effacer"
       }
     },
     "models": {
@@ -1505,12 +1498,6 @@
       "subpages": {
         "profilesCaption": "Changez le nom, le rôle et la personnalité de l'assistant.",
         "memoryCaption": "Ce que l'assistant retient de vous d'une conversation à l'autre."
-      },
-      "tapToLock": {
-        "label": "Appuyer pour verrouiller",
-        "info": "Pendant que vous maintenez le raccourci de l'assistant, appuyez sur cette touche pour verrouiller le mode mains libres : vous pouvez alors relâcher et continuer à parler. Choisissez une touche qui ne fait pas partie de votre raccourci de l'assistant (une touche commune est ignorée), ou effacez-la pour désactiver cette option.",
-        "off": "Désactivé",
-        "clear": "Effacer"
       },
       "provider": {
         "title": "Fournisseur de l'assistant",
@@ -2594,6 +2581,10 @@
       "cancel": {
         "title": "Annuler",
         "what": "Arrête un enregistrement ou une réponse en cours de lecture."
+      },
+      "globe": {
+        "hint": "macOS réagit aussi à la touche 🌐. Réglez « Appuyer sur la touche 🌐 pour » sur « Ne rien faire » pour qu’elle ne serve qu’à dicter.",
+        "open": "Réglages du clavier"
       }
     },
     "setup": {
@@ -3150,7 +3141,10 @@
   },
   "shortcutEditor": {
     "change": "Modifier le raccourci {{name}}",
-    "reset": "Rétablir {{name}} par défaut"
+    "useDefault": "Par défaut",
+    "turnOff": "Désactiver",
+    "turnedOff": "Raccourci {{name}} désactivé",
+    "undo": "Annuler"
   },
   "memoryManager": {
     "status": {

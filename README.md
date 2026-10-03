@@ -89,7 +89,7 @@ this, explain this. Copy the answer, insert it, or replace the selection.
 
 **Call**
 
-<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd>
+<kbd>Left Ctrl</kbd> + <kbd>Left Alt</kbd> + <kbd>C</kbd>
 
 A hands-free conversation. Talk a problem through and it answers out loud.
 Press the keys again to hang up.
@@ -194,7 +194,7 @@ It can do more when you let it:
 
 ### Call: talk it through, out loud
 
-Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> and just talk. The
+Press <kbd>Left Ctrl</kbd> + <kbd>Left Alt</kbd> + <kbd>C</kbd> and just talk. The
 assistant answers out loud, you can cut in while it's speaking, and pressing
 the keys again hangs up. Need to type something mid-call? Dictate as usual: the
 call holds while you do, then picks up again.
@@ -301,20 +301,30 @@ Full documentation for each:
 
 ## Default hotkeys
 
-| Action                            | Windows                        | macOS                          | Linux                          |
-| --------------------------------- | ------------------------------ | ------------------------------ | ------------------------------ |
-| Dictate                           | `Left Ctrl + Left Win`         | `Option + Space`               | `Ctrl + Space`                 |
-| Ask the assistant                 | `Left Ctrl + Left Alt`         | `Option + Ctrl + Space`        | `Ctrl + Alt + Space`           |
-| Start or end a call               | `Ctrl + Shift + C`             | `Option + Ctrl + C`            | `Ctrl + Alt + C`               |
-| Dictate and clean up <sup>1</sup> | `Ctrl + Shift + Space`         | `Option + Shift + Space`       | `Ctrl + Shift + Space`         |
-| Cancel                            | Not set. Bind one in Settings. | Not set. Bind one in Settings. | Not set. Bind one in Settings. |
+| Action                            | Windows                       | macOS            | Linux                  |
+| --------------------------------- | ----------------------------- | ---------------- | ---------------------- |
+| Dictate                           | `Left Ctrl + Left Win`        | `Fn` (🌐)        | `Ctrl + Space`         |
+| Ask the assistant                 | `Left Ctrl + Left Alt`        | `Fn + Ctrl`      | `Ctrl + Alt + Space`   |
+| Start or end a call               | `Left Ctrl + Left Alt + C`    | `Fn + Ctrl + C`  | `Ctrl + Alt + C`       |
+| Dictate and clean up <sup>1</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`     | `Ctrl + Shift + Space` |
+| Cancel                            | `Esc`                         | `Esc`            | Not available yet      |
 
 <sup>1</sup> Only while AI cleanup is on and set to its own hotkey.
 
-Hold a recording hotkey to talk and release it to finish, or switch the home
-page's **Hold to talk** to **Tap to toggle** so one press starts and the next
-press stops. The choice applies to every recording hotkey. Cancel is unset
-because a global Esc would swallow Esc presses meant for other apps.
+The pattern is the same everywhere: add Shift to the dictation keys to dictate
+and clean up, and add C to the ask keys to start a call. Hold a recording
+hotkey to talk and release it to finish, or switch the home page's **Hold to
+talk** to **Tap to toggle** so one press starts and the next press stops. The
+choice applies to every recording hotkey.
+
+Esc only cancels while something is running (a recording, or a reply being
+written or read aloud), so it never takes Esc from other apps the rest of the
+time. To turn it off, or the call hotkey, click its keys and choose **Turn
+off**.
+
+On a Mac, set **System Settings → Keyboard → Press 🌐 key to** to **Do
+Nothing**, or the globe key also opens the emoji picker. Macs that were already
+on Option + Space keep it after updating.
 
 Every shortcut and its default, on all three platforms:
 [Keyboard shortcuts](https://www.speakoflow.com/docs/start/keyboard-shortcuts).

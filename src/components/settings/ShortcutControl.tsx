@@ -1,11 +1,119 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { Keycaps } from "../ui/Keycaps";
+import { formatKeyCombination } from "../../lib/utils/keyboard";
+import { useOsType } from "../../hooks/useOsType";
 
 /** `hero` is for feature banners; `default` for cards and tables. */
 export type ShortcutFinish = "default" | "hero";
 export type ShortcutSize = "sm" | "md" | "lg";
+
+/**
+ * Shortcuts that may be left without a key. Mirrors `OPTIONAL_BINDINGS` in
+ * `settings.rs`, which is what actually accepts the empty binding.
+ */
+const OPTIONAL_SHORTCUTS = new Set(["cancel", "assistant_call"]);
+
+export const isOptionalShortcut = (id: string): boolean =>
+  OPTIONAL_SHORTCUTS.has(id);
+
+/**
+ * What the shortcut editor offers besides pressing new keys: going back to
+ * the default, and turning an optional shortcut off.
+ *
+ * These only appear while a shortcut is being changed. A row at rest shows its
+ * keys and nothing else, because a remove button and a reset button sitting
+ * beside every set of keys were easy to hit by accident and made each row a
+ * cluster of icons. Turning a shortcut off now takes two deliberate clicks
+ * (change, then Turn off), and is announced with an Undo.
+ *
+ * Esc cannot be how you leave the editor: it is itself a key you may want to
+ * record (it is Cancel's default). Clicking anywhere else leaves it, keeping
+ * the shortcut as it was. That click handling is the editors' own, and it
+ * treats these buttons as part of the editor, so render them inside the
+ * element the editor watches.
+ */
+export const ShortcutEditActions: React.FC<{
+  /** The binding as it was when editing began. */
+  current: string;
+  defaultBinding: string;
+  optional: boolean;
+  finish?: ShortcutFinish;
+  disabled?: boolean;
+  onUseDefault: () => void;
+  onTurnOff: () => void;
+}> = ({
+  current,
+  defaultBinding,
+  optional,
+  finish = "default",
+  disabled = false,
+  onUseDefault,
+  onTurnOff,
+}) => {
+  const { t } = useTranslation();
+  const osType = useOsType();
+  const hero = finish === "hero";
+  const showDefault =
+    defaultBinding.trim() !== "" && current !== defaultBinding;
+  const showOff = optional && current.trim() !== "";
+  if (!showDefault && !showOff) return null;
+
+  const action = `shrink-0 cursor-pointer whitespace-nowrap rounded px-1 text-xs font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+    hero
+      ? "text-hero-muted hover:text-hero-ink focus-visible:ring-hero-ink"
+      : "text-muted hover:text-ink focus-visible:ring-accent/40"
+  }`;
+  return (
+    <span className="flex items-center justify-end">
+      {showDefault && (
+        <button
+          type="button"
+          className={action}
+          disabled={disabled}
+          title={formatKeyCombination(defaultBinding, osType)}
+          onClick={onUseDefault}
+        >
+          {t("shortcutEditor.useDefault")}
+        </button>
+      )}
+      {showDefault && showOff && (
+        <span
+          aria-hidden="true"
+          className={hero ? "text-hero-muted" : "text-muted"}
+        >
+          ·
+        </span>
+      )}
+      {showOff && (
+        <button
+          type="button"
+          className={action}
+          disabled={disabled}
+          onClick={onTurnOff}
+        >
+          {t("shortcutEditor.turnOff")}
+        </button>
+      )}
+    </span>
+  );
+};
+
+/**
+ * Say that a shortcut was turned off, with a way back. `restore` puts the keys
+ * it had back.
+ */
+export const announceTurnedOff = (
+  t: (key: string, options?: Record<string, unknown>) => string,
+  name: string,
+  restore: () => void,
+) => {
+  toast(t("shortcutEditor.turnedOff", { name }), {
+    action: { label: t("shortcutEditor.undo"), onClick: restore },
+  });
+};
 
 /**
  * A shortcut you can see *and* change: the keys themselves are the button.
@@ -22,6 +130,8 @@ export const ShortcutKeysButton: React.FC<{
   finish?: ShortcutFinish;
   size?: ShortcutSize;
   disabled?: boolean;
+  /** Shown with no keys: "Off" for a shortcut turned off on purpose. */
+  emptyLabel?: string;
   onClick: () => void;
 }> = ({
   binding,
@@ -29,6 +139,7 @@ export const ShortcutKeysButton: React.FC<{
   finish = "default",
   size = "md",
   disabled = false,
+  emptyLabel,
   onClick,
 }) => {
   const { t } = useTranslation();
@@ -54,7 +165,7 @@ export const ShortcutKeysButton: React.FC<{
           <span
             className={`px-1 text-sm ${hero ? "text-hero-muted" : "text-muted"}`}
           >
-            {t("settings.general.shortcut.notSet")}
+            {emptyLabel ?? t("settings.general.shortcut.notSet")}
           </span>
         }
       />
@@ -86,7 +197,7 @@ export const RecordingKeys = React.forwardRef<
       data-shortcut-recording="true"
       role="status"
       aria-live="polite"
-      className={`inline-flex min-w-0 max-w-full items-center gap-2 rounded-[0.625rem] border font-medium ${RECORDING_SIZES[size]} ${
+      className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[0.625rem] border font-medium ${RECORDING_SIZES[size]} ${
         hero
           ? "border-hero-border bg-hero-control text-hero-ink"
           : "border-accent bg-accent/10 text-accent"
@@ -96,7 +207,7 @@ export const RecordingKeys = React.forwardRef<
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60 motion-reduce:hidden" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
       </span>
-      <span className="min-w-0">{text}</span>
+      <span>{text}</span>
     </div>
   );
 });

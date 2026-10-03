@@ -94,7 +94,6 @@ export const AssistantPage: React.FC = () => {
                     bare
                     finish="hero"
                     size="lg"
-                    showReset="never"
                   />
                 </HeroShortcut>
                 <HeroShortcut
@@ -106,7 +105,6 @@ export const AssistantPage: React.FC = () => {
                     bare
                     finish="hero"
                     size="lg"
-                    showReset="never"
                   />
                 </HeroShortcut>
               </div>
