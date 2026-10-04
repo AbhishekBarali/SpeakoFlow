@@ -47,7 +47,7 @@ jobs:
           # The list scripts/install-arch.sh checks for, plus what CI needs to
           # check out, fetch toolchains and run makepkg as a regular user.
           pacman -Syu --noconfirm --needed \
-            alsa-lib base-devel cmake glslang gtk-layer-shell gtk3 \
+            alsa-lib base-devel clang cmake glslang gtk-layer-shell gtk3 \
             libappindicator libdrm libglvnd librsvg libx11 libxrandr libxtst \
             openssl patchelf pipewire pkgconf shaderc spirv-headers \
             vulkan-headers vulkan-icd-loader wayland webkit2gtk-4.1 \

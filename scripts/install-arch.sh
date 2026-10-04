@@ -85,6 +85,7 @@ fi
 arch_dependencies=(
   alsa-lib
   base-devel
+  clang
   cmake
   glslang
   gtk-layer-shell
