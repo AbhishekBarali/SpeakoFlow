@@ -2476,13 +2476,7 @@
       "debug": "Débogage"
     },
     "general": {
-      "appearance": "Apparence",
-      "onboarding": {
-        "title": "Prise en main",
-        "replay": "Configuration initiale",
-        "replayInfo": "Refaites la configuration et la visite, comme lors d'une nouvelle installation. Les modèles que vous avez déjà restent installés.",
-        "replayButton": "Revoir la prise en main"
-      }
+      "appearance": "Apparence"
     },
     "shortcuts": {
       "intro": "Chaque raccourci fonctionne dans toutes les applications. Cliquez sur un raccourci pour en enregistrer un nouveau.",

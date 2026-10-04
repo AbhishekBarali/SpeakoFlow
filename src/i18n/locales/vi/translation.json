@@ -2440,13 +2440,7 @@
       "debug": "Gỡ lỗi"
     },
     "general": {
-      "appearance": "Giao diện",
-      "onboarding": {
-        "title": "Hướng dẫn ban đầu",
-        "replay": "Thiết lập lần đầu",
-        "replayInfo": "Đi lại phần thiết lập và phần giới thiệu, đúng như khi mới cài đặt. Các mô hình bạn đã có vẫn được giữ nguyên.",
-        "replayButton": "Xem lại hướng dẫn ban đầu"
-      }
+      "appearance": "Giao diện"
     },
     "shortcuts": {
       "intro": "Mọi phím tắt đều hoạt động trong mọi ứng dụng. Nhấp vào một phím tắt để ghi phím mới.",

@@ -2440,13 +2440,7 @@
       "debug": "디버그"
     },
     "general": {
-      "appearance": "모양",
-      "onboarding": {
-        "title": "온보딩",
-        "replay": "첫 실행 설정",
-        "replayInfo": "새로 설치했을 때처럼 설정과 둘러보기를 다시 진행합니다. 이미 설치한 모델은 그대로 유지됩니다.",
-        "replayButton": "온보딩 다시 보기"
-      }
+      "appearance": "모양"
     },
     "shortcuts": {
       "intro": "모든 단축키는 어느 앱에서나 작동합니다. 단축키를 클릭하면 새 단축키를 녹화할 수 있습니다.",

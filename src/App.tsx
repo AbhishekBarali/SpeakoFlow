@@ -17,8 +17,6 @@ import {
   VoicePrefetch,
   hasCompletedOnboarding,
   markOnboardingComplete,
-  useOnboardingReplay,
-  useSetupQueue,
 } from "./components/onboarding";
 import TitleBar from "./components/TitleBar";
 import { MainShell } from "./components/shell/MainShell";
@@ -68,25 +66,10 @@ function App() {
     (state) => state.refreshOutputDevices,
   );
   const hasCompletedPostOnboardingInit = useRef(false);
-  const replayRequests = useOnboardingReplay((state) => state.requests);
 
   useEffect(() => {
     checkOnboardingStatus();
   }, []);
-
-  // Settings → General → "Show onboarding again": the whole first-run flow,
-  // from the welcome screen, exactly as a new install sees it. Nothing is
-  // reset underneath it: models on disk stay installed (setup shows them as
-  // installed and offers Continue), downloads in flight keep going, and the
-  // completion flag is only rewritten when the replay reaches the end.
-  useEffect(() => {
-    if (replayRequests === 0) return;
-    useSetupQueue.getState().clearSettled();
-    setSkippedModels(false);
-    setIsReturningUser(false);
-    setShellNavigation(INITIAL_NAVIGATION);
-    setOnboardingStep("welcome");
-  }, [replayRequests]);
 
   // Initialize RTL direction when language changes
   useEffect(() => {

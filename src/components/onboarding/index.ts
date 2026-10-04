@@ -4,7 +4,6 @@ export { WelcomeStep } from "./WelcomeStep";
 export { TourStep } from "./TourStep";
 export { VoicePrefetch } from "./VoicePrefetch";
 export { hasCompletedOnboarding, markOnboardingComplete } from "./completion";
-export { useOnboardingReplay } from "./replay";
 export { useSetupQueue } from "./setupQueue";
 export { default as ModelCard } from "./ModelCard";
 export { isLegacyModel } from "./ModelCard";

@@ -2440,13 +2440,7 @@
       "debug": "偵錯"
     },
     "general": {
-      "appearance": "外觀",
-      "onboarding": {
-        "title": "新手引導",
-        "replay": "首次使用設定",
-        "replayInfo": "以全新安裝的樣子，重新走一次設定與導覽。您已擁有的模型會保留安裝。",
-        "replayButton": "重新顯示新手引導"
-      }
+      "appearance": "外觀"
     },
     "shortcuts": {
       "intro": "每個快捷鍵在任何應用程式中都能使用。點選快捷鍵即可錄製新的組合。",

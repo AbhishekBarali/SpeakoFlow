@@ -50,12 +50,6 @@ interface SetupQueueState {
   setWebviewVoiceProgress: (progress: number) => void;
   /** Called by `VoicePrefetch` when the web-view voice is ready or failed. */
   finishWebviewVoice: (ok: boolean) => void;
-  /**
-   * Forget every task that is over (ready, failed or cancelled), so a replayed
-   * onboarding starts from a clean summary. Anything still waiting or
-   * downloading is kept: a replay must never abandon a download.
-   */
-  clearSettled: () => void;
 }
 
 /** Longest wait for verification and unpacking after a download returns. */
@@ -319,14 +313,4 @@ export const useSetupQueue = create<SetupQueueState>()((set, get) => ({
     webviewVoiceDone = null;
     done?.(ok);
   },
-
-  clearSettled: () =>
-    set((s) => ({
-      tasks: s.tasks.filter(
-        (task) =>
-          task.state === "waiting" ||
-          task.state === "downloading" ||
-          task.state === "switching",
-      ),
-    })),
 }));

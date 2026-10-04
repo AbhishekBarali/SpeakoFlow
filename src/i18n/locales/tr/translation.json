@@ -2458,13 +2458,7 @@
       "debug": "Hata Ayıklama"
     },
     "general": {
-      "appearance": "Görünüm",
-      "onboarding": {
-        "title": "İlk kullanım",
-        "replay": "İlk çalıştırma kurulumu",
-        "replayInfo": "Kurulumu ve turu, yeni bir kurulumda göründüğü şekilde yeniden gözden geçirin. Mevcut modelleriniz yüklü kalır.",
-        "replayButton": "İlk kullanım rehberini yeniden göster"
-      }
+      "appearance": "Görünüm"
     },
     "shortcuts": {
       "intro": "Her kısayol tüm uygulamalarda çalışır. Yenisini kaydetmek için bir kısayola tıklayın.",

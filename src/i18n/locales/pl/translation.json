@@ -2494,13 +2494,7 @@
       "debug": "Debugowanie"
     },
     "general": {
-      "appearance": "Wygląd",
-      "onboarding": {
-        "title": "Wprowadzenie",
-        "replay": "Konfiguracja przy pierwszym uruchomieniu",
-        "replayInfo": "Przejdź ponownie przez konfigurację i prezentację, tak jak przy nowej instalacji. Pobrane modele pozostaną zainstalowane.",
-        "replayButton": "Pokaż wprowadzenie ponownie"
-      }
+      "appearance": "Wygląd"
     },
     "shortcuts": {
       "intro": "Każdy skrót działa w dowolnej aplikacji. Kliknij skrót, aby nagrać nowy.",

@@ -2494,13 +2494,7 @@
       "debug": "Ladění"
     },
     "general": {
-      "appearance": "Vzhled",
-      "onboarding": {
-        "title": "Úvodní průvodce",
-        "replay": "Nastavení při prvním spuštění",
-        "replayInfo": "Projděte si znovu nastavení a prohlídku tak, jak je vidí nová instalace. Modely, které už máte, zůstanou nainstalované.",
-        "replayButton": "Zobrazit průvodce znovu"
-      }
+      "appearance": "Vzhled"
     },
     "shortcuts": {
       "intro": "Každá zkratka funguje v jakékoli aplikaci. Kliknutím na zkratku nahrajete novou.",

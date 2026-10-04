@@ -2476,13 +2476,7 @@
       "debug": "Depuração"
     },
     "general": {
-      "appearance": "Aparência",
-      "onboarding": {
-        "title": "Introdução",
-        "replay": "Configuração inicial",
-        "replayInfo": "Passe de novo pela configuração e pelo tour, como uma instalação nova os vê. Os modelos que você já tem continuam instalados.",
-        "replayButton": "Mostrar a introdução de novo"
-      }
+      "appearance": "Aparência"
     },
     "shortcuts": {
       "intro": "Todos os atalhos funcionam em qualquer app. Clique em um atalho para gravar um novo.",

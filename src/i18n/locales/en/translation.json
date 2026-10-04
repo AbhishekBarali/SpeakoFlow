@@ -2458,13 +2458,7 @@
       "debug": "Debug"
     },
     "general": {
-      "appearance": "Appearance",
-      "onboarding": {
-        "title": "Onboarding",
-        "replay": "First-run setup",
-        "replayInfo": "Walk through setup and the tour again, the way a new install sees them. Models you already have stay installed.",
-        "replayButton": "Show onboarding again"
-      }
+      "appearance": "Appearance"
     },
     "shortcuts": {
       "intro": "Every shortcut works in any app. Click a shortcut to record a new one.",

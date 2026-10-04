@@ -2458,13 +2458,7 @@
       "debug": "Felsökning"
     },
     "general": {
-      "appearance": "Utseende",
-      "onboarding": {
-        "title": "Introduktion",
-        "replay": "Första konfigurationen",
-        "replayInfo": "Gå igenom konfigurationen och rundturen igen, så som en ny installation visar dem. Modeller du redan har förblir installerade.",
-        "replayButton": "Visa introduktionen igen"
-      }
+      "appearance": "Utseende"
     },
     "shortcuts": {
       "intro": "Alla kortkommandon fungerar i alla appar. Klicka på ett kortkommando för att spela in ett nytt.",

@@ -2476,13 +2476,7 @@
       "debug": "Depuración"
     },
     "general": {
-      "appearance": "Apariencia",
-      "onboarding": {
-        "title": "Bienvenida",
-        "replay": "Configuración inicial",
-        "replayInfo": "Repite la configuración y el recorrido tal como los ve una instalación nueva. Los modelos que ya tienes siguen instalados.",
-        "replayButton": "Mostrar de nuevo la bienvenida"
-      }
+      "appearance": "Apariencia"
     },
     "shortcuts": {
       "intro": "Todos los atajos funcionan en cualquier aplicación. Haz clic en un atajo para grabar uno nuevo.",

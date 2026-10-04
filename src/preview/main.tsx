@@ -1,7 +1,7 @@
 // Must be first: installs the fake Tauri backend before any module touches it.
 import { previewParams } from "./mockBackend";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster } from "sonner";
 import "@fontsource-variable/inter";
@@ -24,8 +24,6 @@ import {
   WelcomeStep,
   TourStep,
   VoicePrefetch,
-  useOnboardingReplay,
-  useSetupQueue,
 } from "@/components/onboarding";
 import { applyThemePreference, type ThemePreference } from "@/lib/theme";
 import { watchScreenScale } from "@/lib/screenScale";
@@ -70,19 +68,10 @@ const initialNavigation: NavigationState = {
 type FlowStep = "welcome" | "accessibility" | "setup" | "tour" | "done";
 
 /** `?onboarding=welcome|setup|tour` walks first-run setup from that step,
- *  with `&scene=0…2` opening the tour on one scene. Without `?onboarding`, the
- *  shell's Settings → General → Show onboarding again starts the flow too. */
+ *  with `&scene=0…2` opening the tour on one scene. */
 const OnboardingPreview: React.FC<{ from: FlowStep }> = ({ from }) => {
   const [step, setStep] = useState<FlowStep>(from);
   const [chooseModels, setChooseModels] = useState(false);
-  // Settings → General → Show onboarding again, as App handles it.
-  const replays = useOnboardingReplay((state) => state.requests);
-  useEffect(() => {
-    if (replays === 0) return;
-    useSetupQueue.getState().clearSettled();
-    setChooseModels(false);
-    setStep("welcome");
-  }, [replays]);
   if (step === "welcome") {
     return <WelcomeStep onContinue={() => setStep("setup")} />;
   }

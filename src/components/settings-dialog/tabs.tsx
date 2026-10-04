@@ -14,7 +14,6 @@ import {
   MessageSquareText,
   Mic,
   PhoneCall,
-  RotateCcw,
   Scale,
   SunMoon,
   Type as TypeIcon,
@@ -41,7 +40,6 @@ import {
   UpdateStatusLine,
 } from "@/components/update-checker/UpdatePanel";
 import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
-import { useOnboardingReplay } from "@/components/onboarding/replay";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { PushToTalk } from "@/components/settings/PushToTalk";
 import { MicrophoneSelector } from "@/components/settings/MicrophoneSelector";
@@ -87,7 +85,6 @@ import { ClamshellMicrophoneSelector } from "@/components/settings/ClamshellMicr
 
 export const GeneralTab: React.FC = () => {
   const { t } = useTranslation();
-  const replayOnboarding = useOnboardingReplay((state) => state.request);
   return (
     <>
       <SettingsGroup title={t("settingsDialog.general.appearance")}>
@@ -106,19 +103,6 @@ export const GeneralTab: React.FC = () => {
         <StartHidden descriptionMode="tooltip" grouped={true} />
         <ShowTrayIcon descriptionMode="tooltip" grouped={true} />
         <QuitOnClose descriptionMode="tooltip" grouped={true} />
-      </SettingsGroup>
-
-      <SettingsGroup title={t("settingsDialog.general.onboarding.title")}>
-        <SettingContainer
-          title={t("settingsDialog.general.onboarding.replay")}
-          description={t("settingsDialog.general.onboarding.replayInfo")}
-          grouped={true}
-        >
-          <Button variant="secondary" size="sm" onClick={replayOnboarding}>
-            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("settingsDialog.general.onboarding.replayButton")}
-          </Button>
-        </SettingContainer>
       </SettingsGroup>
     </>
   );

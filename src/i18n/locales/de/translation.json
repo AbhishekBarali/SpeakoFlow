@@ -2458,13 +2458,7 @@
       "debug": "Debug"
     },
     "general": {
-      "appearance": "Erscheinungsbild",
-      "onboarding": {
-        "title": "Einführung",
-        "replay": "Ersteinrichtung",
-        "replayInfo": "Geh die Einrichtung und die Tour noch einmal durch, so wie bei einer Neuinstallation. Bereits vorhandene Modelle bleiben installiert.",
-        "replayButton": "Einführung erneut anzeigen"
-      }
+      "appearance": "Erscheinungsbild"
     },
     "shortcuts": {
       "intro": "Jedes Tastenkürzel funktioniert in jeder App. Klicke auf ein Tastenkürzel, um ein neues aufzunehmen.",

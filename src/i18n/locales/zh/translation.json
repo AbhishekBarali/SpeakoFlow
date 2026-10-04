@@ -2440,13 +2440,7 @@
       "debug": "调试"
     },
     "general": {
-      "appearance": "外观",
-      "onboarding": {
-        "title": "新手引导",
-        "replay": "首次运行设置",
-        "replayInfo": "像全新安装时那样，重新走一遍设置和功能导览。已有的模型会保留安装。",
-        "replayButton": "重新显示新手引导"
-      }
+      "appearance": "外观"
     },
     "shortcuts": {
       "intro": "所有快捷键在任何应用中都可用。点击某个快捷键即可录制新的组合键。",

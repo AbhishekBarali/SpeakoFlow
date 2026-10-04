@@ -2476,13 +2476,7 @@
       "debug": "Debug"
     },
     "general": {
-      "appearance": "Aspetto",
-      "onboarding": {
-        "title": "Primi passi",
-        "replay": "Configurazione iniziale",
-        "replayInfo": "Ripercorri la configurazione e il tour, come li vede una nuova installazione. I modelli che hai già restano installati.",
-        "replayButton": "Mostra di nuovo i primi passi"
-      }
+      "appearance": "Aspetto"
     },
     "shortcuts": {
       "intro": "Ogni scorciatoia funziona in qualsiasi app. Fai clic su una scorciatoia per registrarne una nuova.",
