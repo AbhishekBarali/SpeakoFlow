@@ -1,0 +1,145 @@
+name: "Arch Linux Test Build"
+
+# Unsigned test build compiled natively on Arch Linux, packaged as a pacman
+# package and uploaded as an artifact (not a GitHub Release). Install it with
+#   sudo pacman -U speakoflow-test-*.pkg.tar.zst
+# and remove it with `sudo pacman -R speakoflow-test`.
+#
+# It compiles inside the official archlinux image rather than repackaging the
+# Ubuntu .deb, so the binary links against Arch's rolling libraries (glibc,
+# webkit2gtk, CMake 4) instead of Ubuntu 24.04's. The build and file layout are
+# exactly scripts/install-arch.sh (`bun run install:arch`), staged into the
+# package instead of ~/.local, so a problem found here reproduces with the
+# local installer and the other way round.
+#
+# x86_64 only: Docker Hub's archlinux image has no ARM64 variant.
+#
+# Trigger: gh workflow run arch-build.yml --ref <branch>, or Actions -> "Arch
+# Linux Test Build" -> "Run workflow". `workflow_dispatch` only resolves for
+# workflows that exist on the default branch, so a push that edits this file
+# also runs it; that is what lets it be tried before it reaches main.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/arch-build.yml"
+
+concurrency:
+  group: arch-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arch:
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    timeout-minutes: 120
+    env:
+      # Same reason as build.yml's "Build portable whisper.cpp CPU code": without
+      # it ggml compiles for this runner's CPU (often AVX-512) and the package
+      # dies with SIGILL on most consumer machines. Must be set before the first
+      # cargo build, since whisper-rs-sys does not rebuild when it changes.
+      GGML_NATIVE: "OFF"
+    steps:
+      - name: Install Arch build dependencies
+        run: |
+          set -euo pipefail
+          # The list scripts/install-arch.sh checks for, plus what CI needs to
+          # check out, fetch toolchains and run makepkg as a regular user.
+          pacman -Syu --noconfirm --needed \
+            alsa-lib base-devel cmake glslang gtk-layer-shell gtk3 \
+            libappindicator libdrm libglvnd librsvg libx11 libxrandr libxtst \
+            openssl patchelf pipewire pkgconf shaderc spirv-headers \
+            vulkan-headers vulkan-icd-loader wayland webkit2gtk-4.1 \
+            git rustup unzip curl
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          key: archlinux-x86_64-ggml-portable
+
+      - name: Version
+        id: version
+        run: |
+          set -euo pipefail
+          base=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
+          # pkgver allows letters, digits and periods only. The run number makes
+          # each build a newer version than the last, so `pacman -U` upgrades.
+          pkgver="${base//-/.}.r${GITHUB_RUN_NUMBER}.g${GITHUB_SHA::7}"
+          echo "pkgver=$pkgver" >> "$GITHUB_OUTPUT"
+          echo "Package version: $pkgver"
+
+      - name: Build and stage with scripts/install-arch.sh
+        run: |
+          set -euo pipefail
+          bash scripts/install-arch.sh --skip-deps --prefix "$GITHUB_WORKSPACE/pkgroot/usr"
+          # The installer refreshes the desktop and icon caches in its prefix.
+          # Those files belong to the system's pacman hooks, not to a package:
+          # shipping them makes `pacman -U` fail with "exists in filesystem".
+          rm -f pkgroot/usr/share/applications/mimeinfo.cache \
+                pkgroot/usr/share/icons/hicolor/icon-theme.cache
+          find pkgroot -maxdepth 4 | sort
+
+      - name: Package with makepkg
+        env:
+          PKGVER: ${{ steps.version.outputs.pkgver }}
+        run: |
+          set -euo pipefail
+          # makepkg refuses to run as root.
+          useradd -m builder
+          mkdir -p /tmp/pkg
+          mv pkgroot /tmp/pkg/pkgroot
+          cat > /tmp/pkg/PKGBUILD <<EOF
+          pkgname=speakoflow-test
+          pkgver=${PKGVER}
+          pkgrel=1
+          pkgdesc="SpeakoFlow test build: voice dictation and AI assistant"
+          arch=(x86_64)
+          url="https://github.com/AbhishekBarali/SpeakoFlow"
+          license=(MIT)
+          provides=(speakoflow)
+          conflicts=(speakoflow speakoflow-bin)
+          depends=(alsa-lib gtk-layer-shell gtk3 libappindicator libdrm libglvnd
+                   librsvg libx11 libxrandr libxtst openssl pipewire
+                   vulkan-icd-loader wayland webkit2gtk-4.1)
+          # Prebuilt, already laid out by install-arch.sh. Stripping is skipped
+          # so the binary and speech-engine libraries are exactly what was built.
+          options=(!strip !debug)
+          package() {
+            cp -a "\$startdir/pkgroot/." "\$pkgdir/"
+          }
+          EOF
+          chown -R builder:builder /tmp/pkg
+          cd /tmp/pkg
+          sudo -u builder makepkg --nodeps --noconfirm
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp /tmp/pkg/*.pkg.tar.zst "$GITHUB_WORKSPACE/dist/"
+          ls -la "$GITHUB_WORKSPACE/dist"
+
+      - name: Check the package installs
+        run: |
+          set -euo pipefail
+          pacman -U --noconfirm dist/*.pkg.tar.zst
+          pacman -Ql speakoflow-test | grep -E 'bin/speak$|libtranscribe|silero' 
+          # Every shared library the binary needs must resolve on a clean Arch.
+          if ldd /usr/lib/speakoflow/bin/speakoflow | grep 'not found'; then
+            echo "ERROR: unresolved shared libraries" >&2
+            exit 1
+          fi
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: speakoflow-test-archlinux-x86_64
+          path: dist/*.pkg.tar.zst
+          if-no-files-found: error
