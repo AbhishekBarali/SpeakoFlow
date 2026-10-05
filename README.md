@@ -446,23 +446,31 @@ are.
 <br />
 
 A log full of `rdev grab error: ... PermissionDenied` means the app can't read
-your input devices. This only affects the **handy-keys** keyboard engine, which
-reads `/dev/input/event*` and needs your user in the `input` group. Tauri is the
-default engine on Linux, so you'd only see this after switching.
+your input devices. This only affects the **SpeakoFlow Keys** keyboard engine,
+which reads `/dev/input/event*` (needs your user in the `input` group) and
+re-sends keys through `/dev/uinput` (root-only by default on many
+distributions, Ubuntu included, so the group alone is not enough). Tauri is the default engine on Linux, so you'd only
+see this after switching. The **Shortcuts** card on the Home page says when
+this is the case and gives the exact command.
 
-- Add yourself to the group, then log out and back in:
+- Grant both, then log out and back in:
   ```bash
-  sudo usermod -aG input $USER
+  sudo usermod -aG input "$USER"
+  echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' | sudo tee /etc/udev/rules.d/70-speakoflow-uinput.rules
+  sudo udevadm control --reload && sudo udevadm trigger /dev/uinput
   ```
 - Or switch the keyboard engine back to **Tauri** in Settings → Advanced. It
   needs no permissions but registers shortcuts through X11, so on native
   Wayland it only hears them while an X11 window has focus.
 
-On Wayland the dependable option is a shortcut owned by your desktop. Add a
-custom shortcut in GNOME or KDE settings, or a `bind` line in Sway or Hyprland,
-that runs `speakoflow --toggle-transcription` (for an AppImage, its path
-followed by the same flag). `--toggle-post-process`, `--toggle-assistant`, and
-`--cancel` work the same way.
+On Wayland the dependable option is a shortcut owned by your desktop. On a
+Wayland session the Shortcuts card shows a **Set up** button that lists the
+command for each action, ready to copy. Add a custom shortcut in GNOME or KDE
+settings, or a `bind` line in Sway or Hyprland, that runs
+`speakoflow --toggle-transcription` (for an AppImage, its path followed by the
+same flag). `--toggle-post-process`, `--toggle-assistant`, `--toggle-call`
+(start or end a conversation), and `--cancel` work the same way. These start
+with one press and stop with the next, like **Tap to toggle**.
 
 </details>
 

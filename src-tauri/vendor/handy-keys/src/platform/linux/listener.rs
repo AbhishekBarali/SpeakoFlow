@@ -164,13 +164,19 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<LinuxLi
                         // membership needs a re-login), so retrying every 2s
                         // just spams the log — surface one actionable message
                         // and stop the listener thread.
+                        // The grab needs two things: read access to every
+                        // /dev/input/event* (the `input` group) and write access to
+                        // /dev/uinput, which re-sends the keys it lets through and
+                        // is root-only by default on Ubuntu and many others. The
+                        // group alone was the old advice, and it is not enough.
                         eprintln!(
                             "handy-keys: keyboard capture disabled on Linux — permission denied \
-                             reading /dev/input (errno 13). Global hotkeys will not work. \
-                             Fix: add your user to the 'input' group with \
-                             `sudo usermod -aG input $USER`, then log out and back in. \
-                             Alternatively, switch the keyboard engine to 'Tauri' in Settings \
-                             (it does not require the input group)."
+                             opening /dev/input/event* or /dev/uinput (errno 13). Global hotkeys \
+                             will not work. Fix: `sudo usermod -aG input $USER`, plus a udev rule \
+                             making /dev/uinput writable by that group \
+                             (KERNEL==\"uinput\", GROUP=\"input\", MODE=\"0660\"), then log out \
+                             and back in. The app's Shortcuts card shows the exact command. \
+                             Alternatively, switch the keyboard engine to 'Tauri' in Settings."
                         );
                         break;
                     }
