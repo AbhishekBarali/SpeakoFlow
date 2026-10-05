@@ -1383,6 +1383,8 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
             } else if args.iter().any(|a| a == "--toggle-assistant") {
                 signal_handle::send_transcription_input(app, "assistant", "CLI");
+            } else if args.iter().any(|a| a == "--toggle-call") {
+                signal_handle::toggle_call(app, "CLI");
             } else if args.iter().any(|a| a == "--cancel") {
                 crate::utils::cancel_current_operation(app);
             } else {

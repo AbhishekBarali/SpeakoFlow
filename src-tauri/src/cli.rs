@@ -23,6 +23,11 @@ pub struct CliArgs {
     #[arg(long)]
     pub toggle_assistant: bool,
 
+    /// Start a hands-free conversation with the assistant, or end the one in
+    /// progress (sent to running instance)
+    #[arg(long)]
+    pub toggle_call: bool,
+
     /// Cancel the current operation (sent to running instance)
     #[arg(long)]
     pub cancel: bool,
@@ -58,5 +63,14 @@ mod tests {
         let args = CliArgs::try_parse_from(["speakoflow", "--toggle-assistant"])
             .expect("--toggle-assistant should be a supported background command");
         assert!(args.toggle_assistant);
+    }
+
+    /// The conversation shortcut needs a flag of its own, for desktop shortcuts
+    /// on Linux (Wayland), where the app's own keys cannot be heard.
+    #[test]
+    fn parses_toggle_call() {
+        let args = CliArgs::try_parse_from(["speakoflow", "--toggle-call"])
+            .expect("--toggle-call should be a supported background command");
+        assert!(args.toggle_call);
     }
 }
