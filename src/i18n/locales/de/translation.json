@@ -2590,6 +2590,20 @@
       "globe": {
         "hint": "macOS reagiert ebenfalls auf die 🌐-Taste. Stelle „🌐-Taste drücken, um“ auf „Keine Aktion“, damit sie nur diktiert.",
         "open": "Tastatureinstellungen"
+      },
+      "linux": {
+        "wayland": "Unter Wayland gibt dein Desktop diese Tasten nur an SpeakoFlow weiter, solange eines seiner Fenster im Vordergrund ist. Damit sie in jeder App funktionieren, lege sie als Tastenkürzel in deinen Systemeinstellungen an.",
+        "noAccess": "SpeakoFlow Keys kann auf diesem Computer die Tastatur nicht lesen, deshalb tun diese Tastenkürzel noch nichts.",
+        "setUp": "Einrichten",
+        "where": {
+          "gnome": "Öffne Einstellungen → Tastatur → Tastenkombinationen anzeigen und anpassen → Eigene Tastenkombinationen, lege für jeden Befehl unten eine an und drücke die gewünschten Tasten.",
+          "kde": "Öffne Systemeinstellungen → Tastatur → Kurzbefehle, wähle für jeden Befehl unten Neu hinzufügen → Befehl oder Skript und drücke die gewünschten Tasten.",
+          "other": "Lege für jeden Befehl unten ein eigenes Tastenkürzel in den Tastatureinstellungen deines Desktops an, oder eine bind-Zeile in der Konfiguration deines Compositors."
+        },
+        "tapOnly": "So angelegte Tastenkürzel funktionieren wie „Antippen zum Umschalten“: einmal drücken zum Starten, noch einmal zum Stoppen.",
+        "access": "Oder erlaube SpeakoFlow Keys, die Tastatur zu lesen. Führe dies in einem Terminal aus und melde dich danach ab und wieder an:",
+        "copy": "Kopieren",
+        "copied": "Kopiert"
       }
     },
     "setup": {

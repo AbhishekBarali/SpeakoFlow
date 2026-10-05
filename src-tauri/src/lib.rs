@@ -1029,6 +1029,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_keyboard_implementation_setting,
             shortcut::get_keyboard_implementation,
             shortcut::globe_key_has_own_action,
+            shortcut::environment::get_shortcut_environment,
             shortcut::open_keyboard_settings,
             shortcut::change_show_tray_icon_setting,
             shortcut::change_close_behavior_setting,
@@ -1386,6 +1387,8 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
             } else if args.iter().any(|a| a == "--toggle-assistant") {
                 signal_handle::send_transcription_input(app, "assistant", "CLI");
+            } else if args.iter().any(|a| a == "--toggle-call") {
+                signal_handle::toggle_call(app, "CLI");
             } else if args.iter().any(|a| a == "--cancel") {
                 crate::utils::cancel_current_operation(app);
             } else {

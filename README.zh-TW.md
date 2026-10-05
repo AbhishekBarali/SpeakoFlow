@@ -317,15 +317,17 @@ macOS 沒有提供應用程式直接錄製電腦播放聲音的方式。Windows 
 
 <br />
 
-如果日誌中充滿 `rdev grab error: ... PermissionDenied`，代表應用程式無法讀取你的輸入裝置。這只會影響 **handy-keys** 鍵盤引擎，它需要讀取 `/dev/input/event*`，並要求你的使用者屬於 `input` 群組。Linux 預設使用的是 Tauri 引擎，所以只有手動切換過引擎才會遇到這個問題。
+如果日誌中充滿 `rdev grab error: ... PermissionDenied`，代表應用程式無法讀取你的輸入裝置。這只會影響 **SpeakoFlow Keys** 鍵盤引擎：它要讀取 `/dev/input/event*`（需要你的使用者屬於 `input` 群組），還要透過 `/dev/uinput` 重新送出按鍵（在包括 Ubuntu 在內的許多發行版上預設只有 root 可寫入，所以只加入該群組還不夠）。Linux 預設使用的是 Tauri 引擎，所以只有手動切換過引擎才會遇到這個問題。首頁的「快捷鍵」卡片會提示這種情況，並列出要執行的指令。
 
-- 把自己加入該群組，然後登出再登入：
+- 授予這兩項權限，然後登出再登入：
   ```bash
-  sudo usermod -aG input $USER
+  sudo usermod -aG input "$USER"
+  echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' | sudo tee /etc/udev/rules.d/70-speakoflow-uinput.rules
+  sudo udevadm control --reload && sudo udevadm trigger /dev/uinput
   ```
 - 或在「設定 → 進階」中把鍵盤引擎切回 **Tauri**。它不需要任何權限，但透過 X11 註冊快速鍵，所以在原生 Wayland 下，只有當某個 X11 視窗取得焦點時才能回應。
 
-在 Wayland 上，最可靠的做法是使用桌面環境本身的快速鍵。在 GNOME 或 KDE 設定中新增自訂快速鍵，或在 Sway、Hyprland 中加入一行 `bind`，讓它執行 `speakoflow --toggle-transcription`（若使用 AppImage，就寫它的路徑再加上相同參數）。`--toggle-post-process`、`--toggle-assistant` 與 `--cancel` 的用法相同。
+在 Wayland 上，最可靠的做法是使用桌面環境本身的快速鍵。在 Wayland 工作階段中，「快捷鍵」卡片會顯示「設定」按鈕，列出每個操作對應的指令，可直接複製。在 GNOME 或 KDE 設定中新增自訂快速鍵，或在 Sway、Hyprland 中加入一行 `bind`，讓它執行 `speakoflow --toggle-transcription`（若使用 AppImage，就寫它的路徑再加上相同參數）。`--toggle-post-process`、`--toggle-assistant`、`--toggle-call`（開始或結束對話）與 `--cancel` 的用法相同。這樣設定的快速鍵按一次開始、再按一次停止，和「按一下切換」一樣。
 
 </details>
 

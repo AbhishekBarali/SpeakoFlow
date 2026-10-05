@@ -2611,6 +2611,20 @@
       "globe": {
         "hint": "O macOS também usa a tecla 🌐. Defina «Pressionar a tecla 🌐 para» como «Não fazer nada» para que ela só dite.",
         "open": "Ajustes de teclado"
+      },
+      "linux": {
+        "wayland": "No Wayland, sua área de trabalho só repassa essas teclas ao SpeakoFlow enquanto uma das janelas dele está em primeiro plano. Para usá-las em qualquer app, adicione-as como atalhos nas configurações do sistema.",
+        "noAccess": "O SpeakoFlow Keys não consegue ler o teclado neste computador, então esses atalhos ainda não fazem nada.",
+        "setUp": "Configurar",
+        "where": {
+          "gnome": "Abra Configurações → Teclado → Ver e personalizar atalhos → Atalhos personalizados, adicione um para cada comando abaixo e pressione as teclas que quiser.",
+          "kde": "Abra Configurações do sistema → Teclado → Atalhos, escolha Adicionar novo → Comando ou script para cada comando abaixo e pressione as teclas que quiser.",
+          "other": "Adicione um atalho personalizado nas configurações de teclado da sua área de trabalho, ou uma linha bind na configuração do seu compositor, para cada comando abaixo."
+        },
+        "tapOnly": "Um atalho adicionado assim funciona como “Toque para alternar”: pressione uma vez para começar e de novo para parar.",
+        "access": "Ou permita que o SpeakoFlow Keys leia o teclado. Execute isto em um terminal e depois saia e entre de novo na sessão:",
+        "copy": "Copiar",
+        "copied": "Copiado"
       }
     },
     "setup": {

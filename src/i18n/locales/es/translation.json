@@ -2611,6 +2611,20 @@
       "globe": {
         "hint": "macOS también usa la tecla 🌐. Ajusta «Pulsar la tecla 🌐 para» en «No hacer nada» para que solo dicte.",
         "open": "Ajustes de teclado"
+      },
+      "linux": {
+        "wayland": "En Wayland, tu escritorio solo pasa estas teclas a SpeakoFlow mientras una de sus ventanas está al frente. Para usarlas en cualquier app, añádelas como atajos en los ajustes del sistema.",
+        "noAccess": "SpeakoFlow Keys no puede leer el teclado en este equipo, así que estos atajos todavía no hacen nada.",
+        "setUp": "Configurar",
+        "where": {
+          "gnome": "Abre Configuración → Teclado → Ver y personalizar atajos → Atajos personalizados, añade uno por cada comando de abajo y pulsa las teclas que quieras.",
+          "kde": "Abre Preferencias del sistema → Teclado → Atajos de teclado, elige Añadir nuevo → Orden o guion para cada comando de abajo y pulsa las teclas que quieras.",
+          "other": "Añade un atajo personalizado en los ajustes de teclado de tu escritorio, o una línea bind en la configuración de tu compositor, para cada comando de abajo."
+        },
+        "tapOnly": "Un atajo añadido así funciona como «Pulsa para activar o desactivar»: pulsa una vez para empezar y otra para parar.",
+        "access": "O deja que SpeakoFlow Keys lea el teclado. Ejecuta esto en una terminal y luego cierra la sesión y vuelve a entrar:",
+        "copy": "Copiar",
+        "copied": "Copiado"
       }
     },
     "setup": {

@@ -10,6 +10,7 @@
 //! setting and can be changed at runtime.
 
 pub mod chord;
+pub mod environment;
 mod handler;
 pub mod handy_keys;
 mod tauri_impl;
@@ -56,6 +57,12 @@ pub fn init_shortcuts(app: &AppHandle) {
             }
         }
     }
+
+    // Neither engine can say that its keys go unheard (see `environment`), so
+    // the reason goes to the log for whoever reads a "shortcuts do nothing"
+    // report.
+    #[cfg(target_os = "linux")]
+    environment::log_startup_environment(app);
 }
 
 /// Register the cancel shortcut (called when recording starts)

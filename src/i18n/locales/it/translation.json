@@ -2611,6 +2611,20 @@
       "globe": {
         "hint": "Anche macOS usa il tasto 🌐. Imposta «Premi il tasto 🌐 per» su «Non fare nulla» perché serva solo a dettare.",
         "open": "Impostazioni tastiera"
+      },
+      "linux": {
+        "wayland": "Su Wayland il desktop passa questi tasti a SpeakoFlow solo mentre una delle sue finestre è in primo piano. Per usarli in qualsiasi app, aggiungili come scorciatoie nelle impostazioni di sistema.",
+        "noAccess": "SpeakoFlow Keys non riesce a leggere la tastiera su questo computer, quindi queste scorciatoie per ora non fanno nulla.",
+        "setUp": "Configura",
+        "where": {
+          "gnome": "Apri Impostazioni → Tastiera → Visualizza e personalizza le scorciatoie → Scorciatoie personalizzate, aggiungine una per ogni comando qui sotto e premi i tasti che vuoi.",
+          "kde": "Apri Impostazioni di sistema → Tastiera → Scorciatoie, scegli Aggiungi nuova → Comando o script per ogni comando qui sotto e premi i tasti che vuoi.",
+          "other": "Aggiungi una scorciatoia personalizzata nelle impostazioni della tastiera del tuo desktop, o una riga bind nella configurazione del compositor, per ogni comando qui sotto."
+        },
+        "tapOnly": "Una scorciatoia aggiunta così funziona come «Tocca per avviare e fermare»: premi una volta per iniziare e di nuovo per fermare.",
+        "access": "Oppure consenti a SpeakoFlow Keys di leggere la tastiera. Esegui questo in un terminale, poi esci e rientra nella sessione:",
+        "copy": "Copia",
+        "copied": "Copiato"
       }
     },
     "setup": {

@@ -8,6 +8,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { useNavigation, type PageId } from "@/components/shell/navigation";
+import { LinuxShortcutHelp } from "./LinuxShortcutHelp";
 
 interface ShortcutRow {
   id: string;
@@ -81,6 +82,13 @@ export const ShortcutsCard: React.FC = () => {
       info: t("home.shortcuts.cancel.what"),
     });
   }
+
+  // Linux names the actions in its desktop-shortcut list the way these rows
+  // do, Cancel included although it has no row there.
+  const labels: Record<string, string> = Object.fromEntries([
+    ...rows.map((row) => [row.id, row.title]),
+    ["cancel", t("home.shortcuts.cancel.title")],
+  ]);
 
   // On a Mac the dictation default is the globe key, which macOS also acts on
   // unless "Press 🌐 key to" is Do Nothing. Checked again when the window
@@ -176,6 +184,7 @@ export const ShortcutsCard: React.FC = () => {
             </button>
           </li>
         )}
+        {os === "linux" && <LinuxShortcutHelp labels={labels} />}
       </ul>
     </section>
   );

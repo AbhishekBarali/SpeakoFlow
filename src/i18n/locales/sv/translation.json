@@ -2590,6 +2590,20 @@
       "globe": {
         "hint": "macOS reagerar också på 🌐-tangenten. Ställ in ”Tryck på 🌐-tangenten för att” på ”Gör ingenting” så att den bara dikterar.",
         "open": "Tangentbordsinställningar"
+      },
+      "linux": {
+        "wayland": "Under Wayland skickar skrivbordet bara de här tangenterna till SpeakoFlow medan något av dess fönster ligger överst. Lägg till dem som kortkommandon i systeminställningarna för att använda dem i alla appar.",
+        "noAccess": "SpeakoFlow Keys kan inte läsa tangentbordet på den här datorn, så de här kortkommandona gör inget än.",
+        "setUp": "Ställ in",
+        "where": {
+          "gnome": "Öppna Inställningar → Tangentbord → Visa och anpassa kortkommandon → Anpassade kortkommandon, lägg till ett för varje kommando nedan och tryck på de tangenter du vill ha.",
+          "kde": "Öppna Systeminställningar → Tangentbord → Genvägar, välj Lägg till ny → Kommando eller skript för varje kommando nedan och tryck på de tangenter du vill ha.",
+          "other": "Lägg till ett eget kortkommando i skrivbordets tangentbordsinställningar, eller en bind-rad i kompositorns konfiguration, för varje kommando nedan."
+        },
+        "tapOnly": "Ett kortkommando som läggs till så fungerar som ”Tryck för att växla”: tryck en gång för att starta och en gång till för att stoppa.",
+        "access": "Eller låt SpeakoFlow Keys läsa tangentbordet. Kör det här i en terminal och logga sedan ut och in igen:",
+        "copy": "Kopiera",
+        "copied": "Kopierat"
       }
     },
     "setup": {

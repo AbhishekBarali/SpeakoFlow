@@ -49,6 +49,21 @@ pub fn send_transcription_input(app: &AppHandle, binding_id: &str, source: &str)
     }
 }
 
+/// Start a conversation, or end the one in progress, from outside the app
+/// (`--toggle-call`). A conversation is not a recording, so this goes to its
+/// shortcut action, exactly as the call key does, rather than to the
+/// transcription coordinator.
+pub fn toggle_call(app: &AppHandle, source: &str) {
+    if !crate::settings::get_settings(app).assistant_enabled {
+        warn!("Ignoring the conversation toggle from {source}: the assistant is switched off");
+        return;
+    }
+    match crate::actions::ACTION_MAP.get("assistant_call") {
+        Some(action) => action.start(app, "assistant_call", source),
+        None => warn!("No action for 'assistant_call'"),
+    }
+}
+
 /// Listen for Unix signals that remotely toggle transcription.
 ///
 /// SIGUSR2 toggles plain transcription on every Unix platform. SIGUSR1

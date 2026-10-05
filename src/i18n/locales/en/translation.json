@@ -2590,6 +2590,20 @@
       "globe": {
         "hint": "macOS also acts on the 🌐 key. Set “Press 🌐 key to” to Do Nothing so it only dictates.",
         "open": "Keyboard settings"
+      },
+      "linux": {
+        "wayland": "On Wayland, your desktop only passes these keys to SpeakoFlow while one of its windows is in front. To use them in any app, add them as shortcuts in your system settings.",
+        "noAccess": "SpeakoFlow Keys can't read the keyboard on this computer, so these shortcuts do nothing yet.",
+        "setUp": "Set up",
+        "where": {
+          "gnome": "Open Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts, add one for each command below, and press the keys you want.",
+          "kde": "Open System Settings → Keyboard → Shortcuts, choose Add New → Command or Script for each command below, and press the keys you want.",
+          "other": "Add a custom shortcut in your desktop's keyboard settings, or a bind line in your compositor's config, for each command below."
+        },
+        "tapOnly": "A shortcut added this way works like Tap to toggle: press once to start and again to stop.",
+        "access": "Or let SpeakoFlow Keys read the keyboard. Run this in a terminal, then log out and back in:",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "setup": {
