@@ -12,7 +12,7 @@
 说话，它就替你打字，任何应用都行。提问，它就回答。开启对话，和它把问题聊透。<br />
 它还能帮你整理会议纪要。免费、开源，默认在本地运行。
 
-[![Latest release](https://img.shields.io/github/v/release/AbhishekBarali/SpeakoFlow?label=release&color=0A7A70)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
+[![Latest release](https://img.shields.io/badge/release-v2.0.0-0A7A70)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-informational)](#安装)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)

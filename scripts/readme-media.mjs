@@ -37,7 +37,7 @@
  *   --from-frames <dir>  skip recording and encode PNGs recorded earlier
  *   --scale <px>         output width (keeps the aspect ratio)
  *   --colors 256         GIF palette size
- *   --quality 90         WebP quality of the frames encoded lossy
+ *   --quality 90         WebP effort for lossless frames (higher is smaller)
  *   --ffmpeg <path>      ffmpeg binary (or env FFMPEG; default "ffmpeg")
  *   --python <path>      Python binary (or env PYTHON; default "python")
  *   --out <path>[,<path>]  .gif / .webp outputs, or a .png with --still
@@ -79,7 +79,7 @@ const python = args.python ?? process.env.PYTHON ?? "python";
 const still = args.still === undefined ? null : Number(args.still);
 
 // A run that hangs must end rather than stall whatever launched it. Encoding
-// a long WebP in mixed mode is the slow part, about ten minutes at 2x.
+// a long lossless WebP is the slow part, several minutes at 2x.
 const watchdog = setTimeout(() => {
   console.log("WATCHDOG\tgave up after 40 minutes");
   process.exit(3);
@@ -95,8 +95,9 @@ const run = (command, commandArgs) => {
 };
 
 /** Encode the numbered PNGs in `dir` into `target` (.gif or .webp). WebP goes
- *  through scripts/readme-webp.py, which can mix lossy and lossless frames;
- *  ffmpeg's encoder cannot, and its lossy output ghosted on this footage. */
+ *  through scripts/readme-webp.py, which encodes every frame lossless: any
+ *  lossy frame (ffmpeg's encoder, or libwebp's mixed mode) left trails of
+ *  one scene over the next. */
 const encode = (dir, target) => {
   mkdirSync(dirname(target), { recursive: true });
   if (extname(target).toLowerCase() === ".webp") {
