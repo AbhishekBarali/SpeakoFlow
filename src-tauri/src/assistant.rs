@@ -56,8 +56,11 @@ const LEGACY_POSITION_KEYS: [&str; 4] = [
 ///
 /// The frame is the expanded conversation's size in **both** forms (see
 /// [`conversation_size`]); this is only the floor a small display may squeeze it
-/// to, which must still hold the widest bar and a few lines of bubble.
+/// to, which must still hold the widest bar and a few lines of bubble. Checked
+/// against `CallBar.css` in the tests rather than read at run time.
+#[cfg_attr(not(test), allow(dead_code))]
 const CALL_FRAME_FLOOR_WIDTH: f64 = 440.0;
+#[cfg_attr(not(test), allow(dead_code))]
 const CALL_FRAME_FLOOR_HEIGHT: f64 = 200.0;
 
 /// How far above the bottom of the display the call bar opens, over and above
@@ -127,24 +130,6 @@ fn ask_size_for_display(mon_w: f64, mon_h: f64, anchor: crate::settings::AskAnch
     let max_w = (mon_w - 2.0 * PANEL_MARGIN).max(ASK_FRAME_FLOOR_WIDTH);
     let max_h = (mon_h - 2.0 * PANEL_MARGIN - TASKBAR_CLEARANCE).max(ASK_FRAME_FLOOR_HEIGHT);
     (w.min(max_w), h.min(max_h))
-}
-
-/// Clamp a desired logical size so it never exceeds the monitor it's on, leaving
-/// a margin so the window never covers the whole screen or the taskbar. Falls
-/// back to the requested size if the monitor can't be read.
-fn clamp_to_monitor(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
-    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        if let Ok(Some(monitor)) = window.current_monitor() {
-            let scale = monitor.scale_factor();
-            let size = monitor.size();
-            let mon_w = size.width as f64 / scale;
-            let mon_h = size.height as f64 / scale;
-            let max_w = (mon_w * 0.92).max(CALL_FRAME_FLOOR_WIDTH);
-            let max_h = (mon_h * 0.85).max(CALL_FRAME_FLOOR_HEIGHT);
-            return (w.min(max_w), h.min(max_h));
-        }
-    }
-    (w, h)
 }
 
 /// A display's logical bounds.
@@ -453,19 +438,33 @@ fn active_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
 /// At rest it is the floating call bar (see [`CALL_FRAME_FLOOR_WIDTH`]). Expanded,
 /// it is the same bar with the conversation above it — the transcript, the saved
 /// conversations to go back to, and the call's options — in a window the user
-/// can resize. This is the call's frame until the user drags it to another size.
-const CONVERSATION_DEFAULT_SIZE: (f64, f64) = (480.0, 660.0);
+/// can resize.
+///
+/// Its size is a share of the display it opens on, so a laptop gets a smaller
+/// panel than a desktop monitor. It used to be a fixed 480x660 everywhere, which
+/// on a laptop (720-900 logical points tall) covered most of the screen height.
+/// That old size is now the ceiling, so a large display looks as it always did.
+const CONVERSATION_WIDTH_FRACTION: f64 = 0.26;
+const CONVERSATION_HEIGHT_FRACTION: f64 = 0.55;
+const CONVERSATION_MAX_DEFAULT_SIZE: (f64, f64) = (480.0, 660.0);
 
 /// Floor for a manual drag-resize of the expanded call. Wide enough that the
 /// call bar (whose widest form, typing, is 300px) still fits with its margins,
 /// tall enough that at least a few messages sit above it.
 const CONVERSATION_MIN_WIDTH: f64 = 400.0;
-const CONVERSATION_MIN_HEIGHT: f64 = 420.0;
+const CONVERSATION_MIN_HEIGHT: f64 = 380.0;
 
-/// Session memory of a manual resize of the expanded call. Only the expanded form
-/// has resize grips, but the size is the frame of both forms.
+/// The most of a display a call may cover, even after the user drags it larger.
+const CONVERSATION_MAX_DISPLAY_FRACTION: (f64, f64) = (0.92, 0.85);
+
+/// Session memory of a manual resize of the expanded call, as a share of the
+/// display it was made on (in ten-thousandths; 0 = never resized). Stored as a
+/// share rather than in points so a size chosen on a large monitor scales down
+/// when the call next opens on a laptop, instead of covering it. Only the
+/// expanded form has resize grips, but the size is the frame of both forms.
 static CONVERSATION_W: AtomicU32 = AtomicU32::new(0);
 static CONVERSATION_H: AtomicU32 = AtomicU32::new(0);
+const FRACTION_SCALE: f64 = 10_000.0;
 
 /// Whether the call is in its expanded form. Reset when a call ends, so the
 /// next one opens as the bar. It no longer changes the window's size, only what
@@ -490,15 +489,55 @@ static CALL_BAR_ANCHOR: Mutex<Option<(f64, f64)>> = Mutex::new(None);
 /// a frame or two: either the bar (or its "Message …" field) flashed at the wrong
 /// height, or — once the webview blanked itself to hide that — the call vanished
 /// for a beat and then reappeared, which is what opening it looked like.
-fn conversation_size(app: &AppHandle) -> (f64, f64) {
+fn conversation_size(display: DisplayBounds) -> (f64, f64) {
     let w = CONVERSATION_W.load(Ordering::SeqCst);
     let h = CONVERSATION_H.load(Ordering::SeqCst);
-    let (w, h) = if w == 0 || h == 0 {
-        CONVERSATION_DEFAULT_SIZE
-    } else {
-        (w as f64, h as f64)
+    let remembered =
+        (w != 0 && h != 0).then(|| (w as f64 / FRACTION_SCALE, h as f64 / FRACTION_SCALE));
+    conversation_size_for_display(display.width, display.height, remembered)
+}
+
+/// The call's frame on a display of the given logical size. Pure, so it can be
+/// checked against real screen sizes without a monitor.
+///
+/// `remembered` is a manual resize as a share of the display it was made on.
+/// Without one, the frame is the default share of this display, kept between
+/// the resize floor and the old fixed size. Either way it never exceeds
+/// [`CONVERSATION_MAX_DISPLAY_FRACTION`] of the display, and never drops below
+/// the resize floor (the window would refuse a smaller size anyway).
+fn conversation_size_for_display(
+    display_w: f64,
+    display_h: f64,
+    remembered: Option<(f64, f64)>,
+) -> (f64, f64) {
+    let (w, h) = match remembered {
+        Some((fw, fh)) => (display_w * fw, display_h * fh),
+        None => {
+            let (max_w, max_h) = CONVERSATION_MAX_DEFAULT_SIZE;
+            (
+                (display_w * CONVERSATION_WIDTH_FRACTION).clamp(CONVERSATION_MIN_WIDTH, max_w),
+                (display_h * CONVERSATION_HEIGHT_FRACTION).clamp(CONVERSATION_MIN_HEIGHT, max_h),
+            )
+        }
     };
-    clamp_to_monitor(app, w, h)
+    let (cap_w, cap_h) = CONVERSATION_MAX_DISPLAY_FRACTION;
+    let max_w = (display_w * cap_w).max(CONVERSATION_MIN_WIDTH);
+    let max_h = (display_h * cap_h).max(CONVERSATION_MIN_HEIGHT);
+    (
+        w.clamp(CONVERSATION_MIN_WIDTH, max_w),
+        h.clamp(CONVERSATION_MIN_HEIGHT, max_h),
+    )
+}
+
+/// The display the panel window is on now, falling back to the primary one.
+fn window_display(app: &AppHandle, window: &tauri::WebviewWindow) -> DisplayBounds {
+    window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten())
+        .map(|m| display_bounds_of(&m))
+        .unwrap_or(FALLBACK_DISPLAY)
 }
 
 /// Top-left of a window of `w`x`h` whose bottom-centre sits at `anchor`, kept
@@ -560,22 +599,26 @@ fn remember_call_size(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    let scale = window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .map(|m| m.scale_factor())
-        .unwrap_or(1.0);
+    let Ok(Some(monitor)) = window.current_monitor() else {
+        return;
+    };
+    let scale = monitor.scale_factor();
+    let display = display_bounds_of(&monitor);
     let Ok(size) = window.inner_size() else {
         return;
     };
     let w = size.width as f64 / scale;
     let h = size.height as f64 / scale;
-    if w < CONVERSATION_MIN_WIDTH || h < CONVERSATION_MIN_HEIGHT {
+    if w < CONVERSATION_MIN_WIDTH
+        || h < CONVERSATION_MIN_HEIGHT
+        || display.width <= 0.0
+        || display.height <= 0.0
+    {
         return;
     }
-    CONVERSATION_W.store(w.round() as u32, Ordering::SeqCst);
-    CONVERSATION_H.store(h.round() as u32, Ordering::SeqCst);
+    let fraction = |v: f64, of: f64| ((v / of) * FRACTION_SCALE).round().max(1.0) as u32;
+    CONVERSATION_W.store(fraction(w, display.width), Ordering::SeqCst);
+    CONVERSATION_H.store(fraction(h, display.height), Ordering::SeqCst);
 }
 
 /// Every shape the panel window takes.
@@ -681,7 +724,7 @@ fn apply_panel_geometry(app: &AppHandle) {
         return;
     };
     if crate::voice_conversation::is_active(app) {
-        let (w, h) = conversation_size(app);
+        let (w, h) = conversation_size(window_display(app, &window));
         apply_panel_constraints(app, &window);
         let _ = window.set_size(tauri::LogicalSize::new(w, h));
         keep_panel_on_monitor(&window, w, h);
@@ -713,9 +756,7 @@ fn place_call_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    let Some(display) = active_display_bounds(app) else {
-        return;
-    };
+    let display = active_display_bounds(app).unwrap_or_else(|| window_display(app, &window));
     let remembered = CALL_BAR_ANCHOR.lock().ok().and_then(|slot| *slot);
     // A remembered anchor on a display that has since gone away is ignored
     // rather than clamped onto whichever screen happens to be active.
@@ -727,7 +768,23 @@ fn place_call_window(app: &AppHandle) {
                 && bottom <= display.y + display.height
         })
         .unwrap_or_else(|| default_call_bar_anchor(display));
-    let (w, h) = conversation_size(app);
+    // Sized for the display it is about to land on, not the one the window was
+    // last on: a call hidden on a desktop monitor and opened on a laptop must
+    // take the laptop's size. Only resized on a real change, since a resize of a
+    // visible WebView2 window can show a stale frame.
+    let (w, h) = conversation_size(display);
+    let current = window.inner_size().ok().map(|size| {
+        let scale = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .map(|m| m.scale_factor())
+            .unwrap_or(1.0);
+        (size.width as f64 / scale, size.height as f64 / scale)
+    });
+    if current.is_none_or(|(cw, ch)| (cw - w).abs() >= 1.0 || (ch - h).abs() >= 1.0) {
+        let _ = window.set_size(tauri::LogicalSize::new(w, h));
+    }
     let (x, y) = bottom_anchored_position(anchor, w, h, display);
     place_panel(&window, x, y);
 }
@@ -2464,7 +2521,7 @@ fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
     let call_active = crate::voice_conversation::is_active(app);
     let call_starting = reason == PresentReason::CallStarting && !call_active;
     if call_active {
-        let (width, height) = conversation_size(app);
+        let (width, height) = conversation_size(window_display(app, &window));
         apply_panel_constraints(app, &window);
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
         ensure_call_on_screen(app, &window);
@@ -2474,8 +2531,7 @@ fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
         // with its floor) applied now, while the window is still hidden, instead
         // of as a style change on a visible window once the session exists.
         apply_panel_constraints_for(&window, PanelForm::CallBar);
-        let (width, height) = conversation_size(app);
-        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+        // Sizes the frame for the display the call opens on, then places it.
         place_call_window(app);
     } else if !PANEL_VISIBLE.load(Ordering::SeqCst) || reason == PresentReason::VoiceTurn {
         // A new ask opens at its dock zone. Opening the window the user can
@@ -5826,7 +5882,7 @@ mod tests {
         );
         let (floor_w, floor_h) =
             panel_min_size(PanelForm::CallExpanded).expect("the expanded call is resizable");
-        let (w, h) = CONVERSATION_DEFAULT_SIZE;
+        let (w, h) = conversation_size_for_display(1920.0, 1080.0, None);
         assert!(
             w >= floor_w && h >= floor_h,
             "the default expanded call is below its resize floor"
@@ -5863,7 +5919,7 @@ mod tests {
             height: 1080.0,
         };
         let anchor = default_call_bar_anchor(display);
-        let (w, h) = CONVERSATION_DEFAULT_SIZE;
+        let (w, h) = conversation_size_for_display(1920.0, 1080.0, None);
         let (x, y) = bottom_anchored_position(anchor, w, h, display);
         // Centred, and above the taskbar.
         assert_eq!(x, (1920.0 - w) / 2.0);
@@ -5959,11 +6015,50 @@ mod tests {
     /// panel able to hold the call bar below the conversation.
     #[test]
     fn the_expanded_call_is_a_panel_that_holds_the_bar() {
-        let (w, h) = CONVERSATION_DEFAULT_SIZE;
+        let (w, h) = conversation_size_for_display(1920.0, 1080.0, None);
         assert!(
             w >= CALL_FRAME_FLOOR_WIDTH - 40.0 && h > CALL_FRAME_FLOOR_HEIGHT * 2.0,
             "the expanded call is too small for a conversation above the bar"
         );
+    }
+
+    /// The call follows the display: a laptop gets a smaller panel than a
+    /// desktop, a large monitor never gets more than the old fixed size, and a
+    /// size the user dragged on one display is carried as a share of it, so it
+    /// cannot cover a smaller one.
+    #[test]
+    fn the_call_is_sized_for_its_display() {
+        // A 1080p desktop keeps roughly the size it always had.
+        let (w, h) = conversation_size_for_display(1920.0, 1080.0, None);
+        assert!(w <= 480.0 && h <= 660.0 && h >= 580.0, "{w}x{h}");
+        // A big monitor is capped at the old size rather than growing.
+        assert_eq!(
+            conversation_size_for_display(3840.0, 2160.0, None),
+            CONVERSATION_MAX_DEFAULT_SIZE
+        );
+        // Common laptop resolutions (logical points) stay well under the screen.
+        for (dw, dh) in [
+            (1280.0, 720.0),
+            (1280.0, 800.0),
+            (1366.0, 768.0),
+            (1440.0, 900.0),
+            (1463.0, 914.0),
+            (1536.0, 864.0),
+        ] {
+            let (w, h) = conversation_size_for_display(dw, dh, None);
+            assert!(h <= dh * 0.6, "{dw}x{dh}: {w}x{h} covers too much height");
+            assert!(w <= dw * 0.35, "{dw}x{dh}: {w}x{h} covers too much width");
+            assert!(w >= CONVERSATION_MIN_WIDTH && h >= CONVERSATION_MIN_HEIGHT);
+        }
+        // A resize made on a 1440p monitor scales down onto a laptop.
+        let remembered = Some((700.0 / 2560.0, 1100.0 / 1440.0));
+        let (w, h) = conversation_size_for_display(2560.0, 1440.0, remembered);
+        assert!((w - 700.0).abs() < 0.5 && (h - 1100.0).abs() < 0.5);
+        let (w, h) = conversation_size_for_display(1366.0, 768.0, remembered);
+        assert!(w < 400.0 + 1.0 && h <= 768.0 * 0.85, "{w}x{h}");
+        // Never below the resize floor, even on a tiny display.
+        let (w, h) = conversation_size_for_display(800.0, 500.0, None);
+        assert_eq!((w, h), (CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT));
     }
 
     /// The rule that decides whether a stored position is still usable. This is

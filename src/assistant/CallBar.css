@@ -3,8 +3,8 @@
  * bar under the conversation when expanded. See `CallBar.tsx`.
  *
  * Geometry is shared with Rust, so keep these in step with `assistant.rs`:
- *   window           conversation_size() in both forms (480 x 660 by default,
- *                    never below CALL_FRAME_FLOOR_WIDTH x _HEIGHT, 440 x 200)
+ *   window           conversation_size() in both forms (a share of the display,
+ *                    400 x 380 up to 480 x 660 by default)
  *   bar slot         46px tall, 10px above the window's bottom edge
  *   typing bar       300px wide
  * The bar sits at the same bottom-centre point in both forms, and the window
