@@ -1703,10 +1703,20 @@ pub struct AppSettings {
     /// those keys in previously stored settings.
     #[serde(default = "default_assistant_panel_opacity")]
     pub assistant_panel_opacity: f64,
-    /// Where the quick ask opens. Centre by default. `Custom` is a legacy value
-    /// from when dragging remembered a position; it reads as `Center`.
+    /// Where the quick ask opens. Along the top by default. `Custom` is a legacy
+    /// value from when dragging remembered a position; it reads as `TopCenter`.
     #[serde(default = "default_ask_anchor")]
     pub assistant_ask_anchor: AskAnchor,
+    /// Whether the move of the quick ask's default from the middle of the
+    /// screen to the top has been applied to this store. Every store wrote the
+    /// old default (`center`) out in full, so changing `default_ask_anchor`
+    /// alone only reached fresh installs: an upgraded install kept opening in
+    /// the middle and Settings showed "Middle of the screen" as if the user had
+    /// picked it. This one-time pass moves an untouched middle to the top once
+    /// and then never touches the setting again, so choosing the middle
+    /// afterwards sticks. See [`apply_ask_anchor_top_default`].
+    #[serde(default)]
+    pub assistant_ask_anchor_top_default_applied: bool,
     /// Which display the quick ask opens on.
     ///
     /// A free-form string rather than an enum, because the interesting values are
@@ -4075,6 +4085,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_font_size: default_assistant_font_size(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_ask_anchor: default_ask_anchor(),
+        assistant_ask_anchor_top_default_applied: true,
         assistant_ask_display: default_ask_display(),
         assistant_tts_stop_on_dictation: false,
         assistant_web_search_enabled: false,
@@ -4963,6 +4974,28 @@ fn apply_meeting_opt_in_defaults(settings: &mut AppSettings) -> bool {
     true
 }
 
+/// One-time move of the quick ask from the middle of the screen to the top.
+///
+/// Returns whether anything changed. The middle was the default until the top
+/// replaced it, and every store had written `center` out, so only fresh
+/// installs ever saw the new default. Runs once per store: an untouched middle
+/// (or the legacy `custom`, which already reads as the top) becomes the top,
+/// any other choice is kept, and afterwards the marker leaves the setting
+/// alone, so picking the middle again sticks.
+fn apply_ask_anchor_top_default(settings: &mut AppSettings) -> bool {
+    if settings.assistant_ask_anchor_top_default_applied {
+        return false;
+    }
+    if matches!(
+        settings.assistant_ask_anchor,
+        AskAnchor::Center | AskAnchor::Custom
+    ) {
+        settings.assistant_ask_anchor = AskAnchor::TopCenter;
+    }
+    settings.assistant_ask_anchor_top_default_applied = true;
+    true
+}
+
 fn deserialize_settings_value(raw: serde_json::Value) -> (AppSettings, bool) {
     let (normalized, changed) = normalize_settings_json(raw);
     match serde_json::from_value::<AppSettings>(normalized.clone()) {
@@ -4993,6 +5026,18 @@ fn salvage_settings(stored: &serde_json::Value) -> AppSettings {
     // field on top, one at a time — keeping only the ones that still parse.
     let mut merged = serde_json::to_value(get_default_settings())
         .expect("default settings serialize to a JSON object");
+    // A one-time migration marker is `true` in the defaults, because a fresh
+    // install has nothing to migrate. A stored object that lacks it predates
+    // the migration, so it must read as not yet applied, exactly as the
+    // whole-object parse would read it (`serde(default)` = false).
+    for marker in ["assistant_ask_anchor_top_default_applied"] {
+        if !stored_map.contains_key(marker) {
+            merged
+                .as_object_mut()
+                .expect("merged settings stay an object")
+                .insert(marker.to_string(), serde_json::Value::Bool(false));
+        }
+    }
 
     for (key, value) in stored_map {
         let previous = merged
@@ -5053,6 +5098,11 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         // "Offer to record calls" and the meeting indicator became opt-in.
         // See `meeting_opt_in_defaults_applied`.
         if apply_meeting_opt_in_defaults(&mut settings) {
+            updated = true;
+        }
+        // The quick ask moved from the middle of the screen to the top.
+        // See `assistant_ask_anchor_top_default_applied`.
+        if apply_ask_anchor_top_default(&mut settings) {
             updated = true;
         }
 
@@ -5431,6 +5481,83 @@ mod tests {
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()
+    }
+
+    /// A store written while the quick ask defaulted to the middle, with the
+    /// anchor it held then: the marker did not exist yet.
+    fn pre_top_default_store(anchor: &str) -> serde_json::Value {
+        let mut stored = default_settings_json();
+        let map = stored.as_object_mut().unwrap();
+        map.insert(
+            "assistant_ask_anchor".into(),
+            serde_json::Value::String(anchor.into()),
+        );
+        map.remove("assistant_ask_anchor_top_default_applied");
+        stored
+    }
+
+    /// A fresh install opens the quick ask at the top and has nothing to
+    /// migrate.
+    #[test]
+    fn ask_anchor_defaults_to_the_top() {
+        let mut settings = get_default_settings();
+        assert_eq!(settings.assistant_ask_anchor, AskAnchor::TopCenter);
+        assert!(!apply_ask_anchor_top_default(&mut settings));
+        assert_eq!(settings.assistant_ask_anchor, AskAnchor::TopCenter);
+    }
+
+    /// The bug: an install upgraded from the middle default kept opening in the
+    /// middle. It moves to the top once, and a later choice of the middle
+    /// survives every following launch.
+    #[test]
+    fn ask_anchor_moves_an_old_middle_default_to_the_top_once() {
+        let (mut settings, _) = deserialize_settings_value(pre_top_default_store("center"));
+        assert_eq!(settings.assistant_ask_anchor, AskAnchor::Center);
+        assert!(!settings.assistant_ask_anchor_top_default_applied);
+
+        assert!(apply_ask_anchor_top_default(&mut settings));
+        assert_eq!(settings.assistant_ask_anchor, AskAnchor::TopCenter);
+
+        settings.assistant_ask_anchor = AskAnchor::Center;
+        let (mut reloaded, _) =
+            deserialize_settings_value(serde_json::to_value(&settings).unwrap());
+        assert!(!apply_ask_anchor_top_default(&mut reloaded));
+        assert_eq!(reloaded.assistant_ask_anchor, AskAnchor::Center);
+    }
+
+    /// Only the old default moves. A side or an edge someone picked is theirs;
+    /// the legacy `custom` already opened at the top and now says so.
+    #[test]
+    fn ask_anchor_migration_keeps_a_chosen_position() {
+        for (stored, expected) in [
+            ("left", AskAnchor::Left),
+            ("right", AskAnchor::Right),
+            ("bottomcenter", AskAnchor::BottomCenter),
+            ("topcenter", AskAnchor::TopCenter),
+            ("custom", AskAnchor::TopCenter),
+        ] {
+            let (mut settings, _) = deserialize_settings_value(pre_top_default_store(stored));
+            assert!(apply_ask_anchor_top_default(&mut settings), "{stored}");
+            assert_eq!(settings.assistant_ask_anchor, expected, "{stored}");
+            assert!(settings.assistant_ask_anchor_top_default_applied);
+        }
+    }
+
+    /// A store that only loads through salvage (one field no longer parses)
+    /// still gets the move: salvage starts from the defaults, where the marker
+    /// reads as already applied.
+    #[test]
+    fn ask_anchor_migration_survives_salvage() {
+        let mut stored = pre_top_default_store("center");
+        stored.as_object_mut().unwrap().insert(
+            "overlay_position".into(),
+            serde_json::Value::String("a-position-from-another-version".into()),
+        );
+        let (mut settings, changed) = deserialize_settings_value(stored);
+        assert!(changed, "the store should have gone through salvage");
+        assert_eq!(settings.assistant_ask_anchor, AskAnchor::Center);
+        assert!(apply_ask_anchor_top_default(&mut settings));
+        assert_eq!(settings.assistant_ask_anchor, AskAnchor::TopCenter);
     }
 
     /// Both meeting switches are opt-in. A fresh install starts with them off
