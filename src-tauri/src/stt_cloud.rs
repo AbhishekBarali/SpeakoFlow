@@ -63,6 +63,51 @@ const MAX_KEYTERM_CHARS: usize = 50;
 /// how MAI-Transcribe is selected. Earlier versions have no such field.
 const AZURE_SPEECH_API_VERSION: &str = "2025-10-15";
 
+/// Extra request time allowed for each second of recorded audio, on top of the
+/// configured `cloud_stt_timeout_secs`.
+///
+/// The client timeout covers the whole exchange: connecting, uploading the
+/// body, the provider transcribing it, and the response. The body is
+/// uncompressed 16 kHz / 16-bit WAV, ~32 kB per second of speech, so a fixed
+/// ceiling that is plenty for a 10-second dictation is not enough for a
+/// five-minute one (~9.6 MB) on a slow uplink: on a 1 Mbit/s laptop Wi-Fi link
+/// the upload alone takes ~77 s, longer than the 60 s default before the
+/// provider has even started. The request then times out, and the recording
+/// is quietly finished on the local model ("Cloud transcription didn't
+/// respond").
+///
+/// Half a second per second of audio covers the upload on a ~1 Mbit/s link
+/// (0.26 s/s) plus the provider's own processing with room to spare, and only
+/// costs anything when a request has genuinely hung.
+const TIMEOUT_PER_AUDIO_SECOND: f64 = 0.5;
+
+/// Upper bound on a single batch request however long the recording is, so a
+/// hung request on a very long recording still ends and falls back.
+const MAX_REQUEST_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
+/// How long establishing the connection may take.
+///
+/// Separate from the request timeout because that one now grows with the
+/// recording. An unreachable network should not wait out a ten-minute budget
+/// meant for uploading audio: it fails here quickly, is retried once as a
+/// transient failure, and then falls back.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The timeout for one batch request carrying `audio_secs` of audio.
+///
+/// `base_secs` is the user's `cloud_stt_timeout_secs`, which stays the floor —
+/// short dictations behave exactly as before — and the audio's length adds to
+/// it, capped at [`MAX_REQUEST_TIMEOUT`].
+fn request_timeout(base_secs: u64, audio_secs: f64) -> Duration {
+    let base = Duration::from_secs(base_secs);
+    let extra = if audio_secs.is_finite() && audio_secs > 0.0 {
+        Duration::from_secs_f64(audio_secs * TIMEOUT_PER_AUDIO_SECOND)
+    } else {
+        Duration::ZERO
+    };
+    (base + extra).min(MAX_REQUEST_TIMEOUT.max(base))
+}
+
 /// Resolve the active cloud transcription configuration, or explain why it
 /// cannot run. Returns `Err` with [`CloudSttUnavailableReason::NotEnabled`] when
 /// the user is on the local engine, so callers can treat "not configured" and
@@ -646,14 +691,18 @@ pub(crate) fn transcribe_cloud_blocking(
     samples: &[f32],
 ) -> Result<String, String> {
     let wav = encode_wav_16k_mono(samples)?;
-    let request = CloudRequest::from_config(cfg);
-    let seconds = samples.len() as f32 / WHISPER_SAMPLE_RATE as f32;
+    let seconds = samples.len() as f64 / WHISPER_SAMPLE_RATE as f64;
+    let mut request = CloudRequest::from_config(cfg);
+    // The configured timeout was sized for a dictation; a long recording needs
+    // time to upload and be transcribed in proportion to its length.
+    request.timeout = request_timeout(cfg.timeout_secs, seconds);
     info!(
-        "Cloud transcription: {} / {} ({:.1}s, {} kB){}",
+        "Cloud transcription: {} / {} ({:.1}s, {} kB, timeout {}s){}",
         cfg.provider.label,
         cfg.model,
         seconds,
         wav.len() / 1024,
+        request.timeout.as_secs(),
         // Only claimed when the request really is going to the translation route,
         // so this line can be trusted the way the local engine's cannot when the
         // setting is on and the model cannot honour it.
@@ -776,8 +825,12 @@ impl CloudRequest {
             "X-Title",
             reqwest::header::HeaderValue::from_static("SpeakoFlow"),
         );
+        // No overall timeout here: it differs per request (it grows with the
+        // recording, see `request_timeout`) and is set in `post`. Baking it in
+        // would mint a separate client — and a separate, cold connection pool —
+        // for every recording length.
         let client = reqwest::Client::builder()
-            .timeout(self.timeout)
+            .connect_timeout(CONNECT_TIMEOUT)
             .default_headers(headers)
             .pool_idle_timeout(Duration::from_secs(300))
             .pool_max_idle_per_host(2)
@@ -797,13 +850,22 @@ impl CloudRequest {
     }
 
     /// Everything that changes the connection or its baked-in headers. The API
-    /// key is hashed, never stored in the key.
+    /// key is hashed, never stored in the key. The timeout is deliberately not
+    /// part of it: it is applied per request.
     fn cache_key(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.base_url.hash(&mut hasher);
         self.api_key.hash(&mut hasher);
-        self.timeout.hash(&mut hasher);
         hasher.finish()
+    }
+
+    /// A `POST` on the pooled client, bounded by this request's own timeout.
+    ///
+    /// `RequestBuilder::timeout` covers the same span the client-level one did
+    /// (connect through the end of the response body) and overrides it for
+    /// this request only.
+    fn post(&self, url: &str) -> Result<reqwest::RequestBuilder, String> {
+        Ok(self.client()?.post(url).timeout(self.timeout))
     }
 
     async fn transcribe(&self, wav: Vec<u8>) -> Result<String, String> {
@@ -843,8 +905,7 @@ impl CloudRequest {
             .text("definition", definition.to_string());
 
         let response = self
-            .client()?
-            .post(&url)
+            .post(&url)?
             .header("Ocp-Apim-Subscription-Key", &self.api_key)
             .multipart(form)
             .send()
@@ -893,8 +954,7 @@ impl CloudRequest {
         }
 
         let response = self
-            .client()?
-            .post(&url)
+            .post(&url)?
             .header("xi-api-key", &self.api_key)
             .multipart(form)
             .send()
@@ -956,7 +1016,7 @@ impl CloudRequest {
             form = form.text("prompt", self.keyterms.join(", "));
         }
 
-        let mut request = self.client()?.post(&url).multipart(form);
+        let mut request = self.post(&url)?.multipart(form);
         if !self.api_key.is_empty() {
             request = request.bearer_auth(&self.api_key);
         }
@@ -993,8 +1053,7 @@ impl CloudRequest {
         }
 
         let response = self
-            .client()?
-            .post(&url)
+            .post(&url)?
             .query(&query)
             .header("Authorization", format!("Token {}", self.api_key))
             .header("Content-Type", "audio/wav")
@@ -1072,14 +1131,17 @@ impl CloudRequest {
     }
 
     fn network_error(&self, e: reqwest::Error) -> String {
-        if e.is_timeout() {
+        // Connect first: a connect timeout is both, and it is about the network
+        // (cut off at `CONNECT_TIMEOUT`), not about the request's own budget —
+        // so it is reported as unreachable, which is also what gets it retried.
+        if e.is_connect() {
+            format!("Could not reach {}: {e}", self.label)
+        } else if e.is_timeout() {
             format!(
                 "{} did not respond within {}s",
                 self.label,
                 self.timeout.as_secs()
             )
-        } else if e.is_connect() {
-            format!("Could not reach {}: {e}", self.label)
         } else {
             format!("{} request failed: {e}", self.label)
         }
