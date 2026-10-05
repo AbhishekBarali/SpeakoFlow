@@ -2578,6 +2578,20 @@
       "globe": {
         "hint": "macOS da 🌐 tuşuna tepki verir. Yalnızca dikte etmesi için “🌐 tuşuna basınca” ayarını “Hiçbir Şey Yapma” yapın.",
         "open": "Klavye ayarları"
+      },
+      "linux": {
+        "wayland": "Wayland'de masaüstünüz bu tuşları SpeakoFlow'a yalnızca pencerelerinden biri öndeyken iletir. Bunları her uygulamada kullanmak için sistem ayarlarında kısayol olarak ekleyin.",
+        "noAccess": "SpeakoFlow Keys bu bilgisayarda klavyeyi okuyamıyor, bu yüzden bu kısayollar henüz bir şey yapmıyor.",
+        "setUp": "Kur",
+        "where": {
+          "gnome": "Ayarlar → Klavye → Kısayolları Görüntüle ve Özelleştir → Özel Kısayollar'ı açın, aşağıdaki her komut için bir tane ekleyin ve istediğiniz tuşlara basın.",
+          "kde": "Sistem Ayarları → Klavye → Kısayollar'ı açın, aşağıdaki her komut için Yeni Ekle → Komut veya Betik'i seçin ve istediğiniz tuşlara basın.",
+          "other": "Aşağıdaki her komut için masaüstünüzün klavye ayarlarına özel bir kısayol ya da compositor yapılandırmanıza bir bind satırı ekleyin."
+        },
+        "tapOnly": "Bu şekilde eklenen bir kısayol “Açıp kapatmak için dokun” gibi çalışır: başlatmak için bir kez, durdurmak için tekrar basın.",
+        "access": "Ya da SpeakoFlow Keys'in klavyeyi okumasına izin verin. Bunu bir terminalde çalıştırın, ardından oturumu kapatıp yeniden açın:",
+        "copy": "Kopyala",
+        "copied": "Kopyalandı"
       }
     },
     "setup": {

@@ -1028,6 +1028,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_keyboard_implementation_setting,
             shortcut::get_keyboard_implementation,
             shortcut::globe_key_has_own_action,
+            shortcut::environment::get_shortcut_environment,
             shortcut::open_keyboard_settings,
             shortcut::change_show_tray_icon_setting,
             shortcut::change_close_behavior_setting,

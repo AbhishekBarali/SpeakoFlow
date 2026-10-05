@@ -2599,6 +2599,20 @@
       "globe": {
         "hint": "macOS réagit aussi à la touche 🌐. Réglez « Appuyer sur la touche 🌐 pour » sur « Ne rien faire » pour qu’elle ne serve qu’à dicter.",
         "open": "Réglages du clavier"
+      },
+      "linux": {
+        "wayland": "Sous Wayland, votre bureau ne transmet ces touches à SpeakoFlow que lorsqu'une de ses fenêtres est au premier plan. Pour les utiliser dans n'importe quelle app, ajoutez-les comme raccourcis dans les paramètres du système.",
+        "noAccess": "SpeakoFlow Keys ne peut pas lire le clavier sur cet ordinateur, ces raccourcis ne font donc encore rien.",
+        "setUp": "Configurer",
+        "where": {
+          "gnome": "Ouvrez Paramètres → Clavier → Afficher et personnaliser les raccourcis → Raccourcis personnalisés, ajoutez-en un pour chaque commande ci-dessous et appuyez sur les touches voulues.",
+          "kde": "Ouvrez Configuration du système → Clavier → Raccourcis, choisissez Ajouter nouveau → Commande ou script pour chaque commande ci-dessous et appuyez sur les touches voulues.",
+          "other": "Ajoutez un raccourci personnalisé dans les paramètres clavier de votre bureau, ou une ligne bind dans la configuration de votre compositeur, pour chaque commande ci-dessous."
+        },
+        "tapOnly": "Un raccourci ajouté ainsi fonctionne comme « Appuyer pour activer » : appuyez une fois pour démarrer et une autre fois pour arrêter.",
+        "access": "Ou autorisez SpeakoFlow Keys à lire le clavier. Exécutez ceci dans un terminal, puis déconnectez-vous et reconnectez-vous :",
+        "copy": "Copier",
+        "copied": "Copié"
       }
     },
     "setup": {

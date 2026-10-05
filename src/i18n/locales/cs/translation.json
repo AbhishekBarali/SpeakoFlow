@@ -2620,6 +2620,20 @@
       "globe": {
         "hint": "macOS na klávesu 🌐 také reaguje. Nastavte „Stisknutím klávesy 🌐“ na „Nedělat nic“, aby sloužila jen k diktování.",
         "open": "Nastavení klávesnice"
+      },
+      "linux": {
+        "wayland": "Ve Waylandu předává pracovní prostředí tyto klávesy aplikaci SpeakoFlow jen tehdy, když je některé z jejích oken vpředu. Chcete-li je používat v každé aplikaci, přidejte je jako zkratky v nastavení systému.",
+        "noAccess": "SpeakoFlow Keys na tomto počítači nemůže číst klávesnici, takže tyto zkratky zatím nic nedělají.",
+        "setUp": "Nastavit",
+        "where": {
+          "gnome": "Otevřete Nastavení → Klávesnice → Zobrazit a přizpůsobit klávesové zkratky → Vlastní zkratky, přidejte jednu pro každý příkaz níže a stiskněte požadované klávesy.",
+          "kde": "Otevřete Nastavení systému → Klávesnice → Zkratky, pro každý příkaz níže zvolte Přidat nový → Příkaz nebo skript a stiskněte požadované klávesy.",
+          "other": "Pro každý příkaz níže přidejte vlastní zkratku v nastavení klávesnice svého prostředí, nebo řádek bind v konfiguraci kompozitoru."
+        },
+        "tapOnly": "Takto přidaná zkratka funguje jako „Stiskem zapnout/vypnout“: jedním stiskem začnete, dalším skončíte.",
+        "access": "Nebo povolte SpeakoFlow Keys číst klávesnici. Spusťte toto v terminálu a pak se odhlaste a znovu přihlaste:",
+        "copy": "Kopírovat",
+        "copied": "Zkopírováno"
       }
     },
     "setup": {

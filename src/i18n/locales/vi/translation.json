@@ -2557,6 +2557,20 @@
       "globe": {
         "hint": "macOS cũng phản hồi phím 🌐. Đặt “Nhấn phím 🌐 để” thành “Không làm gì” để phím chỉ dùng cho đọc chính tả.",
         "open": "Cài đặt bàn phím"
+      },
+      "linux": {
+        "wayland": "Trên Wayland, màn hình nền chỉ chuyển các phím này cho SpeakoFlow khi một cửa sổ của nó đang ở phía trước. Để dùng chúng trong mọi ứng dụng, hãy thêm chúng làm phím tắt trong cài đặt hệ thống.",
+        "noAccess": "SpeakoFlow Keys không đọc được bàn phím trên máy tính này, nên các phím tắt này chưa có tác dụng.",
+        "setUp": "Thiết lập",
+        "where": {
+          "gnome": "Mở Cài đặt → Bàn phím → Xem và tùy chỉnh phím tắt → Phím tắt tùy chỉnh, thêm một phím tắt cho mỗi lệnh bên dưới rồi nhấn các phím bạn muốn.",
+          "kde": "Mở Thiết lập hệ thống → Bàn phím → Phím tắt, chọn Thêm mới → Lệnh hoặc tập lệnh cho mỗi lệnh bên dưới rồi nhấn các phím bạn muốn.",
+          "other": "Với mỗi lệnh bên dưới, hãy thêm một phím tắt tùy chỉnh trong cài đặt bàn phím của màn hình nền, hoặc một dòng bind trong cấu hình compositor."
+        },
+        "tapOnly": "Phím tắt thêm theo cách này hoạt động như “Nhấn để bật/tắt”: nhấn một lần để bắt đầu và nhấn lần nữa để dừng.",
+        "access": "Hoặc cho phép SpeakoFlow Keys đọc bàn phím. Chạy lệnh này trong terminal, rồi đăng xuất và đăng nhập lại:",
+        "copy": "Sao chép",
+        "copied": "Đã sao chép"
       }
     },
     "setup": {

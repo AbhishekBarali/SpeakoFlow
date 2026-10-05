@@ -2620,6 +2620,20 @@
       "globe": {
         "hint": "macOS też reaguje na klawisz 🌐. Ustaw „Naciśnij klawisz 🌐, aby” na „Nic nie rób”, żeby służył tylko do dyktowania.",
         "open": "Ustawienia klawiatury"
+      },
+      "linux": {
+        "wayland": "W Waylandzie pulpit przekazuje te klawisze do SpeakoFlow tylko wtedy, gdy jedno z jego okien jest na wierzchu. Aby używać ich w każdej aplikacji, dodaj je jako skróty w ustawieniach systemu.",
+        "noAccess": "SpeakoFlow Keys nie może odczytać klawiatury na tym komputerze, więc te skróty jeszcze nic nie robią.",
+        "setUp": "Skonfiguruj",
+        "where": {
+          "gnome": "Otwórz Ustawienia → Klawiatura → Wyświetl i dostosuj skróty → Własne skróty, dodaj po jednym dla każdego polecenia poniżej i naciśnij wybrane klawisze.",
+          "kde": "Otwórz Ustawienia systemowe → Klawiatura → Skróty, dla każdego polecenia poniżej wybierz Dodaj nowy → Polecenie lub skrypt i naciśnij wybrane klawisze.",
+          "other": "Dla każdego polecenia poniżej dodaj własny skrót w ustawieniach klawiatury swojego pulpitu albo wiersz bind w konfiguracji kompozytora."
+        },
+        "tapOnly": "Skrót dodany w ten sposób działa jak „Stuknij, aby przełączyć”: naciśnij raz, aby zacząć, i jeszcze raz, aby zatrzymać.",
+        "access": "Albo pozwól SpeakoFlow Keys odczytywać klawiaturę. Uruchom to w terminalu, a potem wyloguj się i zaloguj ponownie:",
+        "copy": "Kopiuj",
+        "copied": "Skopiowano"
       }
     },
     "setup": {

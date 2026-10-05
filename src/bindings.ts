@@ -627,6 +627,13 @@ async globeKeyHasOwnAction() : Promise<boolean> {
     return await TAURI_INVOKE("globe_key_has_own_action");
 },
 /**
+ * Whether shortcuts reach the app on this session, and the commands for
+ * desktop shortcuts when they do not. Off Linux there is nothing to explain.
+ */
+async getShortcutEnvironment() : Promise<ShortcutEnvironment> {
+    return await TAURI_INVOKE("get_shortcut_environment");
+},
+/**
  * Open System Settings → Keyboard, where "Press 🌐 key to" lives.
  */
 async openKeyboardSettings() : Promise<Result<null, string>> {
@@ -770,6 +777,33 @@ async revealUpdateInstaller(path: string) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Called by the frontend right before it hands over to the installer.
+ * 
+ * On Windows it also does the app's quit cleanup. `install()` there starts
+ * the installer and ends the process with `std::process::exit`, which skips
+ * `RunEvent::Exit`, so without this a meeting recording at that moment lost
+ * its tail and stayed unfinalised until the next launch recovered it.
+ * macOS and Linux don't need it: they install in place and then relaunch
+ * through `request_restart`, which does fire `RunEvent::Exit`.
+ * 
+ * Async so the cleanup (up to five seconds for a meeting) runs off the main
+ * thread and the "closing and reopening" message stays on screen meanwhile.
+ */
+async prepareUpdateInstall(version: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("prepare_update_install", { version }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The update this launch finished, once, for the "Updated to …" notice.
+ */
+async takeUpdateNotice() : Promise<FinishedUpdate | null> {
+    return await TAURI_INVOKE("take_update_notice");
 },
 async getFeedbackSystemInfo() : Promise<FeedbackSystemInfo> {
     return await TAURI_INVOKE("get_feedback_system_info");
@@ -4405,6 +4439,18 @@ export type ConversationSensitivity =
 export type CustomPostProcessTone = { id: string; name: string; instruction: string }
 export type CustomSounds = { start: boolean; stop: boolean }
 /**
+ * One action and the command a desktop shortcut runs to trigger it.
+ */
+export type DesktopShortcutCommand = { 
+/**
+ * The binding id (`transcribe`, `assistant_call`, ...).
+ */
+id: string; 
+/**
+ * The full command line, ready to paste.
+ */
+command: string }
+/**
  * Outcome of a pass, so callers can tell the three "nothing was written" cases
  * apart — they need different follow-up.
  */
@@ -4500,6 +4546,7 @@ export type FeedbackSystemInfo = { app_version: string; os: string; arch: string
  * webview or by `assistant_read_file`).
  */
 export type FileAttachment = { name: string; content: string }
+export type FinishedUpdate = { from: string; to: string }
 /**
  * A persona drafted by the model from a short description. Not persisted by
  * the backend — the UI shows it for review, then saves it via
@@ -4596,8 +4643,28 @@ export type ImplementationChangeResult = { success: boolean;
  * List of binding IDs that were reset to defaults due to incompatibility
  */
 reset_bindings: string[] }
+/**
+ * What the SpeakoFlow keys engine is missing. Each needs its own fix.
+ */
+export type KeyboardAccessGap = 
+/**
+ * A `/dev/input/event*` device cannot be opened for reading.
+ */
+"input_devices" | 
+/**
+ * `/dev/uinput` cannot be opened for writing.
+ */
+"uinput" | 
+/**
+ * No X display (`DISPLAY`), which `rdev` needs for key names.
+ */
+"display"
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
+/**
+ * The desktop, as far as it changes where custom shortcuts are added.
+ */
+export type LinuxDesktop = "gnome" | "kde" | "other"
 export type LocalLlmStatus = { 
 /**
  * Whether the engine process is currently running.
@@ -5105,6 +5172,39 @@ content?: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecretString = string
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
+/**
+ * Everything the Shortcuts card needs to explain a Linux session.
+ */
+export type ShortcutEnvironment = { reach: ShortcutReach; desktop: LinuxDesktop; 
+/**
+ * Filled for `NoKeyboardAccess`.
+ */
+missing: KeyboardAccessGap[]; 
+/**
+ * A terminal command that grants what `missing` lists, or empty.
+ */
+access_command: string; 
+/**
+ * One command per action that is in use, for desktop shortcuts.
+ */
+commands: DesktopShortcutCommand[] }
+/**
+ * Whether shortcuts pressed in other apps reach SpeakoFlow.
+ */
+export type ShortcutReach = 
+/**
+ * They do (or this platform needs nothing explained).
+ */
+"works" | 
+/**
+ * Wayland with the Tauri engine: heard only while an X11 window is in
+ * front, so in practice not at all.
+ */
+"wayland_x11_only" | 
+/**
+ * The SpeakoFlow keys engine cannot open the keyboard devices.
+ */
+"no_keyboard_access"
 export type SkipReason = 
 /**
  * The 27 MB model is not on disk. The one reason worth an affordance.
