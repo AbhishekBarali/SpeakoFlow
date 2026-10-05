@@ -202,13 +202,15 @@ Esc 只在有任务进行时（例如正在录音，或正在朗读回答）才�
 - **云端语音服务**：如果你选择它来代替本地模型。它会收到你的录音。
 - **助手的服务商**：如果它不是本地服务商。它会收到你的问题、你选中的文字、开启屏幕视觉且模型请求时的截图，以及你生成会议纪要或就会议提问时的会议文字记录。
 - **网络搜索**：如果你开启了它。搜索服务商会收到搜索词。
-- **反馈**：如果你在应用内发送反馈。发送的内容与对话框中显示的完全一致。
+- **反馈**：如果你在应用内发送反馈。发送的内容与对话框中显示的完全一致，并且只会发到一个仅开发者可见的私有问题追踪器。
 
 API 密钥保存在系统钥匙串中。记忆在你开启之前一直是关闭的，并且只保存在你的电脑上，你可以查看、编辑或清除。更多细节见[隐私页面](https://www.speakoflow.com/docs/reference/privacy)。
 
 ## 安装
 
 从 [Releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) 页面下载最新版本。首次启动时你需要选择一个语音模型，模型下载期间会有一段简短的导览介绍快捷键。
+
+还在用 1.4 或更早的版本？这些版本无法自行更新到 2.0，请从 Releases 下载一次 2.0，直接覆盖安装旧版本即可。你的设置和历史记录都会保留。从 2.0 开始，更新都可以在应用内完成。
 
 ### Windows
 
@@ -362,6 +364,8 @@ SpeakoFlow 以 [MIT 许可证](LICENSE)发布。
 语音输入核心来自 CJ Pais 开发的 [Handy](https://github.com/cjpais/Handy)，依据 MIT 许可证使用。感谢 CJ 将它开源。助手、对话、会议、屏幕视觉、用 Flow 生成、翻译、语音回答和记忆功能由 SpeakoFlow 自行开发。
 
 同时感谢 [Tauri](https://tauri.app)、whisper.cpp、llama.cpp、ONNX Runtime、[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、Silero VAD、WeSpeaker、[Kokoro](https://github.com/hexgrad/kokoro) 以及 Kyutai 的 Pocket TTS。
+
+云端转写上传的音频使用 [LAME](https://lame.sourceforge.io) MP3 编码器压缩，通过 [mp3lame-encoder](https://github.com/DoumanAsh/mp3lame-encoder) 调用。两者均采用 LGPL-3.0 许可，并以静态方式链接；它们和本应用的源代码都是公开的，因此随时可以基于修改过的 LAME 重新构建。
 
 <div align="center">
 
