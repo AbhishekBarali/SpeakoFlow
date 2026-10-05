@@ -3842,10 +3842,21 @@ assistant_memory_incognito?: boolean; assistant_font_size?: string;
  */
 assistant_panel_opacity?: number; 
 /**
- * Where the quick ask opens. Centre by default. `Custom` is a legacy value
- * from when dragging remembered a position; it reads as `Center`.
+ * Where the quick ask opens. Along the top by default. `Custom` is a legacy
+ * value from when dragging remembered a position; it reads as `TopCenter`.
  */
 assistant_ask_anchor?: AskAnchor; 
+/**
+ * Whether the move of the quick ask's default from the middle of the
+ * screen to the top has been applied to this store. Every store wrote the
+ * old default (`center`) out in full, so changing `default_ask_anchor`
+ * alone only reached fresh installs: an upgraded install kept opening in
+ * the middle and Settings showed "Middle of the screen" as if the user had
+ * picked it. This one-time pass moves an untouched middle to the top once
+ * and then never touches the setting again, so choosing the middle
+ * afterwards sticks. See [`apply_ask_anchor_top_default`].
+ */
+assistant_ask_anchor_top_default_applied?: boolean; 
 /**
  * Which display the quick ask opens on.
  * 
