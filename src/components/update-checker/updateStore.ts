@@ -21,7 +21,7 @@ const HANDOVER_PAUSE_MS = 1500;
  * The whole update flow in one place, so the sidebar pill, the About card and
  * the tray all show the same state instead of each running its own check.
  *
- * Before 1.5.0 the only update UI was a component rendered with
+ * Before 2.0.0 the only update UI was a component rendered with
  * `className="hidden"`: a check could succeed and nobody would ever see it.
  * Everything here is visible by construction — a found update puts a pill in
  * the sidebar until it is installed.

@@ -280,9 +280,9 @@ Download the latest build from the
 first launch you pick a speech model, and a short tour shows the shortcuts
 while it downloads.
 
-Already on 1.4 or earlier? Those versions can't update themselves to 1.5, so
-download 1.5 once from Releases and install it over the old one. Your settings
-and history are kept. From 1.5 on, updates install from inside the app.
+Already on 1.4 or earlier? Those versions can't update themselves to 2.0, so
+download 2.0 once from Releases and install it over the old one. Your settings
+and history are kept. From 2.0 on, updates install from inside the app.
 
 ### Windows
 

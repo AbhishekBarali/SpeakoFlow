@@ -21,7 +21,7 @@ name: "Release (unsigned)"
 #     `xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app`.
 #     See the macOS section of README.md — keep the two in sync. An in-app
 #     update is downloaded by the app, not a browser, so it is not quarantined.
-#   * Installed apps from 1.5.0 onward update in place. 1.0-1.4 trusted
+#   * Installed apps from 2.0.0 onward update in place. 1.0-1.4 trusted
 #     upstream Handy's updater key and can only be reached by a manual
 #     reinstall.
 # Use the signed release.yml once signing secrets are configured

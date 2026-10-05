@@ -1518,15 +1518,15 @@ const handlers: Record<string, (args: Json) => unknown> = {
       }) as Record<string, string[]>
     )[providerId as string]?.map((id) => ({ id, label: id })) ?? [],
   preview_recording_retention: () => 0,
-  "plugin:app|version": () => "1.5.0",
+  "plugin:app|version": () => "2.0.0",
   "plugin:window|is_maximized": () => false,
   "plugin:os|locale": () => "en-US",
   "plugin:updater|check": () =>
     params.get("update") === "1"
       ? {
           rid: 1,
-          currentVersion: "1.5.0",
-          version: "1.6.0",
+          currentVersion: "2.0.0",
+          version: "2.1.0",
           date: "2026-10-12T09:00:00Z",
           body: "## What's new\n\n- **Updates install themselves.** No more downloading every version by hand.\n- Send feedback from the **?** next to Settings.\n- Fixed the overlay hiding behind full-screen apps.",
           rawJson: {},
@@ -1538,7 +1538,7 @@ const handlers: Record<string, (args: Json) => unknown> = {
       "https://github.com/AbhishekBarali/SpeakoFlow/releases/latest",
   }),
   get_feedback_system_info: () => ({
-    app_version: "1.5.0",
+    app_version: "2.0.0",
     os: "Windows 10.0.26100",
     arch: "x86_64",
     install: "nsis",

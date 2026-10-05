@@ -9,7 +9,7 @@
  * The updater plugin reports three quite different situations as errors:
  *  - `ReleaseNotFound` ("Could not fetch a valid release JSON…"): the endpoint
  *    answered but had no manifest — true of every release published before
- *    1.5.0, whose `releases/latest` carries no latest.json. There is nothing
+ *    2.0.0, whose `releases/latest` carries no latest.json. There is nothing
  *    newer to offer, so that is "up to date", not a failure.
  *  - `TargetsNotFound` ("None of the fallback platforms…"): the release exists
  *    but has no build for this OS/architecture (a platform that failed in CI,
