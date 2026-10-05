@@ -646,6 +646,7 @@
         "errors": {
           "restore": "Det gick inte att återställa det ursprungliga kortkommandot.",
           "set": "Det gick inte att ställa in kortkommandot: {{error}}",
+          "inUse": "”{{name}}” använder redan {{keys}}. Välj andra tangenter eller ändra det kortkommandot först.",
           "reset": "Kunde inte återställa kortkommandot."
         },
         "clickToChange": "Klicka för att ändra",

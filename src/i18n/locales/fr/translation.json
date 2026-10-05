@@ -648,6 +648,7 @@
         "errors": {
           "restore": "Impossible de restaurer le raccourci d'origine.",
           "set": "Impossible de définir le raccourci : {{error}}",
+          "inUse": "« {{name}} » utilise déjà {{keys}}. Choisissez d'autres touches, ou modifiez d'abord ce raccourci.",
           "reset": "Impossible de réinitialiser le raccourci."
         },
         "clickToChange": "Cliquez pour modifier",

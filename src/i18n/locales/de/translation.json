@@ -646,6 +646,7 @@
         "errors": {
           "restore": "Das ursprüngliche Tastenkürzel konnte nicht wiederhergestellt werden.",
           "set": "Das Tastenkürzel konnte nicht festgelegt werden: {{error}}",
+          "inUse": "„{{name}}“ verwendet bereits {{keys}}. Andere Tasten wählen oder zuerst jenes Tastenkürzel ändern.",
           "reset": "Tastenkürzel konnte nicht zurückgesetzt werden."
         },
         "clickToChange": "Zum Ändern klicken",

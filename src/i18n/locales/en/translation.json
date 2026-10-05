@@ -646,6 +646,7 @@
         "errors": {
           "restore": "Couldn't restore the original shortcut.",
           "set": "Couldn't set the shortcut: {{error}}",
+          "inUse": "{{name}} already uses {{keys}}. Pick other keys, or change that shortcut first.",
           "reset": "Couldn't reset the shortcut."
         },
         "clickToChange": "Click to change",

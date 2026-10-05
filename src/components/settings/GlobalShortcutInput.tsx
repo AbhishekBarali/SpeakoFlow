@@ -5,6 +5,7 @@ import {
   formatKeyCombination,
   normalizeKey,
 } from "../../lib/utils/keyboard";
+import { shortcutUsingKeys } from "../../lib/utils/shortcutConflict";
 import { SettingContainer } from "../ui/SettingContainer";
 import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
@@ -121,8 +122,27 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
           return 0;
         });
         const newShortcut = sortedKeys.join("+");
+        const takenBy = editingShortcutId
+          ? shortcutUsingKeys(bindings, newShortcut, editingShortcutId)
+          : null;
 
-        if (editingShortcutId && bindings[editingShortcutId]) {
+        if (editingShortcutId && takenBy) {
+          // Nothing was changed: put the suspended shortcut back as it was.
+          toast.error(
+            t("settings.general.shortcut.errors.inUse", {
+              name: t(
+                `settings.general.shortcut.bindings.${takenBy}.name`,
+                bindings[takenBy]?.name ?? takenBy,
+              ),
+              keys: formatKeyCombination(newShortcut, osType),
+            }),
+          );
+          commands.resumeBinding(editingShortcutId).catch(console.error);
+          setEditingShortcutId(null);
+          setKeyPressed([]);
+          setRecordedKeys([]);
+          setOriginalBinding("");
+        } else if (editingShortcutId && bindings[editingShortcutId]) {
           try {
             await updateBinding(editingShortcutId, newShortcut);
           } catch (error) {

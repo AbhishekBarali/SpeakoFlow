@@ -648,6 +648,7 @@
         "errors": {
           "restore": "No se pudo restaurar el atajo original.",
           "set": "No se pudo configurar el atajo: {{error}}",
+          "inUse": "«{{name}}» ya usa {{keys}}. Elige otras teclas o cambia primero ese atajo.",
           "reset": "No se pudo restablecer el atajo."
         },
         "clickToChange": "Haz clic para cambiarlo",

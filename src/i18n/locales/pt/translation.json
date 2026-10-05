@@ -648,6 +648,7 @@
         "errors": {
           "restore": "Não foi possível restaurar o atalho original.",
           "set": "Não foi possível definir o atalho: {{error}}",
+          "inUse": "“{{name}}” já usa {{keys}}. Escolha outras teclas ou altere primeiro esse atalho.",
           "reset": "Não foi possível redefinir o atalho."
         },
         "clickToChange": "Clique para alterar",
