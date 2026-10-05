@@ -511,6 +511,11 @@ Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, ONNX Runtime,
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), Silero VAD, WeSpeaker,
 [Kokoro](https://github.com/hexgrad/kokoro), and Kyutai's Pocket TTS.
 
+Cloud transcription uploads are compressed with the [LAME](https://lame.sourceforge.io)
+MP3 encoder, via [mp3lame-encoder](https://github.com/DoumanAsh/mp3lame-encoder).
+Both are LGPL-3.0 and are statically linked; their source, and this app's, are
+public, so a build against a modified LAME is always possible.
+
 <div align="center">
 
 Made by [Abhishek Barali](https://github.com/AbhishekBarali) · [speakoflow.com](https://www.speakoflow.com)

@@ -123,6 +123,12 @@ cpal = "0.16.0"
 anyhow = "1.0.95"
 rubato = "0.16.2"
 hound = "3.5.1"
+# MP3 encoding for cloud transcription uploads (see `stt_cloud::encode_mp3_16k_mono`).
+# Builds the bundled LAME 3.100 from source: autotools on macOS/Linux, `cc` on
+# Windows, so there is no system library to install. LAME and these bindings are
+# LGPL-3.0; it is statically linked, which the LGPL permits as long as users can
+# rebuild against a modified LAME — they can, since this whole app is open source.
+mp3lame-encoder = "0.2.5"
 log = "0.4.25"
 env_filter = "0.1.0"
 tokio = { version = "1.43.0", features = [
