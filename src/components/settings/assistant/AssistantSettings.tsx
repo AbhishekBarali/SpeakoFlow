@@ -24,6 +24,7 @@ import {
   type AssistantResponseLength,
   type AssistantSearchDepth,
   type AskAnchor,
+  type AudioTagIntensity,
   type DisplayChoice,
   type ModelChoice,
   type ModelUnloadTimeout,
@@ -60,6 +61,7 @@ import { NativeEngineRows, NativeVoicePackRow } from "./NativeVoicePack";
 import { useModelStore } from "@/stores/modelStore";
 import {
   TTS_ENGINES,
+  elevenLabsModelSupportsAudioTags,
   hostOf,
   ttsEngineSpec,
   ttsNeedsSetup,
@@ -110,9 +112,30 @@ const TEST_PHRASES = [
   "Yo, mic check. Sounding crispy.",
 ];
 
+/** Sample lines for an ElevenLabs voice with audio tags on, so the test
+ *  plays what the feature actually does: a performance, with reactions and
+ *  sound effects, rather than a plain read. Not translated, like the above;
+ *  the tags themselves are English whatever the language. */
+const AUDIO_TAG_TEST_PHRASES = [
+  "[excited] Audio tags are on! [laughs] Now I can actually perform, not just talk.",
+  "[whispers] Can you keep a secret? [normal voice] I can whisper now. [chuckles]",
+  "[crowd cheering] [applause] Thank you, thank you! [laughs] You're all too kind.",
+  "[drumroll] And the award for best voice assistant goes to... [gasps] me! [applause]",
+  "[sighs] Another Monday. [mischievously] But hey, at least I sound great.",
+];
+
 /** Pick a random sample line for the voice test. */
-const randomTestPhrase = (): string =>
-  TEST_PHRASES[Math.floor(Math.random() * TEST_PHRASES.length)];
+const randomTestPhrase = (audioTags = false): string => {
+  const phrases = audioTags ? AUDIO_TAG_TEST_PHRASES : TEST_PHRASES;
+  return phrases[Math.floor(Math.random() * phrases.length)];
+};
+
+/** Audio-tag intensities in slider order, left (least) to right (most). */
+const AUDIO_TAG_INTENSITIES: readonly AudioTagIntensity[] = [
+  "subtle",
+  "balanced",
+  "theatrical",
+];
 
 /** Editable model/voice picker (input + datalist + refresh). Shared with the
  *  dictation-cleanup model field via `@/components/ui/ModelCombo` so the two
@@ -349,6 +372,15 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     defaultValue: ttsEngine,
   });
   const ttsHasSpeed = ttsSpec?.speed != null;
+  // ElevenLabs audio tags. The model check reads the field as shown, so the
+  // switch reacts as soon as a model is picked; the backend applies the same
+  // rule (`audio_tags::active`) to the model it actually requests.
+  const audioTagsOn = settings?.assistant_tts_elevenlabs_audio_tags ?? false;
+  const audioTagsModelOk = elevenLabsModelSupportsAudioTags(ttsModel);
+  const audioTagsActive =
+    ttsEngine === "elevenlabs" && audioTagsOn && audioTagsModelOk;
+  const audioTagIntensity: AudioTagIntensity =
+    settings?.assistant_tts_elevenlabs_audio_tag_intensity ?? "balanced";
   // What speed does on this engine: its own range, or that it has none.
   const ttsSpeedHelp = [
     t("settings.assistant.tts.speedDescription"),
@@ -702,7 +734,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const handleTestTts = async () => {
     setTestState("testing");
     setTestError(null);
-    const phrase = randomTestPhrase();
+    const phrase = randomTestPhrase(audioTagsActive);
     try {
       if (ttsEngine === "kokoro" && !kokoroOnProcessor) {
         await kokoroTest.prepare();
@@ -1895,6 +1927,70 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     })
                   }
                 />
+              )}
+
+              {/* ElevenLabs only, and only meaningful on a model that performs
+                tags (v3 and later). On an older model the switch stays visible
+                but disabled, saying which models it needs, so the feature can
+                be found; the backend ignores it there either way. */}
+              {ttsEngine === "elevenlabs" && (
+                <>
+                  <ToggleSwitch
+                    checked={audioTagsOn && audioTagsModelOk}
+                    disabled={!audioTagsModelOk}
+                    onChange={(checked) =>
+                      void queueTtsTask(() =>
+                        setAndRefresh(
+                          commands.setAssistantTtsElevenlabsAudioTags(checked),
+                        ),
+                      )
+                    }
+                    label={t("settings.assistant.tts.audioTagsLabel")}
+                    description={
+                      audioTagsModelOk
+                        ? t("settings.assistant.tts.audioTagsDescription")
+                        : t("settings.assistant.tts.audioTagsNeedsModel")
+                    }
+                    info={t("settings.assistant.tts.audioTagsInfo")}
+                    grouped={true}
+                  />
+                  {audioTagsActive && (
+                    <Slider
+                      value={Math.max(
+                        0,
+                        AUDIO_TAG_INTENSITIES.indexOf(audioTagIntensity),
+                      )}
+                      onChange={(index) =>
+                        queueTtsTask(() =>
+                          setAndRefresh(
+                            commands.setAssistantTtsElevenlabsAudioTagIntensity(
+                              AUDIO_TAG_INTENSITIES[Math.round(index)] ??
+                                "balanced",
+                            ),
+                          ),
+                        )
+                      }
+                      min={0}
+                      max={AUDIO_TAG_INTENSITIES.length - 1}
+                      step={1}
+                      label={t("settings.assistant.tts.audioTagIntensityLabel")}
+                      description={t(
+                        "settings.assistant.tts.audioTagIntensityDescription",
+                      )}
+                      grouped={true}
+                      controlClassName="w-[300px]"
+                      valueClassName="min-w-[5.5rem] whitespace-nowrap ps-2"
+                      formatValue={(index) =>
+                        t(
+                          `settings.assistant.tts.audioTagIntensityLevels.${
+                            AUDIO_TAG_INTENSITIES[Math.round(index)] ??
+                            "balanced"
+                          }`,
+                        )
+                      }
+                    />
+                  )}
+                </>
               )}
 
               <SettingContainer

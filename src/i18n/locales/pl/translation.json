@@ -1785,6 +1785,17 @@
           "lively": "Żywy",
           "veryExpressive": "Bardzo ekspresyjny"
         },
+        "audioTagsLabel": "Tagi dźwiękowe",
+        "audioTagsDescription": "Pozwól głosowi odgrywać odpowiedzi ze wskazówkami jak [laughs] i [whispers] oraz efektami dźwiękowymi jak [applause].",
+        "audioTagsNeedsModel": "Wymaga modelu Eleven v3 lub v4, np. eleven_v4. Wybierz go w polu Model, aby to włączyć.",
+        "audioTagsInfo": "Asystent wpisuje w mówione odpowiedzi krótkie wskazówki w nawiasach kwadratowych, a głos ElevenLabs odgrywa je lub odtwarza jako dźwięki zamiast je czytać. Poproś o scenę, np. tłum, który ci kibicuje, a zbuduje ją z efektów. Czat pokazuje wskazówki tak, jak zostały zapisane. Odgrywają je tylko głosy ElevenLabs v3 i v4; przy każdym innym głosie są usuwane przed mówieniem.",
+        "audioTagIntensityLabel": "Ekspresja",
+        "audioTagIntensityDescription": "Jak często głos reaguje i dodaje efekty, od lekkiego akcentu po pełny występ.",
+        "audioTagIntensityLevels": {
+          "subtle": "Subtelna",
+          "balanced": "Zrównoważona",
+          "theatrical": "Teatralna"
+        },
         "testLabel": "Testuj głos",
         "testDescription": "Odtwórz krótką próbkę z obecnymi ustawieniami.",
         "testButton": "Testuj głos",

@@ -1758,6 +1758,17 @@
           "lively": "Sinh động",
           "veryExpressive": "Rất biểu cảm"
         },
+        "audioTagsLabel": "Thẻ âm thanh",
+        "audioTagsDescription": "Để giọng nói diễn câu trả lời với các chỉ dẫn như [laughs] và [whispers], cùng hiệu ứng âm thanh như [applause].",
+        "audioTagsNeedsModel": "Cần một mô hình Eleven v3 hoặc v4, chẳng hạn eleven_v4. Hãy chọn một mô hình ở mục Mô hình để bật tính năng này.",
+        "audioTagsInfo": "Trợ lý viết các chỉ dẫn ngắn trong dấu ngoặc vuông vào câu trả lời nói, và giọng ElevenLabs sẽ diễn chúng hoặc phát thành âm thanh thay vì đọc ra. Hãy yêu cầu một cảnh, như đám đông cổ vũ bạn, và trợ lý sẽ dựng cảnh bằng hiệu ứng. Cuộc trò chuyện hiển thị chỉ dẫn đúng như đã viết. Chỉ giọng ElevenLabs v3 và v4 diễn được chúng; với mọi giọng khác, chúng bị loại bỏ trước khi nói.",
+        "audioTagIntensityLabel": "Diễn xuất",
+        "audioTagIntensityDescription": "Mức độ giọng nói phản ứng và thêm hiệu ứng, từ điểm xuyết nhẹ đến một màn trình diễn trọn vẹn.",
+        "audioTagIntensityLevels": {
+          "subtle": "Nhẹ nhàng",
+          "balanced": "Cân bằng",
+          "theatrical": "Kịch tính"
+        },
         "testLabel": "Thử giọng",
         "testDescription": "Phát một mẫu ngắn với cài đặt hiện tại.",
         "testButton": "Thử giọng",

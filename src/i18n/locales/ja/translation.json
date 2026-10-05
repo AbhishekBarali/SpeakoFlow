@@ -1758,6 +1758,17 @@
           "lively": "生き生き",
           "veryExpressive": "とても表現豊か"
         },
+        "audioTagsLabel": "オーディオタグ",
+        "audioTagsDescription": "[laughs] や [whispers] などの指示や、[applause] などの効果音で、音声が返答を演じます。",
+        "audioTagsNeedsModel": "Eleven v3 または v4 のモデル（eleven_v4 など）が必要です。オンにするには「モデル」で選択してください。",
+        "audioTagsInfo": "アシスタントは話す返答の中に角かっこで短い指示を書き込み、ElevenLabs の音声はそれを読み上げずに演技したり効果音として再生したりします。観客に応援されるような場面を頼むと、効果音を使って演出します。チャットには指示が書かれたとおりに表示されます。これを演じられるのは ElevenLabs v3 と v4 の音声だけで、ほかの音声では話す前に取り除かれます。",
+        "audioTagIntensityLabel": "演技",
+        "audioTagIntensityDescription": "音声がどのくらいリアクションや効果音を入れるか。控えめな味付けから本格的な演技まで。",
+        "audioTagIntensityLevels": {
+          "subtle": "控えめ",
+          "balanced": "標準",
+          "theatrical": "劇的"
+        },
         "testLabel": "音声をテスト",
         "testDescription": "現在の設定で短いサンプルを再生します。",
         "testButton": "音声をテスト",

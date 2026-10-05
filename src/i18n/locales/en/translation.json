@@ -1767,6 +1767,17 @@
           "lively": "Lively",
           "veryExpressive": "Very expressive"
         },
+        "audioTagsLabel": "Audio tags",
+        "audioTagsDescription": "Let the voice perform its replies with cues like [laughs] and [whispers], and sound effects like [applause].",
+        "audioTagsNeedsModel": "Needs an Eleven v3 or v4 model, such as eleven_v4. Choose one under Model to turn this on.",
+        "audioTagsInfo": "The assistant writes short cues in square brackets into its spoken replies, and the ElevenLabs voice acts them out or plays them as sounds instead of reading them. Ask for a scene, like being cheered on by a crowd, and it builds one with effects. The chat shows the cues as written. Only ElevenLabs v3 and v4 voices perform them; every other voice has them removed before speaking.",
+        "audioTagIntensityLabel": "Performance",
+        "audioTagIntensityDescription": "How often the voice reacts and adds effects, from a light touch to a full performance.",
+        "audioTagIntensityLevels": {
+          "subtle": "Subtle",
+          "balanced": "Balanced",
+          "theatrical": "Theatrical"
+        },
         "testLabel": "Test voice",
         "testDescription": "Play a short sample with the current settings.",
         "testButton": "Test voice",

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AudioDevice,
+  AudioTagIntensity,
   ConversationPace,
   ConversationSensitivity,
   ModelChoice,
@@ -143,6 +144,12 @@ const settingUpdaters: {
     commands.setAssistantTtsVolume(value as number),
   assistant_tts_elevenlabs_stability: (value) =>
     commands.setAssistantTtsElevenlabsStability(value as number | null),
+  assistant_tts_elevenlabs_audio_tags: (value) =>
+    commands.setAssistantTtsElevenlabsAudioTags(value as boolean),
+  assistant_tts_elevenlabs_audio_tag_intensity: (value) =>
+    commands.setAssistantTtsElevenlabsAudioTagIntensity(
+      value as AudioTagIntensity,
+    ),
   assistant_tts_kokoro_device: (value) =>
     commands.setAssistantTtsKokoroDevice(value as string),
   assistant_conversation_pace: (value) =>

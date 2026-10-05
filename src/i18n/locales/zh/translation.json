@@ -1758,6 +1758,17 @@
           "lively": "生动",
           "veryExpressive": "非常富有表现力"
         },
+        "audioTagsLabel": "音频标签",
+        "audioTagsDescription": "让语音用 [laughs]、[whispers] 等提示以及 [applause] 等音效来演绎回复。",
+        "audioTagsNeedsModel": "需要 Eleven v3 或 v4 模型，例如 eleven_v4。请在“模型”中选择一个以开启此功能。",
+        "audioTagsInfo": "助手会在语音回复中用方括号写入简短提示，ElevenLabs 语音会把它们演绎出来或作为声音播放，而不是读出来。请它营造一个场景，比如一群人为你欢呼，它就会用音效搭建出来。聊天中会按原样显示这些提示。只有 ElevenLabs v3 和 v4 语音能演绎它们；使用其他语音时，会在朗读前将其移除。",
+        "audioTagIntensityLabel": "表现力度",
+        "audioTagIntensityDescription": "语音做出反应和加入音效的频率，从轻微点缀到完整表演。",
+        "audioTagIntensityLevels": {
+          "subtle": "含蓄",
+          "balanced": "均衡",
+          "theatrical": "戏剧化"
+        },
         "testLabel": "测试语音",
         "testDescription": "用当前设置播放一段简短示例。",
         "testButton": "测试语音",

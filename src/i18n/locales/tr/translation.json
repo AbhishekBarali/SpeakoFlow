@@ -1767,6 +1767,17 @@
           "lively": "Canlı",
           "veryExpressive": "Çok ifadeli"
         },
+        "audioTagsLabel": "Ses etiketleri",
+        "audioTagsDescription": "Sesin yanıtlarını [laughs] ve [whispers] gibi yönergelerle ve [applause] gibi ses efektleriyle canlandırmasını sağlar.",
+        "audioTagsNeedsModel": "eleven_v4 gibi bir Eleven v3 veya v4 modeli gerekir. Açmak için Model alanından birini seçin.",
+        "audioTagsInfo": "Asistan sesli yanıtlarına köşeli parantez içinde kısa yönergeler yazar; ElevenLabs sesi bunları okumak yerine canlandırır veya ses olarak çalar. Sizi tezahürat eden bir kalabalık gibi bir sahne isteyin, efektlerle kursun. Sohbet, yönergeleri yazıldığı gibi gösterir. Bunları yalnızca ElevenLabs v3 ve v4 sesleri canlandırır; diğer tüm seslerde konuşmadan önce kaldırılır.",
+        "audioTagIntensityLabel": "Performans",
+        "audioTagIntensityDescription": "Sesin ne sıklıkla tepki verip efekt eklediği; hafif bir dokunuştan tam bir gösteriye kadar.",
+        "audioTagIntensityLevels": {
+          "subtle": "Hafif",
+          "balanced": "Dengeli",
+          "theatrical": "Teatral"
+        },
         "testLabel": "Sesi test et",
         "testDescription": "Geçerli ayarlarla kısa bir örnek çalın.",
         "testButton": "Sesi test et",

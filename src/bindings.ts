@@ -2207,6 +2207,30 @@ async setAssistantTtsElevenlabsStability(stability: number | null) : Promise<Res
 }
 },
 /**
+ * Whether the assistant directs an ElevenLabs v3/v4 voice with audio tags
+ * (`[laughs]`, `[whispers]`, `[applause]`). Read when a reply starts, so it
+ * applies from the next reply on; ignored on other engines and models.
+ */
+async setAssistantTtsElevenlabsAudioTags(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_tts_elevenlabs_audio_tags", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How much the voice performs while audio tags are on.
+ */
+async setAssistantTtsElevenlabsAudioTagIntensity(intensity: AudioTagIntensity) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_tts_elevenlabs_audio_tag_intensity", { intensity }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * How long a hands-free conversation waits for you to finish speaking before it
  * answers. Persisted, so it applies to every call rather than only the one it
  * was changed in.
@@ -3778,6 +3802,19 @@ assistant_tts_volume?: number;
  */
 assistant_tts_elevenlabs_stability?: number | null; 
 /**
+ * Lets the assistant direct an ElevenLabs v3/v4 voice with inline audio
+ * tags (`[laughs]`, `[whispers]`, `[applause]`) when it speaks. Off by
+ * default. Only takes effect when the engine is ElevenLabs and the model
+ * understands tags (`audio_tags::active`); on any other engine or model the
+ * prompt never asks for tags and the speech sanitizer removes stray ones,
+ * so they are never read out as words.
+ */
+assistant_tts_elevenlabs_audio_tags?: boolean; 
+/**
+ * How much the voice performs while audio tags are on.
+ */
+assistant_tts_elevenlabs_audio_tag_intensity?: AudioTagIntensity; 
+/**
  * How long a hands-free conversation waits for you to finish speaking.
  */
 assistant_conversation_pace?: ConversationPace; 
@@ -4133,6 +4170,27 @@ export type AssistantSearchDepth =
  * Broadest single pass. More queries/sources, scrape more winners.
  */
 "high"
+/**
+ * How much an ElevenLabs v3/v4 voice performs when audio tags are on
+ * (`assistant_tts_elevenlabs_audio_tags`). Each level is a different paragraph
+ * of the spoken-reply prompt (`audio_tags::prompt_section`), so it changes how
+ * often the model writes `[laughs]`, `[whispers]` or `[applause]`, not how the
+ * voice itself is tuned. That is what the Expressiveness (stability) control
+ * is for, and the two combine.
+ */
+export type AudioTagIntensity = 
+/**
+ * A tag only where a reaction is obvious; sound effects only on request.
+ */
+"subtle" | 
+/**
+ * The default: an expressive speaker, a few tags per reply.
+ */
+"balanced" | 
+/**
+ * Performs every reply like a voice actor, building scenes with effects.
+ */
+"theatrical"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 /**
  * Whether auto-learn can work here, whether it is on, and what it has learned.

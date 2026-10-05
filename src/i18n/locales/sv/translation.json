@@ -1767,6 +1767,17 @@
           "lively": "Livlig",
           "veryExpressive": "Mycket uttrycksfull"
         },
+        "audioTagsLabel": "Ljudtaggar",
+        "audioTagsDescription": "Låt rösten framföra svaren med instruktioner som [laughs] och [whispers] och ljudeffekter som [applause].",
+        "audioTagsNeedsModel": "Kräver en Eleven v3- eller v4-modell, till exempel eleven_v4. Välj en under Modell för att slå på detta.",
+        "audioTagsInfo": "Assistenten skriver korta instruktioner inom hakparenteser i sina talade svar, och ElevenLabs-rösten spelar upp dem eller framför dem som ljud i stället för att läsa dem. Be om en scen, som en publik som hejar på dig, så bygger den upp den med effekter. Chatten visar instruktionerna som de skrevs. Bara ElevenLabs v3- och v4-röster framför dem; med alla andra röster tas de bort innan uppläsningen.",
+        "audioTagIntensityLabel": "Framförande",
+        "audioTagIntensityDescription": "Hur ofta rösten reagerar och lägger till effekter, från en lätt touch till en hel föreställning.",
+        "audioTagIntensityLevels": {
+          "subtle": "Diskret",
+          "balanced": "Balanserad",
+          "theatrical": "Teatralisk"
+        },
         "testLabel": "Testa rösten",
         "testDescription": "Spela upp ett kort prov med de nuvarande inställningarna.",
         "testButton": "Testa rösten",

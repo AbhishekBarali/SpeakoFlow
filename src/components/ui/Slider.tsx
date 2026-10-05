@@ -24,6 +24,11 @@ interface SliderProps {
    *  assistant opacity row passes a fixed width so the slider lines up with the
    *  dropdown rows above it instead of running wider and starting further left. */
   controlClassName?: string;
+  /** Tailwind classes for the value label. Defaults to a fixed `w-12`, which
+   *  fits numbers and percentages; a slider that shows words (the audio-tag
+   *  intensity) widens it so a long label, or a longer translation, does not
+   *  spill past the row. */
+  valueClassName?: string;
   /** For a setting whose effect is visible or audible elsewhere while it is
    *  dragged (the assistant's voice volume during a call): also commit during
    *  the drag, at most once per this many milliseconds. Omit to commit only
@@ -56,6 +61,7 @@ export const Slider: React.FC<SliderProps> = ({
   showValue = true,
   formatValue = (v) => v.toFixed(2),
   controlClassName = "w-full",
+  valueClassName = "w-12",
   liveCommitMs,
 }) => {
   // What the thumb shows while a drag is uncommitted (or its commit is still
@@ -211,7 +217,9 @@ export const Slider: React.FC<SliderProps> = ({
             }}
           />
           {showValue && (
-            <span className="text-sm font-medium text-ink w-12 text-end">
+            <span
+              className={`text-sm font-medium text-ink text-end ${valueClassName}`}
+            >
               {formatValue(shown)}
             </span>
           )}

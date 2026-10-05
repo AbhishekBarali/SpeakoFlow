@@ -1803,6 +1803,17 @@
           "lively": "حيوي",
           "veryExpressive": "معبّر جدًا"
         },
+        "audioTagsLabel": "وسوم صوتية",
+        "audioTagsDescription": "دع الصوت يؤدي ردوده بإشارات مثل [laughs] و[whispers]، ومؤثرات صوتية مثل [applause].",
+        "audioTagsNeedsModel": "يتطلب نموذج Eleven v3 أو v4، مثل eleven_v4. اختر واحدًا من حقل النموذج لتفعيل هذا.",
+        "audioTagsInfo": "يكتب المساعد إشارات قصيرة بين أقواس مربعة في ردوده المنطوقة، فيؤديها صوت ElevenLabs أو يشغّلها كأصوات بدلًا من قراءتها. اطلب مشهدًا، مثل جمهور يشجعك، وسيبنيه بالمؤثرات. تعرض المحادثة الإشارات كما كُتبت. لا تؤديها إلا أصوات ElevenLabs v3 وv4؛ وتُزال قبل النطق مع أي صوت آخر.",
+        "audioTagIntensityLabel": "الأداء",
+        "audioTagIntensityDescription": "مدى تكرار تفاعل الصوت وإضافته للمؤثرات، من لمسة خفيفة إلى أداء كامل.",
+        "audioTagIntensityLevels": {
+          "subtle": "خفيف",
+          "balanced": "متوازن",
+          "theatrical": "مسرحي"
+        },
         "testLabel": "اختبار الصوت",
         "testDescription": "شغّل عيّنة قصيرة بالإعدادات الحالية.",
         "testButton": "اختبار الصوت",

@@ -624,6 +624,36 @@ pub fn set_assistant_tts_elevenlabs_stability(
     Ok(())
 }
 
+/// Whether the assistant directs an ElevenLabs v3/v4 voice with audio tags
+/// (`[laughs]`, `[whispers]`, `[applause]`). Read when a reply starts, so it
+/// applies from the next reply on; ignored on other engines and models.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_tts_elevenlabs_audio_tags(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_tts_elevenlabs_audio_tags = enabled;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// How much the voice performs while audio tags are on.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_tts_elevenlabs_audio_tag_intensity(
+    app: AppHandle,
+    intensity: crate::settings::AudioTagIntensity,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_tts_elevenlabs_audio_tag_intensity = intensity;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 /// How long a hands-free conversation waits for you to finish speaking before it
 /// answers. Persisted, so it applies to every call rather than only the one it
 /// was changed in.
@@ -912,8 +942,9 @@ pub fn assistant_toggle_voice(app: AppHandle) -> Result<(), String> {
 pub async fn assistant_speak(app: AppHandle, text: String) -> Result<(), String> {
     let settings = get_settings(&app);
     // Same cleanup the auto-summary path uses, so replayed/!test text never
-    // reads out Markdown, code or emojis.
-    let text = crate::tts::sanitize_for_speech(&text);
+    // reads out Markdown, code or emojis, and keeps audio tags only for an
+    // engine that performs them.
+    let text = crate::tts::sanitize_for_speech_for(&settings, &text);
     if text.trim().is_empty() {
         return Ok(());
     }

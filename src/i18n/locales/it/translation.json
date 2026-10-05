@@ -1776,6 +1776,17 @@
           "lively": "Vivace",
           "veryExpressive": "Molto espressiva"
         },
+        "audioTagsLabel": "Tag audio",
+        "audioTagsDescription": "Lascia che la voce interpreti le risposte con indicazioni come [laughs] e [whispers], ed effetti sonori come [applause].",
+        "audioTagsNeedsModel": "Richiede un modello Eleven v3 o v4, come eleven_v4. Scegline uno in Modello per attivarlo.",
+        "audioTagsInfo": "L'assistente inserisce brevi indicazioni tra parentesi quadre nelle risposte parlate, e la voce di ElevenLabs le recita o le riproduce come suoni invece di leggerle. Chiedi una scena, come una folla che ti incita, e la costruirà con gli effetti. La chat mostra le indicazioni così come sono scritte. Solo le voci ElevenLabs v3 e v4 le interpretano; con qualsiasi altra voce vengono rimosse prima di parlare.",
+        "audioTagIntensityLabel": "Interpretazione",
+        "audioTagIntensityDescription": "Quanto spesso la voce reagisce e aggiunge effetti, da un tocco leggero a una vera esibizione.",
+        "audioTagIntensityLevels": {
+          "subtle": "Sottile",
+          "balanced": "Bilanciata",
+          "theatrical": "Teatrale"
+        },
         "testLabel": "Prova la voce",
         "testDescription": "Riproduce un breve campione con le impostazioni attuali.",
         "testButton": "Prova la voce",

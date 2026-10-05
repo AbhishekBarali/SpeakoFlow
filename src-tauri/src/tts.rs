@@ -1535,6 +1535,9 @@ pub(crate) fn pcm_to_wav(
     out
 }
 
+/// The ElevenLabs model used when the user has not chosen one.
+pub const ELEVENLABS_DEFAULT_MODEL: &str = "eleven_flash_v2_5";
+
 /// Most recent ElevenLabs request ids to condition a chunk on. ElevenLabs
 /// accepts at most three, and only ids from the last two hours.
 const ELEVENLABS_MAX_STITCH_IDS: usize = 3;
@@ -1593,14 +1596,10 @@ async fn fetch_elevenlabs_speech(
         voice_id
     );
 
-    let model = if settings.assistant_tts_model.trim().is_empty()
-        || settings.assistant_tts_model == "gpt-4o-mini-tts"
-    {
-        // Sensible default when the user hasn't set an ElevenLabs model.
-        "eleven_flash_v2_5".to_string()
-    } else {
-        settings.assistant_tts_model.clone()
-    };
+    // Falls back to a sensible default when the user hasn't set a model. Shared
+    // with the audio-tags gate, so "does this model perform tags" is always
+    // asked about the model that is actually requested.
+    let model = crate::audio_tags::elevenlabs_model(settings);
 
     let client = tts_client()?;
     let mut body = serde_json::json!({
@@ -2901,8 +2900,18 @@ fn truncate(s: &str, max: usize) -> &str {
 /// leave nothing speakable, the original (whitespace-collapsed) text is returned
 /// when it still contains pronounceable characters, otherwise an empty string so
 /// the caller can skip playback instead of voicing garbage.
+///
+/// ElevenLabs audio tags (`[laughs]`) are removed too, since an engine that
+/// cannot perform them reads them out as words. Use [`sanitize_for_speech_for`]
+/// where the engine might be one that performs them.
 pub fn sanitize_for_speech(input: &str) -> String {
-    sanitize_speech_inner(input, true)
+    sanitize_speech_inner(input, true, false)
+}
+
+/// [`sanitize_for_speech`] for the engine `settings` selects: audio tags are
+/// kept exactly when that engine performs them ([`crate::audio_tags::active`]).
+pub fn sanitize_for_speech_for(settings: &AppSettings, input: &str) -> String {
+    sanitize_speech_inner(input, true, crate::audio_tags::active(settings))
 }
 
 /// [`sanitize_for_speech`] for a single streamed chunk rather than a whole reply.
@@ -2912,11 +2921,15 @@ pub fn sanitize_for_speech(input: &str) -> String {
 /// all. A *chunk* that cleans away to nothing is usually a fenced code block or
 /// a divider, and falling back would read the code aloud — exactly what the
 /// filter exists to prevent. Callers skip empty results instead.
-pub fn sanitize_for_speech_chunk(input: &str) -> String {
-    sanitize_speech_inner(input, false)
+///
+/// `keep_audio_tags` passes `[laughs]`-style audio tags through for an engine
+/// that performs them; otherwise they are removed, as in
+/// [`sanitize_for_speech`].
+pub fn sanitize_for_speech_chunk(input: &str, keep_audio_tags: bool) -> String {
+    sanitize_speech_inner(input, false, keep_audio_tags)
 }
 
-fn sanitize_speech_inner(input: &str, allow_raw_fallback: bool) -> String {
+fn sanitize_speech_inner(input: &str, allow_raw_fallback: bool, keep_audio_tags: bool) -> String {
     // Fenced code blocks (``` … ``` or ~~~ … ~~~), including the info string.
     static FENCED_CODE: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"(?s)```[^\n]*\n?.*?```|~~~[^\n]*\n?.*?~~~").unwrap());
@@ -2967,6 +2980,11 @@ fn sanitize_speech_inner(input: &str, allow_raw_fallback: bool) -> String {
     let mut text = FENCED_CODE.replace_all(input, " ").into_owned();
     text = IMAGE.replace_all(&text, " ").into_owned();
     text = LINK.replace_all(&text, "$1").into_owned();
+    // After links, so a link's `[label]` is already plain text; before `_`
+    // becomes a space and emphasis goes, so a tag is still recognisable.
+    if !keep_audio_tags {
+        text = crate::audio_tags::strip(&text);
+    }
     text = URL.replace_all(&text, " ").into_owned();
     text = INLINE_CODE.replace_all(&text, "$1").into_owned();
     text = HEADING.replace_all(&text, "").into_owned();
@@ -2984,8 +3002,17 @@ fn sanitize_speech_inner(input: &str, allow_raw_fallback: bool) -> String {
     if cleaned.is_empty() {
         // Over-aggressive strip: only fall back to the raw text if it actually
         // contains something pronounceable, otherwise let the caller skip.
-        if allow_raw_fallback && input.chars().any(|c| c.is_alphanumeric()) {
-            return WS.replace_all(input.trim(), " ").into_owned();
+        //
+        // A reply that was nothing but tags must stay silent on an engine that
+        // cannot perform them, so the fallback is taken from the text with its
+        // tags already removed rather than from the raw input.
+        let fallback = if keep_audio_tags {
+            input.to_string()
+        } else {
+            crate::audio_tags::strip(&LINK.replace_all(input, "$1"))
+        };
+        if allow_raw_fallback && fallback.chars().any(|c| c.is_alphanumeric()) {
+            return WS.replace_all(fallback.trim(), " ").into_owned();
         }
         return String::new();
     }
@@ -3521,12 +3548,12 @@ mod tests {
         // than not at all; for a chunk that fallback would read code aloud, so it
         // must return empty and let the caller skip it.
         let code_only = "```rust\nlet x = 1;\n```";
-        assert_eq!(super::sanitize_for_speech_chunk(code_only), "");
+        assert_eq!(super::sanitize_for_speech_chunk(code_only, false), "");
         assert!(!super::sanitize_for_speech(code_only).is_empty());
 
         // Ordinary prose is treated identically by both.
         let prose = "This is a normal sentence.";
-        assert_eq!(super::sanitize_for_speech_chunk(prose), prose);
+        assert_eq!(super::sanitize_for_speech_chunk(prose, false), prose);
         assert_eq!(super::sanitize_for_speech(prose), prose);
     }
 

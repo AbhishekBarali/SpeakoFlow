@@ -1730,6 +1730,16 @@ const handlers: Record<string, (args: Json) => unknown> = {
           "assistant_max_history_messages",
         ],
         ["set_assistant_auto_summarize", "enabled", "assistant_auto_summarize"],
+        [
+          "set_assistant_tts_elevenlabs_audio_tags",
+          "enabled",
+          "assistant_tts_elevenlabs_audio_tags",
+        ],
+        [
+          "set_assistant_tts_elevenlabs_audio_tag_intensity",
+          "intensity",
+          "assistant_tts_elevenlabs_audio_tag_intensity",
+        ],
         ["set_assistant_font_size", "size", "assistant_font_size"],
         ["set_assistant_panel_opacity", "opacity", "assistant_panel_opacity"],
         ["set_assistant_ask_anchor", "anchor", "assistant_ask_anchor"],
