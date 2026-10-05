@@ -162,6 +162,10 @@ struct HookContext {
     /// (sloppy press order, tap-to-lock Shift taps, hotkeys registered
     /// mid-hold, …) and leaves keys stuck "pressed forever" at the OS level.
     blocked_keys: std::collections::HashSet<u16>,
+    /// The modifiers this hook last reported as withheld to the rest of the
+    /// process (`platform::withheld`). Kept so the shared record is only
+    /// touched when the set changes.
+    published_withheld: Modifiers,
 }
 
 thread_local! {
@@ -293,7 +297,16 @@ fn reconcile_modifiers(ctx: &mut HookContext, hard: bool) {
         ctx.physically_down.retain(|vk| async_key_down(*vk));
         ctx.blocked_keys.retain(|vk| async_key_down(*vk));
     }
-    let physical = physical_modifiers() | blocked_modifiers(&ctx.blocked_keys);
+    if hard {
+        publish_withheld(ctx);
+    }
+    // Withheld keys read as up to Windows, so they are trusted from the record:
+    // this hook's own, and those of any other blocking hook in this process.
+    // Without the second, the Settings recorder (a non-blocking listener) saw
+    // the assistant's withheld Ctrl+Alt as released the moment C went down.
+    let physical = physical_modifiers()
+        | blocked_modifiers(&ctx.blocked_keys)
+        | crate::platform::withheld::PROCESS.union();
     let stale = stale_modifiers(ctx.current_modifiers, physical);
     if !stale.is_empty() {
         // A stale modifier's key is not down, so its auto-repeat record is
@@ -307,6 +320,20 @@ fn reconcile_modifiers(ctx: &mut HookContext, hard: bool) {
         let _ = ctx.event_sender.send(event);
     }
     ctx.current_modifiers |= physical & RECONCILABLE & !ctx.current_modifiers;
+}
+
+/// Tell the other listeners in this process which modifiers this hook is
+/// withholding from Windows (see `platform::withheld`). Only a blocking hook
+/// withholds anything, so a listening-only hook never touches the record.
+fn publish_withheld(ctx: &mut HookContext) {
+    if ctx.blocking_hotkeys.is_none() {
+        return;
+    }
+    let withheld = blocked_modifiers(&ctx.blocked_keys);
+    if withheld != ctx.published_withheld {
+        ctx.published_withheld = withheld;
+        crate::platform::withheld::PROCESS.publish(thread::current().id(), withheld);
+    }
 }
 
 /// Reconcile from the hook thread's message loop (session change, where no
@@ -461,6 +488,7 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<Windows
                 blocking_hotkeys: thread_blocking,
                 physically_down: std::collections::HashSet::new(),
                 blocked_keys: std::collections::HashSet::new(),
+                published_withheld: Modifiers::empty(),
             });
         });
 
@@ -539,10 +567,12 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<Windows
             let _ = UnhookWindowsHookEx(mouse_hook);
         }
 
-        // Clear thread-local state
+        // Clear thread-local state, and this hook's entry in the shared record
+        // of withheld modifiers: with the hook gone it withholds nothing.
         HOOK_CONTEXT.with(|ctx| {
             *ctx.borrow_mut() = None;
         });
+        crate::platform::withheld::PROCESS.clear(thread::current().id());
     });
 
     Ok(WindowsListenerState {
@@ -699,6 +729,8 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
                     changed_modifier: None,
                 });
             }
+
+            publish_withheld(ctx);
         }
     });
 
@@ -958,6 +990,36 @@ mod tests {
         let physical = Modifiers::CTRL_LEFT | blocked_modifiers(&blocked);
         let stale = stale_modifiers(Modifiers::CTRL_LEFT | Modifiers::OPT_LEFT, physical);
         assert!(stale.is_empty(), "{stale:?}");
+    }
+
+    /// The Settings recorder bug. The blocking manager withheld Ctrl+Alt (the
+    /// assistant's key), so Windows reports both as up. The recorder, a second
+    /// hook that only listens, must not read them as released when C goes
+    /// down: that synthetic release is what made recording Ctrl+Alt+C commit
+    /// Ctrl+Alt, which then collided with the assistant ("Hotkey already
+    /// registered"). Assumes nobody is holding Ctrl or Alt while tests run.
+    #[test]
+    fn a_modifier_another_hook_withholds_is_not_released_by_reconcile() {
+        let manager = std::thread::spawn(|| std::thread::current().id())
+            .join()
+            .unwrap();
+        let held = Modifiers::CTRL_LEFT | Modifiers::OPT_LEFT;
+        crate::platform::withheld::PROCESS.publish(manager, held);
+
+        let (tx, rx) = mpsc::channel();
+        let mut recorder = HookContext {
+            event_sender: tx,
+            current_modifiers: held,
+            blocking_hotkeys: None,
+            physically_down: [0xA2, 0xA4].into_iter().collect(),
+            blocked_keys: std::collections::HashSet::new(),
+            published_withheld: Modifiers::empty(),
+        };
+        reconcile_modifiers(&mut recorder, false);
+        crate::platform::withheld::PROCESS.clear(manager);
+
+        assert_eq!(recorder.current_modifiers, held);
+        assert!(rx.try_recv().is_err(), "a phantom release was emitted");
     }
 
     #[test]
