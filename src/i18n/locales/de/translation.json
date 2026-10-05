@@ -1767,6 +1767,17 @@
           "lively": "Lebhaft",
           "veryExpressive": "Sehr ausdrucksstark"
         },
+        "audioTagsLabel": "Audio-Tags",
+        "audioTagsDescription": "Lässt die Stimme ihre Antworten mit Anweisungen wie [laughs] und [whispers] und Soundeffekten wie [applause] spielen.",
+        "audioTagsNeedsModel": "Benötigt ein Eleven-v3- oder -v4-Modell, etwa eleven_v4. Wähle eines unter Modell, um dies einzuschalten.",
+        "audioTagsInfo": "Der Assistent schreibt kurze Anweisungen in eckigen Klammern in seine gesprochenen Antworten, und die ElevenLabs-Stimme spielt sie oder gibt sie als Geräusche wieder, statt sie vorzulesen. Bitte um eine Szene, etwa eine jubelnde Menge, und er baut sie mit Effekten auf. Der Chat zeigt die Anweisungen so, wie sie geschrieben wurden. Nur ElevenLabs-v3- und -v4-Stimmen spielen sie; bei jeder anderen Stimme werden sie vor dem Sprechen entfernt.",
+        "audioTagIntensityLabel": "Darbietung",
+        "audioTagIntensityDescription": "Wie oft die Stimme reagiert und Effekte einsetzt, von einem Hauch bis zur vollen Vorstellung.",
+        "audioTagIntensityLevels": {
+          "subtle": "Dezent",
+          "balanced": "Ausgewogen",
+          "theatrical": "Theatralisch"
+        },
         "testLabel": "Stimme testen",
         "testDescription": "Spiele eine kurze Probe mit den aktuellen Einstellungen ab.",
         "testButton": "Stimme testen",

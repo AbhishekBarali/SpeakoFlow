@@ -1758,6 +1758,17 @@
           "lively": "生動",
           "veryExpressive": "非常富有表現力"
         },
+        "audioTagsLabel": "音訊標籤",
+        "audioTagsDescription": "讓語音用 [laughs]、[whispers] 等提示以及 [applause] 等音效來演繹回覆。",
+        "audioTagsNeedsModel": "需要 Eleven v3 或 v4 模型，例如 eleven_v4。請在「模型」中選擇一個以開啟此功能。",
+        "audioTagsInfo": "助理會在語音回覆中用方括號寫入簡短提示，ElevenLabs 語音會把它們演繹出來或當作聲音播放，而不是唸出來。請它營造一個場景，例如一群人為你歡呼，它就會用音效搭建出來。聊天中會照原樣顯示這些提示。只有 ElevenLabs v3 和 v4 語音能演繹它們；使用其他語音時，會在朗讀前將其移除。",
+        "audioTagIntensityLabel": "表現力道",
+        "audioTagIntensityDescription": "語音做出反應和加入音效的頻率，從輕微點綴到完整表演。",
+        "audioTagIntensityLevels": {
+          "subtle": "含蓄",
+          "balanced": "均衡",
+          "theatrical": "戲劇化"
+        },
         "testLabel": "測試語音",
         "testDescription": "以目前的設定播放一段簡短範例。",
         "testButton": "測試語音",

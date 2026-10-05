@@ -1758,6 +1758,17 @@
           "lively": "생동감",
           "veryExpressive": "매우 풍부함"
         },
+        "audioTagsLabel": "오디오 태그",
+        "audioTagsDescription": "[laughs], [whispers] 같은 지시와 [applause] 같은 효과음으로 음성이 답변을 연기하게 합니다.",
+        "audioTagsNeedsModel": "eleven_v4 같은 Eleven v3 또는 v4 모델이 필요합니다. 켜려면 모델에서 하나를 선택하세요.",
+        "audioTagsInfo": "어시스턴트가 말로 하는 답변에 대괄호로 짧은 지시를 넣으면, ElevenLabs 음성은 이를 읽지 않고 연기하거나 소리로 재생합니다. 관중이 응원해 주는 장면처럼 상황을 요청하면 효과음으로 만들어 줍니다. 채팅에는 지시가 쓰인 그대로 표시됩니다. ElevenLabs v3와 v4 음성만 이를 연기하며, 다른 음성에서는 말하기 전에 제거됩니다.",
+        "audioTagIntensityLabel": "연기",
+        "audioTagIntensityDescription": "음성이 얼마나 자주 반응하고 효과음을 넣는지. 가벼운 터치부터 완전한 공연까지.",
+        "audioTagIntensityLevels": {
+          "subtle": "은은하게",
+          "balanced": "균형",
+          "theatrical": "극적으로"
+        },
         "testLabel": "음성 테스트",
         "testDescription": "현재 설정으로 짧은 샘플을 재생합니다.",
         "testButton": "음성 테스트",

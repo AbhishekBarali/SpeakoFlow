@@ -4090,6 +4090,17 @@ async fn run_assistant_turn_inner(
             ));
         }
 
+        // ElevenLabs audio tags ([laughs], [applause]). Only when this reply is
+        // actually going to be spoken (`assistant_tts_enabled` was resolved for
+        // this turn above) by a voice that performs them; every other engine
+        // would read "[laughs]" out loud, so it never sees the instruction.
+        // Fixed text per intensity, so the prefix stays cache-stable in a call.
+        if settings.assistant_tts_enabled && crate::audio_tags::active(&settings) {
+            sections.push(crate::audio_tags::prompt_section(
+                settings.assistant_tts_elevenlabs_audio_tag_intensity,
+            ));
+        }
+
         // 2a. The meeting under discussion. Stable for the whole conversation,
         //     so it sits before the per-turn memory block and stays inside the
         //     cacheable prefix — which matters, because an inlined transcript is
@@ -4896,7 +4907,8 @@ fn spawn_tts_speak(app: &AppHandle, settings: &crate::settings::AppSettings, ful
     // The full reply is spoken verbatim, so strip Markdown, code blocks, links
     // and emojis first — otherwise the engine reads symbols and code aloud. The
     // on-screen reply is unaffected; this only cleans the spoken copy.
-    let text = crate::tts::sanitize_for_speech(&full_text);
+    // Audio tags are kept only for an engine that performs them.
+    let text = crate::tts::sanitize_for_speech_for(settings, &full_text);
     if text.trim().is_empty() {
         return;
     }

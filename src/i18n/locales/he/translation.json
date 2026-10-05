@@ -1776,6 +1776,17 @@
           "lively": "חי",
           "veryExpressive": "הבעתי מאוד"
         },
+        "audioTagsLabel": "תגיות שמע",
+        "audioTagsDescription": "אפשרו לקול לבצע את התשובות עם הנחיות כמו [laughs] ו־[whispers], ואפקטים קוליים כמו [applause].",
+        "audioTagsNeedsModel": "נדרש מודל Eleven v3 או v4, כמו eleven_v4. בחרו אחד בשדה המודל כדי להפעיל זאת.",
+        "audioTagsInfo": "העוזר כותב הנחיות קצרות בסוגריים מרובעים בתשובות המדוברות, וקול ElevenLabs מבצע אותן או משמיע אותן כצלילים במקום להקריא אותן. בקשו סצנה, כמו קהל שמריע לכם, והוא יבנה אותה עם אפקטים. הצ'אט מציג את ההנחיות כפי שנכתבו. רק קולות ElevenLabs v3 ו־v4 מבצעים אותן; בכל קול אחר הן מוסרות לפני ההקראה.",
+        "audioTagIntensityLabel": "ביצוע",
+        "audioTagIntensityDescription": "באיזו תדירות הקול מגיב ומוסיף אפקטים, מנגיעה קלה ועד הופעה מלאה.",
+        "audioTagIntensityLevels": {
+          "subtle": "עדין",
+          "balanced": "מאוזן",
+          "theatrical": "תיאטרלי"
+        },
         "testLabel": "בדוק את הקול",
         "testDescription": "השמע דוגמה קצרה עם ההגדרות הנוכחיות.",
         "testButton": "בדוק את הקול",

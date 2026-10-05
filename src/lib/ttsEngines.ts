@@ -170,6 +170,23 @@ export const TTS_ENGINE_IDS: readonly string[] = TTS_ENGINES.map((e) => e.id);
 export const ttsEngineSpec = (id: string): TtsEngineSpec | undefined =>
   TTS_ENGINES.find((engine) => engine.id === id);
 
+/**
+ * Whether an ElevenLabs model performs audio tags (`[laughs]`, `[applause]`).
+ * Mirrors `audio_tags::model_supports_tags` in `src-tauri/src/audio_tags.rs`:
+ * the id's `v<N>` segment is generation 3 or later (`eleven_v3`,
+ * `eleven_v3_conversational`, `eleven_v4`, `eleven_v4_turbo`). An empty
+ * model falls back to the engine default, which does not.
+ */
+export const elevenLabsModelSupportsAudioTags = (model: string): boolean =>
+  model
+    .trim()
+    .toLowerCase()
+    .split(/[_-]/)
+    .some((segment) => {
+      const match = /^v(\d+)$/.exec(segment);
+      return match !== null && Number(match[1]) >= 3;
+    });
+
 export interface TtsValues {
   url: string;
   key: string;

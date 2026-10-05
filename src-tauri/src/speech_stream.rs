@@ -177,6 +177,10 @@ pub struct SpeechChunker {
     /// suppressed all further cuts and made `finish` discard the rest of the
     /// reply unspoken.
     at_line_start: bool,
+    /// Whether ElevenLabs audio tags (`[laughs]`) survive sanitizing, for an
+    /// engine that performs them. Off, they are removed so no engine reads a
+    /// tag aloud as a word.
+    keep_audio_tags: bool,
 }
 
 impl Default for SpeechChunker {
@@ -196,7 +200,14 @@ impl SpeechChunker {
             buf: String::new(),
             chunks_spoken: 0,
             at_line_start: true,
+            keep_audio_tags: false,
         }
+    }
+
+    /// Keep audio tags in the chunks (see [`crate::audio_tags::active`]).
+    pub fn keeping_audio_tags(mut self, keep: bool) -> Self {
+        self.keep_audio_tags = keep;
+        self
     }
 
     /// Drop all buffered text without speaking it, and rearm the opening pacing.
@@ -222,7 +233,7 @@ impl SpeechChunker {
         while let Some(cut) = self.next_cut() {
             let raw: String = self.buf.drain(..cut).collect();
             self.at_line_start = raw.ends_with('\n');
-            if let Some(clean) = clean_chunk(&raw) {
+            if let Some(clean) = clean_chunk(&raw, self.keep_audio_tags) {
                 self.chunks_spoken += 1;
                 out.push(clean);
             }
@@ -247,7 +258,7 @@ impl SpeechChunker {
         }
         let raw = std::mem::take(&mut self.buf);
         self.at_line_start = true;
-        match clean_chunk(&raw) {
+        match clean_chunk(&raw, self.keep_audio_tags) {
             Some(clean) => {
                 self.chunks_spoken += 1;
                 vec![clean]
@@ -583,8 +594,8 @@ fn preceding_token(buf: &str, i: usize) -> &str {
 }
 
 /// Sanitize one chunk, returning `None` when nothing speakable is left.
-fn clean_chunk(raw: &str) -> Option<String> {
-    let clean = crate::tts::sanitize_for_speech_chunk(raw);
+fn clean_chunk(raw: &str, keep_audio_tags: bool) -> Option<String> {
+    let clean = crate::tts::sanitize_for_speech_chunk(raw, keep_audio_tags);
     if clean.trim().is_empty() {
         None
     } else {
@@ -685,7 +696,8 @@ impl SpeechPipeline {
         Self {
             chunker: SpeechChunker::with_policy(ChunkPolicy::for_engine_limit(
                 crate::tts::max_chars_for(settings),
-            )),
+            ))
+            .keeping_audio_tags(crate::audio_tags::active(settings)),
             delivery,
             epoch,
             spoke: false,

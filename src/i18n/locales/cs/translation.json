@@ -1785,6 +1785,17 @@
           "lively": "Živý",
           "veryExpressive": "Velmi výrazný"
         },
+        "audioTagsLabel": "Zvukové značky",
+        "audioTagsDescription": "Nechte hlas přednášet odpovědi s pokyny jako [laughs] a [whispers] a se zvukovými efekty jako [applause].",
+        "audioTagsNeedsModel": "Vyžaduje model Eleven v3 nebo v4, například eleven_v4. Vyberte ho v poli Model a pak to zapněte.",
+        "audioTagsInfo": "Asistent vkládá do mluvených odpovědí krátké pokyny v hranatých závorkách a hlas ElevenLabs je zahraje nebo přehraje jako zvuky, místo aby je přečetl. Požádejte o scénu, třeba dav, který vás povzbuzuje, a asistent ji postaví z efektů. Chat zobrazuje pokyny tak, jak byly napsány. Zahrají je jen hlasy ElevenLabs v3 a v4; u každého jiného hlasu se před mluvením odstraní.",
+        "audioTagIntensityLabel": "Přednes",
+        "audioTagIntensityDescription": "Jak často hlas reaguje a přidává efekty, od jemného nádechu po celé představení.",
+        "audioTagIntensityLevels": {
+          "subtle": "Jemný",
+          "balanced": "Vyvážený",
+          "theatrical": "Divadelní"
+        },
         "testLabel": "Otestovat hlas",
         "testDescription": "Přehraje krátkou ukázku s aktuálním nastavením.",
         "testButton": "Otestovat hlas",

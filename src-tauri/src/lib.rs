@@ -3,6 +3,7 @@ mod actions;
 mod apple_intelligence;
 mod assistant;
 mod audio_feedback;
+mod audio_tags;
 pub mod audio_toolkit;
 mod autolearn;
 mod catalog;
@@ -1188,6 +1189,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_tts_speed,
             commands::assistant::set_assistant_tts_volume,
             commands::assistant::set_assistant_tts_elevenlabs_stability,
+            commands::assistant::set_assistant_tts_elevenlabs_audio_tags,
+            commands::assistant::set_assistant_tts_elevenlabs_audio_tag_intensity,
             commands::assistant::set_assistant_conversation_pace,
             commands::assistant::set_assistant_conversation_sensitivity,
             commands::assistant::set_assistant_panel_opacity,

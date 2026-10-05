@@ -873,6 +873,24 @@ pub enum ConversationPace {
     Patient,
 }
 
+/// How much an ElevenLabs v3/v4 voice performs when audio tags are on
+/// (`assistant_tts_elevenlabs_audio_tags`). Each level is a different paragraph
+/// of the spoken-reply prompt (`audio_tags::prompt_section`), so it changes how
+/// often the model writes `[laughs]`, `[whispers]` or `[applause]`, not how the
+/// voice itself is tuned. That is what the Expressiveness (stability) control
+/// is for, and the two combine.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioTagIntensity {
+    /// A tag only where a reaction is obvious; sound effects only on request.
+    Subtle,
+    /// The default: an expressive speaker, a few tags per reply.
+    #[default]
+    Balanced,
+    /// Performs every reply like a voice actor, building scenes with effects.
+    Theatrical,
+}
+
 /// How readily a hands-free call decides that a sound is the user speaking.
 ///
 /// The pace above is about *when a turn ends*; this is about *whether a turn
@@ -1615,6 +1633,17 @@ pub struct AppSettings {
     /// the ElevenLabs engine reads it.
     #[serde(default)]
     pub assistant_tts_elevenlabs_stability: Option<f32>,
+    /// Lets the assistant direct an ElevenLabs v3/v4 voice with inline audio
+    /// tags (`[laughs]`, `[whispers]`, `[applause]`) when it speaks. Off by
+    /// default. Only takes effect when the engine is ElevenLabs and the model
+    /// understands tags (`audio_tags::active`); on any other engine or model the
+    /// prompt never asks for tags and the speech sanitizer removes stray ones,
+    /// so they are never read out as words.
+    #[serde(default)]
+    pub assistant_tts_elevenlabs_audio_tags: bool,
+    /// How much the voice performs while audio tags are on.
+    #[serde(default)]
+    pub assistant_tts_elevenlabs_audio_tag_intensity: AudioTagIntensity,
     /// How long a hands-free conversation waits for you to finish speaking.
     #[serde(default)]
     pub assistant_conversation_pace: ConversationPace,
@@ -4029,6 +4058,8 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_speed: default_assistant_tts_speed(),
         assistant_tts_volume: default_assistant_tts_volume(),
         assistant_tts_elevenlabs_stability: None,
+        assistant_tts_elevenlabs_audio_tags: false,
+        assistant_tts_elevenlabs_audio_tag_intensity: AudioTagIntensity::default(),
         assistant_conversation_pace: ConversationPace::default(),
         assistant_conversation_sensitivity: ConversationSensitivity::default(),
         assistant_max_history_messages: default_assistant_max_history_messages(),
