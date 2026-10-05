@@ -240,6 +240,5 @@ while the app stays open instead of only at launch.
 | macOS, Intel         | `SpeakoFlow_2.0.0_x64.dmg`                                          |
 | Linux x86_64         | `SpeakoFlow_2.0.0_amd64.deb` or `SpeakoFlow_2.0.0_amd64.AppImage`   |
 | Linux ARM64          | `SpeakoFlow_2.0.0_arm64.deb` or `SpeakoFlow_2.0.0_aarch64.AppImage` |
-| Arch Linux           | `speakoflow-bin` from the AUR                                       |
 
 Every commit: [v1.4.0...v2.0.0](https://github.com/AbhishekBarali/SpeakoFlow/compare/v1.4.0...v2.0.0)
