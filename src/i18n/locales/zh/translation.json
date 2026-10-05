@@ -2152,7 +2152,7 @@
       "flowEmpty": "请在激活短语之后说出指令",
       "cleanupFallback": "AI 清理未运行——已粘贴原始文本",
       "cleanupModelRejected": "您的清理提供商拒绝了该模型——请在设置中检查模型",
-      "cloudSttFellBack": "云端转写未响应——已改用本机模型",
+      "cloudSttFellBack": "云端转写失败——已改用本机模型",
       "noSpeechModel": "还没有语音模型。请在“模型”页面选择一个"
     },
     "listening": "正在聆听…",

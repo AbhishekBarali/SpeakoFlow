@@ -2164,7 +2164,7 @@
       "flowEmpty": "Say a command after the activation phrase",
       "cleanupFallback": "AI cleanup didn't run — pasted the raw text",
       "cleanupModelRejected": "Your cleanup provider rejected that model — check the model in Settings",
-      "cloudSttFellBack": "Cloud transcription didn't respond — used the on-device model",
+      "cloudSttFellBack": "Cloud transcription failed — used the on-device model",
       "noSpeechModel": "No speech model yet. Pick one on the Models page"
     },
     "listening": "Listening…",

@@ -2164,7 +2164,7 @@
       "flowEmpty": "Etkinleştirme ifadesinden sonra bir komut söyleyin",
       "cleanupFallback": "Yapay zekâ temizleme çalışmadı — ham metin yapıştırıldı",
       "cleanupModelRejected": "Temizleme sağlayıcınız bu modeli reddetti — Ayarlar'da modeli kontrol edin",
-      "cloudSttFellBack": "Bulut transkripsiyonu yanıt vermedi — cihazdaki model kullanıldı",
+      "cloudSttFellBack": "Bulut transkripsiyonu başarısız oldu — cihazdaki model kullanıldı",
       "noSpeechModel": "Henüz konuşma modeli yok. Modeller sayfasından bir tane seçin"
     },
     "listening": "Dinleniyor…",

@@ -1121,12 +1121,28 @@ impl CloudRequest {
         // recording, see `request_timeout`) and is set in `post`. Baking it in
         // would mint a separate client — and a separate, cold connection pool —
         // for every recording length.
-        let client = reqwest::Client::builder()
+        let builder = reqwest::Client::builder()
             .connect_timeout(CONNECT_TIMEOUT)
             .default_headers(headers)
             .pool_idle_timeout(Duration::from_secs(300))
             .pool_max_idle_per_host(2)
-            .tcp_keepalive(Duration::from_secs(30))
+            .tcp_keepalive(Duration::from_secs(30));
+        // TLS 1.2 on Windows. With TLS 1.3, schannel (through native-tls) lets
+        // the first large request on a new connection arrive short: Azure
+        // answered every upload over ~90 kB sent as the first request with 400
+        // "Failed to read the request form. Unexpected end of Stream", while the
+        // same bytes worked as a second request on the same connection, from
+        // curl (also schannel) and from Python, and from this client capped at
+        // TLS 1.2 (measured 2026-10-05: 0 of 12 cold uploads accepted on 1.3,
+        // 4 of 4 on 1.2). Short dictations rarely saw it because the warm-up
+        // leaves a connection open, but Azure closes an idle one after about
+        // two minutes, so any dictation longer than that went out on a fresh
+        // connection, failed, and was finished on the local model. TLS 1.2 is
+        // supported by every provider here and costs one extra round trip,
+        // only when a connection is opened.
+        #[cfg(windows)]
+        let builder = builder.max_tls_version(reqwest::tls::Version::TLS_1_2);
+        let client = builder
             .build()
             .map_err(|e| format!("Failed to build the HTTP client: {e}"))?;
 

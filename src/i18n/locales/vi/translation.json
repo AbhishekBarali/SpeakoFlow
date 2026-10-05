@@ -2152,7 +2152,7 @@
       "flowEmpty": "Hãy nói một câu lệnh sau cụm từ kích hoạt",
       "cleanupFallback": "Dọn dẹp bằng AI không chạy — đã dán văn bản gốc",
       "cleanupModelRejected": "Nhà cung cấp dọn dẹp đã từ chối mô hình đó — hãy kiểm tra mô hình trong Cài đặt",
-      "cloudSttFellBack": "Chuyển giọng nói trên đám mây không phản hồi — đã dùng mô hình trên thiết bị",
+      "cloudSttFellBack": "Chuyển giọng nói trên đám mây thất bại — đã dùng mô hình trên thiết bị",
       "noSpeechModel": "Chưa có mô hình giọng nói. Hãy chọn một mô hình trong trang Mô hình"
     },
     "listening": "Đang lắng nghe…",

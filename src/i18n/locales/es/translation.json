@@ -2176,7 +2176,7 @@
       "flowEmpty": "Di una orden después de la frase de activación",
       "cleanupFallback": "La limpieza con IA no se ejecutó: se pegó el texto sin procesar",
       "cleanupModelRejected": "Tu proveedor de limpieza rechazó ese modelo: revisa el modelo en Ajustes",
-      "cloudSttFellBack": "La transcripción en la nube no respondió: se usó el modelo del dispositivo",
+      "cloudSttFellBack": "Falló la transcripción en la nube: se usó el modelo del dispositivo",
       "noSpeechModel": "Aún no hay modelo de voz. Elige uno en la página Modelos"
     },
     "listening": "Escuchando…",

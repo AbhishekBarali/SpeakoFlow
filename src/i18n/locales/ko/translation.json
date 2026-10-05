@@ -2152,7 +2152,7 @@
       "flowEmpty": "활성화 문구 뒤에 명령을 말하세요",
       "cleanupFallback": "AI 정리가 실행되지 않았습니다 — 원본 텍스트를 붙여넣었습니다",
       "cleanupModelRejected": "정리 제공자가 해당 모델을 거부했습니다 — 설정에서 모델을 확인하세요",
-      "cloudSttFellBack": "클라우드 전사가 응답하지 않았습니다 — 기기의 모델을 사용했습니다",
+      "cloudSttFellBack": "클라우드 전사에 실패했습니다 — 기기의 모델을 사용했습니다",
       "noSpeechModel": "아직 음성 모델이 없습니다. 모델 페이지에서 하나 고르세요"
     },
     "listening": "듣고 있습니다…",

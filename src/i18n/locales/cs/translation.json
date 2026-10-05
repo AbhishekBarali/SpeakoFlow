@@ -2188,7 +2188,7 @@
       "flowEmpty": "Po aktivační frázi vyslovte příkaz",
       "cleanupFallback": "Čištění pomocí AI neproběhlo — vložen původní text",
       "cleanupModelRejected": "Poskytovatel čištění tento model odmítl — zkontrolujte model v Nastavení",
-      "cloudSttFellBack": "Cloudový přepis neodpověděl — použit model v zařízení",
+      "cloudSttFellBack": "Cloudový přepis selhal — použit model v zařízení",
       "noSpeechModel": "Zatím žádný model pro přepis. Vyberte si ho na stránce Modely"
     },
     "listening": "Poslouchám…",

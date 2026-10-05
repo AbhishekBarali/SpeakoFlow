@@ -2176,7 +2176,7 @@
       "flowEmpty": "Dites une commande après la phrase d'activation",
       "cleanupFallback": "Le nettoyage IA ne s'est pas exécuté — texte brut collé",
       "cleanupModelRejected": "Votre fournisseur de nettoyage a refusé ce modèle — vérifiez le modèle dans les Paramètres",
-      "cloudSttFellBack": "La transcription cloud n'a pas répondu — modèle local utilisé",
+      "cloudSttFellBack": "Échec de la transcription cloud — modèle local utilisé",
       "noSpeechModel": "Aucun modèle vocal pour l'instant. Choisissez-en un sur la page Modèles"
     },
     "listening": "À l'écoute…",

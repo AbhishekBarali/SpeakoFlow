@@ -2164,7 +2164,7 @@
       "flowEmpty": "Sage nach der Aktivierungsphrase einen Befehl",
       "cleanupFallback": "KI-Bereinigung lief nicht — Rohtext eingefügt",
       "cleanupModelRejected": "Dein Bereinigungs-Anbieter hat dieses Modell abgelehnt – prüfe das Modell in den Einstellungen",
-      "cloudSttFellBack": "Cloud-Transkription hat nicht geantwortet — Modell auf dem Gerät verwendet",
+      "cloudSttFellBack": "Cloud-Transkription fehlgeschlagen — Modell auf dem Gerät verwendet",
       "noSpeechModel": "Noch kein Sprachmodell. Wähle eines auf der Seite „Modelle“"
     },
     "listening": "Hört zu…",

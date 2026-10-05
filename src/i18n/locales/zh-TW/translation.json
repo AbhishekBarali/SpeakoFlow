@@ -2152,7 +2152,7 @@
       "flowEmpty": "請在啟動語句後說出指令",
       "cleanupFallback": "AI 整理未執行——已貼上原始文字",
       "cleanupModelRejected": "您的整理供應商拒絕了該模型——請在「設定」中檢查模型",
-      "cloudSttFellBack": "雲端轉寫沒有回應——已改用本機模型",
+      "cloudSttFellBack": "雲端轉寫失敗——已改用本機模型",
       "noSpeechModel": "尚未選擇語音模型。請在「模型」頁面選擇一個"
     },
     "listening": "正在聆聽…",

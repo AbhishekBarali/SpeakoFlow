@@ -2164,7 +2164,7 @@
       "flowEmpty": "Säg ett kommando efter aktiveringsfrasen",
       "cleanupFallback": "AI-rensningen kördes inte — klistrade in råtexten",
       "cleanupModelRejected": "Leverantören för rensning avvisade modellen — kontrollera modellen i Inställningar",
-      "cloudSttFellBack": "Molntranskriberingen svarade inte — använde modellen på enheten",
+      "cloudSttFellBack": "Molntranskriberingen misslyckades — använde modellen på enheten",
       "noSpeechModel": "Ingen talmodell än. Välj en på sidan Modeller"
     },
     "listening": "Lyssnar…",

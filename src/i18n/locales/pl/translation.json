@@ -2188,7 +2188,7 @@
       "flowEmpty": "Po frazie aktywującej wypowiedz polecenie",
       "cleanupFallback": "Czyszczenie AI nie zadziałało — wklejono surowy tekst",
       "cleanupModelRejected": "Dostawca czyszczenia odrzucił ten model — sprawdź model w Ustawieniach",
-      "cloudSttFellBack": "Transkrypcja w chmurze nie odpowiedziała — użyto modelu na urządzeniu",
+      "cloudSttFellBack": "Transkrypcja w chmurze nie powiodła się — użyto modelu na urządzeniu",
       "noSpeechModel": "Brak modelu mowy. Wybierz go na stronie Modele"
     },
     "listening": "Słucham…",
