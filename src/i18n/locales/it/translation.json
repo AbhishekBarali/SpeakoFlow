@@ -648,6 +648,7 @@
         "errors": {
           "restore": "Impossibile ripristinare la scorciatoia originale.",
           "set": "Impossibile impostare la scorciatoia: {{error}}",
+          "inUse": "«{{name}}» usa già {{keys}}. Scegli altri tasti, oppure cambia prima quella scorciatoia.",
           "reset": "Impossibile ripristinare la scorciatoia."
         },
         "clickToChange": "Fai clic per cambiare",

@@ -644,6 +644,7 @@
         "errors": {
           "restore": "Không thể khôi phục phím tắt ban đầu.",
           "set": "Không thể đặt phím tắt: {{error}}",
+          "inUse": "“{{name}}” đã dùng {{keys}}. Hãy chọn phím khác, hoặc đổi phím tắt đó trước.",
           "reset": "Không thể đặt lại phím tắt."
         },
         "clickToChange": "Nhấp để thay đổi",

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { formatKeyCombination } from "../../lib/utils/keyboard";
+import { shortcutUsingKeys } from "../../lib/utils/shortcutConflict";
 import { SettingContainer } from "../ui/SettingContainer";
 import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
@@ -62,6 +63,9 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
   const osType = useOsType();
 
   const bindings = getSetting("bindings") || {};
+  // Read by the key-event handler, which outlives a render.
+  const bindingsRef = useRef(bindings);
+  bindingsRef.current = bindings;
 
   // Handle cancellation
   const cancelRecording = useCallback(async () => {
@@ -114,23 +118,41 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
           } else if (!is_key_down && currentKeysRef.current) {
             // Key released - commit the shortcut using the ref value
             const keysToCommit = currentKeysRef.current;
-            try {
-              await updateBinding(shortcutId, keysToCommit);
-            } catch (error) {
-              console.error("Failed to change binding:", error);
+            const takenBy = shortcutUsingKeys(
+              bindingsRef.current,
+              keysToCommit,
+              shortcutId,
+            );
+            if (takenBy) {
+              // Nothing was changed, so the shortcut keeps its keys.
               toast.error(
-                t("settings.general.shortcut.errors.set", {
-                  error: String(error),
+                t("settings.general.shortcut.errors.inUse", {
+                  name: t(
+                    `settings.general.shortcut.bindings.${takenBy}.name`,
+                    bindingsRef.current[takenBy]?.name ?? takenBy,
+                  ),
+                  keys: formatKeyCombination(keysToCommit, osType),
                 }),
               );
+            } else {
+              try {
+                await updateBinding(shortcutId, keysToCommit);
+              } catch (error) {
+                console.error("Failed to change binding:", error);
+                toast.error(
+                  t("settings.general.shortcut.errors.set", {
+                    error: String(error),
+                  }),
+                );
 
-              // Reset to original binding on error
-              if (originalBinding) {
-                try {
-                  await updateBinding(shortcutId, originalBinding);
-                } catch (resetError) {
-                  console.error("Failed to reset binding:", resetError);
-                  toast.error(t("settings.general.shortcut.errors.reset"));
+                // Reset to original binding on error
+                if (originalBinding) {
+                  try {
+                    await updateBinding(shortcutId, originalBinding);
+                  } catch (resetError) {
+                    console.error("Failed to reset binding:", resetError);
+                    toast.error(t("settings.general.shortcut.errors.reset"));
+                  }
                 }
               }
             }
@@ -175,6 +197,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
     originalBinding,
     updateBinding,
     cancelRecording,
+    osType,
     t,
   ]);
 

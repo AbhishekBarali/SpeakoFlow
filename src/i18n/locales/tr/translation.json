@@ -646,6 +646,7 @@
         "errors": {
           "restore": "Orijinal kısayol geri yüklenemedi.",
           "set": "Kısayol ayarlanamadı: {{error}}",
+          "inUse": "“{{name}}” zaten {{keys}} kullanıyor. Başka tuşlar seçin veya önce o kısayolu değiştirin.",
           "reset": "Kısayol sıfırlanamadı."
         },
         "clickToChange": "Değiştirmek için tıklayın",

@@ -372,7 +372,7 @@ keyring = { version = "3", features = [
 tauri-runtime = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-runtime-wry = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-utils = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
-# Vendored handy-keys with two Windows fixes.
+# Vendored handy-keys with three Windows fixes.
 #
 # 1. OS-level stuck keys: the low-level hook now blocks a key's UP (and
 #    auto-repeats) if-and-only-if it blocked that key's DOWN, instead of
@@ -386,6 +386,11 @@ tauri-utils = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.1
 #    that injected Ctrl key-up came back through our own hook and read as the user
 #    releasing the modifier-only `Ctrl+Alt` hotkey — ending a hold-to-talk
 #    recording ~30 ms after it began. See vendor/handy-keys/src/injected.rs.
+# 3. Modifiers a blocking hook withholds (the assistant's Ctrl+Alt) are shared
+#    with every other listener in the process. Windows reports withheld keys
+#    as up, so the Settings recorder read a held Ctrl+Alt as released when C
+#    went down, and recording Ctrl+Alt+C saved Ctrl+Alt ("Hotkey already
+#    registered"). See vendor/handy-keys/src/platform/withheld.rs.
 handy-keys = { path = "vendor/handy-keys" }
 
 [dev-dependencies]

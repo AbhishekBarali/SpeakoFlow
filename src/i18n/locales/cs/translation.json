@@ -650,6 +650,7 @@
         "errors": {
           "restore": "Nepodařilo se obnovit původní zkratku.",
           "set": "Nepodařilo se nastavit zkratku: {{error}}",
+          "inUse": "„{{name}}“ už používá {{keys}}. Vyberte jiné klávesy, nebo nejdřív změňte tu zkratku.",
           "reset": "Nepodařilo se resetovat zkratku."
         },
         "clickToChange": "Kliknutím změníte",

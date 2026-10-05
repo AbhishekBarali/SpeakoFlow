@@ -650,6 +650,7 @@
         "errors": {
           "restore": "Nie udało się przywrócić oryginalnego skrótu.",
           "set": "Nie udało się ustawić skrótu: {{error}}",
+          "inUse": "„{{name}}” już używa {{keys}}. Wybierz inne klawisze albo najpierw zmień tamten skrót.",
           "reset": "Nie udało się zresetować skrótu."
         },
         "clickToChange": "Kliknij, aby zmienić",
