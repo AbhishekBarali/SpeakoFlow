@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { renderSmall } from "./small-icon.mjs";
+import { renderTrayTemplate } from "./build-tray-template.mjs";
 
 async function matchesSmall(data, size) {
   const expected = await sharp(await renderSmall(size))
@@ -189,6 +190,40 @@ for (const f of [
   if (r.colors > 4) {
     console.log(`FAIL ${f} looks like artwork, not a flat state glyph`);
     bad++;
+  }
+}
+
+// macOS draws the tray from alpha alone, so the colour tile above shows up there
+// as a blank rounded square. Its idle icon is a separate template glyph.
+console.log("\n== macOS menu bar: idle is a template glyph drawn in alpha ==");
+{
+  const f = "src-tauri/resources/tray_idle_template.png";
+  const shipped = await sharp(f)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const expected = await sharp(await renderTrayTemplate())
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+  const { data, info } = shipped;
+  const alpha = (x, y) => data[(y * info.width + x) * 4 + 3];
+  // The tallest waveform bar runs through the centre of the tile: a hole there,
+  // with solid tile on either side, is what makes the mark visible.
+  const c = info.width / 2;
+  const cutOut =
+    alpha(c - 1, c) === 0 && alpha(c - 3, c) === 255 && alpha(c + 2, c) === 255;
+  const checks = [
+    [info.width === 36 && info.height === 36, "36x36 (18pt @2x)"],
+    [cutOut, "waveform is cut out of the alpha"],
+    [
+      Buffer.compare(data, expected) === 0,
+      "matches build-tray-template.mjs output",
+    ],
+  ];
+  for (const [ok, what] of checks) {
+    if (!ok) bad++;
+    console.log(`${ok ? "OK  " : "FAIL"} ${f.padEnd(50)} ${what}`);
   }
 }
 

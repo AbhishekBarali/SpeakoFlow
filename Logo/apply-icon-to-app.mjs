@@ -21,6 +21,11 @@
 // tray_transcribing*.png, recording.png, transcribing.png. Those are
 // recording/transcribing STATE glyphs, not the brand mark.
 //
+// Also untouched: src-tauri/resources/tray_idle_template.png, the macOS menu-bar
+// idle icon. macOS draws the tray from alpha only, so the colour tile written
+// below is a blank rounded square there. That file comes from
+// build-tray-template.mjs; never point a TARGET at it.
+//
 // Run from the Logo folder: node apply-icon-to-app.mjs
 
 import fs from "node:fs";
@@ -46,8 +51,9 @@ const render = (size) => (size <= SMALL_MAX ? small(size) : hero(size));
 
 // [destination, size, why]
 const TARGETS = [
-  // System tray. Windows draws 16, macOS's menu bar ~22, Linux 22-24 -- all well
-  // inside the small tier, so these ship the simplified mark even at 64px source.
+  // System tray on Windows (16px) and Linux (22-24px) -- well inside the small
+  // tier, so these ship the simplified mark even at 64px source. macOS idle uses
+  // tray_idle_template.png instead (see above).
   ["src-tauri/resources/tray_idle.png", 64, "tray idle (dark themes)"],
   ["src-tauri/resources/tray_idle_dark.png", 64, "tray idle (light themes)"],
   ["src-tauri/resources/speakoflow.png", 64, "tray idle (Linux)"],

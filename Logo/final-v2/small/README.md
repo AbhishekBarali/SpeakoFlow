@@ -10,6 +10,9 @@ adjusts light mixing at small edges without redrawing or thickening the mark.
 The rejected enlarged vector bars, separate background plate and runtime DPI
 icon override have been removed. Existing Windows window-icon behavior is restored.
 The 16–64px PNGs, ICO entries, favicon and small ICNS slots share the same renderer.
+The macOS menu-bar idle icon is the exception: macOS draws tray icons from their
+alpha channel only, so `build-tray-template.mjs` cuts the waveform out of the
+tile's alpha instead of drawing it in colour.
 Large app slots keep the original detailed hero artwork.
 
 The runtime window PNGs use a 48px export. An offscreen Windows `CreateIcon` +
@@ -24,6 +27,7 @@ From `Logo/`, run:
 ```sh
 node build-small-icon.mjs
 node apply-icon-to-app.mjs
+node build-tray-template.mjs
 node patch-icns-small.mjs
 node preview-small-icon.mjs
 cd ..

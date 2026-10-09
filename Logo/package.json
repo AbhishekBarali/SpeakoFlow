@@ -10,6 +10,7 @@
     "build:icon-v2": "node build-new-icon.mjs",
     "build:lockup-v2": "node build-new-lockup.mjs",
     "build:small": "node build-small-icon.mjs",
+    "build:tray-template": "node build-tray-template.mjs",
     "apply:app": "node apply-icon-to-app.mjs",
     "apply:icns": "node patch-icns-small.mjs",
     "preview:small": "node preview-small-icon.mjs",
