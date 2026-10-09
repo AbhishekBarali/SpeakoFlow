@@ -185,7 +185,7 @@ the reminder popup (`reminder/`).
 
 ### Settings System
 
-Settings are stored using Tauri's store plugin with reactive updates:
+Settings live in `settings_store.json`. `settings_file.rs` owns that file rather than `tauri-plugin-store`. Every save is atomic: it writes a temporary file, fsyncs it and renames it over the old one. An unreadable file is moved aside to `.corrupt-<time>` and the settings come back from `settings_store.json.bak`, which every launch that read a good file refreshes. Two rules matter. **Never open that file with `app.store()`**: the plugin would keep its own copy and write it back non-atomically on exit. **Go through `settings::settings_file(app)`** for any other key kept in that file (the meeting pill position, for example). The plugin's in-place `fs::write`, together with a load that silently ignored a damaged file, is how a shutdown reset every setting. What the settings cover:
 
 - Keyboard shortcuts (configurable, supports push-to-talk)
 - Audio devices (microphone/output selection)
