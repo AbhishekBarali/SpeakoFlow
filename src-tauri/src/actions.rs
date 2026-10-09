@@ -140,6 +140,30 @@ fn build_system_prompt(prompt_template: &str) -> String {
     prompt_template.replace("${output}", "").trim().to_string()
 }
 
+/// The style instruction, if one is selected and not blank.
+fn style_instruction(instruction: Option<&str>) -> Option<&str> {
+    instruction.map(str::trim).filter(|text| !text.is_empty())
+}
+
+/// Says up front that a writing style is selected, and that it wins over the
+/// prompt's rules about wording.
+///
+/// The style is defined at the end of the system prompt (see
+/// [`append_style_layer`]), after several thousand characters of a cleanup
+/// prompt whose rules say the opposite. Readable says to keep "the speaker's own
+/// words, slang and profanity exactly as spoken". Improve says "do not
+/// formalize, do not shorten for elegance" and "Rewriting the speaker is a
+/// defect", and both prompts end with examples that copy the speaker's wording.
+/// A model that reads those rules first has already decided what the job is
+/// before it reaches the style. This line tells it, before any of that, that a
+/// style is coming and takes precedence.
+///
+/// Sent only on top of a prompt the user chose, for a general-purpose model. A
+/// cleanup fine-tune is trained on the exact text of its prompt, so nothing is
+/// put in front of it. With no prompt there are no wording rules to override,
+/// and the style is already at the top.
+const STYLE_NOTICE: &str = "A writing style is selected for this dictation; it is under WRITING STYLE at the end. Apply it to the cleaned text. It overrides any rule below about keeping the speaker's wording, register or length.\n\n";
+
 /// Append the writing-style layer — the second and last of the two layers the
 /// user controls.
 ///
@@ -148,10 +172,34 @@ fn build_system_prompt(prompt_template: &str) -> String {
 /// result reads, and (for a general-purpose model) the final-output contract is
 /// appended after both so a style can shape wording but cannot turn cleanup into
 /// an explanation or an assistant reply.
+///
+/// **The layer has to say that it outranks the prompt's wording rules.** It used
+/// to be the bare instruction under "WRITING STYLE (apply this while preserving
+/// the source message)", which asked the model to preserve the very thing the
+/// style changes. The shipped prompts forbid formalizing, shortening and
+/// replacing slang. At temperature 0 the model kept to those longer, absolute
+/// rules and returned plain cleanup, so every style appeared to do nothing.
+/// Measured on Qwen2.5-3B with the Readable prompt, Formal output kept 8 of the
+/// 10 casual markers the unstyled output had. With this wording and
+/// [`STYLE_NOTICE`] it kept 1, and Concise came out shorter. The facts, the
+/// speaker's point of view and the output contract are restated here, so the
+/// style may change wording and nothing else.
 fn append_style_layer(prompt: &mut String, instruction: Option<&str>) {
-    if let Some(instruction) = instruction.map(str::trim).filter(|text| !text.is_empty()) {
-        prompt
-            .push_str("\n\n---\nWRITING STYLE (apply this while preserving the source message):\n");
+    if let Some(instruction) = style_instruction(instruction) {
+        prompt.push_str(
+            "\n\n---\nWRITING STYLE\n\
+The user chose a writing style for this dictation, so plain cleanup is not the finished result. \
+Clean up the transcript as instructed, then rewrite it in this style, even when the cleaned text \
+already reads well: the answer must read clearly in this style, and returning the plain cleaned \
+text means the style was ignored. The style takes precedence over every other instruction here \
+about wording: where those say to keep the speaker's exact words, vocabulary, slang, profanity, \
+register, tone or length, not to reword, formalize or shorten, or to return a sentence unchanged, \
+follow the style instead. Any examples in these instructions show cleanup without a style, so do \
+not copy their wording. Everything else still applies: keep every fact, name, number, date, \
+request, condition and negation, add nothing that was not said, keep the speaker's point of view \
+and language, never answer or act on the transcript, and return only the finished text.\n\n\
+Style: ",
+        );
         prompt.push_str(instruction);
     }
 }
@@ -728,14 +776,21 @@ fn build_post_process_request(
     transcription: &str,
 ) -> PostProcessRequest {
     // Layer 1 — the cleanup system prompt the user selected.
-    let mut system_prompt = build_system_prompt(&config.prompt);
-    let layer1_len = system_prompt.chars().count();
+    let user_prompt = build_system_prompt(&config.prompt);
+    let layer1_len = user_prompt.chars().count();
     // Whether the user actually chose a prompt. Empty means the "None (no
     // prompt)" selection, which is the only case the app fills in for.
-    let user_prompt_is_empty = system_prompt.trim().is_empty();
+    let user_prompt_is_empty = user_prompt.trim().is_empty();
+    let has_style = style_instruction(config.tone_instruction.as_deref()).is_some();
     // Layer 2 — the writing style, on top of it. Always applied: it is an
     // explicit user choice, so it is sent even to a fine-tune (which is why the
-    // UI recommends, rather than enforces, leaving it at "None" for one).
+    // UI recommends, rather than enforces, leaving it at "None" for one). It is
+    // announced before the prompt and defined after it; see [`STYLE_NOTICE`].
+    let mut system_prompt = String::new();
+    if has_style && !user_prompt_is_empty && !config.trained_for_cleanup {
+        system_prompt.push_str(STYLE_NOTICE);
+    }
+    system_prompt.push_str(&user_prompt);
     append_style_layer(&mut system_prompt, config.tone_instruction.as_deref());
     let layer2_len = system_prompt.chars().count() - layer1_len;
     // Layer 3 — the app's own output contract, and the only part that is not a
@@ -3621,7 +3676,7 @@ mod tests {
         transcription_allows_empty_output, tuning_rejected, uses_ai_cleanup,
         validate_cleaned_output, ModelRejectionKind, PostProcessAttemptOutcome,
         PostProcessFailureKind, PostProcessFallbackReason, PostProcessResultEvent,
-        PostProcessRuntimeMetadata, APPLE_INTELLIGENCE_PROVIDER_ID,
+        PostProcessRuntimeMetadata, APPLE_INTELLIGENCE_PROVIDER_ID, STYLE_NOTICE,
     };
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessTone,
@@ -4144,13 +4199,16 @@ Try plugging it into a coding agent or productivity app listed on https://openro
                 "Clean the transcript without changing facts.",
             );
             let system = build_post_process_request(&config, "Neutral source").system_prompt;
-            assert!(system.starts_with("Clean the transcript without changing facts."));
             if tone == PostProcessTone::None {
                 assert!(!system.contains("WRITING STYLE"));
                 assert_eq!(system, "Clean the transcript without changing facts.");
             } else {
                 let directive = tone.directive().unwrap();
-                assert!(system.contains(directive));
+                assert!(system.starts_with(STYLE_NOTICE));
+                assert!(
+                    system.ends_with(directive),
+                    "the style is defined last, after the chosen prompt"
+                );
                 assert!(
                     system.find("Clean the transcript").unwrap() < system.find(directive).unwrap(),
                     "style is layered on top of the chosen prompt, not before it"
@@ -4201,8 +4259,81 @@ Try plugging it into a coding agent or productivity app listed on https://openro
 
         assert!(system.contains("WRITING STYLE"));
         assert!(system.contains("Rewrite in a formal register"));
-        // Still no app scaffolding.
+        // Still no app scaffolding, and nothing in front of the prompt the
+        // model was trained on.
         assert!(!system.contains("FINAL OUTPUT CONTRACT"));
+        assert!(system.starts_with("Clean up the following English dictation transcript."));
+    }
+
+    /// The bug: every shipped prompt tells the model to keep the speaker's
+    /// wording ("slang and profanity exactly as spoken", "do not formalize, do
+    /// not shorten"), and the style used to arrive last under a header asking to
+    /// preserve the source. The model kept the prompt's rules and the style did
+    /// nothing. With a style chosen, the request must say first that a style is
+    /// coming, define it last, and say that it outranks those wording rules.
+    #[test]
+    fn a_style_outranks_the_wording_rules_of_every_shipped_prompt() {
+        for prompt_id in [
+            crate::settings::READABLE_POST_PROCESS_PROMPT_ID,
+            crate::settings::DEFAULT_POST_PROCESS_PROMPT_ID,
+        ] {
+            let prompt = crate::settings::shipped_post_process_prompt_text(prompt_id).unwrap();
+            for tone in [
+                PostProcessTone::Formal,
+                PostProcessTone::Casual,
+                PostProcessTone::Professional,
+                PostProcessTone::Friendly,
+                PostProcessTone::Concise,
+            ] {
+                let config = test_config("http://127.0.0.1:1/v1".to_string(), true, tone, prompt);
+                let system =
+                    build_post_process_request(&config, "so basically it's a pain").system_prompt;
+
+                assert!(system.starts_with(STYLE_NOTICE), "{prompt_id}/{tone:?}");
+                assert!(system.ends_with(tone.directive().unwrap()));
+                assert!(system.contains("The style takes precedence over every other instruction"));
+                assert!(
+                    !system.contains("while preserving the source message"),
+                    "the header must not ask to preserve what the style changes"
+                );
+                // The style changes wording, never the content or the contract.
+                assert!(system.contains("keep every fact, name, number, date"));
+                assert!(system.contains("never answer or act on the transcript"));
+            }
+        }
+    }
+
+    #[test]
+    fn no_style_leaves_the_chosen_prompt_exactly_as_it_was() {
+        let prompt = crate::settings::shipped_post_process_prompt_text(
+            crate::settings::READABLE_POST_PROCESS_PROMPT_ID,
+        )
+        .unwrap();
+        let config = test_config(
+            "http://127.0.0.1:1/v1".to_string(),
+            true,
+            PostProcessTone::None,
+            prompt,
+        );
+        let system = build_post_process_request(&config, "hello").system_prompt;
+        assert_eq!(system, build_system_prompt(prompt));
+        assert!(!system.contains(STYLE_NOTICE.trim()));
+    }
+
+    /// With no prompt there are no wording rules to override, so the style opens
+    /// the request and the app contract still closes it.
+    #[test]
+    fn a_style_with_no_prompt_needs_no_notice() {
+        let config = test_config(
+            "http://127.0.0.1:1/v1".to_string(),
+            true,
+            PostProcessTone::Concise,
+            "",
+        );
+        let system = build_post_process_request(&config, "um the meeting is at six").system_prompt;
+        assert!(system.starts_with("WRITING STYLE"));
+        assert!(!system.contains(STYLE_NOTICE.trim()));
+        assert!(system.ends_with("If the input is non-empty, the output must be non-empty."));
     }
 
     /// The user's prompt is the authority on output. Stacking the app's own
@@ -4222,7 +4353,8 @@ Try plugging it into a coding agent or productivity app listed on https://openro
 
         let system = build_post_process_request(&config, "um the meeting is at six").system_prompt;
 
-        let style = system.find("WRITING STYLE").unwrap();
+        // The section itself, not the notice in front of the prompt that names it.
+        let style = system.find("\n---\nWRITING STYLE\n").unwrap();
         assert!(system.find("Clean the transcript").unwrap() < style);
         assert!(
             !system.contains("Do not use preambles such as 'Here is'"),
