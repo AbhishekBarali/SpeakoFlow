@@ -2789,6 +2789,10 @@
         "instruction": "Instructions",
         "instructionTip": "Comment la formulation doit changer. Appliqué après le nettoyage, les corrections restent donc identiques.",
         "instructionPlaceholder": "Par exemple : garder un ton décontracté, tout en minuscules, et transformer les noms d'emoji prononcés en emoji."
+      },
+      "specialist": {
+        "ignored": "{{model}} se limite au nettoyage, il ignore donc les styles d'écriture. Utilisez un modèle généraliste pour appliquer un style.",
+        "changeModel": "Changer de modèle"
       }
     },
     "shortcut": {

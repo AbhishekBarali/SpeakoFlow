@@ -2743,6 +2743,10 @@
         "instruction": "指示",
         "instructionTip": "言い回しをどう変えるか。整形のあとに適用されるため、修正内容は変わりません。",
         "instructionPlaceholder": "例：くだけた口調にして、話した絵文字の名前は絵文字に変える。"
+      },
+      "specialist": {
+        "ignored": "{{model}} は基本的な整形のみを行うため、文体を無視します。文体を適用するには汎用モデルを使ってください。",
+        "changeModel": "モデルを変更"
       }
     },
     "shortcut": {

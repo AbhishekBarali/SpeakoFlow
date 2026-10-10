@@ -2766,6 +2766,10 @@
         "instruction": "Talimatlar",
         "instructionTip": "İfadelerin nasıl değişmesi gerektiği. Temizlemeden sonra uygulanır, böylece düzeltmeler aynı kalır.",
         "instructionPlaceholder": "Örneğin: rahat ve küçük harfle yaz, söylenen emoji adlarını emojiye çevir."
+      },
+      "specialist": {
+        "ignored": "{{model}} yalnızca temel temizleme yapar, bu yüzden yazım stillerini yok sayar. Bir stil uygulamak için genel amaçlı bir model kullanın.",
+        "changeModel": "Modeli değiştir"
       }
     },
     "shortcut": {

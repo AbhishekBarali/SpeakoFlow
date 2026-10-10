@@ -2789,6 +2789,10 @@
         "instruction": "Istruzioni",
         "instructionTip": "Come devono cambiare le parole. Viene applicato dopo la pulizia, quindi le correzioni restano invariate.",
         "instructionPlaceholder": "Per esempio: tieni un tono informale, tutto in minuscolo, e trasforma i nomi delle emoji pronunciati in emoji."
+      },
+      "specialist": {
+        "ignored": "{{model}} fa solo la pulizia di base, quindi ignora gli stili di scrittura. Usa un modello generico per applicare uno stile.",
+        "changeModel": "Cambia modello"
       }
     },
     "shortcut": {

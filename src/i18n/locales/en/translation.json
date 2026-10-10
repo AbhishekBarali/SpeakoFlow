@@ -2766,6 +2766,10 @@
         "instruction": "Instructions",
         "instructionTip": "How the wording should change. Applied after cleanup, so the fixes stay the same.",
         "instructionPlaceholder": "For example: keep it casual and lowercase, and turn spoken emoji names into emoji."
+      },
+      "specialist": {
+        "ignored": "{{model}} only does plain cleanup, so it ignores writing styles. Use a general model to apply a style.",
+        "changeModel": "Change model"
       }
     },
     "shortcut": {

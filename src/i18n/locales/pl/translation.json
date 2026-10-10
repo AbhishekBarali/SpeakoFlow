@@ -2812,6 +2812,10 @@
         "instruction": "Instrukcje",
         "instructionTip": "Jak mają się zmienić sformułowania. Stosowane po czyszczeniu, więc poprawki pozostają takie same.",
         "instructionPlaceholder": "Na przykład: pisz swobodnie i małymi literami, a wypowiedziane nazwy emoji zamieniaj na emoji."
+      },
+      "specialist": {
+        "ignored": "{{model}} wykonuje tylko podstawowe porządkowanie, więc ignoruje style pisania. Aby zastosować styl, użyj modelu ogólnego.",
+        "changeModel": "Zmień model"
       }
     },
     "shortcut": {

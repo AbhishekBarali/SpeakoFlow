@@ -2789,6 +2789,10 @@
         "instruction": "Instruções",
         "instructionTip": "Como as palavras devem mudar. É aplicado depois da limpeza, então as correções continuam iguais.",
         "instructionPlaceholder": "Por exemplo: mantenha informal e em minúsculas, e transforme nomes de emoji falados em emoji."
+      },
+      "specialist": {
+        "ignored": "{{model}} faz apenas a limpeza básica, por isso ignora os estilos de escrita. Use um modelo geral para aplicar um estilo.",
+        "changeModel": "Trocar modelo"
       }
     },
     "shortcut": {

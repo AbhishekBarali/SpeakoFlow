@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
-import { useModelStore } from "@/stores/modelStore";
-import { isCleanupSpecialistModel } from "@/lib/utils/cleanupSpecialist";
 import { Page, PageHeader, SectionTitle } from "@/components/ui/Page";
 import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
@@ -18,12 +16,12 @@ import { useNavigation } from "@/components/shell/navigation";
 import { useModelSlots } from "@/components/shell/useModelSlots";
 import { LlmModelPicker } from "@/components/shell/ModelPicker";
 import { WritingStyleCard } from "./cleanup/WritingStyle";
+import { useCleanupSpecialist } from "./cleanup/useCleanupSpecialist";
 
 /** The base cleanup prompt: long-form text, so it is edited in a window. */
 const InstructionsRow: React.FC = () => {
   const { t } = useTranslation();
-  const { getSetting, postProcessReadiness, settings } = useSettings();
-  const models = useModelStore((state) => state.models);
+  const { getSetting } = useSettings();
   const [open, setOpen] = useState(false);
 
   const prompts = getSetting("post_process_prompts") ?? [];
@@ -36,17 +34,7 @@ const InstructionsRow: React.FC = () => {
 
   // A cleanup fine-tune was trained on one exact prompt; say so where the
   // prompt is edited, so nobody "improves" it into worse output.
-  const resolvedModel =
-    postProcessReadiness?.state === "ready"
-      ? postProcessReadiness.model
-      : (settings?.post_process_models?.[
-          settings?.post_process_provider_id ?? ""
-        ] ?? "");
-  const specialist =
-    isCleanupSpecialistModel(resolvedModel) ||
-    models.some(
-      (model) => model.id === resolvedModel && model.is_cleanup_specialist,
-    );
+  const specialist = useCleanupSpecialist() !== null;
 
   return (
     <SettingContainer
