@@ -1868,6 +1868,24 @@
         "opacityLabel": "Panel opacity",
         "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
       }
+    },
+    "thinking": {
+      "title": "Thinking",
+      "description": {
+        "cleanup": "How long a reasoning model thinks before it cleans up your dictation. Off is fastest, and models that always think, such as gpt-oss, use their lowest level. Turn it up only if cleanup makes mistakes, since it adds a delay to every dictation.",
+        "assistant": "How long a reasoning model thinks before it answers. Off is fastest, and models that always think, such as gpt-oss, use their lowest level. Higher levels handle hard questions better but take longer to start answering."
+      },
+      "unsupported": {
+        "builtin": "Models on this computer always answer without thinking, which keeps them fast.",
+        "anthropic": "Anthropic doesn't let apps set this, so Claude decides. Use Claude through OpenRouter to set it.",
+        "apple": "Apple Intelligence has no thinking setting."
+      },
+      "options": {
+        "off": "Off",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      }
     }
   },
   "footer": {

@@ -1868,6 +1868,24 @@
         "opacityLabel": "Panel opaklığı",
         "opacityDescription": "Yüzen panelin ne kadar opak olduğu. %100 tamamen katıdır; daha düşük değerlerde masaüstü bulanık olarak görünür."
       }
+    },
+    "thinking": {
+      "title": "Düşünme",
+      "description": {
+        "cleanup": "Bir akıl yürütme modelinin dikte metninizi temizlemeden önce ne kadar düşündüğü. Kapalı en hızlısıdır ve gpt-oss gibi her zaman düşünen modeller en düşük seviyelerini kullanır. Yalnızca temizleme hata yaparsa artırın, çünkü her diktenin gecikmesine yol açar.",
+        "assistant": "Bir akıl yürütme modelinin yanıt vermeden önce ne kadar düşündüğü. Kapalı en hızlısıdır ve gpt-oss gibi her zaman düşünen modeller en düşük seviyelerini kullanır. Yüksek seviyeler zor soruları daha iyi yanıtlar ama yanıta başlamaları daha uzun sürer."
+      },
+      "unsupported": {
+        "builtin": "Bu bilgisayardaki modeller her zaman düşünmeden yanıt verir, bu da onları hızlı tutar.",
+        "anthropic": "Anthropic uygulamaların bunu ayarlamasına izin vermez, bu yüzden Claude karar verir. Ayarlamak için Claude'u OpenRouter üzerinden kullanın.",
+        "apple": "Apple Intelligence'ın düşünme ayarı yoktur."
+      },
+      "options": {
+        "off": "Kapalı",
+        "low": "Düşük",
+        "medium": "Orta",
+        "high": "Yüksek"
+      }
     }
   },
   "footer": {

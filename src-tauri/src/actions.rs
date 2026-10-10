@@ -11,7 +11,7 @@ use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{
     get_settings, resolve_post_process_config, AppSettings, ModelUnloadTimeout,
     PostProcessConfigSource, PostProcessResolutionError, PostProcessUnavailableReason,
-    ResolvedPostProcessConfig, APPLE_INTELLIGENCE_PROVIDER_ID,
+    ResolvedPostProcessConfig, ThinkingLevel, APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
@@ -678,7 +678,10 @@ struct PostProcessRequest {
 /// which is the safe direction: it overestimates the budget rather than cutting a
 /// sentence short. The envelope allowance covers the `{"cleaned_text": "…"}`
 /// wrapper and its escapes on the structured path.
-fn cleanup_token_budget(transcription: &str) -> u32 {
+///
+/// The reasoning headroom grows with the user's thinking level: a model asked
+/// to think harder spends more of the ceiling before it writes anything.
+fn cleanup_token_budget(transcription: &str, thinking: ThinkingLevel) -> u32 {
     const CHARS_PER_TOKEN: usize = 3;
     const JSON_ENVELOPE_TOKENS: usize = 32;
     /// Room for a very short dictation that legitimately expands.
@@ -688,6 +691,11 @@ fn cleanup_token_budget(transcription: &str) -> u32 {
     /// but a model whose thinking cannot be turned off must still be able to
     /// produce output rather than nothing.
     const REASONING_HEADROOM_TOKENS: usize = 2048;
+    let headroom = match thinking {
+        ThinkingLevel::Off | ThinkingLevel::Low => REASONING_HEADROOM_TOKENS,
+        ThinkingLevel::Medium => REASONING_HEADROOM_TOKENS * 2,
+        ThinkingLevel::High => REASONING_HEADROOM_TOKENS * 4,
+    };
 
     // Mirror the validator's allowance exactly: FLOOR.max(chars * RATIO).
     let allowed_chars = 80usize.max(transcription.chars().count().saturating_mul(3));
@@ -695,7 +703,7 @@ fn cleanup_token_budget(transcription: &str) -> u32 {
         .div_ceil(CHARS_PER_TOKEN)
         .max(FLOOR_TOKENS)
         .saturating_add(JSON_ENVELOPE_TOKENS)
-        .saturating_add(REASONING_HEADROOM_TOKENS);
+        .saturating_add(headroom);
     budget.min(u32::MAX as usize) as u32
 }
 
@@ -774,8 +782,8 @@ fn build_post_process_request(
         .trim_start()
         .to_string();
     let (reasoning_effort, reasoning) =
-        cleanup_reasoning_options(&config.provider.id, &config.model);
-    let max_tokens = cleanup_token_budget(transcription);
+        cleanup_reasoning_options(&config.provider.id, &config.model, config.thinking);
+    let max_tokens = cleanup_token_budget(transcription, config.thinking);
 
     // Exactly what the model is about to be told, and who wrote each part.
     // Nothing about cleanup is harder to debug than not knowing whether the app
@@ -783,7 +791,7 @@ fn build_post_process_request(
     // find out was to read the source. Sizes at debug, full text at trace, so
     // `--debug` gives the shape and trace gives the bytes.
     debug!(
-        "Cleanup prompt layers: prompt '{}' {} chars + style '{}' {} chars + app contract {} chars = {} chars; transcript {} chars, max_tokens {}",
+        "Cleanup prompt layers: prompt '{}' {} chars + style '{}' {} chars + app contract {} chars = {} chars; transcript {} chars, max_tokens {}, thinking {:?} (effort {:?})",
         config.prompt_id,
         layer1_len,
         config.tone_id,
@@ -791,7 +799,11 @@ fn build_post_process_request(
         layer3_len,
         system_prompt.chars().count(),
         transcription.chars().count(),
-        max_tokens
+        max_tokens,
+        config.thinking,
+        reasoning_effort
+            .as_deref()
+            .or_else(|| reasoning.as_ref().and_then(|r| r.effort.as_deref()))
     );
     log::trace!("Cleanup system prompt sent verbatim:\n{system_prompt}");
 
@@ -872,13 +884,19 @@ pub(crate) fn wants_low_rather_than_no_reasoning(model: &str) -> bool {
 fn cleanup_reasoning_options(
     provider_id: &str,
     model: &str,
+    thinking: ThinkingLevel,
 ) -> (Option<String>, Option<crate::llm_client::ReasoningConfig>) {
-    let effort = if wants_low_rather_than_no_reasoning(model)
-        || token_cap_starves_output(provider_id, model)
-    {
-        "low"
-    } else {
-        "none"
+    // `Off` is the suppression described above. An explicit level (the user's
+    // `post_process_thinking`) is sent as-is, and a provider that refuses it
+    // gets the same step-down ladder in `send_post_process_request`.
+    let effort = match thinking.effort() {
+        Some(level) => level,
+        None if wants_low_rather_than_no_reasoning(model)
+            || token_cap_starves_output(provider_id, model) =>
+        {
+            "low"
+        }
+        None => "none",
     };
     match provider_id {
         // OpenRouter has its own reasoning object, and `exclude` also keeps the
@@ -3856,21 +3874,37 @@ mod tests {
     use super::{
         append_final_output_contract, append_style_layer, build_post_process_request,
         build_system_prompt, classify_chat_error, cleans_up, cleanup_fallback_notice,
-        cleanup_reasoning_options, cleanup_token_budget, fallback_reason_for_failure,
-        finalize_post_process_attempt, is_schema_compatibility_error, is_system_role_error,
-        model_rejection_detail, parse_structured_output, remember_token_cap_starves_output,
-        replace_dashes_with_plain_punctuation, run_provider_post_process,
-        sanitize_post_process_output, structured_output_unusable, token_cap_starves_output,
-        transcription_allows_empty_output, tuning_rejected, uses_ai_cleanup,
-        validate_cleaned_output, ModelRejectionKind, PostProcessAttemptOutcome,
+        fallback_reason_for_failure, finalize_post_process_attempt, is_schema_compatibility_error,
+        is_system_role_error, model_rejection_detail, parse_structured_output,
+        remember_token_cap_starves_output, replace_dashes_with_plain_punctuation,
+        run_provider_post_process, sanitize_post_process_output, structured_output_unusable,
+        token_cap_starves_output, transcription_allows_empty_output, tuning_rejected,
+        uses_ai_cleanup, validate_cleaned_output, ModelRejectionKind, PostProcessAttemptOutcome,
         PostProcessFailureKind, PostProcessFallbackReason, PostProcessResultEvent,
         PostProcessRuntimeMetadata, APPLE_INTELLIGENCE_PROVIDER_ID,
     };
-    use super::{prompt_echo, validate_cleaned_output_against_prompt, FOLDED_TRANSCRIPT_BOUNDARY};
+    use super::{
+        cleanup_reasoning_options as cleanup_reasoning_options_at,
+        cleanup_token_budget as cleanup_token_budget_at, prompt_echo,
+        validate_cleaned_output_against_prompt, FOLDED_TRANSCRIPT_BOUNDARY,
+    };
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessTone,
-        PostProcessUnavailableReason, ResolvedPostProcessConfig,
+        PostProcessUnavailableReason, ResolvedPostProcessConfig, ThinkingLevel,
     };
+
+    /// The cleanup reasoning options with the thinking dial at its default.
+    fn cleanup_reasoning_options(
+        provider_id: &str,
+        model: &str,
+    ) -> (Option<String>, Option<crate::llm_client::ReasoningConfig>) {
+        cleanup_reasoning_options_at(provider_id, model, ThinkingLevel::Off)
+    }
+
+    /// The cleanup token ceiling with the thinking dial at its default.
+    fn cleanup_token_budget(transcription: &str) -> u32 {
+        cleanup_token_budget_at(transcription, ThinkingLevel::Off)
+    }
     use std::collections::HashSet;
     use std::io::{Read, Write};
     use std::net::TcpListener;
@@ -4136,6 +4170,71 @@ mod tests {
         assert!(
             content.ends_with(&format!("{FOLDED_TRANSCRIPT_BOUNDARY}\nThank you.")),
             "the transcript follows an explicit boundary, never the examples directly: {content:?}"
+        );
+    }
+
+    #[test]
+    fn the_cleanup_thinking_dial_is_sent_and_gets_room_to_think() {
+        // Off is the suppression the app always sent.
+        assert_eq!(
+            cleanup_reasoning_options_at("azure_openai", "gpt-6-luna", ThinkingLevel::Off)
+                .0
+                .as_deref(),
+            Some("none")
+        );
+        assert_eq!(
+            cleanup_reasoning_options_at("groq", "openai/gpt-oss-120b", ThinkingLevel::Off)
+                .0
+                .as_deref(),
+            Some("low")
+        );
+        for (level, wire) in [
+            (ThinkingLevel::Low, "low"),
+            (ThinkingLevel::Medium, "medium"),
+            (ThinkingLevel::High, "high"),
+        ] {
+            assert_eq!(
+                cleanup_reasoning_options_at("azure_openai", "gpt-6-luna", level)
+                    .0
+                    .as_deref(),
+                Some(wire)
+            );
+            let (effort, reasoning) =
+                cleanup_reasoning_options_at("openrouter", "openai/gpt-oss-120b", level);
+            assert!(effort.is_none());
+            assert_eq!(reasoning.unwrap().effort.as_deref(), Some(wire));
+            for id in ["anthropic", "builtin", APPLE_INTELLIGENCE_PROVIDER_ID] {
+                let (effort, reasoning) = cleanup_reasoning_options_at(id, "m", level);
+                assert!(effort.is_none() && reasoning.is_none(), "{id}");
+            }
+        }
+        let text = "a short dictation";
+        assert_eq!(
+            cleanup_token_budget_at(text, ThinkingLevel::Off),
+            cleanup_token_budget(text)
+        );
+        assert!(
+            cleanup_token_budget_at(text, ThinkingLevel::Medium)
+                > cleanup_token_budget_at(text, ThinkingLevel::Low)
+        );
+        assert!(
+            cleanup_token_budget_at(text, ThinkingLevel::High)
+                > cleanup_token_budget_at(text, ThinkingLevel::Medium)
+        );
+
+        // And it reaches the wire through the resolved config.
+        let mut config = test_config(
+            "http://127.0.0.1:1/v1".to_string(),
+            false,
+            PostProcessTone::None,
+            "Clean it.",
+        );
+        config.thinking = ThinkingLevel::High;
+        let request = build_post_process_request(&config, text);
+        assert_eq!(request.reasoning_effort.as_deref(), Some("high"));
+        assert_eq!(
+            request.max_tokens,
+            Some(cleanup_token_budget_at(text, ThinkingLevel::High))
         );
     }
 
@@ -4548,6 +4647,7 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             tone_id: tone.id().to_string(),
             tone_instruction: tone.directive().map(str::to_string),
             trained_for_cleanup: false,
+            thinking: ThinkingLevel::Off,
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key: String::new(),
         }
@@ -5845,6 +5945,7 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             tone_id: PostProcessTone::None.id().to_string(),
             tone_instruction: PostProcessTone::None.directive().map(str::to_string),
             trained_for_cleanup: false,
+            thinking: ThinkingLevel::Off,
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key: String::new(),
         }
@@ -6107,6 +6208,13 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             tone_id: PostProcessTone::None.id().to_string(),
             tone_instruction: None,
             trained_for_cleanup: false,
+            // `SPEAKOFLOW_LIVE_THINKING=high` exercises the dial on the wire.
+            thinking: match std::env::var("SPEAKOFLOW_LIVE_THINKING").as_deref() {
+                Ok("low") => ThinkingLevel::Low,
+                Ok("medium") => ThinkingLevel::Medium,
+                Ok("high") => ThinkingLevel::High,
+                _ => ThinkingLevel::Off,
+            },
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key,
         };

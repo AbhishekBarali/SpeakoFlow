@@ -12,6 +12,7 @@ import type {
   PostProcessReadiness,
   RecordingRetentionPeriod,
   Replacement,
+  ThinkingLevel,
   WhisperAcceleratorSetting,
   OrtAcceleratorSetting,
 } from "@/bindings";
@@ -48,7 +49,8 @@ const isCleanupSetting = (key: keyof Settings): boolean =>
   key === "post_process_on_dictation" ||
   key === "post_process_selected_prompt_id" ||
   key === "post_process_tone" ||
-  key === "post_process_timeout_secs";
+  key === "post_process_timeout_secs" ||
+  key === "post_process_thinking";
 
 const showCleanupSaveError = () =>
   toast.error(
@@ -234,6 +236,10 @@ const settingUpdaters: {
     commands.changePostProcessToneSetting(value as string),
   post_process_timeout_secs: (value) =>
     commands.changePostProcessTimeoutSetting(value as number),
+  post_process_thinking: (value) =>
+    commands.changePostProcessThinkingSetting(value as ThinkingLevel),
+  assistant_thinking: (value) =>
+    commands.setAssistantThinking(value as ThinkingLevel),
   mute_while_recording: (value) =>
     commands.changeMuteWhileRecordingSetting(value as boolean),
   append_trailing_space: (value) =>

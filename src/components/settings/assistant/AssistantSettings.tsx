@@ -49,6 +49,7 @@ import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { ShortcutInput } from "../ShortcutInput";
 import { PushToTalk } from "../PushToTalk";
 import { RemindersSettings } from "./RemindersSettings";
+import { ThinkingLevelSetting } from "../ThinkingLevelSetting";
 import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
 import { localTtsActive } from "../../../assistant/localTts";
@@ -1386,6 +1387,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         />
       </SettingContainer>
       {brainMode === "device" ? deviceProviderForm : cloudProviderForm}
+      {brainMode === "cloud" && (
+        <ThinkingLevelSetting
+          job="assistant"
+          providerId={settings?.assistant_provider_id}
+          grouped={true}
+        />
+      )}
 
       {/* Last row of the group on purpose: it tests whatever the rows above
           resolved to, in either mode. A wrong key, an empty balance, or a model

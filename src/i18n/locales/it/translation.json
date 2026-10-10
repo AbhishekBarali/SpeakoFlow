@@ -1877,6 +1877,24 @@
         "opacityLabel": "Opacità del pannello",
         "opacityDescription": "Quanto è opaco il pannello flottante. 100% è completamente pieno; con valori più bassi il desktop traspare sfocato."
       }
+    },
+    "thinking": {
+      "title": "Ragionamento",
+      "description": {
+        "cleanup": "Quanto pensa un modello di ragionamento prima di ripulire la tua dettatura. Disattivato è il più veloce, e i modelli che pensano sempre, come gpt-oss, usano il loro livello più basso. Alzalo solo se la pulizia commette errori, perché aggiunge un ritardo a ogni dettatura.",
+        "assistant": "Quanto pensa un modello di ragionamento prima di rispondere. Disattivato è il più veloce, e i modelli che pensano sempre, come gpt-oss, usano il loro livello più basso. I livelli più alti gestiscono meglio le domande difficili, ma impiegano più tempo a iniziare a rispondere."
+      },
+      "unsupported": {
+        "builtin": "I modelli su questo computer rispondono sempre senza pensare, ed è questo che li rende veloci.",
+        "anthropic": "Anthropic non consente alle app di impostarlo, quindi decide Claude. Usa Claude tramite OpenRouter per impostarlo.",
+        "apple": "Apple Intelligence non ha un'impostazione di ragionamento."
+      },
+      "options": {
+        "off": "Disattivato",
+        "low": "Basso",
+        "medium": "Medio",
+        "high": "Alto"
+      }
     }
   },
   "footer": {

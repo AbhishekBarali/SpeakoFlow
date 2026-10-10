@@ -1254,6 +1254,20 @@ pub fn set_assistant_search_depth(
     Ok(())
 }
 
+/// Set how much a reasoning model may think before answering an ask or a call.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_thinking(
+    app: AppHandle,
+    level: crate::settings::ThinkingLevel,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_thinking = level;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 /// DEPRECATED / no-op since web search became snippet-only (the Firecrawl
 /// credit guard was removed). Still registered so existing bindings/settings
 /// stay valid; it only writes the now-unused setting field.

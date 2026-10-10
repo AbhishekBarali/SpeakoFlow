@@ -332,6 +332,17 @@ async changePostProcessTimeoutSetting(seconds: number) : Promise<Result<null, st
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Set how much a reasoning model may think before cleaning a dictation.
+ */
+async changePostProcessThinkingSetting(level: ThinkingLevel) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_thinking_setting", { level }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeExperimentalEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_experimental_enabled_setting", { enabled }) };
@@ -2723,6 +2734,17 @@ async setAssistantSearchDepth(depth: AssistantSearchDepth) : Promise<Result<null
 }
 },
 /**
+ * Set how much a reasoning model may think before answering an ask or a call.
+ */
+async setAssistantThinking(level: ThinkingLevel) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_thinking", { level }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * DEPRECATED / no-op since web search became snippet-only (the Firecrawl
  * credit guard was removed). Still registered so existing bindings/settings
  * stay valid; it only writes the now-unused setting field.
@@ -3731,6 +3753,11 @@ post_process_custom_tones?: CustomPostProcessTone[];
  */
 post_process_selected_tone_id?: string | null; post_process_timeout_secs?: number; 
 /**
+ * How much a reasoning model may think before cleaning a dictation. See
+ * [`ThinkingLevel`]; `Off` keeps cleanup on its fast path.
+ */
+post_process_thinking?: ThinkingLevel; 
+/**
  * The cloud provider the user last had selected for AI cleanup, remembered
  * so the device ⇄ cloud switch can put it back.
  * 
@@ -3982,6 +4009,11 @@ assistant_web_search_fetch_content?: boolean;
  */
 assistant_search_depth?: AssistantSearchDepth; 
 /**
+ * How much a reasoning model may think before answering an ask or a call.
+ * See [`ThinkingLevel`]; `Off` keeps replies on the fast path.
+ */
+assistant_thinking?: ThinkingLevel; 
+/**
  * DEPRECATED / unused since the Firecrawl credit guard was removed (search
  * is now snippet-only over per-request SERP APIs). Kept so existing
  * settings files and generated bindings stay stable.
@@ -4215,6 +4247,7 @@ export type AssistantSearchDepth =
  * Broadest single pass. More queries/sources, scrape more winners.
  */
 "high"
+export type AudioDevice = { index: string; name: string; is_default: boolean }
 /**
  * How much an ElevenLabs v3/v4 voice performs when audio tags are on
  * (`assistant_tts_elevenlabs_audio_tags`). Each level is a different paragraph
@@ -4236,7 +4269,6 @@ export type AudioTagIntensity =
  * Performs every reply like a voice actor, building scenes with effects.
  */
 "theatrical"
-export type AudioDevice = { index: string; name: string; is_default: boolean }
 /**
  * Whether auto-learn can work here, whether it is on, and what it has learned.
  */
@@ -5355,6 +5387,36 @@ help: string | null }
  * "system") to match the `data-theme` attribute the frontend sets on <html>.
  */
 export type Theme = "light" | "dark" | "system"
+/**
+ * How much a reasoning model may think before it answers. One dial each for AI
+ * cleanup (`post_process_thinking`) and the assistant (`assistant_thinking`).
+ * 
+ * **`Off` is the default for both, and it is the fast path the app always
+ * used**: `reasoning_effort: "none"`, or the lowest level a model accepts for
+ * one that cannot stop thinking (gpt-oss, the o-series, R1), negotiated per
+ * model when a provider refuses either. The other levels are sent as-is in the
+ * one form that is close to universal: `reasoning_effort` on the OpenAI schema
+ * (OpenAI, Azure, Groq, Cerebras, Gemini's compatibility layer, Bedrock), and
+ * `reasoning.effort` on OpenRouter, which maps it onto each upstream's own
+ * control (Claude's thinking budget included).
+ * 
+ * Three providers cannot take it, and the settings row says so rather than
+ * offering a dial that does nothing: Anthropic's OpenAI-compatible layer
+ * documents `reasoning_effort` as ignored, Apple Intelligence has no such
+ * control, and the built-in engine is launched with a zero thinking budget
+ * (`LLAMA_ARG_THINK_BUDGET=0`), which a request cannot lift.
+ * 
+ * Measured before this existed, because it is the obvious suspect when a
+ * thinking model "does not clean up": gpt-oss-120b on Azure returned the
+ * transcript unchanged at both `low` and `medium` effort. Thinking was never
+ * the cause there (the structured-output field name was, see
+ * `actions::CLEANED_TEXT_FIELD`), so this is a quality dial, not a repair.
+ */
+export type ThinkingLevel = 
+/**
+ * Answer straight away; the lowest level for a model that must think.
+ */
+"off" | "low" | "medium" | "high"
 /**
  * A voice option handed to the settings UI for any remote TTS engine, so the
  * user can pick from a loaded list instead of typing an opaque id.

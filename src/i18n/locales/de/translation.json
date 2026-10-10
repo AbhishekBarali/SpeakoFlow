@@ -1868,6 +1868,24 @@
         "opacityLabel": "Deckkraft des Panels",
         "opacityDescription": "Wie deckend das schwebende Panel ist. 100 % ist vollständig deckend; niedrigere Werte lassen den Desktop verschwommen durchscheinen."
       }
+    },
+    "thinking": {
+      "title": "Nachdenken",
+      "description": {
+        "cleanup": "Wie lange ein Reasoning-Modell nachdenkt, bevor es dein Diktat bereinigt. Aus ist am schnellsten, und Modelle, die immer nachdenken, wie gpt-oss, nutzen ihre niedrigste Stufe. Erhöhe es nur, wenn die Bereinigung Fehler macht, denn es verzögert jedes Diktat.",
+        "assistant": "Wie lange ein Reasoning-Modell nachdenkt, bevor es antwortet. Aus ist am schnellsten, und Modelle, die immer nachdenken, wie gpt-oss, nutzen ihre niedrigste Stufe. Höhere Stufen beantworten schwierige Fragen besser, brauchen aber länger, bis die Antwort beginnt."
+      },
+      "unsupported": {
+        "builtin": "Modelle auf diesem Computer antworten immer ohne Nachdenken, deshalb sind sie schnell.",
+        "anthropic": "Anthropic lässt Apps diese Einstellung nicht vornehmen, daher entscheidet Claude selbst. Nutze Claude über OpenRouter, um sie festzulegen.",
+        "apple": "Apple Intelligence hat keine Einstellung für das Nachdenken."
+      },
+      "options": {
+        "off": "Aus",
+        "low": "Niedrig",
+        "medium": "Mittel",
+        "high": "Hoch"
+      }
     }
   },
   "footer": {
