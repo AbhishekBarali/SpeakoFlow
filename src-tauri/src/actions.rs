@@ -3553,6 +3553,76 @@ impl ShortcutAction for AssistantCallAction {
     }
 }
 
+// Paste Last Transcript Action: re-pastes the newest finished dictation.
+//
+// Nothing is kept in memory for it. History already holds every finished
+// dictation, and the tray's "Copy last transcript" reads the same row with the
+// same rule (cleaned-up text when cleanup ran, the raw transcript otherwise).
+// A dismissed dictation is skipped there for the reason it is here: the user
+// threw it away.
+struct PasteLastTranscriptAction;
+
+impl ShortcutAction for PasteLastTranscriptAction {
+    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        let hm = app.state::<Arc<HistoryManager>>().inner().clone();
+        let app = app.clone();
+        // The History query is a blocking SQLite read, and this runs on the
+        // keyboard engine's thread, which must stay free for the next key.
+        std::thread::spawn(move || {
+            let text = match hm.get_latest_completed_entry() {
+                Ok(Some(entry)) => crate::tray::last_transcript_text(&entry).to_string(),
+                Ok(None) => {
+                    debug!("Paste last transcript: History has no finished dictation yet");
+                    return;
+                }
+                Err(err) => {
+                    error!("Paste last transcript: could not read History: {}", err);
+                    return;
+                }
+            };
+            if text.trim().is_empty() {
+                debug!("Paste last transcript: the last transcript is empty");
+                return;
+            }
+            let ah = app.clone();
+            let queued = app.run_on_main_thread(move || {
+                // No recording started this paste, so a target remembered by an
+                // earlier dictation must not pull focus back to a stale window.
+                crate::input::forget_paste_target();
+                let main_focused = ah
+                    .get_webview_window("main")
+                    .and_then(|window| window.is_focused().ok())
+                    .unwrap_or(false);
+                // Same reason as `paste_final`: a synthetic Ctrl+V cannot land in
+                // a field of our own window while this closure holds the thread.
+                if delivers_in_app(main_focused, false) {
+                    if let Err(e) = ah.emit_to("main", "dictation-into-focus", text) {
+                        error!(
+                            "Failed to hand the last transcript to the main window: {}",
+                            e
+                        );
+                    }
+                    return;
+                }
+                if let Err(e) = utils::paste(text, ah.clone()) {
+                    error!("Failed to paste the last transcript: {}", e);
+                    let _ = ah.emit("paste-error", ());
+                }
+            });
+            if let Err(e) = queued {
+                error!(
+                    "Failed to run the last-transcript paste on the main thread: {:?}",
+                    e
+                );
+            }
+        });
+    }
+
+    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        // A single press; nothing happens on release.
+    }
+}
+
 // Test Action
 struct TestAction;
 
@@ -3600,6 +3670,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map.insert(
         "assistant_call".to_string(),
         Arc::new(AssistantCallAction) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "paste_last_transcript".to_string(),
+        Arc::new(PasteLastTranscriptAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "test".to_string(),

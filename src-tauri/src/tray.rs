@@ -401,7 +401,7 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
     let _ = tray.set_tooltip(Some(version_label));
 }
 
-fn last_transcript_text(entry: &HistoryEntry) -> &str {
+pub(crate) fn last_transcript_text(entry: &HistoryEntry) -> &str {
     entry
         .post_processed_text
         .as_deref()

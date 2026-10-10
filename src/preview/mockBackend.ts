@@ -520,6 +520,7 @@ const settings: Json = {
     assistant: binding("assistant", "ctrl_left+alt_left"),
     assistant_call: binding("assistant_call", "ctrl_left+alt_left+c"),
     cancel: binding("cancel", "escape"),
+    paste_last_transcript: binding("paste_last_transcript", ""),
   },
   push_to_talk: true,
   audio_feedback: false,

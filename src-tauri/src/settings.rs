@@ -1954,7 +1954,7 @@ pub const CLEANUP_BINDING_ID: &str = "transcribe_with_post_process";
 /// cleanup shortcut is turned off with its own switch on the cleanup page.
 /// Cancel is here because a global Esc, even one only registered while
 /// something is running, is one some people would rather not have at all.
-pub const OPTIONAL_BINDINGS: [&str; 2] = ["cancel", "assistant_call"];
+pub const OPTIONAL_BINDINGS: [&str; 3] = ["cancel", "assistant_call", "paste_last_transcript"];
 
 /// Whether a shortcut may be left without a key.
 pub fn is_optional_binding(id: &str) -> bool {
@@ -3581,6 +3581,34 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     changed
 }
 
+/// Bindings added after the first release. `load_or_create_app_settings` merges
+/// new default bindings into a stored file, but only at startup and into the
+/// copy it returns, so a stored file that predates one still reaches the
+/// frontend without it — and a shortcut row for a binding the settings do not
+/// have renders nothing at all, which left "Paste last transcript" impossible
+/// to set. Every read goes through `get_settings`, so the merge happens there
+/// too. It is a cheap id check first: this runs on every shortcut press, and
+/// building the defaults is not free.
+const ADDED_BINDINGS: [&str; 1] = ["paste_last_transcript"];
+
+fn ensure_added_bindings(settings: &mut AppSettings) -> bool {
+    if ADDED_BINDINGS
+        .iter()
+        .all(|id| settings.bindings.contains_key(*id))
+    {
+        return false;
+    }
+    let defaults = get_default_settings();
+    for id in ADDED_BINDINGS {
+        if !settings.bindings.contains_key(id) {
+            if let Some(binding) = defaults.bindings.get(id) {
+                settings.bindings.insert(id.to_string(), binding.clone());
+            }
+        }
+    }
+    true
+}
+
 fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     let mut changed = false;
     for provider in default_post_process_providers() {
@@ -3945,6 +3973,20 @@ pub fn get_default_settings() -> AppSettings {
             // which is not a discoverable way to find a feature.
             default_binding: default_assistant_call_shortcut.to_string(),
             current_binding: default_assistant_call_shortcut.to_string(),
+        },
+    );
+
+    // Re-paste the newest dictation. Ships unbound, like Petal's: any combo
+    // chosen for everyone would take keys from some app, and this is a
+    // shortcut people reach for occasionally rather than all day.
+    bindings.insert(
+        "paste_last_transcript".to_string(),
+        ShortcutBinding {
+            id: "paste_last_transcript".to_string(),
+            name: "Paste last transcript".to_string(),
+            description: "Paste your most recent dictation again.".to_string(),
+            default_binding: String::new(),
+            current_binding: String::new(),
         },
     );
 
@@ -5150,7 +5192,8 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         default_settings
     };
 
-    if ensure_post_process_defaults(&mut settings)
+    if ensure_added_bindings(&mut settings)
+        | ensure_post_process_defaults(&mut settings)
         | ensure_assistant_defaults(&mut settings)
         | ensure_cloud_stt_defaults(&mut settings)
     {
@@ -5424,9 +5467,35 @@ mod tests {
     fn only_cancel_and_the_call_can_be_left_unbound() {
         assert!(is_optional_binding("cancel"));
         assert!(is_optional_binding("assistant_call"));
+        assert!(is_optional_binding("paste_last_transcript"));
         assert!(!is_optional_binding("transcribe"));
         assert!(!is_optional_binding("assistant"));
         assert!(!is_optional_binding(CLEANUP_BINDING_ID));
+    }
+
+    /// A settings file from before paste-last has no such binding, and the
+    /// frontend draws nothing for a binding it does not have.
+    #[test]
+    fn a_stored_file_without_paste_last_gets_its_binding_on_read() {
+        let mut settings = get_default_settings();
+        settings.bindings.remove("paste_last_transcript");
+        assert!(ensure_added_bindings(&mut settings));
+        assert_eq!(
+            settings.bindings["paste_last_transcript"].current_binding,
+            ""
+        );
+        assert!(!ensure_added_bindings(&mut settings));
+    }
+
+    /// Paste-last ships without a key (any combo picked for everyone would take
+    /// keys from some app), and has an action to run once the user binds one.
+    #[test]
+    fn paste_last_transcript_ships_unbound_with_an_action() {
+        let defaults = get_default_settings().bindings;
+        let paste_last = &defaults["paste_last_transcript"];
+        assert!(paste_last.default_binding.is_empty());
+        assert!(paste_last.current_binding.is_empty());
+        assert!(crate::actions::ACTION_MAP.contains_key("paste_last_transcript"));
     }
 
     /// Cleanup's own key is the dictation keys plus Shift, and the call is the
