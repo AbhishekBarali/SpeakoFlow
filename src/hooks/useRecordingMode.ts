@@ -23,17 +23,23 @@ export function useRecordingMode() {
 
   const setMode = useCallback(
     async (next: RecordingModeChoice) => {
-      // Auto turns hold on itself; the other two turn auto off, in an order
-      // that never leaves auto on over tap.
+      // The backend keeps the pair consistent on its own, but the store only
+      // learns about the field that was sent. Auto used to send just
+      // `dynamic_shortcuts`, so `push_to_talk` stayed false in the store, the
+      // mode still read "tap", and clicking Hold or tap appeared to do nothing.
+      // So every field that changes is sent, in an order that never leaves
+      // auto on over tap.
       if (next === "auto") {
+        await updateSetting("push_to_talk", true);
         await updateSetting("dynamic_shortcuts", true);
         return;
       }
       if (next === "hold") {
-        await updateSetting("push_to_talk", true);
         await updateSetting("dynamic_shortcuts", false);
+        await updateSetting("push_to_talk", true);
         return;
       }
+      await updateSetting("dynamic_shortcuts", false);
       await updateSetting("push_to_talk", false);
     },
     [updateSetting],
