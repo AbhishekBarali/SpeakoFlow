@@ -3322,5 +3322,15 @@
     "best": "Nejlepší den",
     "typical": "Běžný den",
     "typicalSub": "Ve dny, kdy diktujete"
+  },
+  "settingsNotice": {
+    "restored": "Vaše nastavení byla poškozená, a proto byla obnovena ze zálohy.",
+    "unrecoverableTitle": "Nastavení se nepodařilo obnovit",
+    "unrecoverableDescription": "SpeakoFlow se spustil s výchozím nastavením. Poškozený soubor byl uložen jako {{file}}.",
+    "notSavingTitle": "Změny nastavení se neuloží",
+    "notSavingDescription": "Soubor s nastavením nešlo přečíst, a tak zůstal beze změny. Restartujte SpeakoFlow a zkuste to znovu.",
+    "saveFailingTitle": "Nastavení se neukládá",
+    "saveFailingDescription": "Vaše poslední změny zatím nejsou uložené. SpeakoFlow to bude zkoušet dál.",
+    "dismiss": "Zavřít"
   }
 }

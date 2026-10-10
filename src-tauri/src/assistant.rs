@@ -15,7 +15,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering}
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
-use tauri_plugin_store::StoreExt;
 use tokio::sync::Notify;
 
 pub const PANEL_LABEL: &str = "assistant_panel";
@@ -1806,12 +1805,9 @@ fn ensure_call_on_screen(app: &AppHandle, window: &tauri::WebviewWindow) {
 
 /// Delete the positions earlier versions stored (see [`LEGACY_POSITION_KEYS`]).
 fn forget_legacy_positions(app: &AppHandle) {
-    if let Ok(store) = app.store(crate::portable::store_path(
-        crate::settings::SETTINGS_STORE_PATH,
-    )) {
-        for key in LEGACY_POSITION_KEYS {
-            store.delete(key);
-        }
+    let store = crate::settings::settings_file(app);
+    for key in LEGACY_POSITION_KEYS {
+        store.delete(key);
     }
 }
 

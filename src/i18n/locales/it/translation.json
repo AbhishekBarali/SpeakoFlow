@@ -3288,5 +3288,15 @@
     "best": "Giorno migliore",
     "typical": "Giorno tipico",
     "typicalSub": "Nei giorni in cui detti"
+  },
+  "settingsNotice": {
+    "restored": "Le tue impostazioni erano danneggiate e sono state ripristinate da un backup.",
+    "unrecoverableTitle": "Impossibile recuperare le tue impostazioni",
+    "unrecoverableDescription": "SpeakoFlow è stato avviato con le impostazioni predefinite. Il file danneggiato è stato conservato come {{file}}.",
+    "notSavingTitle": "Le modifiche alle impostazioni non verranno salvate",
+    "notSavingDescription": "Non è stato possibile leggere il file delle impostazioni, quindi è stato lasciato com'è. Riavvia SpeakoFlow per riprovare.",
+    "saveFailingTitle": "Le impostazioni non vengono salvate",
+    "saveFailingDescription": "Le modifiche recenti non sono ancora state salvate. SpeakoFlow continuerà a provare.",
+    "dismiss": "Ignora"
   }
 }

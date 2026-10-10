@@ -10,6 +10,7 @@ pub mod stt_cloud;
 pub mod transcription;
 
 use crate::settings::{get_settings, write_settings, AppSettings, LogLevel};
+use crate::settings_file::{SettingsNotice, SettingsNoticeKind};
 use crate::utils::cancel_current_operation;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
@@ -18,6 +19,24 @@ use tauri_plugin_opener::OpenerExt;
 #[specta::specta]
 pub fn cancel_operation(app: AppHandle) {
     cancel_current_operation(&app);
+}
+
+/// What the user has to know about the settings file: settings restored from
+/// the backup, settings that could not be recovered, or changes that are not
+/// being saved. The file is read before any window listens, so the main window
+/// asks once when it mounts; later notices arrive as `settings-notices`.
+#[tauri::command]
+#[specta::specta]
+pub fn get_settings_notices(app: AppHandle) -> Vec<SettingsNotice> {
+    crate::settings::settings_file(&app).notices()
+}
+
+/// The user closed a settings notice, so reloading the window does not show it
+/// again.
+#[tauri::command]
+#[specta::specta]
+pub fn dismiss_settings_notice(app: AppHandle, kind: SettingsNoticeKind) {
+    crate::settings::settings_file(&app).dismiss_notice(kind);
 }
 
 /// Copy from the non-activating overlay and acknowledge the actual OS write.

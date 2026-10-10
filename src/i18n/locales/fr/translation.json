@@ -3288,5 +3288,15 @@
     "best": "Meilleur jour",
     "typical": "Jour type",
     "typicalSub": "Les jours où vous dictez"
+  },
+  "settingsNotice": {
+    "restored": "Vos paramètres étaient endommagés et ont été restaurés à partir d'une sauvegarde.",
+    "unrecoverableTitle": "Impossible de récupérer vos paramètres",
+    "unrecoverableDescription": "SpeakoFlow a démarré avec les paramètres par défaut. Le fichier endommagé a été conservé sous le nom {{file}}.",
+    "notSavingTitle": "Les modifications des paramètres ne seront pas enregistrées",
+    "notSavingDescription": "Le fichier de paramètres n'a pas pu être lu, il a donc été laissé tel quel. Redémarrez SpeakoFlow pour réessayer.",
+    "saveFailingTitle": "Les paramètres ne sont pas enregistrés",
+    "saveFailingDescription": "Vos dernières modifications ne sont pas encore enregistrées. SpeakoFlow continue d'essayer.",
+    "dismiss": "Ignorer"
   }
 }

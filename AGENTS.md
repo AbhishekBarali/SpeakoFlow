@@ -147,7 +147,7 @@ the reminder popup (`reminder/`).
 
 **Pipeline Processing:** Audio → VAD → Whisper/Parakeet → Text output → Clipboard/Paste
 
-**State Flow:** Zustand → Tauri Command → Rust State → Persistence (tauri-plugin-store)
+**State Flow:** Zustand → Tauri Command → Rust State → Persistence (`settings_file.rs`, see Settings System)
 
 **Custom Title Bar:** Native window decorations are disabled on Windows/Linux (`decorations(false)` in `lib.rs`); the webview draws the chrome via `TitleBar.tsx` (brand + minimize/close, which needs the `core:window:allow-minimize`/`allow-close` capabilities). macOS keeps the window decorated with an overlay title bar (`TitleBarStyle::Overlay` + `hidden_title`) so the native traffic lights still work. Close hides to the tray (see `on_window_event`).
 
@@ -185,7 +185,7 @@ the reminder popup (`reminder/`).
 
 ### Settings System
 
-Settings are stored using Tauri's store plugin with reactive updates:
+Settings live in `settings_store.json`. `settings_file.rs` owns that file rather than `tauri-plugin-store`. Every save is atomic: it writes a temporary file, fsyncs it and renames it over the old one, and the create and the rename are retried for up to ~450 ms when another process holds the file (Defender, the search indexer or a sync client on Windows). Damaged **content** (empty, NUL bytes, not JSON, not an object; a UTF-8 BOM is not damage) is moved aside to `.corrupt-<time>`, of which the newest five are kept, and the settings come back from `settings_store.json.bak`, which every launch that read a good file with a `settings` object refreshes when it differs. A file that parses but lost its `settings` object takes that entry back from the backup and keeps its other keys, so the defaults `get_settings` would write can never reach the backup on the next launch. A read **error** is not damage: after a few retries the file is left where it is, nothing is saved that session, and the session runs on the backup's settings or the defaults. Each of these outcomes, and saves that fail three times in a row or for ten seconds, becomes a `SettingsNotice`. The file is read before any window listens, so the main window fetches the current notices on mount (`get_settings_notices`), hears later ones on `settings-notices`, and shows them as toasts (`hooks/useSettingsNotices.ts`); a dismissed notice is not shown again on reload. Two rules matter. **Never open that file with `app.store()`**: the plugin would keep its own copy and write it back non-atomically on exit. **Go through `settings::settings_file(app)`** for any other key kept in that file (the meeting pill position, for example). The plugin's in-place `fs::write`, together with a load that silently ignored a damaged file, is how a shutdown reset every setting. What the settings cover:
 
 - Keyboard shortcuts (configurable, supports push-to-talk)
 - Audio devices (microphone/output selection)

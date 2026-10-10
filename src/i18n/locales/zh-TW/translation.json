@@ -3220,5 +3220,15 @@
     "best": "最佳的一天",
     "typical": "平常的一天",
     "typicalSub": "在您有語音輸入的日子"
+  },
+  "settingsNotice": {
+    "restored": "你的設定已損毀，已從備份還原。",
+    "unrecoverableTitle": "無法還原你的設定",
+    "unrecoverableDescription": "SpeakoFlow 已使用預設設定啟動。損毀的檔案已保留為 {{file}}。",
+    "notSavingTitle": "設定變更將不會儲存",
+    "notSavingDescription": "無法讀取設定檔，因此未做任何變動。請重新啟動 SpeakoFlow 再試一次。",
+    "saveFailingTitle": "設定未能儲存",
+    "saveFailingDescription": "最近的變更尚未儲存。SpeakoFlow 會繼續嘗試。",
+    "dismiss": "關閉"
   }
 }

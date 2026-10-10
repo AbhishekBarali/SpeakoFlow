@@ -3390,5 +3390,15 @@
     "best": "أفضل يوم",
     "typical": "يوم معتاد",
     "typicalSub": "في الأيام التي تُملي فيها"
+  },
+  "settingsNotice": {
+    "restored": "تلفت إعداداتك، فاستُعيدت من نسخة احتياطية.",
+    "unrecoverableTitle": "تعذّر استرداد إعداداتك",
+    "unrecoverableDescription": "بدأ SpeakoFlow بالإعدادات الافتراضية. احتُفظ بالملف التالف باسم {{file}}.",
+    "notSavingTitle": "لن تُحفظ تغييرات الإعدادات",
+    "notSavingDescription": "تعذّرت قراءة ملف الإعدادات، فتُرك كما هو. أعد تشغيل SpeakoFlow للمحاولة مرة أخرى.",
+    "saveFailingTitle": "لا يتم حفظ الإعدادات",
+    "saveFailingDescription": "لم تُحفظ تغييراتك الأخيرة بعد. سيواصل SpeakoFlow المحاولة.",
+    "dismiss": "تجاهل"
   }
 }

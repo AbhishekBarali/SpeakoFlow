@@ -3288,5 +3288,15 @@
     "best": "Melhor dia",
     "typical": "Dia típico",
     "typicalSub": "Nos dias em que você dita"
+  },
+  "settingsNotice": {
+    "restored": "Suas configurações estavam danificadas e foram restauradas a partir de um backup.",
+    "unrecoverableTitle": "Não foi possível recuperar suas configurações",
+    "unrecoverableDescription": "O SpeakoFlow foi iniciado com as configurações padrão. O arquivo danificado foi mantido como {{file}}.",
+    "notSavingTitle": "As alterações nas configurações não serão salvas",
+    "notSavingDescription": "Não foi possível ler o arquivo de configurações, então ele foi mantido como está. Reinicie o SpeakoFlow para tentar novamente.",
+    "saveFailingTitle": "As configurações não estão sendo salvas",
+    "saveFailingDescription": "Suas alterações recentes ainda não foram salvas. O SpeakoFlow continuará tentando.",
+    "dismiss": "Dispensar"
   }
 }
