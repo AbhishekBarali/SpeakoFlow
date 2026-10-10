@@ -25,6 +25,7 @@ import {
   type NavigationState,
 } from "./components/shell/navigation";
 import { useSettings } from "./hooks/useSettings";
+import { useSettingsNotices } from "./hooks/useSettingsNotices";
 import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
 import { insertDictation } from "@/lib/insertDictation";
@@ -58,6 +59,8 @@ function App() {
   const [shellNavigation, setShellNavigation] =
     useState<NavigationState>(INITIAL_NAVIGATION);
   const { settings, updateSetting } = useSettings();
+  // A damaged or unreadable settings file, or saves that keep failing.
+  useSettingsNotices();
   const direction = getLanguageDirection(i18n.language);
   const refreshAudioDevices = useSettingsStore(
     (state) => state.refreshAudioDevices,

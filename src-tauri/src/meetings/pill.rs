@@ -51,7 +51,6 @@ use std::sync::Mutex;
 
 use log::{debug, error, warn};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
-use tauri_plugin_store::StoreExt;
 
 /// Window label. Must also appear in `capabilities/default.json`, or the window
 /// renders and can `invoke` but every `listen` is denied by the ACL — which
@@ -760,12 +759,7 @@ fn live_rect(app: &AppHandle, window: &tauri::WebviewWindow) -> Option<(Rect, ta
 /// Where the pill was left at the end of an earlier meeting, if that spot is
 /// still on a connected display.
 fn saved_rect(app: &AppHandle) -> Option<(Rect, tauri::Monitor)> {
-    let store = app
-        .store(crate::portable::store_path(
-            crate::settings::SETTINGS_STORE_PATH,
-        ))
-        .ok()?;
-    let value = store.get(POSITION_KEY)?;
+    let value = crate::settings::settings_file(app).get(POSITION_KEY)?;
     let read = |key: &str| value.get(key).and_then(serde_json::Value::as_f64);
     let (x, y, w, h) = (read("x")?, read("y")?, read("w")?, read("h")?);
     if w <= 0.0 || h <= 0.0 {
@@ -798,19 +792,15 @@ fn save_position(app: &AppHandle, window: &tauri::WebviewWindow) {
         _ => rect,
     };
     let scale = monitor.scale_factor();
-    if let Ok(store) = app.store(crate::portable::store_path(
-        crate::settings::SETTINGS_STORE_PATH,
-    )) {
-        store.set(
-            POSITION_KEY,
-            serde_json::json!({
-                "x": pill.x * scale,
-                "y": pill.y * scale,
-                "w": pill.w * scale,
-                "h": pill.h * scale,
-            }),
-        );
-    }
+    crate::settings::settings_file(app).set(
+        POSITION_KEY,
+        serde_json::json!({
+            "x": pill.x * scale,
+            "y": pill.y * scale,
+            "w": pill.w * scale,
+            "h": pill.h * scale,
+        }),
+    );
 }
 
 /// The height to use, given the mode and the display height to clamp against.

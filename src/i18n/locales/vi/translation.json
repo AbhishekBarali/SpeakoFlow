@@ -3220,5 +3220,15 @@
     "best": "Ngày tốt nhất",
     "typical": "Ngày điển hình",
     "typicalSub": "Vào những ngày bạn đọc chính tả"
+  },
+  "settingsNotice": {
+    "restored": "Cài đặt của bạn bị hỏng và đã được khôi phục từ bản sao lưu.",
+    "unrecoverableTitle": "Không thể khôi phục cài đặt của bạn",
+    "unrecoverableDescription": "SpeakoFlow đã khởi động với cài đặt mặc định. Tệp bị hỏng được giữ lại với tên {{file}}.",
+    "notSavingTitle": "Các thay đổi cài đặt sẽ không được lưu",
+    "notSavingDescription": "Không thể đọc tệp cài đặt nên tệp được giữ nguyên. Hãy khởi động lại SpeakoFlow để thử lại.",
+    "saveFailingTitle": "Cài đặt không được lưu",
+    "saveFailingDescription": "Các thay đổi gần đây của bạn chưa được lưu. SpeakoFlow sẽ tiếp tục thử.",
+    "dismiss": "Đóng"
   }
 }

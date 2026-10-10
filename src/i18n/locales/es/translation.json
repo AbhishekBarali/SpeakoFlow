@@ -3288,5 +3288,15 @@
     "best": "Mejor día",
     "typical": "Día típico",
     "typicalSub": "Los días que dictas"
+  },
+  "settingsNotice": {
+    "restored": "Tu configuración estaba dañada y se restauró desde una copia de seguridad.",
+    "unrecoverableTitle": "No se pudo recuperar tu configuración",
+    "unrecoverableDescription": "SpeakoFlow se inició con la configuración predeterminada. El archivo dañado se guardó como {{file}}.",
+    "notSavingTitle": "Los cambios en la configuración no se guardarán",
+    "notSavingDescription": "No se pudo leer el archivo de configuración, así que se dejó intacto. Reinicia SpeakoFlow para volver a intentarlo.",
+    "saveFailingTitle": "La configuración no se está guardando",
+    "saveFailingDescription": "Tus cambios recientes aún no se han guardado. SpeakoFlow seguirá intentándolo.",
+    "dismiss": "Descartar"
   }
 }

@@ -3220,5 +3220,15 @@
     "best": "최고 기록",
     "typical": "평소",
     "typicalSub": "받아쓰기한 날 기준"
+  },
+  "settingsNotice": {
+    "restored": "설정이 손상되어 백업에서 복원했습니다.",
+    "unrecoverableTitle": "설정을 복구할 수 없습니다",
+    "unrecoverableDescription": "SpeakoFlow가 기본 설정으로 시작되었습니다. 손상된 파일은 {{file}}(으)로 보관되어 있습니다.",
+    "notSavingTitle": "설정 변경 사항이 저장되지 않습니다",
+    "notSavingDescription": "설정 파일을 읽을 수 없어 그대로 두었습니다. 다시 시도하려면 SpeakoFlow를 다시 시작하세요.",
+    "saveFailingTitle": "설정이 저장되지 않고 있습니다",
+    "saveFailingDescription": "최근 변경 사항이 아직 저장되지 않았습니다. SpeakoFlow가 계속 시도합니다.",
+    "dismiss": "닫기"
   }
 }

@@ -30,6 +30,7 @@ mod screenshot;
 mod secret_store;
 mod selection;
 mod settings;
+mod settings_file;
 mod shortcut;
 mod signal_handle;
 mod speech_readiness;
@@ -1287,6 +1288,8 @@ pub fn run(cli_args: CliArgs) {
             helpers::clamshell::is_laptop,
             window_drag::start_window_drag,
             window_drag::start_window_resize,
+            commands::get_settings_notices,
+            commands::dismiss_settings_notice,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);
 
@@ -1696,8 +1699,9 @@ pub fn run(cli_args: CliArgs) {
         });
 }
 
-/// Everything that has to be put away before the process ends: a meeting
-/// still recording, both llama.cpp engines, and the native voice.
+/// Everything that has to be put away before the process ends: unsaved
+/// settings, a meeting still recording, both llama.cpp engines, and the native
+/// voice.
 ///
 /// Runs from `RunEvent::Exit` on every ordinary quit and restart. The one exit
 /// that skips that event is an in-app update on Windows, where the updater
@@ -1705,6 +1709,10 @@ pub fn run(cli_args: CliArgs) {
 /// `updates::prepare_update_install` calls this first. Safe to call twice:
 /// each step is a no-op once its thing is already stopped.
 pub(crate) fn release_before_exit(app: &AppHandle) {
+    // First, before anything slow: a change made in the last moments before the
+    // quit may still be waiting for the settings writer thread, and a logout or
+    // shutdown can end the process before the steps below finish.
+    settings::flush_settings();
     // A meeting still recording would otherwise lose its tail and leave its
     // recordings unfinalised and unreferenced. Bounded, because draining a
     // transcription backlog can take minutes.

@@ -3288,5 +3288,15 @@
     "best": "היום הטוב ביותר",
     "typical": "יום טיפוסי",
     "typicalSub": "בימים שבהם אתה מכתיב"
+  },
+  "settingsNotice": {
+    "restored": "ההגדרות שלך נפגמו ושוחזרו מגיבוי.",
+    "unrecoverableTitle": "לא ניתן היה לשחזר את ההגדרות שלך",
+    "unrecoverableDescription": "SpeakoFlow הופעל עם הגדרות ברירת המחדל. הקובץ הפגום נשמר בשם {{file}}.",
+    "notSavingTitle": "שינויים בהגדרות לא יישמרו",
+    "notSavingDescription": "לא ניתן היה לקרוא את קובץ ההגדרות, ולכן הוא נשאר ללא שינוי. הפעל מחדש את SpeakoFlow כדי לנסות שוב.",
+    "saveFailingTitle": "ההגדרות לא נשמרות",
+    "saveFailingDescription": "השינויים האחרונים שלך עדיין לא נשמרו. SpeakoFlow ימשיך לנסות.",
+    "dismiss": "סגור"
   }
 }

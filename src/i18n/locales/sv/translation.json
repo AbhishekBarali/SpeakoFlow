@@ -3254,5 +3254,15 @@
     "best": "Bästa dag",
     "typical": "Typisk dag",
     "typicalSub": "Dagar du dikterar"
+  },
+  "settingsNotice": {
+    "restored": "Dina inställningar var skadade och har återställts från en säkerhetskopia.",
+    "unrecoverableTitle": "Det gick inte att återställa dina inställningar",
+    "unrecoverableDescription": "SpeakoFlow startade med standardinställningarna. Den skadade filen sparades som {{file}}.",
+    "notSavingTitle": "Ändringar i inställningarna sparas inte",
+    "notSavingDescription": "Inställningsfilen kunde inte läsas och har därför lämnats orörd. Starta om SpeakoFlow för att försöka igen.",
+    "saveFailingTitle": "Inställningarna sparas inte",
+    "saveFailingDescription": "Dina senaste ändringar har inte sparats än. SpeakoFlow fortsätter att försöka.",
+    "dismiss": "Stäng"
   }
 }

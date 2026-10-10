@@ -3220,5 +3220,15 @@
     "best": "ベストの日",
     "typical": "平均的な日",
     "typicalSub": "音声入力した日の平均"
+  },
+  "settingsNotice": {
+    "restored": "設定ファイルが破損していたため、バックアップから復元しました。",
+    "unrecoverableTitle": "設定を復元できませんでした",
+    "unrecoverableDescription": "SpeakoFlow は既定の設定で起動しました。破損したファイルは {{file}} として残してあります。",
+    "notSavingTitle": "設定の変更は保存されません",
+    "notSavingDescription": "設定ファイルを読み込めなかったため、そのままにしてあります。SpeakoFlow を再起動してもう一度お試しください。",
+    "saveFailingTitle": "設定を保存できていません",
+    "saveFailingDescription": "最近の変更はまだ保存されていません。SpeakoFlow は保存を試み続けます。",
+    "dismiss": "閉じる"
   }
 }
