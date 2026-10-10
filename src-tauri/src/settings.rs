@@ -1954,7 +1954,7 @@ pub const CLEANUP_BINDING_ID: &str = "transcribe_with_post_process";
 /// cleanup shortcut is turned off with its own switch on the cleanup page.
 /// Cancel is here because a global Esc, even one only registered while
 /// something is running, is one some people would rather not have at all.
-pub const OPTIONAL_BINDINGS: [&str; 2] = ["cancel", "assistant_call"];
+pub const OPTIONAL_BINDINGS: [&str; 3] = ["cancel", "assistant_call", "paste_last_transcript"];
 
 /// Whether a shortcut may be left without a key.
 pub fn is_optional_binding(id: &str) -> bool {
@@ -3948,6 +3948,20 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
 
+    // Re-paste the newest dictation. Ships unbound, like Petal's: any combo
+    // chosen for everyone would take keys from some app, and this is a
+    // shortcut people reach for occasionally rather than all day.
+    bindings.insert(
+        "paste_last_transcript".to_string(),
+        ShortcutBinding {
+            id: "paste_last_transcript".to_string(),
+            name: "Paste last transcript".to_string(),
+            description: "Paste your most recent dictation again.".to_string(),
+            default_binding: String::new(),
+            current_binding: String::new(),
+        },
+    );
+
     AppSettings {
         bindings,
         push_to_talk: true,
@@ -5424,9 +5438,21 @@ mod tests {
     fn only_cancel_and_the_call_can_be_left_unbound() {
         assert!(is_optional_binding("cancel"));
         assert!(is_optional_binding("assistant_call"));
+        assert!(is_optional_binding("paste_last_transcript"));
         assert!(!is_optional_binding("transcribe"));
         assert!(!is_optional_binding("assistant"));
         assert!(!is_optional_binding(CLEANUP_BINDING_ID));
+    }
+
+    /// Paste-last ships without a key (any combo picked for everyone would take
+    /// keys from some app), and has an action to run once the user binds one.
+    #[test]
+    fn paste_last_transcript_ships_unbound_with_an_action() {
+        let defaults = get_default_settings().bindings;
+        let paste_last = &defaults["paste_last_transcript"];
+        assert!(paste_last.default_binding.is_empty());
+        assert!(paste_last.current_binding.is_empty());
+        assert!(crate::actions::ACTION_MAP.contains_key("paste_last_transcript"));
     }
 
     /// Cleanup's own key is the dictation keys plus Shift, and the call is the

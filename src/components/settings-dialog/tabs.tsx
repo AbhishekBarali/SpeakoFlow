@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   AudioLines,
   Ban,
+  ClipboardPaste,
   ExternalLink,
   FolderOpen,
   Github,
@@ -186,6 +187,12 @@ export const ShortcutsTab: React.FC = () => {
             tone="rose"
           />
         )}
+        <ShortcutInput
+          shortcutId="paste_last_transcript"
+          grouped={true}
+          icon={ClipboardPaste}
+          tone="amber"
+        />
         <PushToTalk descriptionMode="inline" grouped={true} />
       </SettingsGroup>
 

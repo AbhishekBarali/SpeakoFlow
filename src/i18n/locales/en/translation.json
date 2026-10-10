@@ -626,6 +626,10 @@
             "name": "Cancel",
             "description": "Stops the current recording or a streaming reply."
           },
+          "paste_last_transcript": {
+            "name": "Paste last transcript",
+            "description": "Pastes your most recent dictation again, wherever your cursor is."
+          },
           "transcribe_with_post_process": {
             "name": "Dictate and clean up",
             "description": "Dictate, then clean it up with AI before it's typed out."
@@ -2586,6 +2590,10 @@
       "cancel": {
         "title": "Cancel",
         "what": "Stop a recording, or a reply being read aloud."
+      },
+      "pasteLast": {
+        "title": "Paste last transcript",
+        "what": "Paste your most recent dictation again, wherever your cursor is."
       },
       "globe": {
         "hint": "macOS also acts on the 🌐 key. Set “Press 🌐 key to” to Do Nothing so it only dictates.",
