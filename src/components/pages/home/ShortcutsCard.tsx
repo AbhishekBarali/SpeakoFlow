@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { commands } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { useOsType } from "@/hooks/useOsType";
+import { useRecordingMode } from "@/hooks/useRecordingMode";
 import { SectionTitle } from "@/components/ui/Page";
 import { Segmented } from "@/components/ui/Segmented";
 import { InfoTip } from "@/components/ui/InfoTip";
@@ -28,10 +29,10 @@ interface ShortcutRow {
  */
 export const ShortcutsCard: React.FC = () => {
   const { t } = useTranslation();
-  const { getSetting, updateSetting, isUpdating } = useSettings();
+  const { getSetting } = useSettings();
+  const { mode, setMode, updating } = useRecordingMode();
   const { navigate } = useNavigation();
   const os = useOsType();
-  const holdToTalk = getSetting("push_to_talk") ?? true;
   const cleanupOn = getSetting("post_process_enabled") ?? false;
   // Cleanup that rides on the dictation shortcut has no keys of its own, so
   // the dictation row says "Dictate and clean up" instead of listing both.
@@ -47,9 +48,11 @@ export const ShortcutsCard: React.FC = () => {
         : t("home.shortcuts.dictate.title"),
       info: cleanupOnDictation
         ? t("home.shortcuts.cleanup.what")
-        : holdToTalk
-          ? t("home.shortcuts.dictate.whatHold")
-          : t("home.shortcuts.dictate.whatTap"),
+        : mode === "auto"
+          ? t("home.shortcuts.dictate.whatAuto")
+          : mode === "hold"
+            ? t("home.shortcuts.dictate.whatHold")
+            : t("home.shortcuts.dictate.whatTap"),
     },
     ...(cleanupOnDictation
       ? []
@@ -131,14 +134,13 @@ export const ShortcutsCard: React.FC = () => {
         action={
           <Segmented
             label={t("settings.general.pushToTalk.label")}
-            value={holdToTalk ? "hold" : "tap"}
-            onChange={(mode) =>
-              void updateSetting("push_to_talk", mode === "hold")
-            }
-            disabled={isUpdating("push_to_talk")}
+            value={mode}
+            onChange={(next) => void setMode(next)}
+            disabled={updating}
             options={[
               { value: "hold", label: t("home.shortcuts.mode.hold") },
               { value: "tap", label: t("home.shortcuts.mode.tap") },
+              { value: "auto", label: t("home.shortcuts.mode.auto") },
             ]}
           />
         }

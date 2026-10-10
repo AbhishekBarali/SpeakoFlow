@@ -54,7 +54,10 @@ pub fn handle_shortcut_event(
             // and the assistant — follows the single Push-to-talk setting:
             //   • Push-to-talk ON  → hold the shortcut to record, release to stop.
             //   • Push-to-talk OFF → tap once to start, tap again to stop.
-            let mode = recording_mode(get_settings(app).push_to_talk);
+            //   • Hold or tap (Push-to-talk ON + dynamic_shortcuts) → a quick tap
+            //     locks the recording hands-free, a longer hold is push-to-talk.
+            let settings = get_settings(app);
+            let mode = recording_mode(settings.push_to_talk, settings.dynamic_shortcuts);
             coordinator.send_input(base_id, hotkey_string, is_pressed, mode);
         } else {
             warn!("TranscriptionCoordinator is not initialized");

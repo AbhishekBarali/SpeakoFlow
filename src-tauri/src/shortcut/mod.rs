@@ -612,6 +612,27 @@ fn initialize_handy_keys_with_rollback(app: &AppHandle) -> Result<bool, String> 
 pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.push_to_talk = enabled;
+    // Hold or tap only exists on top of hold-style recording.
+    if !enabled {
+        settings.dynamic_shortcuts = false;
+    }
+    settings::write_settings(&app, settings);
+    handy_keys::apply_recording_mode(&app);
+    Ok(())
+}
+
+/// Hold or tap: with it on, a quick tap of a recording shortcut locks the
+/// recording hands-free and a longer hold is push-to-talk. Turning it on also
+/// turns Push-to-talk on, because the hotkey engines treat it as hold-style
+/// (they fire on press); turning it off leaves plain Hold.
+#[tauri::command]
+#[specta::specta]
+pub fn change_dynamic_shortcuts_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.dynamic_shortcuts = enabled;
+    if enabled {
+        settings.push_to_talk = true;
+    }
     settings::write_settings(&app, settings);
     handy_keys::apply_recording_mode(&app);
     Ok(())

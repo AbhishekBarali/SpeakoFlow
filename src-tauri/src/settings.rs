@@ -1234,6 +1234,12 @@ impl fmt::Debug for SecretString {
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
     pub push_to_talk: bool,
+    /// "Hold or tap" (Auto): only meaningful while `push_to_talk` is on, where
+    /// it makes a quick tap lock the recording hands-free instead of ending it
+    /// on release. Kept as a flag beside `push_to_talk` rather than replacing
+    /// it, so both hotkey engines, the chord logic and every setting that reads
+    /// `push_to_talk` still see Auto as a hold-style mode.
+    pub dynamic_shortcuts: bool,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -3951,6 +3957,7 @@ pub fn get_default_settings() -> AppSettings {
     AppSettings {
         bindings,
         push_to_talk: true,
+        dynamic_shortcuts: false,
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),

@@ -98,16 +98,44 @@ pub enum RecordingMode {
     /// Hands-free: press to start, press again (or commit/cancel) to stop.
     /// Releases are ignored.
     Lock,
+    /// Hold or tap: starts like [`RecordingMode::Hold`], and the release says
+    /// which it was. Held past [`AUTO_HOLD_THRESHOLD`] it is push-to-talk and
+    /// the release stops; let go sooner it was a tap, and the recording turns
+    /// into a [`RecordingMode::Lock`] one that the next press stops.
+    Auto,
+}
+
+/// How long a press must last to count as holding rather than tapping, in
+/// [`RecordingMode::Auto`].
+const AUTO_HOLD_THRESHOLD: Duration = Duration::from_millis(300);
+
+/// What the release of an [`RecordingMode::Auto`] press means.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum AutoRelease {
+    /// Held long enough: it was push-to-talk, stop and transcribe.
+    Stop,
+    /// A tap: keep recording, hands-free from here.
+    Lock,
+}
+
+fn auto_release(held: Duration) -> AutoRelease {
+    if held >= AUTO_HOLD_THRESHOLD {
+        AutoRelease::Stop
+    } else {
+        AutoRelease::Lock
+    }
 }
 
 /// The recording mode a shortcut press asks for. There is one setting for
 /// every recording shortcut: Push-to-talk on means hold to record, off means
-/// tap to start and tap to stop.
-pub fn recording_mode(push_to_talk: bool) -> RecordingMode {
-    if push_to_talk {
-        RecordingMode::Hold
-    } else {
-        RecordingMode::Lock
+/// tap to start and tap to stop, and with `dynamic` also on (hold or tap) the
+/// press decides on release. `dynamic` without push-to-talk is not a state the
+/// UI produces, and means nothing.
+pub fn recording_mode(push_to_talk: bool, dynamic: bool) -> RecordingMode {
+    match (push_to_talk, dynamic) {
+        (true, true) => RecordingMode::Auto,
+        (true, false) => RecordingMode::Hold,
+        (false, _) => RecordingMode::Lock,
     }
 }
 
@@ -228,6 +256,9 @@ impl TranscriptionCoordinator {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut stage = Stage::Idle;
                 let mut last_press: Option<Instant> = None;
+                // When the press that started an `Auto` recording went down, so
+                // its release can tell a hold from a tap.
+                let mut auto_pressed_at: Option<Instant> = None;
                 // Monotonic id for the active recording, bumped on every start.
                 // A max-duration timer captures the value at arm time and only
                 // fires if it still matches — so it can never stop a newer
@@ -268,6 +299,8 @@ impl TranscriptionCoordinator {
                                             // later, unrelated one.
                                             generation = generation.wrapping_add(1);
                                             recording_since = Instant::now();
+                                            auto_pressed_at =
+                                                (mode == RecordingMode::Auto).then_some(now);
                                             match mode {
                                                 // Hands-free (Push-to-talk OFF): a
                                                 // tap-to-toggle recording. Tell the
@@ -280,7 +313,7 @@ impl TranscriptionCoordinator {
                                                 // Push-to-talk (hold): nothing extra
                                                 // to arm — tap-to-lock was removed in
                                                 // favour of the simple hold/tap model.
-                                                RecordingMode::Hold => {}
+                                                RecordingMode::Hold | RecordingMode::Auto => {}
                                             }
                                         }
                                     }
@@ -307,8 +340,27 @@ impl TranscriptionCoordinator {
                                     Stage::Recording { binding_id: id, mode: RecordingMode::Hold }
                                         if id == &binding_id
                                 );
-                                if should_stop {
+                                let release = match &stage {
+                                    Stage::Recording {
+                                        binding_id: id,
+                                        mode: RecordingMode::Auto,
+                                    } if id == &binding_id => Some(auto_release(
+                                        auto_pressed_at.map_or(Duration::MAX, |t| t.elapsed()),
+                                    )),
+                                    _ => None,
+                                };
+                                if should_stop || release == Some(AutoRelease::Stop) {
                                     stop(&app, &mut stage, &binding_id, &hotkey_string);
+                                } else if release == Some(AutoRelease::Lock) {
+                                    // A tap: the recording carries on hands-free,
+                                    // exactly as if it had been started in Tap
+                                    // mode, so the next press stops it.
+                                    use tauri::Emitter;
+                                    stage = Stage::Recording {
+                                        binding_id: binding_id.clone(),
+                                        mode: RecordingMode::Lock,
+                                    };
+                                    let _ = app.emit("recording-locked", true);
                                 }
                             }
                         }
@@ -603,6 +655,26 @@ fn stop(app: &AppHandle, stage: &mut Stage, binding_id: &str, hotkey_string: &st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recording_mode_follows_the_two_settings() {
+        assert_eq!(recording_mode(true, false), RecordingMode::Hold);
+        assert_eq!(recording_mode(false, false), RecordingMode::Lock);
+        assert_eq!(recording_mode(true, true), RecordingMode::Auto);
+        // Dynamic without hold-style recording means nothing.
+        assert_eq!(recording_mode(false, true), RecordingMode::Lock);
+    }
+
+    #[test]
+    fn a_short_press_locks_and_a_long_one_stops() {
+        assert_eq!(auto_release(Duration::from_millis(80)), AutoRelease::Lock);
+        assert_eq!(
+            auto_release(AUTO_HOLD_THRESHOLD - Duration::from_millis(1)),
+            AutoRelease::Lock
+        );
+        assert_eq!(auto_release(AUTO_HOLD_THRESHOLD), AutoRelease::Stop);
+        assert_eq!(auto_release(Duration::from_secs(5)), AutoRelease::Stop);
+    }
 
     #[test]
     fn recording_deadline_fires_without_input() {
