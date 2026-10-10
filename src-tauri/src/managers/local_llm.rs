@@ -13,9 +13,9 @@
 //!   3. `<app-data>/models/engine/` (auto-downloaded on first use),
 //!   4. the system `PATH`.
 //!
-//! If none is present, the manager downloads the official llama.cpp build for
-//! this platform into the app-data engine directory on first use, so the
-//! feature works with zero manual setup.
+//! If none is present, the manager downloads the pinned official llama.cpp
+//! build ([`PINNED_ENGINE_TAG`]) for this platform into the app-data engine
+//! directory on first use, so the feature works with zero manual setup.
 
 use crate::managers::model::{EngineType, ModelManager};
 use crate::managers::transcription::GpuDeviceOption;
@@ -63,14 +63,31 @@ const ASSISTANT_REPEAT_PENALTY: f32 = 1.1;
 /// llama.cpp's "no repetition penalty" value. Used by the cleanup engine.
 const REPEAT_PENALTY_OFF: f32 = 1.0;
 
-/// Pinned llama.cpp release used as a fallback when the GitHub "latest" API is
-/// unreachable or rate-limited. Its assets are fetched directly from the
-/// release-download host, which — unlike `api.github.com` — is NOT subject to
-/// the 60-requests/hour unauthenticated rate limit that shared campus/office
-/// NAT IPs routinely exhaust (the root cause of "No assets in latest llama.cpp
-/// release"). Overridable at runtime via the `HANDY_LLAMA_RELEASE_TAG` env var
-/// so a newer/older build can be pinned without a rebuild.
-const PINNED_ENGINE_TAG: &str = "b10075";
+/// The llama.cpp build the built-in engine downloads. It is the only build the
+/// app ever installs: there is no "newest release" lookup.
+///
+/// There used to be one, against `releases/latest`, and it never worked for
+/// long. llama.cpp marks every real `bNNNNN` build as a prerelease, so GitHub's
+/// "latest" is a semver stub (`v0.6.0`) whose only asset is `nightly-tag.txt`;
+/// the lookup found no archive and every install silently fell back to the pin.
+/// A build we have not run is also a build we have not tested, so the engine
+/// version is now a deliberate choice that ships with the app.
+///
+/// b11429 is the build upstream's own `v0.6.0` stub points to. It is the first
+/// pin with ggml-org/llama.cpp#22789 (in since b10247), which replaced the
+/// scheduler's fixed 30-entry split-input arrays: the previous pin, b10075,
+/// aborted on `GGML_ASSERT(n_inputs < GGML_SCHED_MAX_SPLIT_INPUTS)` whenever a
+/// Gemma 4 E2B/E4B graph was split across backends (two GPUs, or a model only
+/// partly offloaded), because those models pass a per-layer embedding tensor
+/// across the boundary for every layer.
+///
+/// To bump it: check that every archive in [`pinned_asset_names_for`] exists in
+/// the new release, then re-test chat, vision (`--mmproj`), tool calls,
+/// JSON-schema output, `LLAMA_ARG_THINK_BUDGET=0`, and the `--list-devices`
+/// format [`parse_engine_devices`] reads. Every existing install re-downloads
+/// once, since its stamp no longer matches. `HANDY_LLAMA_RELEASE_TAG` overrides
+/// it at runtime, without a rebuild.
+const PINNED_ENGINE_TAG: &str = "b11429";
 
 /// Default context window if the user hasn't chosen one. 8192 leaves room for
 /// the system prompt, chat history, a screenshot (vision models can spend
@@ -306,6 +323,191 @@ fn engine_devices(engine: &Path) -> &'static [EngineDevice] {
     })
 }
 
+/// The engine tag to install: a non-blank `HANDY_LLAMA_RELEASE_TAG` value, or
+/// [`PINNED_ENGINE_TAG`]. Pure so the override is testable without touching the
+/// process environment.
+fn engine_tag_from_override(value: Option<&str>) -> String {
+    value
+        .map(str::trim)
+        .filter(|tag| !tag.is_empty())
+        .unwrap_or(PINNED_ENGINE_TAG)
+        .to_string()
+}
+
+/// Serializes installing or replacing the managed engine across both roles.
+///
+/// Each [`LocalLlmManager`] has its own start lock, but the assistant and
+/// cleanup engines share one engine directory, so the install step needs a
+/// lock of its own that both see.
+fn engine_install_lock() -> &'static tokio::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
+}
+
+/// The file in the managed engine directory that names the llama.cpp build
+/// unpacked there.
+const ENGINE_STAMP_FILENAME: &str = "engine.tag";
+
+/// The build the managed engine directory holds, as its stamp records it.
+fn read_engine_stamp(engine_dir: &Path) -> Option<String> {
+    std::fs::read_to_string(engine_dir.join(ENGINE_STAMP_FILENAME))
+        .ok()
+        .map(|stamp| stamp.trim().to_string())
+        .filter(|stamp| !stamp.is_empty())
+}
+
+/// Record `tag` as the build unpacked in `engine_dir`. Callers pass the tag of
+/// the archive they just extracted, never the pin: the previous code wrote the
+/// pin, so installs that had really come from the old "latest" lookup were
+/// labelled with a build they did not hold.
+fn write_engine_stamp(engine_dir: &Path, tag: &str) -> std::io::Result<()> {
+    std::fs::write(engine_dir.join(ENGINE_STAMP_FILENAME), tag)
+}
+
+fn remove_engine_stamp(engine_dir: &Path) {
+    if let Err(e) = std::fs::remove_file(engine_dir.join(ENGINE_STAMP_FILENAME)) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            debug!("Failed to remove the engine version stamp: {e}");
+        }
+    }
+}
+
+/// What [`LocalLlmManager::ensure_engine_installed`] does with what it found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EngineInstallStep {
+    /// Use the binary found: one the app did not download, or a managed engine
+    /// whose stamp matches.
+    Reuse,
+    /// A managed engine without a matching stamp, which the other role is
+    /// running right now, so it cannot be replaced; see the call site.
+    ReuseWhileInUse,
+    /// Delete the managed engine and download the expected build.
+    Replace,
+    /// Nothing found anywhere: download the expected build.
+    Download,
+}
+
+/// Decide what to do about the engine binary.
+///
+/// `found_managed` is `None` when no binary was found, otherwise whether it is
+/// in the managed engine directory. A binary from `HANDY_LLAMA_SERVER`, the
+/// installer, or `PATH` is never replaced. A managed one is replaced whenever
+/// its stamp is missing or names another build, so a pin bump reaches every
+/// install exactly once.
+fn engine_install_step(
+    found_managed: Option<bool>,
+    stamp: Option<&str>,
+    expected: &str,
+    in_use_by_other_role: bool,
+) -> EngineInstallStep {
+    match found_managed {
+        None => EngineInstallStep::Download,
+        Some(false) => EngineInstallStep::Reuse,
+        Some(true) if stamp.map(str::trim) == Some(expected) => EngineInstallStep::Reuse,
+        Some(true) if in_use_by_other_role => EngineInstallStep::ReuseWhileInUse,
+        Some(true) => EngineInstallStep::Replace,
+    }
+}
+
+/// One prebuilt llama.cpp archive on the release-download host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EngineAsset {
+    /// The release tag the archive belongs to, which is what gets stamped.
+    tag: String,
+    /// The archive's file name in that release.
+    name: String,
+}
+
+impl EngineAsset {
+    /// The archive's URL on the release-download host, which unlike
+    /// `api.github.com` has no 60-requests-an-hour limit for anonymous clients.
+    fn url(&self) -> String {
+        format!(
+            "https://github.com/ggml-org/llama.cpp/releases/download/{}/{}",
+            self.tag, self.name
+        )
+    }
+}
+
+/// The archives to try for `tag` on this OS/arch, in order.
+fn engine_assets_for(tag: &str, os: &str, arch: &str) -> Vec<EngineAsset> {
+    pinned_asset_names_for(tag, os, arch)
+        .into_iter()
+        .map(|name| EngineAsset {
+            tag: tag.to_string(),
+            name,
+        })
+        .collect()
+}
+
+/// Exact archive names for `tag` on an OS/arch pair (as reported by
+/// `std::env::consts`), in the order they are tried. llama.cpp names them
+/// `llama-<tag>-bin-<platform>.<ext>`: `.zip` on Windows, `.tar.gz` elsewhere.
+///
+/// The Vulkan build comes first (the app already uses Vulkan for Whisper) and
+/// the CPU build, which runs anywhere, is the fallback; macOS ships one build
+/// per arch, with Metal built in on Apple silicon. The fallback only covers a
+/// missing or failed download: nothing retries with the CPU build if the
+/// Vulkan one crashes at run time.
+///
+/// Windows on ARM stays on the CPU build even though upstream now publishes
+/// `win-vulkan-arm64`. Those machines carry Qualcomm Adreno GPUs, whose
+/// llama.cpp acceleration upstream builds separately on OpenCL
+/// (`win-opencl-adreno-arm64`), and the Vulkan build has never been run on one
+/// here. A Vulkan engine that dies inside the driver would leave the feature
+/// broken with no way back to the CPU, and the CPU build is what Windows on
+/// ARM has used all along.
+fn pinned_asset_names_for(tag: &str, os: &str, arch: &str) -> Vec<String> {
+    let arm = arch == "aarch64";
+    match os {
+        "windows" if arm => vec![format!("llama-{tag}-bin-win-cpu-arm64.zip")],
+        "windows" => vec![
+            format!("llama-{tag}-bin-win-vulkan-x64.zip"),
+            format!("llama-{tag}-bin-win-cpu-x64.zip"),
+        ],
+        "macos" if arm => vec![format!("llama-{tag}-bin-macos-arm64.tar.gz")],
+        "macos" => vec![format!("llama-{tag}-bin-macos-x64.tar.gz")],
+        "linux" if arm => vec![
+            format!("llama-{tag}-bin-ubuntu-vulkan-arm64.tar.gz"),
+            format!("llama-{tag}-bin-ubuntu-arm64.tar.gz"),
+        ],
+        "linux" => vec![
+            format!("llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz"),
+            format!("llama-{tag}-bin-ubuntu-x64.tar.gz"),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+/// The last `max_lines` lines of `content`, or `None` if they are all blank.
+fn log_tail(content: &str, max_lines: usize) -> Option<String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let start = lines.len().saturating_sub(max_lines);
+    let tail = lines[start..].join("\n");
+    if tail.trim().is_empty() {
+        None
+    } else {
+        Some(tail)
+    }
+}
+
+/// The last `max_lines` non-blank lines of `log` that do not appear anywhere in
+/// `other`, or `None` if `other` already has them all.
+fn lines_missing_from(log: &str, other: &str, max_lines: usize) -> Option<String> {
+    let seen: std::collections::HashSet<&str> = other.lines().map(str::trim_end).collect();
+    let missing: Vec<&str> = log
+        .lines()
+        .map(str::trim_end)
+        .filter(|line| !line.trim().is_empty() && !seen.contains(line))
+        .collect();
+    let start = missing.len().saturating_sub(max_lines);
+    if missing.is_empty() {
+        None
+    } else {
+        Some(missing[start..].join("\n"))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct LocalLlmStatus {
     /// Whether the engine process is currently running.
@@ -322,6 +524,9 @@ pub struct LocalLlmStatus {
 
 struct ServerState {
     child: Option<Child>,
+    /// The binary `child` was started from, so the other role can tell whether
+    /// this engine has the managed engine directory's files open.
+    engine: Option<PathBuf>,
     model_id: Option<String>,
     last_error: Option<String>,
 }
@@ -357,6 +562,15 @@ impl LlmRole {
         match self {
             LlmRole::Assistant => "llama-server.log",
             LlmRole::Cleanup => "llama-server-cleanup.log",
+        }
+    }
+
+    /// The log the engine writes itself (`LLAMA_ARG_LOG_FILE`), beside the
+    /// console capture above.
+    fn debug_log_filename(self) -> &'static str {
+        match self {
+            LlmRole::Assistant => "llama-server-debug.log",
+            LlmRole::Cleanup => "llama-server-cleanup-debug.log",
         }
     }
 }
@@ -450,6 +664,7 @@ impl LocalLlmManager {
             role,
             state: Arc::new(Mutex::new(ServerState {
                 child: None,
+                engine: None,
                 model_id: None,
                 last_error: None,
             })),
@@ -488,17 +703,45 @@ impl LocalLlmManager {
             .join(self.role.log_filename())
     }
 
-    /// Read the last `max_lines` lines of the engine log, for surfacing the
-    /// real failure reason (bad arg, missing DLL, model load error, ...).
-    fn engine_log_tail(&self, max_lines: usize) -> Option<String> {
-        let content = std::fs::read_to_string(self.engine_log_path()).ok()?;
-        let lines: Vec<&str> = content.lines().collect();
-        let start = lines.len().saturating_sub(max_lines);
-        let tail = lines[start..].join("\n");
-        if tail.trim().is_empty() {
+    /// Path to the log the engine writes itself (`LLAMA_ARG_LOG_FILE`).
+    fn engine_debug_log_path(&self) -> PathBuf {
+        self.models_dir
+            .join("engine")
+            .join(self.role.debug_log_filename())
+    }
+
+    /// The engine's own output, for surfacing the real failure reason (bad arg,
+    /// missing DLL, model load error, ...) in the error the user sees.
+    ///
+    /// The console capture comes first, since an abort message is written
+    /// straight to stderr and only ever lands there. The engine's own log file
+    /// is added only for lines the capture lacks, so a build that loses console
+    /// output when it dies still has its last steps reported.
+    fn engine_log_report(&self, max_lines: usize) -> Option<String> {
+        let console_path = self.engine_log_path();
+        let debug_path = self.engine_debug_log_path();
+        let console = std::fs::read_to_string(&console_path).unwrap_or_default();
+        let debug = std::fs::read_to_string(&debug_path).unwrap_or_default();
+
+        let mut sections = Vec::new();
+        if let Some(tail) = log_tail(&console, max_lines) {
+            sections.push(format!(
+                "Engine log ({}):\n{}",
+                console_path.display(),
+                tail
+            ));
+        }
+        if let Some(extra) = lines_missing_from(&debug, &console, max_lines) {
+            sections.push(format!(
+                "Engine debug log ({}):\n{}",
+                debug_path.display(),
+                extra
+            ));
+        }
+        if sections.is_empty() {
             None
         } else {
-            Some(tail)
+            Some(sections.join("\n\n"))
         }
     }
 
@@ -628,39 +871,19 @@ impl LocalLlmManager {
         Self::find_in_path(Self::engine_filename())
     }
 
-    /// The engine version this app build expects on disk. Mirrors the tag used
-    /// to build the pinned download URLs (the `HANDY_LLAMA_RELEASE_TAG` env
-    /// override, otherwise the pinned constant). Bumping `PINNED_ENGINE_TAG`
-    /// therefore changes what "current" means, which is what lets an old cached
-    /// engine be detected as stale and refreshed automatically on next use.
+    /// The engine version this app build expects on disk: the
+    /// `HANDY_LLAMA_RELEASE_TAG` override if set, otherwise
+    /// [`PINNED_ENGINE_TAG`]. It is also the only tag ever downloaded, so
+    /// bumping the pin changes what "current" means, which is what makes an
+    /// older cached engine read as stale and get replaced on next use.
     fn expected_engine_tag() -> String {
-        std::env::var("HANDY_LLAMA_RELEASE_TAG")
-            .ok()
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty())
-            .unwrap_or_else(|| PINNED_ENGINE_TAG.to_string())
+        engine_tag_from_override(std::env::var("HANDY_LLAMA_RELEASE_TAG").ok().as_deref())
     }
 
-    /// Path to the version stamp written alongside the auto-downloaded engine.
-    /// It records which [`Self::expected_engine_tag`] the cached engine was
-    /// installed under, so a later app that bumps the pin can invalidate a
-    /// stale binary instead of reusing it forever.
-    fn engine_stamp_path(&self) -> PathBuf {
-        self.models_dir.join("engine").join("engine.tag")
-    }
-
-    /// Record the engine version currently installed in the managed engine dir.
-    /// Best-effort: a failure here only means the next launch re-checks (and, at
-    /// worst, re-downloads once more), never that the engine won't run.
-    fn write_engine_stamp(&self) {
-        let path = self.engine_stamp_path();
-        if let Err(e) = std::fs::write(&path, Self::expected_engine_tag()) {
-            warn!(
-                "Failed to write engine version stamp {}: {}",
-                path.display(),
-                e
-            );
-        }
+    /// The managed engine directory, where the auto-downloaded engine, its
+    /// version stamp, and both roles' logs live.
+    fn engine_dir(&self) -> PathBuf {
+        self.models_dir.join("engine")
     }
 
     /// Whether `path` lives inside the app-managed engine directory — i.e. it is
@@ -669,7 +892,7 @@ impl LocalLlmManager {
     /// `PATH`. Only managed binaries are subject to version-stamp invalidation
     /// and deletion; we never touch an engine the user or installer supplied.
     fn is_managed_engine(&self, path: &Path) -> bool {
-        let engine_dir = self.models_dir.join("engine");
+        let engine_dir = self.engine_dir();
         match (path.canonicalize(), engine_dir.canonicalize()) {
             (Ok(p), Ok(dir)) => p.starts_with(&dir),
             // If canonicalization fails, fall back to a lexical prefix check.
@@ -677,15 +900,41 @@ impl LocalLlmManager {
         }
     }
 
-    /// Whether the cached managed engine matches the version this app build
-    /// expects. A missing, unreadable, or mismatched stamp all count as stale,
-    /// forcing a one-time re-download so engines from older app versions (or
-    /// from before stamping existed) upgrade themselves automatically.
-    fn managed_engine_is_current(&self) -> bool {
-        match std::fs::read_to_string(self.engine_stamp_path()) {
-            Ok(stamp) => stamp.trim() == Self::expected_engine_tag(),
-            Err(_) => false,
+    /// The other role's manager, if it is registered. The two roles are
+    /// separate managed-state entries (see [`CleanupLlm`]).
+    fn sibling(&self) -> Option<Arc<LocalLlmManager>> {
+        match self.role {
+            LlmRole::Assistant => self
+                .app_handle
+                .try_state::<CleanupLlm>()
+                .map(|cleanup| cleanup.0.clone()),
+            LlmRole::Cleanup => self
+                .app_handle
+                .try_state::<Arc<LocalLlmManager>>()
+                .map(|assistant| assistant.inner().clone()),
         }
+    }
+
+    /// The binary this role's engine is running from, if it is running.
+    fn running_engine(&self) -> Option<PathBuf> {
+        let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let alive = st
+            .child
+            .as_mut()
+            .is_some_and(|child| matches!(child.try_wait(), Ok(None)));
+        if alive {
+            st.engine.clone()
+        } else {
+            None
+        }
+    }
+
+    /// Whether the other role has an engine running out of the managed engine
+    /// directory right now.
+    fn sibling_runs_managed_engine(&self) -> bool {
+        self.sibling()
+            .and_then(|sibling| sibling.running_engine())
+            .is_some_and(|path| self.is_managed_engine(&path))
     }
 
     fn find_in_path(name: &str) -> Option<PathBuf> {
@@ -716,71 +965,92 @@ impl LocalLlmManager {
         None
     }
 
-    /// Ensure an engine binary is available, downloading a llama.cpp release
-    /// for this platform into `<models>/engine/` if none is found anywhere.
+    /// Ensure an engine binary is available, downloading the pinned llama.cpp
+    /// build for this platform into `<models>/engine/` when none is found
+    /// anywhere, or when the one downloaded earlier is not the expected build.
     /// Returns the path to the binary.
     ///
-    /// Robustness: tries the current GitHub "latest" release first, then falls
-    /// back to a PINNED release whose download URLs are constructed directly.
-    /// The pinned URLs hit the release-download host rather than the
-    /// rate-limited `api.github.com`, so a throttled or offline GitHub API — the
-    /// usual cause of "No assets in latest llama.cpp release" on shared
-    /// school/office networks — no longer blocks setup. On total failure it
-    /// returns a clear, actionable message instead of a cryptic API error.
+    /// The archive URLs are built from the tag, so nothing here asks
+    /// `api.github.com`, whose unauthenticated limit shared school and office
+    /// networks exhaust. On total failure it returns a clear, actionable
+    /// message instead of a raw HTTP error.
     async fn ensure_engine_installed(&self) -> Result<PathBuf, String> {
-        if let Some(path) = self.resolve_engine_binary() {
-            // Reuse an existing engine — unless it's OUR auto-downloaded one and
-            // it predates the version this app build expects. An engine cached
-            // by an older app version can be too old for a newer model (e.g. a
-            // GGUF whose architecture that build doesn't know), so we refresh it
-            // once. User-provided (`HANDY_LLAMA_SERVER`), bundled, and PATH
-            // binaries are never touched — only the managed cache.
-            if !self.is_managed_engine(&path) || self.managed_engine_is_current() {
-                return Ok(path);
-            }
-            info!(
-                "Cached built-in engine is stale (expected {}); refreshing to a current build...",
-                Self::expected_engine_tag()
-            );
-            let engine_dir = self.models_dir.join("engine");
-            if let Err(e) = std::fs::remove_dir_all(&engine_dir) {
-                warn!(
-                    "Couldn't remove stale engine dir {} ({}); continuing with a fresh download",
-                    engine_dir.display(),
-                    e
-                );
+        // Both roles share the managed engine directory but each has its own
+        // start lock, so without this they could delete and extract into it at
+        // the same moment: the first use after an update prewarms both from one
+        // recording. The "is it current?" check runs under the lock too, so the
+        // second role to arrive finds the engine the first one just installed
+        // instead of replacing it again.
+        let _install = engine_install_lock().lock().await;
+
+        let expected = Self::expected_engine_tag();
+        let engine_dir = self.engine_dir();
+        let found = self.resolve_engine_binary();
+        let step = engine_install_step(
+            found.as_deref().map(|path| self.is_managed_engine(path)),
+            read_engine_stamp(&engine_dir).as_deref(),
+            &expected,
+            self.sibling_runs_managed_engine(),
+        );
+
+        if let Some(path) = found {
+            match step {
+                EngineInstallStep::Reuse => return Ok(path),
+                EngineInstallStep::ReuseWhileInUse => {
+                    // The other role's engine is running out of this directory.
+                    // On Windows its llama-server.exe and ggml DLLs are open and
+                    // cannot be deleted, so a refresh would fail halfway and
+                    // leave a mix of two builds; elsewhere it would pull the files
+                    // out from under a live process. Stopping that engine would
+                    // drop whatever it is generating. Neither is needed: every
+                    // managed engine this process starts passes this check under
+                    // this lock first, and the expected tag cannot change while
+                    // the app runs, so a running one was either current or
+                    // installed moments ago. A stale verdict beside it means the
+                    // stamp could not be written, not that the binary is old. The
+                    // next start with nothing running checks again.
+                    warn!(
+                        "Built-in engine at {} has no current version stamp (expected {}), \
+                         but the other engine is running from it; reusing it",
+                        path.display(),
+                        expected
+                    );
+                    return Ok(path);
+                }
+                EngineInstallStep::Replace => {
+                    info!(
+                        "Cached built-in engine is not llama.cpp {} (stamp: {}); replacing it",
+                        expected,
+                        read_engine_stamp(&engine_dir).as_deref().unwrap_or("none")
+                    );
+                    if let Err(e) = std::fs::remove_dir_all(&engine_dir) {
+                        warn!(
+                            "Couldn't remove stale engine dir {} ({}); continuing with a fresh download",
+                            engine_dir.display(),
+                            e
+                        );
+                    }
+                }
+                EngineInstallStep::Download => {}
             }
         }
 
-        let engine_dir = self.models_dir.join("engine");
         std::fs::create_dir_all(&engine_dir)
             .map_err(|e| format!("Failed to create engine directory: {}", e))?;
+        // No stamp while the directory is being filled: an interrupted install
+        // must never read as a finished one on the next launch.
+        remove_engine_stamp(&engine_dir);
 
-        info!("Built-in LLM engine not found; downloading llama.cpp build...");
+        info!(
+            "Downloading llama.cpp {} as the built-in LLM engine...",
+            expected
+        );
         let _ = self
             .app_handle
             .emit("local-llm-engine-status", "downloading");
 
-        // Ordered candidate archive URLs: the live "latest" asset first (best
-        // match for this platform, when the API is reachable), then the pinned
-        // fallback URLs. Trying the pinned build means a rate-limited/offline
-        // GitHub API can't stop the built-in engine from installing.
-        let mut candidates: Vec<String> = Vec::new();
-        match self.resolve_latest_asset_url().await {
-            Ok(url) => candidates.push(url),
-            Err(e) => warn!(
-                "Could not resolve the latest llama.cpp release ({}); falling back \
-                 to the pinned build {}",
-                e, PINNED_ENGINE_TAG
-            ),
-        }
-        for url in self.pinned_asset_urls() {
-            if !candidates.contains(&url) {
-                candidates.push(url);
-            }
-        }
-
-        if candidates.is_empty() {
+        let assets = engine_assets_for(&expected, std::env::consts::OS, std::env::consts::ARCH);
+        if assets.is_empty() {
             let _ = self.app_handle.emit("local-llm-engine-status", "error");
             return Err(
                 "No compatible llama.cpp prebuilt binary is available for this platform."
@@ -789,16 +1059,28 @@ impl LocalLlmManager {
         }
 
         let mut last_error = String::from("unknown error");
-        for url in candidates {
+        for asset in assets {
+            let url = asset.url();
             match self.download_and_extract_engine(&url, &engine_dir).await {
                 Ok(()) => {
-                    if let Some(resolved) = self.resolve_engine_binary() {
-                        // Stamp the freshly installed engine with the version we
-                        // consider current, so future launches reuse it and only
-                        // re-download once the app bumps the expected tag.
-                        self.write_engine_stamp();
+                    if let Some(resolved) =
+                        Self::find_binary_in(&engine_dir, Self::engine_filename())
+                    {
+                        // Stamp with the tag of the archive just unpacked, so the
+                        // stamp always names the build that is on disk.
+                        if let Err(e) = write_engine_stamp(&engine_dir, &asset.tag) {
+                            warn!(
+                                "Failed to write the engine version stamp in {}: {}",
+                                engine_dir.display(),
+                                e
+                            );
+                        }
                         let _ = self.app_handle.emit("local-llm-engine-status", "ready");
-                        info!("Built-in LLM engine installed at {}", resolved.display());
+                        info!(
+                            "Built-in LLM engine llama.cpp {} installed at {}",
+                            asset.tag,
+                            resolved.display()
+                        );
                         return Ok(resolved);
                     }
                     last_error = "engine archive downloaded but no llama-server binary was inside"
@@ -814,11 +1096,11 @@ impl LocalLlmManager {
 
         let _ = self.app_handle.emit("local-llm-engine-status", "error");
         Err(format!(
-            "Couldn't set up the built-in engine (llama.cpp). This is usually a network \
-             problem or GitHub rate-limiting (common on shared school/office Wi-Fi). Try \
-             again in a few minutes, switch networks, or pick a cloud or local \
+            "Couldn't set up the built-in engine (llama.cpp {}). This is usually a network \
+             problem: some school and office networks block or throttle downloads from \
+             GitHub. Try again in a few minutes, switch networks, or pick a cloud or local \
              (Ollama / LM Studio) provider in Settings → Assistant. Last error: {}",
-            last_error
+            expected, last_error
         ))
     }
 
@@ -856,146 +1138,6 @@ impl LocalLlmManager {
         // download can't wedge the next attempt.
         let _ = std::fs::remove_file(&archive_path);
         result
-    }
-
-    /// Token sets (in priority order) used to pick the right release asset for
-    /// this OS/arch. The first asset whose name contains all tokens of a set
-    /// wins.
-    fn engine_asset_preferences() -> Vec<Vec<&'static str>> {
-        // Same OS × arch matrix as `pinned_asset_names`. This used to hardcode
-        // x64 on Windows and Linux, so an ARM64 machine that took this path got
-        // an x86_64 llama-server, stamped it as current, and never replaced it
-        // ("Exec format error" on every start on Linux ARM64).
-        let arm = cfg!(target_arch = "aarch64");
-        if cfg!(target_os = "windows") {
-            if arm {
-                vec![vec!["win", "cpu", "arm64"]]
-            } else {
-                // Prefer Vulkan (the app already ships Vulkan for Whisper), fall
-                // back to the CPU build which runs anywhere.
-                vec![vec!["win", "vulkan", "x64"], vec!["win", "cpu", "x64"]]
-            }
-        } else if cfg!(target_os = "macos") {
-            if arm {
-                vec![vec!["macos", "arm64"]]
-            } else {
-                vec![vec!["macos", "x64"]]
-            }
-        } else if arm {
-            vec![vec!["ubuntu", "vulkan", "arm64"], vec!["ubuntu", "arm64"]]
-        } else {
-            vec![vec!["ubuntu", "vulkan", "x64"], vec!["ubuntu", "x64"]]
-        }
-    }
-
-    /// Query the GitHub "latest" release for the best-matching prebuilt binary
-    /// URL for this platform.
-    ///
-    /// Crucially, this checks the HTTP status before parsing: an unauthenticated
-    /// request that is rate-limited returns HTTP 403/429 with a JSON body that
-    /// has no `assets` field, which the previous code misreported as "No assets
-    /// in latest llama.cpp release". Returning a real error here lets the caller
-    /// fall back to the pinned build instead of dead-ending.
-    async fn resolve_latest_asset_url(&self) -> Result<String, String> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get("https://api.github.com/repos/ggml-org/llama.cpp/releases/latest")
-            .header("User-Agent", "speakoflow")
-            .header("Accept", "application/vnd.github+json")
-            .send()
-            .await
-            .map_err(|e| format!("Failed to query llama.cpp releases: {}", e))?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let hint = if status.as_u16() == 403 || status.as_u16() == 429 {
-                " (GitHub API rate limit — common on shared networks)"
-            } else {
-                ""
-            };
-            return Err(format!("GitHub API returned HTTP {}{}", status, hint));
-        }
-
-        let release: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse llama.cpp release info: {}", e))?;
-
-        let assets = release
-            .get("assets")
-            .and_then(|a| a.as_array())
-            .ok_or_else(|| "latest release listing contained no assets".to_string())?;
-
-        for tokens in Self::engine_asset_preferences() {
-            for asset in assets {
-                let name = asset.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                if tokens.iter().all(|t| name.contains(t)) {
-                    if let Some(url) = asset.get("browser_download_url").and_then(|u| u.as_str()) {
-                        return Ok(url.to_string());
-                    }
-                }
-            }
-        }
-        Err("no compatible prebuilt asset in the latest release".to_string())
-    }
-
-    /// Directly-constructed download URLs for the pinned llama.cpp release, in
-    /// priority order for this OS/arch. These target the release-download host
-    /// (not the rate-limited `api.github.com`), so they succeed even when the
-    /// "latest" lookup is throttled or the machine is behind a busy shared IP.
-    /// The tag is overridable via `HANDY_LLAMA_RELEASE_TAG`.
-    fn pinned_asset_urls(&self) -> Vec<String> {
-        Self::pinned_asset_urls_for(&Self::expected_engine_tag())
-    }
-
-    /// Build the pinned release-download URLs for `tag`. Split out from
-    /// `pinned_asset_urls` so it is unit-testable without a Tauri `AppHandle`.
-    fn pinned_asset_urls_for(tag: &str) -> Vec<String> {
-        Self::pinned_asset_names(tag)
-            .into_iter()
-            .map(|name| {
-                format!(
-                    "https://github.com/ggml-org/llama.cpp/releases/download/{}/{}",
-                    tag, name
-                )
-            })
-            .collect()
-    }
-
-    /// Prebuilt archive filenames for the pinned release, in priority order for
-    /// this OS/arch, following llama.cpp's `llama-<tag>-bin-<platform>.<ext>`
-    /// convention. Windows ships `.zip`; macOS/Linux ship `.tar.gz`. Vulkan
-    /// builds are preferred (matching the app's Whisper backend) with a CPU
-    /// build as the always-works fallback.
-    fn pinned_asset_names(tag: &str) -> Vec<String> {
-        if cfg!(target_os = "windows") {
-            if cfg!(target_arch = "aarch64") {
-                vec![format!("llama-{tag}-bin-win-cpu-arm64.zip")]
-            } else {
-                vec![
-                    format!("llama-{tag}-bin-win-vulkan-x64.zip"),
-                    format!("llama-{tag}-bin-win-cpu-x64.zip"),
-                ]
-            }
-        } else if cfg!(target_os = "macos") {
-            if cfg!(target_arch = "aarch64") {
-                vec![format!("llama-{tag}-bin-macos-arm64.tar.gz")]
-            } else {
-                vec![format!("llama-{tag}-bin-macos-x64.tar.gz")]
-            }
-        } else if cfg!(target_arch = "aarch64") {
-            // Linux arm64
-            vec![
-                format!("llama-{tag}-bin-ubuntu-vulkan-arm64.tar.gz"),
-                format!("llama-{tag}-bin-ubuntu-arm64.tar.gz"),
-            ]
-        } else {
-            // Linux x64
-            vec![
-                format!("llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz"),
-                format!("llama-{tag}-bin-ubuntu-x64.tar.gz"),
-            ]
-        }
     }
 
     /// Stream a URL to a file, emitting coarse progress events.
@@ -1211,6 +1353,7 @@ impl LocalLlmManager {
         {
             let mut st = self.state.lock().unwrap();
             st.child = Some(child);
+            st.engine = Some(engine.clone());
             st.model_id = Some(model_id.to_string());
             st.last_error = None;
         }
@@ -1227,13 +1370,8 @@ impl LocalLlmManager {
             Err(e) => {
                 // Surface the engine's real output so the failure is actionable
                 // (e.g. unsupported flag, missing GPU runtime, model load error).
-                let detail = match self.engine_log_tail(20) {
-                    Some(tail) => format!(
-                        "{}\n\nEngine log ({}):\n{}",
-                        e,
-                        self.engine_log_path().display(),
-                        tail
-                    ),
+                let detail = match self.engine_log_report(20) {
+                    Some(report) => format!("{}\n\n{}", e, report),
                     None => e.clone(),
                 };
                 error!("Built-in LLM engine failed to become ready: {}", detail);
@@ -1463,6 +1601,33 @@ impl LocalLlmManager {
         if let Some(parent) = log_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
+
+        // Log at trace level, and have the engine keep its own log file beside
+        // the capture. At the default level (3) the engine logs 14 lines for a
+        // whole model load, none of them the step it died on; trace (4) adds
+        // how many layers went to which device, buffer sizes, and the
+        // scheduler's split count, which is the context the split-inputs abort
+        // needed and did not have. It costs about 30 lines per request (slot,
+        // cache and timing lines, never prompt text), and both files are
+        // truncated on every start. On b11429 the file holds the same lines as
+        // the capture minus raw stderr writes; it is there so the record does
+        // not depend on how a given build writes its console, and the failure
+        // report quotes it only for lines the capture lacks.
+        //
+        // Env vars rather than `--log-file` / `-lv`, the same as above:
+        // `HANDY_LLAMA_SERVER` can name any build, and one that predates an
+        // option ignores an unknown variable but refuses to start on an unknown
+        // flag. The previous run's file goes first, so a build that ignores the
+        // variable cannot leave a stale log to be read as this run's.
+        let debug_log_path = self.engine_debug_log_path();
+        if let Err(e) = std::fs::remove_file(&debug_log_path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                debug!("Failed to remove the previous engine debug log: {e}");
+            }
+        }
+        cmd.env("LLAMA_ARG_LOG_FILE", &debug_log_path);
+        cmd.env("LLAMA_ARG_LOG_VERBOSITY", "4");
+
         let (stdout, stderr) = match std::fs::File::create(&log_path) {
             Ok(f) => match f.try_clone() {
                 Ok(f2) => (Stdio::from(f), Stdio::from(f2)),
@@ -2176,9 +2341,17 @@ mod tests {
     #[test]
     fn roles_use_distinct_ports_and_logs() {
         assert_ne!(LlmRole::Assistant.port(), LlmRole::Cleanup.port());
-        assert_ne!(
+        let logs = [
             LlmRole::Assistant.log_filename(),
-            LlmRole::Cleanup.log_filename()
+            LlmRole::Cleanup.log_filename(),
+            LlmRole::Assistant.debug_log_filename(),
+            LlmRole::Cleanup.debug_log_filename(),
+        ];
+        let distinct: std::collections::HashSet<_> = logs.iter().collect();
+        assert_eq!(
+            distinct.len(),
+            logs.len(),
+            "two writers on one log file: {logs:?}"
         );
     }
 
@@ -2238,7 +2411,8 @@ mod tests {
     }
 
     // Verified against the real output of `llama-server --list-devices` on the
-    // pinned engine build.
+    // pinned engine build (b11429's Vulkan build on a 4070 Ti SUPER + Ryzen iGPU
+    // machine; b10075 printed the same).
     #[test]
     fn engine_device_listing_is_parsed_and_headers_ignored() {
         let listing = "Available devices:\n  \
@@ -2261,6 +2435,15 @@ mod tests {
             ],
             "the 'Available devices:' header must not parse as a device"
         );
+    }
+
+    // Real output of b11429's CPU-only build: a build that sees no GPU now says
+    // so with a `(none)` row instead of an empty listing. That row is not a
+    // device, and must not become a `--device (none)` the engine would refuse.
+    #[test]
+    fn engine_listing_without_a_gpu_yields_no_devices() {
+        assert!(parse_engine_devices("Available devices:\n  (none)\n").is_empty());
+        assert!(parse_engine_devices("Available devices:\n").is_empty());
     }
 
     // A log line can also read `<word>: <text>`; only rows inside the listing
@@ -2382,50 +2565,195 @@ mod tests {
         assert_eq!(select_engine_device_arg(&engine, &probed), None);
     }
 
-    // Asset naming was verified live against the llama.cpp b10075 release:
-    // Windows ships `llama-<tag>-bin-win-*-x64.zip`, macOS/Linux ship
-    // `llama-<tag>-bin-*.tar.gz`. These guard against silent drift in the
-    // pinned-fallback filenames (which are constructed, not discovered).
+    // Every name was checked against the asset list of the pinned release. They
+    // are built rather than discovered, so a wrong one would only surface as a
+    // failed download on users' machines.
     #[test]
-    fn pinned_asset_names_match_platform_convention() {
-        let names = LocalLlmManager::pinned_asset_names("b10075");
-        assert!(
-            !names.is_empty(),
-            "the current platform must have at least one pinned asset"
+    fn pinned_assets_are_the_exact_release_archives() {
+        let tag = PINNED_ENGINE_TAG;
+        let names = |os: &str, arch: &str| pinned_asset_names_for(tag, os, arch);
+
+        assert_eq!(
+            names("windows", "x86_64"),
+            vec![
+                format!("llama-{tag}-bin-win-vulkan-x64.zip"),
+                format!("llama-{tag}-bin-win-cpu-x64.zip"),
+            ],
+            "Vulkan first, CPU as the fallback"
         );
-        for name in &names {
-            assert!(
-                name.starts_with("llama-b10075-bin-"),
-                "unexpected asset name: {name}"
+        assert_eq!(
+            names("windows", "aarch64"),
+            vec![format!("llama-{tag}-bin-win-cpu-arm64.zip")]
+        );
+        assert_eq!(
+            names("macos", "aarch64"),
+            vec![format!("llama-{tag}-bin-macos-arm64.tar.gz")]
+        );
+        assert_eq!(
+            names("macos", "x86_64"),
+            vec![format!("llama-{tag}-bin-macos-x64.tar.gz")]
+        );
+        assert_eq!(
+            names("linux", "x86_64"),
+            vec![
+                format!("llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz"),
+                format!("llama-{tag}-bin-ubuntu-x64.tar.gz"),
+            ]
+        );
+        assert_eq!(
+            names("linux", "aarch64"),
+            vec![
+                format!("llama-{tag}-bin-ubuntu-vulkan-arm64.tar.gz"),
+                format!("llama-{tag}-bin-ubuntu-arm64.tar.gz"),
+            ]
+        );
+        assert!(
+            names("freebsd", "x86_64").is_empty(),
+            "a platform upstream does not build for has nothing to download"
+        );
+    }
+
+    #[test]
+    fn this_platform_has_an_engine_to_download() {
+        assert!(!engine_assets_for(
+            PINNED_ENGINE_TAG,
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        )
+        .is_empty());
+    }
+
+    // The release-download host has no anonymous rate limit; `api.github.com`
+    // does, and shared networks exhaust it.
+    #[test]
+    fn asset_urls_point_at_the_release_download_host() {
+        let assets = engine_assets_for("b12345", "windows", "x86_64");
+        assert!(!assets.is_empty());
+        for asset in &assets {
+            assert_eq!(asset.tag, "b12345");
+            assert_eq!(
+                asset.url(),
+                format!(
+                    "https://github.com/ggml-org/llama.cpp/releases/download/b12345/{}",
+                    asset.name
+                )
             );
-            if cfg!(target_os = "windows") {
-                assert!(name.ends_with(".zip"), "Windows assets are .zip: {name}");
-            } else {
-                assert!(
-                    name.ends_with(".tar.gz"),
-                    "macOS/Linux assets are .tar.gz: {name}"
-                );
-            }
+            assert!(!asset.url().contains("api.github.com"));
         }
     }
 
     #[test]
-    fn pinned_asset_urls_target_release_download_host_not_api() {
-        let urls = LocalLlmManager::pinned_asset_urls_for("b10075");
-        assert!(!urls.is_empty());
-        for url in &urls {
-            assert!(
-                url.starts_with(
-                    "https://github.com/ggml-org/llama.cpp/releases/download/b10075/llama-b10075-bin-"
-                ),
-                "unexpected pinned url: {url}"
-            );
-            // The whole point of the fallback is to bypass the rate-limited API
-            // (api.github.com), so it must never appear in a fallback URL.
-            assert!(
-                !url.contains("api.github.com"),
-                "pinned fallback must not hit the rate-limited API host: {url}"
-            );
-        }
+    fn release_tag_override_replaces_the_pin_only_when_set() {
+        assert_eq!(engine_tag_from_override(None), PINNED_ENGINE_TAG);
+        assert_eq!(engine_tag_from_override(Some("")), PINNED_ENGINE_TAG);
+        assert_eq!(engine_tag_from_override(Some("  \n")), PINNED_ENGINE_TAG);
+        assert_eq!(engine_tag_from_override(Some(" b12000\n")), "b12000");
+
+        // The override decides what is downloaded, and so what is stamped.
+        let assets =
+            engine_assets_for(&engine_tag_from_override(Some("b12000")), "linux", "x86_64");
+        assert!(!assets.is_empty());
+        assert!(assets
+            .iter()
+            .all(|asset| asset.tag == "b12000" && asset.name.starts_with("llama-b12000-bin-")));
+    }
+
+    // The stamp used to be written from the pin, so installs that had really
+    // come from the old "latest" lookup were labelled with a build they did not
+    // hold. It now records the tag of the archive that was unpacked.
+    #[test]
+    fn stamp_records_the_installed_tag() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(read_engine_stamp(dir.path()), None);
+
+        let installed = engine_assets_for("b12000", "windows", "x86_64").remove(0);
+        write_engine_stamp(dir.path(), &installed.tag).unwrap();
+        assert_eq!(read_engine_stamp(dir.path()).as_deref(), Some("b12000"));
+
+        // A stamp edited by hand keeps working.
+        std::fs::write(dir.path().join(ENGINE_STAMP_FILENAME), "b12000\r\n").unwrap();
+        assert_eq!(read_engine_stamp(dir.path()).as_deref(), Some("b12000"));
+
+        remove_engine_stamp(dir.path());
+        assert_eq!(read_engine_stamp(dir.path()), None);
+    }
+
+    #[test]
+    fn a_managed_engine_is_replaced_when_its_stamp_differs() {
+        use EngineInstallStep::*;
+        let pin = PINNED_ENGINE_TAG;
+
+        assert_eq!(
+            engine_install_step(Some(true), Some(pin), pin, false),
+            Reuse
+        );
+        // Every install from an earlier pin, mislabelled or not, upgrades once.
+        assert_eq!(
+            engine_install_step(Some(true), Some("b10075"), pin, false),
+            Replace
+        );
+        assert_eq!(
+            engine_install_step(Some(true), None, pin, false),
+            Replace,
+            "a missing stamp is not a current one"
+        );
+        assert_eq!(engine_install_step(None, Some(pin), pin, false), Download);
+    }
+
+    // `HANDY_LLAMA_SERVER`, the installer's copy, and `PATH` are the user's.
+    #[test]
+    fn an_engine_the_app_did_not_download_is_never_replaced() {
+        use EngineInstallStep::*;
+        let pin = PINNED_ENGINE_TAG;
+        assert_eq!(
+            engine_install_step(Some(false), Some("b10075"), pin, false),
+            Reuse
+        );
+        assert_eq!(engine_install_step(Some(false), None, pin, true), Reuse);
+    }
+
+    // On Windows a running engine's executable and DLLs cannot be deleted, so a
+    // stale verdict while the other role runs from the directory must not try.
+    #[test]
+    fn a_stale_engine_the_other_role_is_running_is_kept() {
+        use EngineInstallStep::*;
+        let pin = PINNED_ENGINE_TAG;
+        assert_eq!(
+            engine_install_step(Some(true), None, pin, true),
+            ReuseWhileInUse
+        );
+        assert_eq!(engine_install_step(Some(true), Some(pin), pin, true), Reuse);
+    }
+
+    #[test]
+    fn debug_log_adds_only_lines_the_console_lacks() {
+        let console = "I srv load_model: loading model 'm.gguf'\n\
+             ggml-backend.cpp:1367: GGML_ASSERT(n_inputs < GGML_SCHED_MAX_SPLIT_INPUTS) failed\n";
+        let debug = "I srv load_model: loading model 'm.gguf'\n\
+             D graph_reserve: reserving a graph\n\
+             \n\
+             D sched_reserve: splits = 31\n";
+        assert_eq!(
+            lines_missing_from(debug, console, 20).as_deref(),
+            Some("D graph_reserve: reserving a graph\nD sched_reserve: splits = 31")
+        );
+        assert_eq!(
+            lines_missing_from(console, console, 20),
+            None,
+            "nothing is repeated"
+        );
+        assert_eq!(lines_missing_from("", console, 20), None);
+        assert_eq!(
+            lines_missing_from("a\nb\nc\n", "", 2).as_deref(),
+            Some("b\nc"),
+            "the most recent lines are the ones kept"
+        );
+    }
+
+    #[test]
+    fn log_tail_keeps_the_last_lines_and_skips_a_blank_log() {
+        assert_eq!(log_tail("a\nb\nc\n", 2).as_deref(), Some("b\nc"));
+        assert_eq!(log_tail("\n  \n", 5), None);
+        assert_eq!(log_tail("", 5), None);
     }
 }
