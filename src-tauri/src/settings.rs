@@ -3581,6 +3581,34 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     changed
 }
 
+/// Bindings added after the first release. `load_or_create_app_settings` merges
+/// new default bindings into a stored file, but only at startup and into the
+/// copy it returns, so a stored file that predates one still reaches the
+/// frontend without it — and a shortcut row for a binding the settings do not
+/// have renders nothing at all, which left "Paste last transcript" impossible
+/// to set. Every read goes through `get_settings`, so the merge happens there
+/// too. It is a cheap id check first: this runs on every shortcut press, and
+/// building the defaults is not free.
+const ADDED_BINDINGS: [&str; 1] = ["paste_last_transcript"];
+
+fn ensure_added_bindings(settings: &mut AppSettings) -> bool {
+    if ADDED_BINDINGS
+        .iter()
+        .all(|id| settings.bindings.contains_key(*id))
+    {
+        return false;
+    }
+    let defaults = get_default_settings();
+    for id in ADDED_BINDINGS {
+        if !settings.bindings.contains_key(id) {
+            if let Some(binding) = defaults.bindings.get(id) {
+                settings.bindings.insert(id.to_string(), binding.clone());
+            }
+        }
+    }
+    true
+}
+
 fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     let mut changed = false;
     for provider in default_post_process_providers() {
@@ -5164,7 +5192,8 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         default_settings
     };
 
-    if ensure_post_process_defaults(&mut settings)
+    if ensure_added_bindings(&mut settings)
+        | ensure_post_process_defaults(&mut settings)
         | ensure_assistant_defaults(&mut settings)
         | ensure_cloud_stt_defaults(&mut settings)
     {
@@ -5442,6 +5471,20 @@ mod tests {
         assert!(!is_optional_binding("transcribe"));
         assert!(!is_optional_binding("assistant"));
         assert!(!is_optional_binding(CLEANUP_BINDING_ID));
+    }
+
+    /// A settings file from before paste-last has no such binding, and the
+    /// frontend draws nothing for a binding it does not have.
+    #[test]
+    fn a_stored_file_without_paste_last_gets_its_binding_on_read() {
+        let mut settings = get_default_settings();
+        settings.bindings.remove("paste_last_transcript");
+        assert!(ensure_added_bindings(&mut settings));
+        assert_eq!(
+            settings.bindings["paste_last_transcript"].current_binding,
+            ""
+        );
+        assert!(!ensure_added_bindings(&mut settings));
     }
 
     /// Paste-last ships without a key (any combo picked for everyone would take
