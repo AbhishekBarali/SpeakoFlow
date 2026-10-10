@@ -2743,6 +2743,10 @@
         "instruction": "Hướng dẫn",
         "instructionTip": "Cách diễn đạt nên thay đổi thế nào. Được áp dụng sau khi dọn dẹp, nên phần sửa lỗi vẫn giữ nguyên.",
         "instructionPlaceholder": "Ví dụ: giữ giọng thoải mái, viết thường toàn bộ, và chuyển tên emoji được nói ra thành emoji."
+      },
+      "specialist": {
+        "ignored": "{{model}} chỉ dọn dẹp cơ bản nên sẽ bỏ qua phong cách viết. Hãy dùng một mô hình đa năng để áp dụng phong cách.",
+        "changeModel": "Đổi mô hình"
       }
     },
     "shortcut": {

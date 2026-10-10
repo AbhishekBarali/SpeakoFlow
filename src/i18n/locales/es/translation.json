@@ -2789,6 +2789,10 @@
         "instruction": "Instrucciones",
         "instructionTip": "Cómo debe cambiar la redacción. Se aplica después de la limpieza, así que las correcciones no cambian.",
         "instructionPlaceholder": "Por ejemplo: mantenlo informal y en minúsculas, y convierte los nombres de emojis que digas en emojis."
+      },
+      "specialist": {
+        "ignored": "{{model}} solo hace una limpieza básica, así que ignora los estilos de escritura. Usa un modelo general para aplicar un estilo.",
+        "changeModel": "Cambiar modelo"
       }
     },
     "shortcut": {

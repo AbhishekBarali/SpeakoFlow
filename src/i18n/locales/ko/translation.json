@@ -2743,6 +2743,10 @@
         "instruction": "지침",
         "instructionTip": "표현을 어떻게 바꿀지 적으세요. 정리 후에 적용되므로 교정 내용은 그대로 유지됩니다.",
         "instructionPlaceholder": "예: 편한 반말로 쓰고, 말로 한 이모지 이름은 이모지로 바꿔 줘."
+      },
+      "specialist": {
+        "ignored": "{{model}}은(는) 기본 정리만 하므로 글쓰기 스타일을 무시합니다. 스타일을 적용하려면 범용 모델을 사용하세요.",
+        "changeModel": "모델 변경"
       }
     },
     "shortcut": {

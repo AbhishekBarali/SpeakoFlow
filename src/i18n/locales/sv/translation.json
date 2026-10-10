@@ -2766,6 +2766,10 @@
         "instruction": "Instruktioner",
         "instructionTip": "Hur formuleringarna ska ändras. Tillämpas efter rensningen, så rättningarna förblir desamma.",
         "instructionPlaceholder": "Till exempel: håll det ledigt och med små bokstäver, och gör om uttalade emojinamn till emojier."
+      },
+      "specialist": {
+        "ignored": "{{model}} gör bara grundläggande rensning och ignorerar därför skrivstilar. Använd en allmän modell för att tillämpa en stil.",
+        "changeModel": "Byt modell"
       }
     },
     "shortcut": {
