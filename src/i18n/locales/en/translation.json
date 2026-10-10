@@ -662,9 +662,10 @@
       },
       "pushToTalk": {
         "label": "Recording behavior",
-        "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Applies to every recording shortcut.",
+        "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Hold or tap: hold to talk, or tap once and the recording keeps going until you tap again. Applies to every recording shortcut.",
         "hold": "Hold",
-        "tap": "Tap"
+        "tap": "Tap",
+        "auto": "Hold or tap"
       }
     },
     "models": {
@@ -2560,7 +2561,8 @@
         "hold": "Hold, talk, let go. Your words are typed where your cursor is.",
         "tap": "Tap to start, talk, tap to stop. Your words are typed where your cursor is.",
         "whatHold": "Hold, talk, let go. Your words type where your cursor is.",
-        "whatTap": "Tap, talk, tap again. Your words type where your cursor is."
+        "whatTap": "Tap, talk, tap again. Your words type where your cursor is.",
+        "whatAuto": "Hold, talk, let go. Or tap once, talk, and tap again to stop. Your words type where your cursor is."
       },
       "cleanup": {
         "title": "Dictate and clean up",
@@ -2581,7 +2583,8 @@
       "offHint": "Turned off",
       "mode": {
         "hold": "Hold to talk",
-        "tap": "Tap to toggle"
+        "tap": "Tap to toggle",
+        "auto": "Hold or tap"
       },
       "cancel": {
         "title": "Cancel",
