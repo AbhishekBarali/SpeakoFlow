@@ -111,8 +111,22 @@ fn finish_idle(app: &AppHandle) {
     change_tray_icon(app, TrayIconState::Idle);
 }
 
-/// Field name for structured output JSON schema
-const TRANSCRIPTION_FIELD: &str = "transcription";
+/// The one field of the structured cleanup answer.
+///
+/// **It must not be called `transcription`, and that is measured, not taste.**
+/// It was, with the description "The cleaned and processed transcription text",
+/// and a model reads a field named after its *input* as a request for the
+/// input. gpt-oss-120b on Azure, given the Readable prompt and five real
+/// dictations, wrote the correct cleanup into its reasoning trace ("Result: I
+/// think we should move the meeting to Friday…") and then returned the raw
+/// transcript in the field, unchanged, for four of the five — so cleanup ran,
+/// validated and "succeeded" while pasting what was dictated. Raising the
+/// effort to medium did not fix it (one answer came back as the bare word
+/// `final`, its channel name). Gemma 4 E2B on the built-in engine, whose
+/// grammar enforces the same schema, did the same for every multi-word input.
+/// Renamed, with a description that names the edit, both cleaned all five, and
+/// gpt-6-luna and OpenRouter's routes answered identically either way.
+const CLEANED_TEXT_FIELD: &str = "cleaned_text";
 
 /// A monotonic suffix prevents two rapidly completed recordings from sharing
 /// a WAV path. Millisecond timestamps alone can collide on fast back-to-back
@@ -658,8 +672,8 @@ struct PostProcessRequest {
 ///
 /// Three characters per token is pessimistic for English prose (four is typical),
 /// which is the safe direction: it overestimates the budget rather than cutting a
-/// sentence short. The envelope allowance covers the `{"cleaned_transcription":
-/// "…"}` wrapper and its escapes on the structured path.
+/// sentence short. The envelope allowance covers the `{"cleaned_text": "…"}`
+/// wrapper and its escapes on the structured path.
 fn cleanup_token_budget(transcription: &str) -> u32 {
     const CHARS_PER_TOKEN: usize = 3;
     const JSON_ENVELOPE_TOKENS: usize = 32;
@@ -1070,7 +1084,7 @@ fn parse_structured_output(
     let json = serde_json::from_str::<serde_json::Value>(content)
         .map_err(|_| PostProcessFailureKind::MalformedResponse)?;
     let value = json
-        .get(TRANSCRIPTION_FIELD)
+        .get(CLEANED_TEXT_FIELD)
         .and_then(|value| value.as_str())
         .ok_or(PostProcessFailureKind::MalformedResponse)?;
     validate_cleaned_output(transcription, value, true)
@@ -1293,12 +1307,12 @@ fn transcription_schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
         "properties": {
-            (TRANSCRIPTION_FIELD): {
+            (CLEANED_TEXT_FIELD): {
                 "type": "string",
-                "description": "The cleaned and processed transcription text"
+                "description": "The edited text, after applying every instruction in the system prompt"
             }
         },
-        "required": [TRANSCRIPTION_FIELD],
+        "required": [CLEANED_TEXT_FIELD],
         "additionalProperties": false
     })
 }
@@ -5190,9 +5204,10 @@ Try plugging it into a coding agent or productivity app listed on https://openro
     }
 
     #[test]
-    fn structured_success_extracts_only_the_transcription_field() {
+    fn structured_success_extracts_only_the_cleaned_text_field() {
         let structured_content = serde_json::json!({
-            "transcription": "Structured cleaned.",
+            "cleaned_text": "Structured cleaned.",
+            "transcription": "must not be pasted",
             "ignored": "must not be pasted"
         })
         .to_string();
@@ -5218,7 +5233,26 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             PostProcessAttemptOutcome::Applied("Structured cleaned.".to_string())
         );
         server.join().unwrap();
-        assert_eq!(requests.try_iter().count(), 1);
+        let sent: Vec<_> = requests.try_iter().collect();
+        assert_eq!(sent.len(), 1);
+        // The field a model fills must not be named after its input: named
+        // `transcription`, gpt-oss and Gemma copied the raw transcript into it.
+        let properties = &sent[0]["response_format"]["json_schema"]["schema"]["properties"];
+        assert!(properties.get("cleaned_text").is_some());
+        assert!(properties.get("transcription").is_none());
+    }
+
+    #[test]
+    fn an_answer_under_the_old_field_name_is_not_a_success() {
+        // There is no `cleaned_text`, so it is malformed and retried plain
+        // rather than pasted.
+        assert_eq!(
+            parse_structured_output(
+                "raw words here",
+                &serde_json::json!({ "transcription": "Raw words here." }).to_string()
+            ),
+            Err(PostProcessFailureKind::MalformedResponse)
+        );
     }
 
     #[test]
