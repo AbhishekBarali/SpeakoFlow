@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { renderSmall } from "./small-icon.mjs";
+import { MENU_BAR_SIZE, renderMenuBar, renderSmall } from "./small-icon.mjs";
 
 async function matchesSmall(data, size) {
   const expected = await sharp(await renderSmall(size))
@@ -142,6 +142,83 @@ for (const f of [
   "src-tauri/icons/StoreLogo.png",
 ])
   await expect(f, "small");
+
+// macOS draws this one as a plain colour image, not a template (see
+// icon_is_template in src-tauri/src/tray.rs), so it has to be the colour tile at
+// menu-bar size: 36px = 18pt @2x, a 2px transparent margin around a 32px tile.
+console.log("\n== macOS menu bar idle: colour tile, 36px with a 2px margin ==");
+{
+  const file = "src-tauri/resources/tray_idle_macos.png";
+  const bytes = fs.readFileSync(file);
+  const { data, info } = await sharp(bytes)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width: W, height: H } = info;
+  const alphaAt = (x, y) => data[(y * W + x) * 4 + 3];
+  const report = (ok, what) => {
+    if (!ok) bad++;
+    console.log(`${ok ? "OK  " : "FAIL"} ${file} ${what}`);
+  };
+
+  report(
+    W === MENU_BAR_SIZE && H === MENU_BAR_SIZE,
+    `is ${W}x${H} (want 36x36)`,
+  );
+
+  if (W === MENU_BAR_SIZE && H === MENU_BAR_SIZE) {
+    let marginOpaque = 0;
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++)
+        if ((x < 2 || x >= W - 2 || y < 2 || y >= H - 2) && alphaAt(x, y))
+          marginOpaque++;
+    report(
+      marginOpaque === 0,
+      `2px margin is transparent (${marginOpaque} px not)`,
+    );
+
+    const corners = [
+      [2, 2],
+      [W - 3, 2],
+      [2, H - 3],
+      [W - 3, H - 3],
+    ].map(([x, y]) => alphaAt(x, y));
+    report(
+      corners.every((a) => a < 64),
+      `tile corners are rounded (alpha ${corners.join("/")})`,
+    );
+
+    // A template-style glyph would be one flat colour. The real tile is mostly
+    // saturated teal around a white waveform.
+    let teal = 0;
+    let centre = 0;
+    for (let y = 10; y < 26; y++)
+      for (let x = 10; x < 26; x++) {
+        const p = (y * W + x) * 4;
+        centre++;
+        if (
+          data[p + 3] === 255 &&
+          data[p + 1] - data[p] > 40 &&
+          data[p + 2] - data[p] > 30
+        )
+          teal++;
+      }
+    report(
+      teal / centre > 0.25,
+      `centre is colour, not a monochrome glyph (${((teal / centre) * 100).toFixed(0)}% saturated teal)`,
+    );
+  }
+
+  // Pixels must be exactly what the generator draws. PNG bytes are compared as
+  // well but only reported: libvips/zlib versions encode the same pixels
+  // differently, so a byte mismatch on its own means another sharp release.
+  const generated = await renderMenuBar();
+  const expectedRaw = await sharp(generated).ensureAlpha().raw().toBuffer();
+  report(data.equals(expectedRaw), "matches renderMenuBar() pixel for pixel");
+  console.log(
+    `--   bytes ${bytes.equals(generated) ? "identical to" : "differ from"} this sharp build's encoding`,
+  );
+}
 
 console.log("\n== approved artwork is preserved exactly ==");
 const originalMaster = await sharp(

@@ -66,6 +66,29 @@ export async function renderSmall(size) {
     .toBuffer();
 }
 
+// macOS menu-bar idle icon (src-tauri/resources/tray_idle_macos.png).
+// The tray crate scales every menu-bar image to 18pt tall, so a 36px canvas is
+// exactly @2x. The tile is the ordinary 32px small render with a 2px (1pt)
+// transparent margin around it, which gives it the visual weight of the other
+// menu-bar extras instead of filling the slot edge to edge. Nothing is redrawn:
+// the margin is added around the same pixels every other small size uses.
+export const MENU_BAR_SIZE = 36;
+const MENU_BAR_TILE = 32;
+
+export async function renderMenuBar() {
+  const margin = (MENU_BAR_SIZE - MENU_BAR_TILE) / 2;
+  return sharp(await renderSmall(MENU_BAR_TILE))
+    .extend({
+      top: margin,
+      bottom: margin,
+      left: margin,
+      right: margin,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
 // SVG-only consumers get a raster wrapper, not a different drawing.
 export async function smallIconSvg(size = 64) {
   const png = await renderSmall(size);
