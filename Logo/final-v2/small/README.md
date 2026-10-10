@@ -17,6 +17,15 @@ The runtime window PNGs use a 48px export. An offscreen Windows `CreateIcon` +
 source is drawn at 24px; the 48px source has more balanced strokes at that size.
 This changes only the exported bitmap size, with no geometry edits or runtime
 DPI override. This check does not establish the live Explorer taskbar result.
+
+The macOS menu-bar idle icon (`src-tauri/resources/tray_idle_macos.png`) is the
+32px small render with a 2px transparent margin, 36px in all (18pt @2x). It is
+shown in colour, not as a template image: as a template, macOS keeps only the
+alpha, and the opaque tile became a plain white or black square. The recording
+and transcribing glyphs stay templates so they follow the menu bar's colour.
+`apply-icon-to-app.mjs` writes it; `preview/macos-menu-bar.png` shows all three
+on a dark and a light menu bar.
+
 The ICO still contains its independent 16/20/24/32/40/48/64/128/256px entries.
 
 From `Logo/`, run:
