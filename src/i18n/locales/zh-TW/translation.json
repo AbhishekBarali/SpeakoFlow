@@ -1859,6 +1859,24 @@
         "opacityLabel": "面板不透明度",
         "opacityDescription": "浮動面板的不透明程度。100% 為完全不透明；數值越低，越能透出模糊的桌面。"
       }
+    },
+    "thinking": {
+      "title": "思考",
+      "description": {
+        "cleanup": "推理模型在整理你的聽寫內容前思考的時間。關閉最快，像 gpt-oss 這類一定會思考的模型會使用其最低等級。只有在整理出錯時才調高，因為它會讓每次聽寫都變慢。",
+        "assistant": "推理模型在回答前思考的時間。關閉最快，像 gpt-oss 這類一定會思考的模型會使用其最低等級。等級越高，越能處理困難的問題，但開始回答所需的時間也越長。"
+      },
+      "unsupported": {
+        "builtin": "這台電腦上的模型一律不經思考直接回答，因此速度很快。",
+        "anthropic": "Anthropic 不允許應用程式設定此項，因此由 Claude 自行決定。如需設定，請透過 OpenRouter 使用 Claude。",
+        "apple": "Apple Intelligence 沒有思考設定。"
+      },
+      "options": {
+        "off": "關閉",
+        "low": "低",
+        "medium": "中",
+        "high": "高"
+      }
     }
   },
   "footer": {

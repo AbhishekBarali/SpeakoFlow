@@ -18,6 +18,7 @@ import { ModelsSettings } from "@/components/settings/models/ModelsSettings";
 import { LlmCatalog } from "@/components/settings/assistant/LlmCatalog";
 import { PostProcessingSettingsApi } from "@/components/settings/post-processing/PostProcessingSettings";
 import { PostProcessTimeout } from "@/components/settings/PostProcessTimeout";
+import { ThinkingLevelSetting } from "@/components/settings/ThinkingLevelSetting";
 import { PostProcessUnloadTimeout } from "@/components/settings/PostProcessUnloadTimeout";
 import { AssistantSettings } from "@/components/settings/assistant/AssistantSettings";
 import { ModelMark } from "@/components/shell/SlotVisuals";
@@ -212,6 +213,13 @@ export const CleanupTab: React.FC = () => {
       )}
 
       <SettingsGroup title={t("modelsHub.performance")}>
+        {!isDevice && (
+          <ThinkingLevelSetting
+            job="cleanup"
+            providerId={getSetting("post_process_provider_id")}
+            grouped={true}
+          />
+        )}
         <PostProcessTimeout grouped={true} />
         {isDevice && <PostProcessUnloadTimeout grouped={true} />}
       </SettingsGroup>

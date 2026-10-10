@@ -1287,6 +1287,19 @@ pub fn change_post_process_timeout_setting(app: AppHandle, seconds: u32) -> Resu
     Ok(())
 }
 
+/// Set how much a reasoning model may think before cleaning a dictation.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_thinking_setting(
+    app: AppHandle,
+    level: settings::ThinkingLevel,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_thinking = level;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_experimental_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {

@@ -1877,6 +1877,24 @@
         "opacityLabel": "Opacidade do painel",
         "opacityDescription": "O quanto o painel flutuante é opaco. 100% é totalmente sólido; valores menores deixam a área de trabalho aparecer desfocada."
       }
+    },
+    "thinking": {
+      "title": "Raciocínio",
+      "description": {
+        "cleanup": "Quanto tempo um modelo de raciocínio pensa antes de limpar seu ditado. Desativado é o mais rápido, e modelos que sempre pensam, como o gpt-oss, usam seu nível mais baixo. Aumente apenas se a limpeza cometer erros, pois isso adiciona um atraso a cada ditado.",
+        "assistant": "Quanto tempo um modelo de raciocínio pensa antes de responder. Desativado é o mais rápido, e modelos que sempre pensam, como o gpt-oss, usam seu nível mais baixo. Níveis mais altos lidam melhor com perguntas difíceis, mas demoram mais para começar a responder."
+      },
+      "unsupported": {
+        "builtin": "Os modelos neste computador sempre respondem sem pensar, e é isso que os mantém rápidos.",
+        "anthropic": "A Anthropic não permite que apps ajustem isso, então o Claude decide. Use o Claude pelo OpenRouter para ajustar.",
+        "apple": "O Apple Intelligence não tem uma configuração de raciocínio."
+      },
+      "options": {
+        "off": "Desativado",
+        "low": "Baixo",
+        "medium": "Médio",
+        "high": "Alto"
+      }
     }
   },
   "footer": {
