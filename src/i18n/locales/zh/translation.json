@@ -2743,6 +2743,10 @@
         "instruction": "指令",
         "instructionTip": "措辞应如何改变。在清理之后应用，因此修正内容保持不变。",
         "instructionPlaceholder": "例如：保持口语化，并把说出的表情名称转换成表情符号。"
+      },
+      "specialist": {
+        "ignored": "{{model}} 只做基础整理，因此会忽略写作风格。要应用风格，请使用通用模型。",
+        "changeModel": "更换模型"
       }
     },
     "shortcut": {

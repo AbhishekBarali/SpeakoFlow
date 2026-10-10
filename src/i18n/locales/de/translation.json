@@ -2766,6 +2766,10 @@
         "instruction": "Anweisungen",
         "instructionTip": "Wie sich die Formulierung ändern soll. Wird nach der Bereinigung angewendet, die Korrekturen bleiben also gleich.",
         "instructionPlaceholder": "Zum Beispiel: locker und in Kleinbuchstaben halten und gesprochene Emoji-Namen in Emojis umwandeln."
+      },
+      "specialist": {
+        "ignored": "{{model}} bereinigt nur, deshalb ignoriert es Schreibstile. Wähle ein allgemeines Modell, um einen Stil anzuwenden.",
+        "changeModel": "Modell ändern"
       }
     },
     "shortcut": {

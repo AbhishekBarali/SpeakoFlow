@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { InfoTip } from "@/components/ui/InfoTip";
+import { Callout } from "@/components/ui/Callout";
+import { useNavigation } from "@/components/shell/navigation";
+import { useCleanupSpecialist } from "./useCleanupSpecialist";
 
 /** Mirrors `PostProcessTone` ids in settings.rs. */
 const BUILTIN_TONE_IDS = [
@@ -294,6 +297,35 @@ const CustomStyleView: React.FC<{
 };
 
 /**
+ * Said under the pills while a style is chosen but cleanup runs on a fine-tune.
+ *
+ * A cleanup fine-tune was trained on one exact prompt with no style, and in
+ * practice returns plain cleanup whatever style is sent with it. The style is
+ * still sent (it is the user's choice), so without this the pills look broken.
+ */
+const SpecialistIgnoresStyle: React.FC<{ name: string }> = ({ name }) => {
+  const { t } = useTranslation();
+  const { openModelSlot } = useNavigation();
+  return (
+    <Callout
+      tone="info"
+      className="mt-4"
+      action={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => openModelSlot("cleanup")}
+        >
+          {t("cleanup.styles.specialist.changeModel")}
+        </Button>
+      }
+    >
+      {t("cleanup.styles.specialist.ignored", { model: name })}
+    </Callout>
+  );
+};
+
+/**
  * Writing style, with every style in plain sight.
  *
  * Each style is a pill. Under the pills: a built-in style shows what it does
@@ -316,6 +348,10 @@ export const WritingStyleCard: React.FC<{ disabled?: boolean }> = ({
   const builtin: BuiltinTone = BUILTIN_IDS.has(selectedId)
     ? (selectedId as BuiltinTone)
     : "none";
+  // What the backend will actually send: an unknown or deleted id resolves to
+  // no style there, so it is no style here too.
+  const styleChosen = !!selectedCustom || builtin !== "none";
+  const specialist = useCleanupSpecialist();
 
   const select = async (toneId: string) => {
     setEditor(null);
@@ -387,6 +423,10 @@ export const WritingStyleCard: React.FC<{ disabled?: boolean }> = ({
           {t("cleanup.styles.newStyle")}
         </button>
       </div>
+
+      {styleChosen && specialist && (
+        <SpecialistIgnoresStyle name={specialist.name} />
+      )}
 
       {editor ? (
         <StyleEditor

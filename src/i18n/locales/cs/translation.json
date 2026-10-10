@@ -2812,6 +2812,10 @@
         "instruction": "Instrukce",
         "instructionTip": "Jak se má formulace změnit. Uplatní se po čištění, takže opravy zůstanou stejné.",
         "instructionPlaceholder": "Například: piš hovorově a malými písmeny a vyslovené názvy emoji převeď na emoji."
+      },
+      "specialist": {
+        "ignored": "{{model}} provádí jen základní úpravu, takže styly psaní ignoruje. Chcete-li použít styl, zvolte obecný model.",
+        "changeModel": "Změnit model"
       }
     },
     "shortcut": {

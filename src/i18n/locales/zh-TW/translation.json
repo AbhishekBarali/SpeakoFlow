@@ -2743,6 +2743,10 @@
         "instruction": "指示",
         "instructionTip": "用字應如何改變。會在整理之後套用，因此修正內容不變。",
         "instructionPlaceholder": "例如：保持輕鬆口語，並把口述的表情符號名稱轉成表情符號。"
+      },
+      "specialist": {
+        "ignored": "{{model}} 只做基本整理，因此會忽略寫作風格。若要套用風格，請使用通用模型。",
+        "changeModel": "更換模型"
       }
     },
     "shortcut": {
