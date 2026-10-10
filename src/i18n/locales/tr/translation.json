@@ -3254,5 +3254,15 @@
     "best": "En iyi gün",
     "typical": "Tipik gün",
     "typicalSub": "Dikte ettiğiniz günlerde"
+  },
+  "settingsNotice": {
+    "restored": "Ayarlarınız bozulmuştu ve bir yedekten geri yüklendi.",
+    "unrecoverableTitle": "Ayarlarınız kurtarılamadı",
+    "unrecoverableDescription": "SpeakoFlow varsayılan ayarlarla başlatıldı. Bozuk dosya {{file}} adıyla saklandı.",
+    "notSavingTitle": "Ayar değişiklikleri kaydedilmeyecek",
+    "notSavingDescription": "Ayar dosyası okunamadığı için olduğu gibi bırakıldı. Tekrar denemek için SpeakoFlow'u yeniden başlatın.",
+    "saveFailingTitle": "Ayarlar kaydedilmiyor",
+    "saveFailingDescription": "Son değişiklikleriniz henüz kaydedilmedi. SpeakoFlow denemeye devam edecek.",
+    "dismiss": "Kapat"
   }
 }

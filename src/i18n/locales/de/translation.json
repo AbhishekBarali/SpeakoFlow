@@ -3254,5 +3254,15 @@
     "best": "Bester Tag",
     "typical": "Typischer Tag",
     "typicalSub": "An Tagen, an denen du diktierst"
+  },
+  "settingsNotice": {
+    "restored": "Deine Einstellungen waren beschädigt und wurden aus einer Sicherung wiederhergestellt.",
+    "unrecoverableTitle": "Deine Einstellungen konnten nicht wiederhergestellt werden",
+    "unrecoverableDescription": "SpeakoFlow wurde mit den Standardeinstellungen gestartet. Die beschädigte Datei wurde als {{file}} aufbewahrt.",
+    "notSavingTitle": "Änderungen an den Einstellungen werden nicht gespeichert",
+    "notSavingDescription": "Die Einstellungsdatei konnte nicht gelesen werden und bleibt deshalb unverändert. Starte SpeakoFlow neu, um es noch einmal zu versuchen.",
+    "saveFailingTitle": "Einstellungen werden nicht gespeichert",
+    "saveFailingDescription": "Deine letzten Änderungen sind noch nicht gespeichert. SpeakoFlow versucht es weiter.",
+    "dismiss": "Schließen"
   }
 }

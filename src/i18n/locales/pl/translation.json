@@ -3322,5 +3322,15 @@
     "best": "Najlepszy dzień",
     "typical": "Typowy dzień",
     "typicalSub": "W dni, w które dyktujesz"
+  },
+  "settingsNotice": {
+    "restored": "Twoje ustawienia były uszkodzone i zostały przywrócone z kopii zapasowej.",
+    "unrecoverableTitle": "Nie udało się odzyskać ustawień",
+    "unrecoverableDescription": "SpeakoFlow uruchomił się z ustawieniami domyślnymi. Uszkodzony plik zachowano jako {{file}}.",
+    "notSavingTitle": "Zmiany ustawień nie zostaną zapisane",
+    "notSavingDescription": "Nie udało się odczytać pliku ustawień, więc pozostawiono go bez zmian. Uruchom ponownie SpeakoFlow, aby spróbować jeszcze raz.",
+    "saveFailingTitle": "Ustawienia nie są zapisywane",
+    "saveFailingDescription": "Ostatnie zmiany nie zostały jeszcze zapisane. SpeakoFlow będzie próbować dalej.",
+    "dismiss": "Zamknij"
   }
 }

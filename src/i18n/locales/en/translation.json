@@ -3254,5 +3254,15 @@
     "best": "Best day",
     "typical": "Typical day",
     "typicalSub": "On days you dictate"
+  },
+  "settingsNotice": {
+    "restored": "Your settings were damaged and have been restored from a backup.",
+    "unrecoverableTitle": "Your settings couldn't be recovered",
+    "unrecoverableDescription": "SpeakoFlow started with its default settings. The damaged file was kept as {{file}}.",
+    "notSavingTitle": "Settings changes won't be saved",
+    "notSavingDescription": "The settings file couldn't be read, so it was left alone. Restart SpeakoFlow to try again.",
+    "saveFailingTitle": "Settings aren't being saved",
+    "saveFailingDescription": "Your recent changes haven't been saved yet. SpeakoFlow will keep trying.",
+    "dismiss": "Dismiss"
   }
 }

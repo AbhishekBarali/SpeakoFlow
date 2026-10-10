@@ -3490,6 +3490,22 @@ async startWindowResize(direction: string) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * What the user has to know about the settings file: settings restored from
+ * the backup, settings that could not be recovered, or changes that are not
+ * being saved. The file is read before any window listens, so the main window
+ * asks once when it mounts; later notices arrive as `settings-notices`.
+ */
+async getSettingsNotices() : Promise<SettingsNotice[]> {
+    return await TAURI_INVOKE("get_settings_notices");
+},
+/**
+ * The user closed a settings notice, so reloading the window does not show it
+ * again.
+ */
+async dismissSettingsNotice(kind: SettingsNoticeKind) : Promise<void> {
+    await TAURI_INVOKE("dismiss_settings_notice", { kind });
 }
 }
 
@@ -5240,6 +5256,42 @@ export type SearchResult = { title: string; url: string; snippet: string;
 content?: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecretString = string
+/**
+ * A notice about the settings file, with the name of the kept damaged copy
+ * for `unrecoverable`.
+ */
+export type SettingsNotice = { 
+/**
+ * What happened.
+ */
+kind: SettingsNoticeKind; 
+/**
+ * The file name the damaged settings were kept under, for `unrecoverable`.
+ */
+kept_as: string | null }
+/**
+ * Something about the settings file the user has to know, shown in the main
+ * window until it is dismissed.
+ */
+export type SettingsNoticeKind = 
+/**
+ * The settings were damaged and came back from the backup.
+ */
+"restored" | 
+/**
+ * The settings were damaged and no backup could replace them, so the
+ * defaults apply. The damaged file was kept.
+ */
+"unrecoverable" | 
+/**
+ * The settings file could not be read or moved aside, so nothing changed
+ * this session is saved.
+ */
+"not_saving" | 
+/**
+ * Saving has been failing. Cleared by the next save that works.
+ */
+"save_failing"
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 /**
  * Everything the Shortcuts card needs to explain a Linux session.
