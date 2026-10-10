@@ -1859,6 +1859,24 @@
         "opacityLabel": "面板不透明度",
         "opacityDescription": "悬浮面板的不透明程度。100% 为完全不透明；数值越低，桌面越会朦胧透出。"
       }
+    },
+    "thinking": {
+      "title": "思考",
+      "description": {
+        "cleanup": "推理模型在整理你的听写内容前思考的时长。关闭最快，像 gpt-oss 这样始终会思考的模型会使用其最低级别。只有在整理出错时才调高，因为它会让每次听写都变慢。",
+        "assistant": "推理模型在回答前思考的时长。关闭最快，像 gpt-oss 这样始终会思考的模型会使用其最低级别。级别越高，越能处理难题，但开始回答所需的时间也越长。"
+      },
+      "unsupported": {
+        "builtin": "这台电脑上的模型总是不经思考直接回答，因此速度很快。",
+        "anthropic": "Anthropic 不允许应用设置此项，因此由 Claude 自行决定。如需设置，请通过 OpenRouter 使用 Claude。",
+        "apple": "Apple Intelligence 没有思考设置。"
+      },
+      "options": {
+        "off": "关闭",
+        "low": "低",
+        "medium": "中",
+        "high": "高"
+      }
     }
   },
   "footer": {

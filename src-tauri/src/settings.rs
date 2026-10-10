@@ -628,6 +628,8 @@ pub(crate) struct ResolvedPostProcessConfig {
     /// system prompt + optional writing style) are still sent, because those are
     /// explicit choices rather than app-added scaffolding.
     pub trained_for_cleanup: bool,
+    /// The user's thinking dial for cleanup (`post_process_thinking`).
+    pub thinking: ThinkingLevel,
     pub source: PostProcessConfigSource,
     pub api_key: String,
 }
@@ -928,6 +930,59 @@ pub enum AssistantSearchDepth {
     Medium,
     /// Broadest single pass. More queries/sources, scrape more winners.
     High,
+}
+
+/// How much a reasoning model may think before it answers. One dial each for AI
+/// cleanup (`post_process_thinking`) and the assistant (`assistant_thinking`).
+///
+/// **`Off` is the default for both, and it is the fast path the app always
+/// used**: `reasoning_effort: "none"`, or the lowest level a model accepts for
+/// one that cannot stop thinking (gpt-oss, the o-series, R1), negotiated per
+/// model when a provider refuses either. The other levels are sent as-is in the
+/// one form that is close to universal: `reasoning_effort` on the OpenAI schema
+/// (OpenAI, Azure, Groq, Cerebras, Gemini's compatibility layer, Bedrock), and
+/// `reasoning.effort` on OpenRouter, which maps it onto each upstream's own
+/// control (Claude's thinking budget included).
+///
+/// Three providers cannot take it, and the settings row says so rather than
+/// offering a dial that does nothing: Anthropic's OpenAI-compatible layer
+/// documents `reasoning_effort` as ignored, Apple Intelligence has no such
+/// control, and the built-in engine is launched with a zero thinking budget
+/// (`LLAMA_ARG_THINK_BUDGET=0`), which a request cannot lift.
+///
+/// Measured before this existed, because it is the obvious suspect when a
+/// thinking model "does not clean up": gpt-oss-120b on Azure returned the
+/// transcript unchanged at both `low` and `medium` effort. Thinking was never
+/// the cause there (the structured-output field name was, see
+/// `actions::CLEANED_TEXT_FIELD`), so this is a quality dial, not a repair.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingLevel {
+    /// Answer straight away; the lowest level for a model that must think.
+    #[default]
+    Off,
+    Low,
+    Medium,
+    High,
+}
+
+impl ThinkingLevel {
+    /// The `reasoning_effort` value for an explicit level; `None` for `Off`,
+    /// whose wire value depends on the model.
+    pub fn effort(self) -> Option<&'static str> {
+        match self {
+            Self::Off => None,
+            Self::Low => Some("low"),
+            Self::Medium => Some("medium"),
+            Self::High => Some("high"),
+        }
+    }
+}
+
+/// Whether a provider accepts a thinking level at all. Mirrored by
+/// `providerSupportsThinking` in `src/lib/thinking.ts`.
+pub fn provider_supports_thinking(provider_id: &str) -> bool {
+    !matches!(provider_id, "builtin" | "anthropic" | "apple_intelligence")
 }
 
 /// How long unstarred dictation/Flow recordings are kept.
@@ -1483,6 +1538,10 @@ pub struct AppSettings {
     pub post_process_selected_tone_id: Option<String>,
     #[serde(default = "default_post_process_timeout_secs")]
     pub post_process_timeout_secs: u32,
+    /// How much a reasoning model may think before cleaning a dictation. See
+    /// [`ThinkingLevel`]; `Off` keeps cleanup on its fast path.
+    #[serde(default)]
+    pub post_process_thinking: ThinkingLevel,
     /// The cloud provider the user last had selected for AI cleanup, remembered
     /// so the device ⇄ cloud switch can put it back.
     ///
@@ -1763,6 +1822,10 @@ pub struct AppSettings {
     /// "max results" number as the primary control; tuned to stay fast.
     #[serde(default)]
     pub assistant_search_depth: AssistantSearchDepth,
+    /// How much a reasoning model may think before answering an ask or a call.
+    /// See [`ThinkingLevel`]; `Off` keeps replies on the fast path.
+    #[serde(default)]
+    pub assistant_thinking: ThinkingLevel,
     /// DEPRECATED / unused since the Firecrawl credit guard was removed (search
     /// is now snippet-only over per-request SERP APIs). Kept so existing
     /// settings files and generated bindings stay stable.
@@ -4015,6 +4078,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_custom_tones: Vec::new(),
         post_process_selected_tone_id: Some(DEFAULT_POST_PROCESS_TONE_ID.to_string()),
         post_process_timeout_secs: default_post_process_timeout_secs(),
+        post_process_thinking: ThinkingLevel::default(),
         // Seeded rather than left None so `get_default_settings()` is a fixed
         // point of the repair pass below (several tests rely on that, and a
         // settings write on every launch would be pointless churn).
@@ -4093,6 +4157,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_web_search_max_results: default_assistant_web_search_max_results(),
         assistant_web_search_fetch_content: default_assistant_web_search_fetch_content(),
         assistant_search_depth: AssistantSearchDepth::default(),
+        assistant_thinking: ThinkingLevel::default(),
         assistant_web_search_daily_credit_budget: default_assistant_web_search_daily_credit_budget(
         ),
         assistant_local_search_smart: false,
@@ -4527,6 +4592,7 @@ pub(crate) fn resolve_post_process_config(
         tone_id,
         tone_instruction,
         trained_for_cleanup,
+        thinking: settings.post_process_thinking,
         source,
         api_key,
     })

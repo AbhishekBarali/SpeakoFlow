@@ -1868,6 +1868,24 @@
         "opacityLabel": "Panelens opacitet",
         "opacityDescription": "Hur ogenomskinlig den flytande panelen är. 100% är helt tät; lägre värden låter skrivbordet skina igenom suddigt."
       }
+    },
+    "thinking": {
+      "title": "Tänkande",
+      "description": {
+        "cleanup": "Hur länge en resonerande modell tänker innan den rensar din diktering. Av är snabbast, och modeller som alltid tänker, som gpt-oss, använder sin lägsta nivå. Höj bara om rensningen gör fel, eftersom det fördröjer varje diktering.",
+        "assistant": "Hur länge en resonerande modell tänker innan den svarar. Av är snabbast, och modeller som alltid tänker, som gpt-oss, använder sin lägsta nivå. Högre nivåer klarar svåra frågor bättre men tar längre tid innan svaret börjar."
+      },
+      "unsupported": {
+        "builtin": "Modeller på den här datorn svarar alltid utan att tänka, vilket gör dem snabba.",
+        "anthropic": "Anthropic låter inte appar ställa in detta, så Claude bestämmer. Använd Claude via OpenRouter för att ställa in det.",
+        "apple": "Apple Intelligence har ingen inställning för tänkande."
+      },
+      "options": {
+        "off": "Av",
+        "low": "Låg",
+        "medium": "Medel",
+        "high": "Hög"
+      }
     }
   },
   "footer": {
