@@ -1225,8 +1225,17 @@ fn fast_reasoning_options(
     } else {
         "none"
     };
+    effort_options(provider_id, effort)
+}
+
+/// One effort value in the shape each provider reads, or nothing for a
+/// provider with no request-level control (see
+/// [`crate::settings::provider_supports_thinking`]).
+fn effort_options(provider_id: &str, effort: &str) -> (Option<String>, Option<ReasoningConfig>) {
+    if !crate::settings::provider_supports_thinking(provider_id) {
+        return (None, None);
+    }
     match provider_id {
-        "builtin" | "anthropic" | "apple_intelligence" => (None, None),
         "openrouter" => (
             None,
             Some(ReasoningConfig {
@@ -1235,6 +1244,23 @@ fn fast_reasoning_options(
             }),
         ),
         _ => (Some(effort.into()), None),
+    }
+}
+
+/// Reasoning options for an assistant turn at the user's thinking level.
+///
+/// `Off` is [`fast_reasoning_options`], unchanged. An explicit level is sent
+/// as-is; a provider that refuses it is stepped down by `send_stream_request`
+/// exactly as for `Off`, so a dial set too high for a model costs one retry,
+/// once, rather than the reply.
+pub(crate) fn reasoning_options_for(
+    provider_id: &str,
+    model: &str,
+    level: crate::settings::ThinkingLevel,
+) -> (Option<String>, Option<ReasoningConfig>) {
+    match level.effort() {
+        None => fast_reasoning_options(provider_id, model),
+        Some(effort) => effort_options(provider_id, effort),
     }
 }
 
@@ -1297,8 +1323,17 @@ async fn send_stream_request(
     mut body: ChatCompletionRequest,
     mut on_token: impl FnMut(&str),
 ) -> Result<ChatRound, String> {
-    let key = format!("{url}|{}", body.model);
     let tuned = body.reasoning_effort.is_some() || body.reasoning.is_some();
+    // Keyed by the effort *asked for* as well as the model. What a model refuses
+    // depends on the value: gpt-oss rejects "none" and accepts "high", so a
+    // memo learned while the dial was Off ("none" refused → use "low") must not
+    // pin the reply to "low" after the user turns thinking up.
+    let requested = body
+        .reasoning_effort
+        .clone()
+        .or_else(|| body.reasoning.as_ref().and_then(|r| r.effort.clone()))
+        .unwrap_or_default();
+    let key = format!("{url}|{}|{requested}", body.model);
     if tuned {
         let support = STREAM_REASONING_SUPPORT
             .lock()
@@ -1849,6 +1884,112 @@ mod tests {
         assert!(fast_reasoning_options("builtin", "qwen3").0.is_none());
         assert!(!reasoning_rejection("Invalid API key"));
         assert!(!reasoning_rejection("model not found"));
+    }
+
+    #[test]
+    fn the_thinking_dial_reaches_each_provider_in_its_own_shape() {
+        use crate::settings::ThinkingLevel;
+        // Off is the fast path, unchanged.
+        assert_eq!(
+            reasoning_options_for("groq", "openai/gpt-oss-120b", ThinkingLevel::Off)
+                .0
+                .as_deref(),
+            Some("low")
+        );
+        assert_eq!(
+            reasoning_options_for("azure_openai", "gpt-6-luna", ThinkingLevel::Off)
+                .0
+                .as_deref(),
+            Some("none")
+        );
+        // An explicit level is sent as-is, including to a model that must think.
+        for (level, wire) in [
+            (ThinkingLevel::Low, "low"),
+            (ThinkingLevel::Medium, "medium"),
+            (ThinkingLevel::High, "high"),
+        ] {
+            let (effort, reasoning) = reasoning_options_for("azure_openai", "gpt-oss-120b", level);
+            assert_eq!(effort.as_deref(), Some(wire));
+            assert!(reasoning.is_none());
+            // OpenRouter reads its own object, and keeps the trace out of the reply.
+            let (effort, reasoning) = reasoning_options_for("openrouter", "x/y", level);
+            assert!(effort.is_none());
+            let reasoning = reasoning.unwrap();
+            assert_eq!(reasoning.effort.as_deref(), Some(wire));
+            assert_eq!(reasoning.exclude, Some(true));
+            // No request-level control: nothing is sent rather than a value
+            // that would be ignored or refused.
+            for id in ["builtin", "anthropic", "apple_intelligence"] {
+                assert_eq!(reasoning_options_for(id, "m", level).0, None);
+                assert!(reasoning_options_for(id, "m", level).1.is_none());
+            }
+        }
+    }
+
+    /// A model that refused "none" while the dial was Off is remembered as
+    /// "use low". That memo must not cap the reply once the user asks for more.
+    #[tokio::test]
+    async fn a_reasoning_memo_learned_at_one_level_does_not_cap_another() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/v1", listener.local_addr().unwrap());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let answer = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n";
+        let rejection =
+            json!({"error":{"message":"reasoning_effort 'none' is not one of low, medium, high"}})
+                .to_string();
+        let replies: Vec<(u16, String)> = vec![
+            (400, rejection),
+            (200, answer.to_string()),
+            (200, answer.to_string()),
+        ];
+        let server = std::thread::spawn(move || {
+            for (status, body) in replies {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request_body(&mut stream);
+                tx.send(serde_json::from_str::<Value>(&request).unwrap())
+                    .unwrap();
+                write!(stream, "HTTP/1.1 {status} Response\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let provider = provider("bedrock_mantle", &base);
+        let messages = vec![json!({"role":"user", "content":"Hi"})];
+        let model = "memo-per-level-model";
+
+        // Dial Off: "none" is refused, "low" answers and is remembered.
+        let (effort, reasoning) =
+            reasoning_options_for(&provider.id, model, crate::settings::ThinkingLevel::Off);
+        send_chat_stream(
+            &provider,
+            String::new(),
+            model,
+            messages.clone(),
+            effort,
+            reasoning,
+            |_| {},
+        )
+        .await
+        .unwrap();
+        // Dial High: the memo for "none" must not turn this into "low".
+        let (effort, reasoning) =
+            reasoning_options_for(&provider.id, model, crate::settings::ThinkingLevel::High);
+        send_chat_stream(
+            &provider,
+            String::new(),
+            model,
+            messages,
+            effort,
+            reasoning,
+            |_| {},
+        )
+        .await
+        .unwrap();
+
+        server.join().unwrap();
+        let sent: Vec<Value> = rx.into_iter().collect();
+        assert_eq!(sent.len(), 3);
+        assert_eq!(sent[0]["reasoning_effort"], "none");
+        assert_eq!(sent[1]["reasoning_effort"], "low");
+        assert_eq!(sent[2]["reasoning_effort"], "high");
     }
 
     /// A voice barge-in cancels a turn before the first token, so history keeps

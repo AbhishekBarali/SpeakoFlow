@@ -1877,6 +1877,24 @@
         "opacityLabel": "Opacité du panneau",
         "opacityDescription": "Le degré d'opacité du panneau flottant. 100 % est totalement opaque ; des valeurs plus faibles laissent apparaître le bureau en flou."
       }
+    },
+    "thinking": {
+      "title": "Réflexion",
+      "description": {
+        "cleanup": "Le temps de réflexion d'un modèle de raisonnement avant de nettoyer votre dictée. Désactivé est le plus rapide, et les modèles qui réfléchissent toujours, comme gpt-oss, utilisent leur niveau le plus bas. Augmentez-le seulement si le nettoyage fait des erreurs, car il ajoute un délai à chaque dictée.",
+        "assistant": "Le temps de réflexion d'un modèle de raisonnement avant de répondre. Désactivé est le plus rapide, et les modèles qui réfléchissent toujours, comme gpt-oss, utilisent leur niveau le plus bas. Les niveaux élevés traitent mieux les questions difficiles, mais mettent plus de temps à commencer à répondre."
+      },
+      "unsupported": {
+        "builtin": "Les modèles sur cet ordinateur répondent toujours sans réfléchir, ce qui les rend rapides.",
+        "anthropic": "Anthropic ne permet pas aux applications de régler ceci, c'est donc Claude qui décide. Utilisez Claude via OpenRouter pour le régler.",
+        "apple": "Apple Intelligence n'a pas de réglage de réflexion."
+      },
+      "options": {
+        "off": "Désactivé",
+        "low": "Faible",
+        "medium": "Moyen",
+        "high": "Élevé"
+      }
     }
   },
   "footer": {

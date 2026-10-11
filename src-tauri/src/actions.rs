@@ -11,7 +11,7 @@ use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{
     get_settings, resolve_post_process_config, AppSettings, ModelUnloadTimeout,
     PostProcessConfigSource, PostProcessResolutionError, PostProcessUnavailableReason,
-    ResolvedPostProcessConfig, APPLE_INTELLIGENCE_PROVIDER_ID,
+    ResolvedPostProcessConfig, ThinkingLevel, APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
@@ -111,8 +111,22 @@ fn finish_idle(app: &AppHandle) {
     change_tray_icon(app, TrayIconState::Idle);
 }
 
-/// Field name for structured output JSON schema
-const TRANSCRIPTION_FIELD: &str = "transcription";
+/// The one field of the structured cleanup answer.
+///
+/// **It must not be called `transcription`, and that is measured, not taste.**
+/// It was, with the description "The cleaned and processed transcription text",
+/// and a model reads a field named after its *input* as a request for the
+/// input. gpt-oss-120b on Azure, given the Readable prompt and five real
+/// dictations, wrote the correct cleanup into its reasoning trace ("Result: I
+/// think we should move the meeting to Friday…") and then returned the raw
+/// transcript in the field, unchanged, for four of the five — so cleanup ran,
+/// validated and "succeeded" while pasting what was dictated. Raising the
+/// effort to medium did not fix it (one answer came back as the bare word
+/// `final`, its channel name). Gemma 4 E2B on the built-in engine, whose
+/// grammar enforces the same schema, did the same for every multi-word input.
+/// Renamed, with a description that names the edit, both cleaned all five, and
+/// gpt-6-luna and OpenRouter's routes answered identically either way.
+const CLEANED_TEXT_FIELD: &str = "cleaned_text";
 
 /// A monotonic suffix prevents two rapidly completed recordings from sharing
 /// a WAV path. Millisecond timestamps alone can collide on fast back-to-back
@@ -555,6 +569,10 @@ enum PostProcessFailureKind {
     ProviderRequest,
     StructuredOutputRejected,
     MalformedResponse,
+    /// The answer repeats the cleanup prompt (a worked example or the
+    /// instructions) instead of the speaker. See [`prompt_echo`]. Never retried:
+    /// at temperature 0 the same request returns the same copy.
+    EchoedPrompt,
     EmptyResponse,
     UnsupportedProvider,
 }
@@ -658,9 +676,12 @@ struct PostProcessRequest {
 ///
 /// Three characters per token is pessimistic for English prose (four is typical),
 /// which is the safe direction: it overestimates the budget rather than cutting a
-/// sentence short. The envelope allowance covers the `{"cleaned_transcription":
-/// "…"}` wrapper and its escapes on the structured path.
-fn cleanup_token_budget(transcription: &str) -> u32 {
+/// sentence short. The envelope allowance covers the `{"cleaned_text": "…"}`
+/// wrapper and its escapes on the structured path.
+///
+/// The reasoning headroom grows with the user's thinking level: a model asked
+/// to think harder spends more of the ceiling before it writes anything.
+fn cleanup_token_budget(transcription: &str, thinking: ThinkingLevel) -> u32 {
     const CHARS_PER_TOKEN: usize = 3;
     const JSON_ENVELOPE_TOKENS: usize = 32;
     /// Room for a very short dictation that legitimately expands.
@@ -670,6 +691,11 @@ fn cleanup_token_budget(transcription: &str) -> u32 {
     /// but a model whose thinking cannot be turned off must still be able to
     /// produce output rather than nothing.
     const REASONING_HEADROOM_TOKENS: usize = 2048;
+    let headroom = match thinking {
+        ThinkingLevel::Off | ThinkingLevel::Low => REASONING_HEADROOM_TOKENS,
+        ThinkingLevel::Medium => REASONING_HEADROOM_TOKENS * 2,
+        ThinkingLevel::High => REASONING_HEADROOM_TOKENS * 4,
+    };
 
     // Mirror the validator's allowance exactly: FLOOR.max(chars * RATIO).
     let allowed_chars = 80usize.max(transcription.chars().count().saturating_mul(3));
@@ -677,7 +703,7 @@ fn cleanup_token_budget(transcription: &str) -> u32 {
         .div_ceil(CHARS_PER_TOKEN)
         .max(FLOOR_TOKENS)
         .saturating_add(JSON_ENVELOPE_TOKENS)
-        .saturating_add(REASONING_HEADROOM_TOKENS);
+        .saturating_add(headroom);
     budget.min(u32::MAX as usize) as u32
 }
 
@@ -756,8 +782,8 @@ fn build_post_process_request(
         .trim_start()
         .to_string();
     let (reasoning_effort, reasoning) =
-        cleanup_reasoning_options(&config.provider.id, &config.model);
-    let max_tokens = cleanup_token_budget(transcription);
+        cleanup_reasoning_options(&config.provider.id, &config.model, config.thinking);
+    let max_tokens = cleanup_token_budget(transcription, config.thinking);
 
     // Exactly what the model is about to be told, and who wrote each part.
     // Nothing about cleanup is harder to debug than not knowing whether the app
@@ -765,7 +791,7 @@ fn build_post_process_request(
     // find out was to read the source. Sizes at debug, full text at trace, so
     // `--debug` gives the shape and trace gives the bytes.
     debug!(
-        "Cleanup prompt layers: prompt '{}' {} chars + style '{}' {} chars + app contract {} chars = {} chars; transcript {} chars, max_tokens {}",
+        "Cleanup prompt layers: prompt '{}' {} chars + style '{}' {} chars + app contract {} chars = {} chars; transcript {} chars, max_tokens {}, thinking {:?} (effort {:?})",
         config.prompt_id,
         layer1_len,
         config.tone_id,
@@ -773,7 +799,11 @@ fn build_post_process_request(
         layer3_len,
         system_prompt.chars().count(),
         transcription.chars().count(),
-        max_tokens
+        max_tokens,
+        config.thinking,
+        reasoning_effort
+            .as_deref()
+            .or_else(|| reasoning.as_ref().and_then(|r| r.effort.as_deref()))
     );
     log::trace!("Cleanup system prompt sent verbatim:\n{system_prompt}");
 
@@ -854,13 +884,19 @@ pub(crate) fn wants_low_rather_than_no_reasoning(model: &str) -> bool {
 fn cleanup_reasoning_options(
     provider_id: &str,
     model: &str,
+    thinking: ThinkingLevel,
 ) -> (Option<String>, Option<crate::llm_client::ReasoningConfig>) {
-    let effort = if wants_low_rather_than_no_reasoning(model)
-        || token_cap_starves_output(provider_id, model)
-    {
-        "low"
-    } else {
-        "none"
+    // `Off` is the suppression described above. An explicit level (the user's
+    // `post_process_thinking`) is sent as-is, and a provider that refuses it
+    // gets the same step-down ladder in `send_post_process_request`.
+    let effort = match thinking.effort() {
+        Some(level) => level,
+        None if wants_low_rather_than_no_reasoning(model)
+            || token_cap_starves_output(provider_id, model) =>
+        {
+            "low"
+        }
+        None => "none",
     };
     match provider_id {
         // OpenRouter has its own reasoning object, and `exclude` also keeps the
@@ -1064,16 +1100,182 @@ fn is_implausibly_long(transcription: &str, cleaned: &str) -> bool {
 }
 
 fn parse_structured_output(
+    system_prompt: &str,
     transcription: &str,
     content: &str,
 ) -> Result<String, PostProcessFailureKind> {
     let json = serde_json::from_str::<serde_json::Value>(content)
         .map_err(|_| PostProcessFailureKind::MalformedResponse)?;
     let value = json
-        .get(TRANSCRIPTION_FIELD)
+        .get(CLEANED_TEXT_FIELD)
         .and_then(|value| value.as_str())
         .ok_or(PostProcessFailureKind::MalformedResponse)?;
-    validate_cleaned_output(transcription, value, true)
+    validate_cleaned_output_against_prompt(system_prompt, transcription, value, true)
+}
+
+/// [`validate_cleaned_output`], plus the checks that need the system prompt the
+/// model was given. Every request path runs this one.
+fn validate_cleaned_output_against_prompt(
+    system_prompt: &str,
+    transcription: &str,
+    output: &str,
+    enforce_length: bool,
+) -> Result<String, PostProcessFailureKind> {
+    // Checked before the length guard so the log names what actually happened:
+    // a copied example is usually also too long, and "implausibly long" sends
+    // whoever reads it looking at the wrong thing.
+    let cleaned = sanitize_post_process_output(output);
+    if cleaned.is_empty() {
+        return validate_cleaned_output(transcription, output, enforce_length);
+    }
+    if !cleaned.chars().any(char::is_alphanumeric)
+        && transcription.chars().any(char::is_alphanumeric)
+    {
+        // Observed on OpenRouter's gpt-oss routes: "..." and "... ... ..." for
+        // dictations of a dozen words. Nothing in it was said.
+        warn!(
+            "Cleanup returned only punctuation ({:?}) for a {}-character transcript; keeping the raw text",
+            cleaned,
+            transcription.chars().count()
+        );
+        return Err(PostProcessFailureKind::EmptyResponse);
+    }
+    if is_leaked_channel_name(transcription, &cleaned) {
+        warn!(
+            "Cleanup returned the bare channel name {:?} instead of text; keeping the raw text",
+            cleaned
+        );
+        return Err(PostProcessFailureKind::MalformedResponse);
+    }
+    if let Some(echo) = prompt_echo(system_prompt, transcription, &cleaned) {
+        let preview: String = cleaned.chars().take(120).collect();
+        warn!(
+            "Cleanup output rejected: {} of its {} words repeat the cleanup prompt rather than the speaker (an example or instruction was returned as the answer). Output began: {:?}",
+            echo.echoed_words,
+            echo.output_words,
+            crate::utils::redact_text(&preview)
+        );
+        return Err(PostProcessFailureKind::EchoedPrompt);
+    }
+    validate_cleaned_output(transcription, output, enforce_length)
+}
+
+/// gpt-oss names its output channels `analysis`, `commentary` and `final`, and a
+/// gateway that mis-parses the Harmony format can hand back the channel name as
+/// the whole answer. Observed twice: `final` for "Yes, let's go out on Friday.
+/// No, no, Saturday." on Azure at medium effort, and `final` for a Nepali
+/// greeting in this app's own history, which was pasted.
+fn is_leaked_channel_name(transcription: &str, cleaned: &str) -> bool {
+    let word = cleaned
+        .trim_matches(|c: char| !c.is_alphanumeric())
+        .to_lowercase();
+    matches!(word.as_str(), "final" | "analysis" | "commentary")
+        && !transcription.to_lowercase().contains(&word)
+}
+
+/// How much of an answer was copied from the prompt instead of the speaker.
+#[derive(Debug, PartialEq, Eq)]
+struct PromptEcho {
+    echoed_words: usize,
+    output_words: usize,
+}
+
+/// Lower-cased words, with the punctuation at their edges removed.
+///
+/// Split on whitespace and trimmed of punctuation rather than split on
+/// "non-alphanumeric", because combining marks are not alphanumeric: splitting
+/// on them would cut a Devanagari word such as हेलो into pieces.
+fn echo_words(text: &str) -> Vec<String> {
+    text.split_whitespace()
+        .map(|word| {
+            word.trim_matches(|c: char| {
+                c.is_ascii_punctuation()
+                    || matches!(
+                        c,
+                        '“' | '”'
+                            | '‘'
+                            | '’'
+                            | '…'
+                            | '«'
+                            | '»'
+                            | '¿'
+                            | '¡'
+                            | '।'
+                            | '—'
+                            | '–'
+                    )
+            })
+            .replace('’', "'")
+            .to_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// Whether the answer reproduces the cleanup prompt — its worked examples or its
+/// instructions — rather than what was said.
+///
+/// **This is the failure behind feedback #8**, reproduced exactly: Gemma 4 E2B
+/// on the built-in engine, the Readable prompt, and a short dictation ("Thank
+/// you.", "Okay.", "Thanks.", "Bye.", "Test, test.") answered with both of the
+/// prompt's worked examples, word for word — "I looked at the pricing today…
+/// There are three things I need from you: 1. The invoice…" — six times in ten.
+/// The user saw the app type a paragraph nobody had said. Qwen3.5-0.8B went
+/// further and returned the prompt's instructions themselves. A length check
+/// cannot see it: the examples are about 330 characters and the 3x allowance for
+/// a 135-character dictation is 405, which is exactly the case in this app's
+/// own history ("…apples, mangoes, and bananas." → "I looked at the pricing
+/// today…").
+///
+/// The test is mechanical so it holds for any prompt, including the ones users
+/// write with their own examples. A run of `N` consecutive output words counts
+/// as copied when the same run appears in the prompt **and** at least half of
+/// it is words the speaker never said. The second half is what keeps a real
+/// cleanup safe: someone who dictates the example sentence itself, or talks
+/// about the prompt, said those words, and the few a cleanup legitimately adds
+/// ("of", a list's "1." for a spoken "first") are not enough to tip a run.
+/// Numbers never count as unsaid for the same reason. The thresholds then ask
+/// for a substantial copy rather than a shared phrase: at least
+/// [`ECHO_MIN_WORDS`] copied words, making up a third of the answer or
+/// [`ECHO_ABSOLUTE_WORDS`] words outright (an example appended after a correct
+/// cleanup of a long dictation).
+fn prompt_echo(system_prompt: &str, transcription: &str, output: &str) -> Option<PromptEcho> {
+    const N: usize = 6;
+    const ECHO_MIN_WORDS: usize = 8;
+    const ECHO_ABSOLUTE_WORDS: usize = 24;
+
+    let output_words = echo_words(output);
+    if output_words.len() < N || system_prompt.trim().is_empty() {
+        return None;
+    }
+    let prompt_words = echo_words(system_prompt);
+    if prompt_words.len() < N {
+        return None;
+    }
+    let prompt_ngrams: HashSet<&[String]> = prompt_words.windows(N).collect();
+    let spoken: HashSet<String> = echo_words(transcription).into_iter().collect();
+    let unsaid = |word: &String| {
+        let numeric = word.chars().any(|c| c.is_ascii_digit())
+            && word
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '.' || c == ',');
+        !numeric && !spoken.contains(word)
+    };
+
+    let mut copied = vec![false; output_words.len()];
+    for (start, window) in output_words.windows(N).enumerate() {
+        if prompt_ngrams.contains(window) && window.iter().filter(|w| unsaid(w)).count() * 2 >= N {
+            for flag in &mut copied[start..start + N] {
+                *flag = true;
+            }
+        }
+    }
+    let echoed_words = copied.iter().filter(|flag| **flag).count();
+    let substantial = echoed_words >= ECHO_ABSOLUTE_WORDS || echoed_words * 3 >= output_words.len();
+    (echoed_words >= ECHO_MIN_WORDS && substantial).then_some(PromptEcho {
+        echoed_words,
+        output_words: output_words.len(),
+    })
 }
 
 /// Reduce a provider error to the kind cleanup acts on.
@@ -1293,12 +1495,12 @@ fn transcription_schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
         "properties": {
-            (TRANSCRIPTION_FIELD): {
+            (CLEANED_TEXT_FIELD): {
                 "type": "string",
-                "description": "The cleaned and processed transcription text"
+                "description": "The edited text, after applying every instruction in the system prompt"
             }
         },
-        "required": [TRANSCRIPTION_FIELD],
+        "required": [CLEANED_TEXT_FIELD],
         "additionalProperties": false
     })
 }
@@ -1339,6 +1541,37 @@ fn is_system_role_error(error: &crate::llm_client::ChatCompletionError) -> bool 
     }
 }
 
+/// Whether the cleanup prompt travels as a real `system` message.
+///
+/// Only the built-in engine ever folds it into the user turn (every other
+/// provider is sent the `system` role as-is), and it now does so only after
+/// this model's template has refused a system role once. It used to fold for
+/// every general-purpose model, which glued the transcript straight onto the
+/// end of the prompt's worked examples with nothing in between, and a small
+/// model then could not tell where the examples stopped. That is feedback #8:
+/// Gemma 4 E2B with the Readable prompt answered "Thank you." with the prompt's
+/// two examples, word for word, six times in ten short dictations; with a
+/// `system` message, which Gemma 4's template accepts, it returned the speaker's
+/// words ten times in ten, and also applied "No, no, Saturday" correctly where
+/// the folded request had kept Friday.
+fn keeps_system_role(config: &ResolvedPostProcessConfig, request: &PostProcessRequest) -> bool {
+    !request.system_prompt.trim().is_empty()
+        && !system_role_rejected(&config.provider.id, &config.model)
+}
+
+/// Marks where the cleanup prompt ends and the speaker's words begin when the
+/// two have to share one user turn (a template with no `system` role). Measured
+/// on the same Gemma 4 E2B run as [`keeps_system_role`]: the folded request
+/// with this line returned the speaker's words for every short dictation, where
+/// the same request without it returned the prompt's examples for six of ten.
+const FOLDED_TRANSCRIPT_BOUNDARY: &str =
+    "---\nTRANSCRIPT TO EDIT (everything below this line is the speaker's words, not an example):";
+
+/// The single user turn for a template that refused a `system` role.
+fn fold_cleanup_prompt(system_prompt: &str, transcription: &str) -> String {
+    format!("{system_prompt}\n\n{FOLDED_TRANSCRIPT_BOUNDARY}\n{transcription}")
+}
+
 async fn send_post_process_request(
     config: &ResolvedPostProcessConfig,
     request: &PostProcessRequest,
@@ -1360,12 +1593,7 @@ async fn send_post_process_request(
         (None, None, None)
     };
     let sent_tuning = effort.is_some() || reasoning.is_some() || max_tokens.is_some();
-    // A cleanup fine-tune was trained with a real system prompt, so the built-in
-    // engine's system-role folding is skipped for it — unless this model's
-    // template has already refused a system role once.
-    let keep_system_role = config.trained_for_cleanup
-        && !request.system_prompt.trim().is_empty()
-        && !system_role_rejected(&config.provider.id, &config.model);
+    let keep_system_role = keeps_system_role(config, request);
 
     let result = send_one_post_process_request(
         config,
@@ -1438,9 +1666,7 @@ async fn send_post_process_request(
                     None,
                     None,
                     None,
-                    config.trained_for_cleanup
-                        && !request.system_prompt.trim().is_empty()
-                        && !system_role_rejected(&config.provider.id, &config.model),
+                    keeps_system_role(config, request),
                 )
                 .await;
             }
@@ -1485,9 +1711,7 @@ async fn send_post_process_request(
                         None,
                         None,
                         None,
-                        config.trained_for_cleanup
-                            && !request.system_prompt.trim().is_empty()
-                            && !system_role_rejected(&config.provider.id, &config.model),
+                        keeps_system_role(config, request),
                     )
                     .await
                 }
@@ -1525,12 +1749,32 @@ async fn send_one_post_process_request(
     // closely does not spend a warm-up request it does not need.
     note_cleanup_request();
 
+    // The built-in engine folds a `system` message into the user turn when it
+    // is not kept. For a general-purpose model the fold is done here instead,
+    // with a boundary line, so the transcript cannot read as one more example
+    // (see `keeps_system_role`). A fine-tune keeps the engine's plain fold.
+    let (user_content, system_prompt) = if config.provider.id == "builtin"
+        && !keep_system_role
+        && !config.trained_for_cleanup
+        && !request.system_prompt.trim().is_empty()
+    {
+        (
+            fold_cleanup_prompt(&request.system_prompt, &request.user_content),
+            None,
+        )
+    } else {
+        (
+            request.user_content.clone(),
+            Some(request.system_prompt.clone()),
+        )
+    };
+
     crate::llm_client::send_chat_completion_with_schema_typed(
         provider.as_ref(),
         config.api_key.clone(),
         &config.model,
-        request.user_content.clone(),
-        Some(request.system_prompt.clone()),
+        user_content,
+        system_prompt,
         schema,
         effort,
         reasoning,
@@ -1542,6 +1786,7 @@ async fn send_one_post_process_request(
 }
 
 fn map_plain_result(
+    system_prompt: &str,
     transcription: &str,
     enforce_length: bool,
     result: Result<
@@ -1551,7 +1796,12 @@ fn map_plain_result(
 ) -> PostProcessAttemptOutcome {
     match result {
         Ok(Ok(Some(content))) => {
-            match validate_cleaned_output(transcription, &content, enforce_length) {
+            match validate_cleaned_output_against_prompt(
+                system_prompt,
+                transcription,
+                &content,
+                enforce_length,
+            ) {
                 Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
                 Err(failure) => PostProcessAttemptOutcome::Failed(failure),
             }
@@ -1593,6 +1843,7 @@ async fn run_plain_attempt(
 
     let started = Instant::now();
     let outcome = map_plain_result(
+        &request.system_prompt,
         transcription,
         enforce_length,
         tokio::time::timeout_at(
@@ -1630,6 +1881,7 @@ A reasoning model can spend the whole budget thinking, so cleanup will run uncap
     );
     let retry_started = Instant::now();
     let retried = map_plain_result(
+        &request.system_prompt,
         transcription,
         enforce_length,
         tokio::time::timeout_at(
@@ -1693,12 +1945,14 @@ async fn run_provider_post_process(
 
         let structured_timed_out = structured.is_err();
         let first_failure = match structured {
-            Ok(Ok(Some(content))) => match parse_structured_output(transcription, &content) {
-                Ok(cleaned) => return PostProcessAttemptOutcome::Applied(cleaned),
-                Err(failure @ PostProcessFailureKind::MalformedResponse)
-                | Err(failure @ PostProcessFailureKind::EmptyResponse) => failure,
-                Err(failure) => return PostProcessAttemptOutcome::Failed(failure),
-            },
+            Ok(Ok(Some(content))) => {
+                match parse_structured_output(&request.system_prompt, transcription, &content) {
+                    Ok(cleaned) => return PostProcessAttemptOutcome::Applied(cleaned),
+                    Err(failure @ PostProcessFailureKind::MalformedResponse)
+                    | Err(failure @ PostProcessFailureKind::EmptyResponse) => failure,
+                    Err(failure) => return PostProcessAttemptOutcome::Failed(failure),
+                }
+            }
             Ok(Ok(None)) => PostProcessFailureKind::EmptyResponse,
             Ok(Err(error)) => {
                 if !is_schema_compatibility_error(&error) {
@@ -1815,6 +2069,7 @@ async fn post_process_transcription(
             // rather than going through that function, so the value is derived
             // again instead of shared.
             let enforce_length = !config.trained_for_cleanup;
+            let system_prompt = request.system_prompt.clone();
             let task = tauri::async_runtime::spawn_blocking(move || {
                 apple_intelligence::process_text_with_system_prompt(
                     &request.system_prompt,
@@ -1824,7 +2079,12 @@ async fn post_process_transcription(
             });
             return match tokio::time::timeout_at(deadline, task).await {
                 Ok(Ok(Ok(content))) => {
-                    match validate_cleaned_output(transcription, &content, enforce_length) {
+                    match validate_cleaned_output_against_prompt(
+                        &system_prompt,
+                        transcription,
+                        &content,
+                        enforce_length,
+                    ) {
                         Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
                         Err(failure) => PostProcessAttemptOutcome::Failed(failure),
                     }
@@ -1877,7 +2137,8 @@ fn fallback_reason_for_failure(failure: PostProcessFailureKind) -> PostProcessFa
         PostProcessFailureKind::Authentication => PostProcessFallbackReason::Authentication,
         PostProcessFailureKind::ProviderRequest => PostProcessFallbackReason::ProviderError,
         PostProcessFailureKind::StructuredOutputRejected
-        | PostProcessFailureKind::MalformedResponse => PostProcessFallbackReason::InvalidResponse,
+        | PostProcessFailureKind::MalformedResponse
+        | PostProcessFailureKind::EchoedPrompt => PostProcessFallbackReason::InvalidResponse,
         PostProcessFailureKind::EmptyResponse => PostProcessFallbackReason::EmptyResponse,
     }
 }
@@ -3613,20 +3874,37 @@ mod tests {
     use super::{
         append_final_output_contract, append_style_layer, build_post_process_request,
         build_system_prompt, classify_chat_error, cleans_up, cleanup_fallback_notice,
-        cleanup_reasoning_options, cleanup_token_budget, fallback_reason_for_failure,
-        finalize_post_process_attempt, is_schema_compatibility_error, is_system_role_error,
-        model_rejection_detail, parse_structured_output, remember_token_cap_starves_output,
-        replace_dashes_with_plain_punctuation, run_provider_post_process,
-        sanitize_post_process_output, structured_output_unusable, token_cap_starves_output,
-        transcription_allows_empty_output, tuning_rejected, uses_ai_cleanup,
-        validate_cleaned_output, ModelRejectionKind, PostProcessAttemptOutcome,
+        fallback_reason_for_failure, finalize_post_process_attempt, is_schema_compatibility_error,
+        is_system_role_error, model_rejection_detail, parse_structured_output,
+        remember_token_cap_starves_output, replace_dashes_with_plain_punctuation,
+        run_provider_post_process, sanitize_post_process_output, structured_output_unusable,
+        token_cap_starves_output, transcription_allows_empty_output, tuning_rejected,
+        uses_ai_cleanup, validate_cleaned_output, ModelRejectionKind, PostProcessAttemptOutcome,
         PostProcessFailureKind, PostProcessFallbackReason, PostProcessResultEvent,
         PostProcessRuntimeMetadata, APPLE_INTELLIGENCE_PROVIDER_ID,
     };
+    use super::{
+        cleanup_reasoning_options as cleanup_reasoning_options_at,
+        cleanup_token_budget as cleanup_token_budget_at, prompt_echo,
+        validate_cleaned_output_against_prompt, FOLDED_TRANSCRIPT_BOUNDARY,
+    };
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessTone,
-        PostProcessUnavailableReason, ResolvedPostProcessConfig,
+        PostProcessUnavailableReason, ResolvedPostProcessConfig, ThinkingLevel,
     };
+
+    /// The cleanup reasoning options with the thinking dial at its default.
+    fn cleanup_reasoning_options(
+        provider_id: &str,
+        model: &str,
+    ) -> (Option<String>, Option<crate::llm_client::ReasoningConfig>) {
+        cleanup_reasoning_options_at(provider_id, model, ThinkingLevel::Off)
+    }
+
+    /// The cleanup token ceiling with the thinking dial at its default.
+    fn cleanup_token_budget(transcription: &str) -> u32 {
+        cleanup_token_budget_at(transcription, ThinkingLevel::Off)
+    }
     use std::collections::HashSet;
     use std::io::{Read, Write};
     use std::net::TcpListener;
@@ -3671,6 +3949,292 @@ mod tests {
         assert_eq!(
             validate_cleaned_output(transcription, monologue, true),
             Err(PostProcessFailureKind::MalformedResponse)
+        );
+    }
+
+    /// Feedback #8, verbatim: "This keeps coming up after transcribing even
+    /// though I didn't say it", followed by the Readable prompt's two worked
+    /// examples. Reproduced on Gemma 4 E2B for "Thank you.", "Okay.", "Thanks.",
+    /// "Bye." and "Test, test.".
+    const FEEDBACK_8_OUTPUT: &str = "I looked at the pricing today, and it's not cheap at all. The thing is, I still think we should try it because the speed is what matters most here.\n\nThere are three things I need from you:\n\n1. The invoice\n2. The signed contract\n3. Confirmation of the date";
+
+    #[test]
+    fn the_prompts_examples_are_never_pasted_as_the_answer() {
+        let prompt = crate::settings::readable_post_process_prompt_text();
+        for transcription in ["Thank you.", "Okay.", "Thanks.", "Bye.", "Test, test."] {
+            assert_eq!(
+                validate_cleaned_output_against_prompt(
+                    prompt,
+                    transcription,
+                    FEEDBACK_8_OUTPUT,
+                    true
+                ),
+                Err(PostProcessFailureKind::EchoedPrompt),
+                "{transcription:?}"
+            );
+        }
+        // From this app's own history: a full sentence in, only the first
+        // example out, short enough to pass the 3x length allowance.
+        let transcription = "All right, hey, we should go out on Thursday and three things are needed for us to bring. That is going to be apples, mangoes, and bananas.";
+        let leaked = "I looked at the pricing today, and it's not cheap at all, right? The thing is, I still think we should try it because the speed is what matters most here.";
+        assert_eq!(
+            validate_cleaned_output(transcription, leaked, true),
+            Ok(leaked.to_string()),
+            "the length check alone cannot see this"
+        );
+        assert_eq!(
+            validate_cleaned_output_against_prompt(prompt, transcription, leaked, true),
+            Err(PostProcessFailureKind::EchoedPrompt)
+        );
+        // A correct cleanup with an example tacked on after it.
+        let appended = format!("We should go out on Thursday. We need three things: apples, mangoes and bananas.\n\n{FEEDBACK_8_OUTPUT}");
+        assert_eq!(
+            validate_cleaned_output_against_prompt(prompt, transcription, &appended, true),
+            Err(PostProcessFailureKind::EchoedPrompt)
+        );
+    }
+
+    #[test]
+    fn the_prompts_instructions_are_never_pasted_as_the_answer() {
+        // Qwen3.5-0.8B on the built-in engine, given the folded request, returned
+        // the prompt from "ALWAYS EDIT" onwards for every short dictation. It is
+        // also caught for a fine-tune, which skips the length check.
+        let prompt = crate::settings::readable_post_process_prompt_text();
+        let echoed = "ALWAYS EDIT\nSpeech-to-text hands you correct punctuation. That is not evidence the sentence is clean, because the damage is inside it.";
+        for enforce_length in [true, false] {
+            assert_eq!(
+                validate_cleaned_output_against_prompt(
+                    prompt,
+                    "Thank you.",
+                    echoed,
+                    enforce_length
+                ),
+                Err(PostProcessFailureKind::EchoedPrompt)
+            );
+        }
+    }
+
+    #[test]
+    fn dictating_words_the_prompt_also_contains_is_not_an_echo() {
+        let prompt = crate::settings::readable_post_process_prompt_text();
+        // Someone dictating the example itself said every word of it.
+        let raw = "So um I looked at the pricing today and it's, it's not cheap at all right. The thing is I still think we should try it because the speed is what matters most here.";
+        let clean = "So I looked at the pricing today, and it's not cheap at all.\n\nThe thing is, I still think we should try it, because the speed is what matters most here.";
+        assert_eq!(
+            validate_cleaned_output_against_prompt(prompt, raw, clean, true),
+            Ok(clean.to_string())
+        );
+        // Talking about the prompt is talking, not a leak.
+        let raw = "the prompt says never return a wall of text and group the text into paragraphs, which I like";
+        let clean = "The prompt says never return a wall of text and group the text into paragraphs, which I like.";
+        assert_eq!(
+            validate_cleaned_output_against_prompt(prompt, raw, clean, true),
+            Ok(clean.to_string())
+        );
+        // Ordinary cleanups measured against the same prompt.
+        for (raw, clean) in [
+            (
+                "so um I think we should uh move the meeting to Thursday, no wait, Friday, and uh can you also send the the notes to Priya",
+                "I think we should move the meeting to Friday, and can you also send the notes to Priya.",
+            ),
+            (
+                "Let me list five things that are important. 1. Apple, 2. Banana, 3. Mango, 4. Grapes, 5. Orange.",
+                "Let me list five things that are important:\n\n1. Apple\n2. Banana\n3. Mango\n4. Grapes\n5. Orange",
+            ),
+            ("Thank you.", "Thank you."),
+            (
+                "There are three things I need from you, first the invoice, second the signed contract, and third can you confirm the date",
+                "There are three things I need from you:\n\n1. The invoice\n2. The signed contract\n3. Confirmation of the date",
+            ),
+        ] {
+            assert_eq!(
+                validate_cleaned_output_against_prompt(prompt, raw, clean, true),
+                Ok(clean.to_string()),
+                "{raw:?}"
+            );
+        }
+        // No prompt, nothing to echo.
+        assert!(prompt_echo("", "Thank you.", FEEDBACK_8_OUTPUT).is_none());
+    }
+
+    #[test]
+    fn a_bare_channel_name_or_punctuation_is_not_a_cleanup() {
+        let prompt = "Clean it.";
+        // gpt-oss's Harmony channel name, observed as the whole answer.
+        assert_eq!(
+            validate_cleaned_output_against_prompt(
+                prompt,
+                "Yes, let's go out on Friday. No, no, Saturday.",
+                "final",
+                true
+            ),
+            Err(PostProcessFailureKind::MalformedResponse)
+        );
+        // Unless the speaker said it.
+        assert_eq!(
+            validate_cleaned_output_against_prompt(prompt, "final", "Final.", true),
+            Ok("Final.".to_string())
+        );
+        // "..." for a dozen words, observed on OpenRouter's gpt-oss routes.
+        assert_eq!(
+            validate_cleaned_output_against_prompt(
+                prompt,
+                "The cleanup is not happening, but damn, the speed is crazy.",
+                "... ... ...",
+                true
+            ),
+            Err(PostProcessFailureKind::EmptyResponse)
+        );
+        // Non-Latin text is text.
+        assert_eq!(
+            validate_cleaned_output_against_prompt(prompt, "हेलो।", "हेलो।", true),
+            Ok("हेलो।".to_string())
+        );
+    }
+
+    /// The built-in engine used to fold the prompt into the user turn for every
+    /// general-purpose model, gluing the transcript onto the prompt's examples.
+    #[test]
+    fn a_general_model_on_the_builtin_engine_gets_a_real_system_message() {
+        let (base_url, requests, server) = spawn_mock_provider(vec![MockResponse {
+            status: 200,
+            body: completion_response("Thank you."),
+            delay: Duration::ZERO,
+        }]);
+        let mut config = test_config(
+            base_url,
+            false,
+            PostProcessTone::None,
+            "Clean the transcript.",
+        );
+        config.provider.id = "builtin".to_string();
+        let outcome = tauri::async_runtime::block_on(run_provider_post_process(
+            &config,
+            "Thank you.",
+            TokioInstant::now() + Duration::from_secs(2),
+            None,
+        ));
+        assert_eq!(
+            outcome,
+            PostProcessAttemptOutcome::Applied("Thank you.".to_string())
+        );
+        server.join().unwrap();
+        let body = requests.recv().unwrap();
+        assert_eq!(body["messages"][0]["role"], "system");
+        assert_eq!(body["messages"][0]["content"], "Clean the transcript.");
+        assert_eq!(body["messages"][1]["role"], "user");
+        assert_eq!(body["messages"][1]["content"], "Thank you.");
+    }
+
+    #[test]
+    fn a_template_without_a_system_role_gets_a_bounded_fold() {
+        let (base_url, requests, server) = spawn_mock_provider(vec![
+            MockResponse {
+                status: 500,
+                body: r#"{"error":{"message":"System role not supported by this chat template"}}"#
+                    .to_string(),
+                delay: Duration::ZERO,
+            },
+            MockResponse {
+                status: 200,
+                body: completion_response("Thank you."),
+                delay: Duration::ZERO,
+            },
+        ]);
+        let mut config = test_config(
+            base_url,
+            false,
+            PostProcessTone::None,
+            "Clean the transcript.",
+        );
+        config.provider.id = "builtin".to_string();
+        let outcome = tauri::async_runtime::block_on(run_provider_post_process(
+            &config,
+            "Thank you.",
+            TokioInstant::now() + Duration::from_secs(3),
+            None,
+        ));
+        assert_eq!(
+            outcome,
+            PostProcessAttemptOutcome::Applied("Thank you.".to_string())
+        );
+        server.join().unwrap();
+        let sent: Vec<_> = requests.try_iter().collect();
+        assert_eq!(sent.len(), 2);
+        assert_eq!(sent[0]["messages"][0]["role"], "system");
+        let folded = &sent[1]["messages"];
+        assert_eq!(folded.as_array().unwrap().len(), 1);
+        assert_eq!(folded[0]["role"], "user");
+        let content = folded[0]["content"].as_str().unwrap();
+        assert!(content.starts_with("Clean the transcript."));
+        assert!(
+            content.ends_with(&format!("{FOLDED_TRANSCRIPT_BOUNDARY}\nThank you.")),
+            "the transcript follows an explicit boundary, never the examples directly: {content:?}"
+        );
+    }
+
+    #[test]
+    fn the_cleanup_thinking_dial_is_sent_and_gets_room_to_think() {
+        // Off is the suppression the app always sent.
+        assert_eq!(
+            cleanup_reasoning_options_at("azure_openai", "gpt-6-luna", ThinkingLevel::Off)
+                .0
+                .as_deref(),
+            Some("none")
+        );
+        assert_eq!(
+            cleanup_reasoning_options_at("groq", "openai/gpt-oss-120b", ThinkingLevel::Off)
+                .0
+                .as_deref(),
+            Some("low")
+        );
+        for (level, wire) in [
+            (ThinkingLevel::Low, "low"),
+            (ThinkingLevel::Medium, "medium"),
+            (ThinkingLevel::High, "high"),
+        ] {
+            assert_eq!(
+                cleanup_reasoning_options_at("azure_openai", "gpt-6-luna", level)
+                    .0
+                    .as_deref(),
+                Some(wire)
+            );
+            let (effort, reasoning) =
+                cleanup_reasoning_options_at("openrouter", "openai/gpt-oss-120b", level);
+            assert!(effort.is_none());
+            assert_eq!(reasoning.unwrap().effort.as_deref(), Some(wire));
+            for id in ["anthropic", "builtin", APPLE_INTELLIGENCE_PROVIDER_ID] {
+                let (effort, reasoning) = cleanup_reasoning_options_at(id, "m", level);
+                assert!(effort.is_none() && reasoning.is_none(), "{id}");
+            }
+        }
+        let text = "a short dictation";
+        assert_eq!(
+            cleanup_token_budget_at(text, ThinkingLevel::Off),
+            cleanup_token_budget(text)
+        );
+        assert!(
+            cleanup_token_budget_at(text, ThinkingLevel::Medium)
+                > cleanup_token_budget_at(text, ThinkingLevel::Low)
+        );
+        assert!(
+            cleanup_token_budget_at(text, ThinkingLevel::High)
+                > cleanup_token_budget_at(text, ThinkingLevel::Medium)
+        );
+
+        // And it reaches the wire through the resolved config.
+        let mut config = test_config(
+            "http://127.0.0.1:1/v1".to_string(),
+            false,
+            PostProcessTone::None,
+            "Clean it.",
+        );
+        config.thinking = ThinkingLevel::High;
+        let request = build_post_process_request(&config, text);
+        assert_eq!(request.reasoning_effort.as_deref(), Some("high"));
+        assert_eq!(
+            request.max_tokens,
+            Some(cleanup_token_budget_at(text, ThinkingLevel::High))
         );
     }
 
@@ -4083,6 +4647,7 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             tone_id: tone.id().to_string(),
             tone_instruction: tone.directive().map(str::to_string),
             trained_for_cleanup: false,
+            thinking: ThinkingLevel::Off,
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key: String::new(),
         }
@@ -4369,6 +4934,7 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::ProviderRequest),
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::StructuredOutputRejected),
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::MalformedResponse),
+            PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EchoedPrompt),
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EmptyResponse),
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::UnsupportedProvider),
             PostProcessAttemptOutcome::TimedOut,
@@ -4380,7 +4946,7 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             assert!(reason.is_some());
         }
         assert_eq!(
-            parse_structured_output(raw, "{not-json"),
+            parse_structured_output("Clean it.", raw, "{not-json"),
             Err(PostProcessFailureKind::MalformedResponse)
         );
         assert_eq!(
@@ -5190,9 +5756,10 @@ Try plugging it into a coding agent or productivity app listed on https://openro
     }
 
     #[test]
-    fn structured_success_extracts_only_the_transcription_field() {
+    fn structured_success_extracts_only_the_cleaned_text_field() {
         let structured_content = serde_json::json!({
-            "transcription": "Structured cleaned.",
+            "cleaned_text": "Structured cleaned.",
+            "transcription": "must not be pasted",
             "ignored": "must not be pasted"
         })
         .to_string();
@@ -5218,7 +5785,27 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             PostProcessAttemptOutcome::Applied("Structured cleaned.".to_string())
         );
         server.join().unwrap();
-        assert_eq!(requests.try_iter().count(), 1);
+        let sent: Vec<_> = requests.try_iter().collect();
+        assert_eq!(sent.len(), 1);
+        // The field a model fills must not be named after its input: named
+        // `transcription`, gpt-oss and Gemma copied the raw transcript into it.
+        let properties = &sent[0]["response_format"]["json_schema"]["schema"]["properties"];
+        assert!(properties.get("cleaned_text").is_some());
+        assert!(properties.get("transcription").is_none());
+    }
+
+    #[test]
+    fn an_answer_under_the_old_field_name_is_not_a_success() {
+        // There is no `cleaned_text`, so it is malformed and retried plain
+        // rather than pasted.
+        assert_eq!(
+            parse_structured_output(
+                "Clean it.",
+                "raw words here",
+                &serde_json::json!({ "transcription": "Raw words here." }).to_string()
+            ),
+            Err(PostProcessFailureKind::MalformedResponse)
+        );
     }
 
     #[test]
@@ -5358,6 +5945,7 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             tone_id: PostProcessTone::None.id().to_string(),
             tone_instruction: PostProcessTone::None.directive().map(str::to_string),
             trained_for_cleanup: false,
+            thinking: ThinkingLevel::Off,
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key: String::new(),
         }
@@ -5562,6 +6150,144 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             model: None,
             elapsed_ms: 0,
         }
+    }
+
+    /// Dictations from this app's own history that cleanup returned unchanged
+    /// on gpt-oss, each with a fix any working cleanup makes.
+    const LIVE_GPT_OSS_CASES: [(&str, &str); 4] = [
+        (
+            "so um I think we should uh move the meeting to Thursday, no wait, Friday, and uh can you also send the the notes to Priya",
+            "Thursday",
+        ),
+        ("Yes, let's go out on Friday. No, no, Saturday.", "No, no"),
+        (
+            "Let me list five things that are important. 1. Apple, 2. Banana, 3. Mango, 4. Grapes, 5. Orange.",
+            "1. Apple, 2.",
+        ),
+        (
+            "Um, like, um, like the texture squeeze give it- gives it like a very fake AI looking vibe.",
+            "Um,",
+        ),
+    ];
+
+    /// The real request path against a real gpt-oss deployment, with the
+    /// Readable prompt. Each case must come back edited: before the schema field
+    /// was renamed, four of these came back character for character.
+    ///
+    /// ```text
+    /// $env:SPEAKOFLOW_LIVE_PROVIDER = "azure_openai"   # or groq, openrouter, …
+    /// $env:SPEAKOFLOW_LIVE_BASE_URL = "https://<resource>.services.ai.azure.com"
+    /// $env:SPEAKOFLOW_LIVE_MODEL    = "gpt-oss-120b"
+    /// cargo test --lib live_gpt_oss -- --ignored --nocapture
+    /// ```
+    ///
+    /// The key is read from the app's own keychain slot for that provider.
+    #[test]
+    #[ignore = "live: needs SPEAKOFLOW_LIVE_PROVIDER/BASE_URL/MODEL and a key in the keychain"]
+    fn live_gpt_oss_cleanup_edits_the_text() {
+        let provider_id = std::env::var("SPEAKOFLOW_LIVE_PROVIDER").expect("provider");
+        let base_url = std::env::var("SPEAKOFLOW_LIVE_BASE_URL").expect("base url");
+        let model = std::env::var("SPEAKOFLOW_LIVE_MODEL").expect("model");
+        let api_key =
+            crate::secret_store::get(&crate::secret_store::account_post_process(&provider_id))
+                .expect("no key in the keychain for this provider");
+        let config = ResolvedPostProcessConfig {
+            provider: PostProcessProvider {
+                id: provider_id.clone(),
+                label: provider_id.clone(),
+                base_url,
+                allow_base_url_edit: true,
+                models_endpoint: Some("/models".to_string()),
+                supports_structured_output: std::env::var("SPEAKOFLOW_LIVE_STRUCTURED")
+                    .map(|v| v != "0")
+                    .unwrap_or(true),
+            },
+            model,
+            prompt_id: crate::settings::READABLE_POST_PROCESS_PROMPT_ID.to_string(),
+            prompt: crate::settings::readable_post_process_prompt_text().to_string(),
+            tone_id: PostProcessTone::None.id().to_string(),
+            tone_instruction: None,
+            trained_for_cleanup: false,
+            // `SPEAKOFLOW_LIVE_THINKING=high` exercises the dial on the wire.
+            thinking: match std::env::var("SPEAKOFLOW_LIVE_THINKING").as_deref() {
+                Ok("low") => ThinkingLevel::Low,
+                Ok("medium") => ThinkingLevel::Medium,
+                Ok("high") => ThinkingLevel::High,
+                _ => ThinkingLevel::Off,
+            },
+            source: PostProcessConfigSource::DedicatedCleanupSelection,
+            api_key,
+        };
+        let mut unedited = Vec::new();
+        for (raw, debris) in LIVE_GPT_OSS_CASES {
+            let started = Instant::now();
+            let outcome = tauri::async_runtime::block_on(run_provider_post_process(
+                &config,
+                raw,
+                TokioInstant::now() + Duration::from_secs(30),
+                None,
+            ));
+            println!(
+                "[{:>5} ms] {raw:?}\n          -> {outcome:?}",
+                started.elapsed().as_millis()
+            );
+            match outcome {
+                PostProcessAttemptOutcome::Applied(text) if !text.contains(debris) => {}
+                other => unedited.push((raw, other)),
+            }
+        }
+        assert!(unedited.is_empty(), "not cleaned: {unedited:#?}");
+    }
+
+    /// The real request path against the built-in engine running a small
+    /// general model with the Readable prompt, for the short dictations that
+    /// produced feedback #8. None may come back as the prompt's examples.
+    ///
+    /// ```text
+    /// llama-server -m gemma-4-E2B_q4_0-it.gguf --port 11499 --jinja --reasoning-budget 0
+    /// $env:SPEAKOFLOW_LIVE_ENGINE = "http://127.0.0.1:11499/v1"
+    /// cargo test --lib live_builtin_short -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "live: needs a llama-server at SPEAKOFLOW_LIVE_ENGINE"]
+    fn live_builtin_short_dictations_are_not_answered_with_the_examples() {
+        let base_url = std::env::var("SPEAKOFLOW_LIVE_ENGINE").expect("engine url");
+        let mut config = test_config(
+            base_url,
+            true,
+            PostProcessTone::None,
+            crate::settings::readable_post_process_prompt_text(),
+        );
+        config.provider.id = "builtin".to_string();
+        config.model = "gemma-4-e2b".to_string();
+        let mut leaked = Vec::new();
+        for raw in [
+            "Thank you.",
+            "Okay.",
+            "Hello.",
+            "Thanks.",
+            "Yes.",
+            "Bye.",
+            "Um, okay.",
+            "Test, test.",
+            "Hmm.",
+            "Thank you very much.",
+            "Got it.",
+        ] {
+            let outcome = tauri::async_runtime::block_on(run_provider_post_process(
+                &config,
+                raw,
+                TokioInstant::now() + Duration::from_secs(60),
+                None,
+            ));
+            println!("{raw:?} -> {outcome:?}");
+            if let PostProcessAttemptOutcome::Applied(text) = &outcome {
+                if text.to_lowercase().contains("pricing") || text.contains("invoice") {
+                    leaked.push((raw, text.clone()));
+                }
+            }
+        }
+        assert!(leaked.is_empty(), "examples pasted: {leaked:#?}");
     }
 
     // A fallback must be announced. Pasting the raw transcript with no signal is

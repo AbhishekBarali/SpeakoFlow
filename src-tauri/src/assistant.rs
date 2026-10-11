@@ -4428,6 +4428,19 @@ async fn run_assistant_turn_inner(
     // so a rejection from that round is recognised as a vision failure too.
     let image_dispatched = Arc::new(AtomicBool::new(has_visual));
 
+    // The user's thinking dial, resolved once for every round of this turn.
+    // `Off` is the fast path the turn always used; see `ThinkingLevel`.
+    let thinking =
+        llm_client::reasoning_options_for(&provider.id, &model, settings.assistant_thinking);
+    debug!(
+        "Assistant thinking: {:?} (reasoning_effort {:?})",
+        settings.assistant_thinking,
+        thinking
+            .0
+            .as_deref()
+            .or_else(|| thinking.1.as_ref().and_then(|r| r.effort.as_deref()))
+    );
+
     let outcome = if let Some(tools) = tool_capabilities {
         let partial_cb = partial.clone();
         let speech_cb = speech_sink.clone();
@@ -4438,6 +4451,7 @@ async fn run_assistant_turn_inner(
         let model_c = model.clone();
         let settings_c = settings.clone();
         let timer_c = timer.clone();
+        let thinking_c = thinking.clone();
         let image_dispatched_c = image_dispatched.clone();
         // Which screen switch a `capture_screen` call is re-checked against.
         let is_call = voice_ticket.is_some();
@@ -4460,8 +4474,8 @@ async fn run_assistant_turn_inner(
                     msgs.clone(),
                     tools.clone(),
                     tool_choice,
-                    None,
-                    None,
+                    thinking_c.0.clone(),
+                    thinking_c.1.clone(),
                     assistant_token_sink(
                         app_tokens.clone(),
                         partial_cb.clone(),
@@ -4638,8 +4652,8 @@ async fn run_assistant_turn_inner(
                             api_key_c.clone(),
                             &model_c,
                             msgs.clone(),
-                            None,
-                            None,
+                            thinking_c.0.clone(),
+                            thinking_c.1.clone(),
                             assistant_token_sink(
                                 app_tokens.clone(),
                                 partial_cb.clone(),
@@ -4665,8 +4679,8 @@ async fn run_assistant_turn_inner(
             api_key.clone(),
             &request_model,
             messages,
-            None,
-            None,
+            thinking.0.clone(),
+            thinking.1.clone(),
             assistant_token_sink(
                 app.clone(),
                 partial.clone(),
@@ -4728,8 +4742,8 @@ async fn run_assistant_turn_inner(
                 api_key.clone(),
                 &model,
                 vision_fallback.take().unwrap_or_default(),
-                None,
-                None,
+                thinking.0.clone(),
+                thinking.1.clone(),
                 assistant_token_sink(
                     app.clone(),
                     partial.clone(),
@@ -4785,8 +4799,8 @@ async fn run_assistant_turn_inner(
                 api_key.clone(),
                 &request_model,
                 tools_fallback.take().unwrap_or_default(),
-                None,
-                None,
+                thinking.0.clone(),
+                thinking.1.clone(),
                 assistant_token_sink(
                     app.clone(),
                     partial.clone(),

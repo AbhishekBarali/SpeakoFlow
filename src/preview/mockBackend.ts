@@ -608,6 +608,8 @@ const settings: Json = {
     },
   ],
   post_process_timeout_secs: 20,
+  post_process_thinking: "off",
+  assistant_thinking: "off",
   assistant_enabled: true,
   assistant_provider_id: params.get("brain") === "device" ? "builtin" : "groq",
   assistant_last_cloud_provider_id: "groq",
@@ -1712,6 +1714,12 @@ const handlers: Record<string, (args: Json) => unknown> = {
           "assistant_web_search_provider",
         ],
         ["set_assistant_search_depth", "depth", "assistant_search_depth"],
+        ["set_assistant_thinking", "level", "assistant_thinking"],
+        [
+          "change_post_process_thinking_setting",
+          "level",
+          "post_process_thinking",
+        ],
         ["set_assistant_memory_enabled", "enabled", "assistant_memory_enabled"],
         ["set_assistant_memory_detail", "detail", "assistant_memory_detail"],
         [
