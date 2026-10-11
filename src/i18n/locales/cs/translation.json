@@ -1886,6 +1886,24 @@
         "opacityLabel": "Průhlednost panelu",
         "opacityDescription": "Jak neprůhledný plovoucí panel je. 100 % je zcela plný; nižší hodnoty nechají prosvítat rozostřenou plochu."
       }
+    },
+    "thinking": {
+      "title": "Přemýšlení",
+      "description": {
+        "cleanup": "Jak dlouho model s uvažováním přemýšlí, než vyčistí váš diktát. Vypnuto je nejrychlejší a modely, které přemýšlejí vždy, například gpt-oss, použijí svou nejnižší úroveň. Zvyšte to jen tehdy, když čištění dělá chyby, protože přidává zpoždění ke každému diktátu.",
+        "assistant": "Jak dlouho model s uvažováním přemýšlí, než odpoví. Vypnuto je nejrychlejší a modely, které přemýšlejí vždy, například gpt-oss, použijí svou nejnižší úroveň. Vyšší úrovně zvládají těžké otázky lépe, ale déle trvá, než začnou odpovídat."
+      },
+      "unsupported": {
+        "builtin": "Modely v tomto počítači vždy odpovídají bez přemýšlení, a proto jsou rychlé.",
+        "anthropic": "Anthropic aplikacím nedovoluje toto nastavit, takže rozhoduje Claude. Chcete-li to nastavit, použijte Claude přes OpenRouter.",
+        "apple": "Apple Intelligence nemá nastavení přemýšlení."
+      },
+      "options": {
+        "off": "Vypnuto",
+        "low": "Nízké",
+        "medium": "Střední",
+        "high": "Vysoké"
+      }
     }
   },
   "footer": {

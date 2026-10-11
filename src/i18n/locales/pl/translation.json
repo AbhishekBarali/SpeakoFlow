@@ -1886,6 +1886,24 @@
         "opacityLabel": "Przezroczystość panelu",
         "opacityDescription": "Jak mocno kryje pływający panel. 100% to pełne krycie; niższe wartości pozwalają przebijać rozmyty pulpit."
       }
+    },
+    "thinking": {
+      "title": "Myślenie",
+      "description": {
+        "cleanup": "Jak długo model rozumujący myśli, zanim oczyści Twoje dyktowanie. Wyłączone jest najszybsze, a modele, które zawsze myślą, takie jak gpt-oss, używają swojego najniższego poziomu. Zwiększ to tylko wtedy, gdy czyszczenie popełnia błędy, bo opóźnia każde dyktowanie.",
+        "assistant": "Jak długo model rozumujący myśli, zanim odpowie. Wyłączone jest najszybsze, a modele, które zawsze myślą, takie jak gpt-oss, używają swojego najniższego poziomu. Wyższe poziomy lepiej radzą sobie z trudnymi pytaniami, ale dłużej zaczynają odpowiadać."
+      },
+      "unsupported": {
+        "builtin": "Modele na tym komputerze zawsze odpowiadają bez myślenia, dlatego są szybkie.",
+        "anthropic": "Anthropic nie pozwala aplikacjom tego ustawiać, więc decyduje Claude. Aby to ustawić, używaj Claude przez OpenRouter.",
+        "apple": "Apple Intelligence nie ma ustawienia myślenia."
+      },
+      "options": {
+        "off": "Wyłączone",
+        "low": "Niskie",
+        "medium": "Średnie",
+        "high": "Wysokie"
+      }
     }
   },
   "footer": {
