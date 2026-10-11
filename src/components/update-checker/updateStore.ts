@@ -4,8 +4,11 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import {
   INSTALLER_PROGRESS_EVENT,
+  UPDATE_PROGRESS_EVENT,
+  downloadUpdate,
   downloadUpdateInstaller,
   getUpdateSupport,
+  installDownloadedUpdate,
   openUpdateInstaller,
   prepareUpdateInstall,
   revealUpdateInstaller,
@@ -171,35 +174,30 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     const update = pending;
     set({ phase: "downloading", progress: 0, error: null });
 
-    let total: number | null = null;
-    let done = 0;
+    const unlisten = await listen<InstallerProgress>(
+      UPDATE_PROGRESS_EVENT,
+      (event) =>
+        set({
+          progress: percentOf(event.payload.downloaded, event.payload.total),
+        }),
+    );
     try {
-      await update.download((event) => {
-        switch (event.event) {
-          case "Started":
-            total = event.data.contentLength ?? null;
-            done = 0;
-            set({ progress: percentOf(0, total) });
-            break;
-          case "Progress":
-            done += event.data.chunkLength;
-            set({ progress: percentOf(done, total) });
-            break;
-          case "Finished":
-            set({ phase: "installing", progress: 100 });
-            break;
-        }
-      });
+      let version = update.version;
+      try {
+        version = await downloadUpdate();
+      } finally {
+        unlisten();
+      }
       set({ phase: "installing", progress: 100 });
       // On Windows the app closes the moment install() starts, so give the
       // "closing and reopening" message a moment on screen first; without it
       // the window simply vanished and the update looked like a crash.
       await new Promise((resolve) => setTimeout(resolve, HANDOVER_PAUSE_MS));
       // Lets the new version come to the front and say it was updated.
-      await prepareUpdateInstall(update.version).catch((error) =>
+      await prepareUpdateInstall(version).catch((error) =>
         console.warn("prepare_update_install failed:", error),
       );
-      await update.install();
+      await installDownloadedUpdate();
     } catch (error) {
       console.error("Update install failed:", error);
       set({
