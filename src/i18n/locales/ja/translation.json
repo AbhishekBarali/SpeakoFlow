@@ -1102,6 +1102,12 @@
           "placeholderWithOptions": "モデルを検索または選択",
           "placeholderNoOptions": "モデル名を入力",
           "refreshModels": "モデルを更新"
+        },
+        "testConnection": {
+          "title": "接続をテスト",
+          "description": "短いリクエストを1つ送信して、AI整形がこのモデルに実際に接続できるか確認します。デバイス上のモデルは先に読み込まれるため、初回のテストは時間がかかることがあります。",
+          "button": "接続をテスト",
+          "testing": "テスト中…"
         }
       },
       "prompts": {

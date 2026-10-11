@@ -1102,6 +1102,12 @@
           "placeholderWithOptions": "搜索或选择模型",
           "placeholderNoOptions": "输入模型名称",
           "refreshModels": "刷新模型"
+        },
+        "testConnection": {
+          "title": "测试连接",
+          "description": "发送一个简短的请求，检查 AI 清理能否真正连上这个模型。设备端模型需要先加载，所以第一次测试可能要等一会儿。",
+          "button": "测试连接",
+          "testing": "正在测试…"
         }
       },
       "prompts": {
