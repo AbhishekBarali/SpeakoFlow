@@ -10,9 +10,15 @@ name: "Updater manifest"
 # the published bytes, so a manifest that an installed app would reject is
 # never published.
 #
+# Once latest.json is uploaded, the .sig files the build attached are deleted:
+# the signatures are inside latest.json now, and installed apps never download
+# a .sig, so they would only clutter the release's file list.
+#
 # Called at the end of release-unsigned.yml and release.yml. Can also be run by
 # hand against an existing draft, e.g. after re-running a single failed
-# platform, because the manifest is rebuilt from whatever the release holds:
+# platform, because the manifest is rebuilt from whatever the release holds
+# (a bundle whose .sig is already gone keeps the signature from the existing
+# latest.json, verified again):
 #
 #   gh workflow run updater-manifest.yml -f release-id=<id>
 #
