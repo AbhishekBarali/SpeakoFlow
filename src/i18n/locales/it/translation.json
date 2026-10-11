@@ -1877,6 +1877,24 @@
         "opacityLabel": "Opacità del pannello",
         "opacityDescription": "Quanto è opaco il pannello flottante. 100% è completamente pieno; con valori più bassi il desktop traspare sfocato."
       }
+    },
+    "thinking": {
+      "title": "Ragionamento",
+      "description": {
+        "cleanup": "Quanto pensa un modello di ragionamento prima di ripulire la tua dettatura. Disattivato è il più veloce, e i modelli che pensano sempre, come gpt-oss, usano il loro livello più basso. Alzalo solo se la pulizia commette errori, perché aggiunge un ritardo a ogni dettatura.",
+        "assistant": "Quanto pensa un modello di ragionamento prima di rispondere. Disattivato è il più veloce, e i modelli che pensano sempre, come gpt-oss, usano il loro livello più basso. I livelli più alti gestiscono meglio le domande difficili, ma impiegano più tempo a iniziare a rispondere."
+      },
+      "unsupported": {
+        "builtin": "I modelli su questo computer rispondono sempre senza pensare, ed è questo che li rende veloci.",
+        "anthropic": "Anthropic non consente alle app di impostarlo, quindi decide Claude. Usa Claude tramite OpenRouter per impostarlo.",
+        "apple": "Apple Intelligence non ha un'impostazione di ragionamento."
+      },
+      "options": {
+        "off": "Disattivato",
+        "low": "Basso",
+        "medium": "Medio",
+        "high": "Alto"
+      }
     }
   },
   "footer": {
@@ -3292,5 +3310,16 @@
     "best": "Giorno migliore",
     "typical": "Giorno tipico",
     "typicalSub": "Nei giorni in cui detti"
+  },
+  "settingsNotice": {
+    "restored": "Le tue impostazioni erano danneggiate e sono state ripristinate da un backup.",
+    "restoredDescription": "Le modifiche più recenti potrebbero mancare.",
+    "unrecoverableTitle": "Impossibile recuperare le tue impostazioni",
+    "unrecoverableDescription": "SpeakoFlow è stato avviato con le impostazioni predefinite. Il file danneggiato è stato conservato come {{file}}.",
+    "notSavingTitle": "Le modifiche alle impostazioni non verranno salvate",
+    "notSavingDescription": "Non è stato possibile leggere il file delle impostazioni, quindi è stato lasciato com'è. Riavvia SpeakoFlow per riprovare.",
+    "saveFailingTitle": "Le impostazioni non vengono salvate",
+    "saveFailingDescription": "Le modifiche recenti non sono ancora state salvate. SpeakoFlow continuerà a provare.",
+    "dismiss": "Ignora"
   }
 }

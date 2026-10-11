@@ -1,11 +1,12 @@
-use log::{debug, info, warn};
+use crate::settings_file::{LoadOutcome, SettingsFile};
+use log::{debug, error, info, warn};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use specta::Type;
 use std::collections::HashMap;
 use std::fmt;
-use tauri::AppHandle;
-use tauri_plugin_store::StoreExt;
+use std::sync::{Arc, OnceLock};
+use tauri::{AppHandle, Emitter};
 
 pub const APPLE_INTELLIGENCE_PROVIDER_ID: &str = "apple_intelligence";
 
@@ -628,6 +629,8 @@ pub(crate) struct ResolvedPostProcessConfig {
     /// system prompt + optional writing style) are still sent, because those are
     /// explicit choices rather than app-added scaffolding.
     pub trained_for_cleanup: bool,
+    /// The user's thinking dial for cleanup (`post_process_thinking`).
+    pub thinking: ThinkingLevel,
     pub source: PostProcessConfigSource,
     pub api_key: String,
 }
@@ -928,6 +931,59 @@ pub enum AssistantSearchDepth {
     Medium,
     /// Broadest single pass. More queries/sources, scrape more winners.
     High,
+}
+
+/// How much a reasoning model may think before it answers. One dial each for AI
+/// cleanup (`post_process_thinking`) and the assistant (`assistant_thinking`).
+///
+/// **`Off` is the default for both, and it is the fast path the app always
+/// used**: `reasoning_effort: "none"`, or the lowest level a model accepts for
+/// one that cannot stop thinking (gpt-oss, the o-series, R1), negotiated per
+/// model when a provider refuses either. The other levels are sent as-is in the
+/// one form that is close to universal: `reasoning_effort` on the OpenAI schema
+/// (OpenAI, Azure, Groq, Cerebras, Gemini's compatibility layer, Bedrock), and
+/// `reasoning.effort` on OpenRouter, which maps it onto each upstream's own
+/// control (Claude's thinking budget included).
+///
+/// Three providers cannot take it, and the settings row says so rather than
+/// offering a dial that does nothing: Anthropic's OpenAI-compatible layer
+/// documents `reasoning_effort` as ignored, Apple Intelligence has no such
+/// control, and the built-in engine is launched with a zero thinking budget
+/// (`LLAMA_ARG_THINK_BUDGET=0`), which a request cannot lift.
+///
+/// Measured before this existed, because it is the obvious suspect when a
+/// thinking model "does not clean up": gpt-oss-120b on Azure returned the
+/// transcript unchanged at both `low` and `medium` effort. Thinking was never
+/// the cause there (the structured-output field name was, see
+/// `actions::CLEANED_TEXT_FIELD`), so this is a quality dial, not a repair.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingLevel {
+    /// Answer straight away; the lowest level for a model that must think.
+    #[default]
+    Off,
+    Low,
+    Medium,
+    High,
+}
+
+impl ThinkingLevel {
+    /// The `reasoning_effort` value for an explicit level; `None` for `Off`,
+    /// whose wire value depends on the model.
+    pub fn effort(self) -> Option<&'static str> {
+        match self {
+            Self::Off => None,
+            Self::Low => Some("low"),
+            Self::Medium => Some("medium"),
+            Self::High => Some("high"),
+        }
+    }
+}
+
+/// Whether a provider accepts a thinking level at all. Mirrored by
+/// `providerSupportsThinking` in `src/lib/thinking.ts`.
+pub fn provider_supports_thinking(provider_id: &str) -> bool {
+    !matches!(provider_id, "builtin" | "anthropic" | "apple_intelligence")
 }
 
 /// How long unstarred dictation/Flow recordings are kept.
@@ -1483,6 +1539,10 @@ pub struct AppSettings {
     pub post_process_selected_tone_id: Option<String>,
     #[serde(default = "default_post_process_timeout_secs")]
     pub post_process_timeout_secs: u32,
+    /// How much a reasoning model may think before cleaning a dictation. See
+    /// [`ThinkingLevel`]; `Off` keeps cleanup on its fast path.
+    #[serde(default)]
+    pub post_process_thinking: ThinkingLevel,
     /// The cloud provider the user last had selected for AI cleanup, remembered
     /// so the device ⇄ cloud switch can put it back.
     ///
@@ -1763,6 +1823,10 @@ pub struct AppSettings {
     /// "max results" number as the primary control; tuned to stay fast.
     #[serde(default)]
     pub assistant_search_depth: AssistantSearchDepth,
+    /// How much a reasoning model may think before answering an ask or a call.
+    /// See [`ThinkingLevel`]; `Off` keeps replies on the fast path.
+    #[serde(default)]
+    pub assistant_thinking: ThinkingLevel,
     /// DEPRECATED / unused since the Firecrawl credit guard was removed (search
     /// is now snippet-only over per-request SERP APIs). Kept so existing
     /// settings files and generated bindings stay stable.
@@ -4015,6 +4079,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_custom_tones: Vec::new(),
         post_process_selected_tone_id: Some(DEFAULT_POST_PROCESS_TONE_ID.to_string()),
         post_process_timeout_secs: default_post_process_timeout_secs(),
+        post_process_thinking: ThinkingLevel::default(),
         // Seeded rather than left None so `get_default_settings()` is a fixed
         // point of the repair pass below (several tests rely on that, and a
         // settings write on every launch would be pointless churn).
@@ -4093,6 +4158,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_web_search_max_results: default_assistant_web_search_max_results(),
         assistant_web_search_fetch_content: default_assistant_web_search_fetch_content(),
         assistant_search_depth: AssistantSearchDepth::default(),
+        assistant_thinking: ThinkingLevel::default(),
         assistant_web_search_daily_credit_budget: default_assistant_web_search_daily_credit_budget(
         ),
         assistant_local_search_smart: false,
@@ -4527,6 +4593,7 @@ pub(crate) fn resolve_post_process_config(
         tone_id,
         tone_instruction,
         trained_for_cleanup,
+        thinking: settings.post_process_thinking,
         source,
         api_key,
     })
@@ -5070,16 +5137,13 @@ fn salvage_settings(stored: &serde_json::Value) -> AppSettings {
 }
 
 pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
-    // Initialize store
-    let store = app
-        .store(crate::portable::store_path(SETTINGS_STORE_PATH))
-        .expect("Failed to initialize store");
+    let store = settings_file(app);
 
     let mut settings = if let Some(settings_value) = store.get("settings") {
         // Parse the entire settings object. On a whole-object parse failure,
         // salvage every individually-valid field instead of wiping the store
         // (Handy #1631) — one bad field must never reset the user's config.
-        let (mut settings, mut updated) = deserialize_settings_value(settings_value.clone());
+        let (mut settings, mut updated) = deserialize_settings_value(settings_value);
         // The full dump includes personal memory ("About You" and notes), custom
         // and learned words, text replacements, prompts and profiles — none of it
         // belongs in a log file that persists on disk in a shipped build. API
@@ -5235,54 +5299,61 @@ fn total_physical_memory_bytes() -> Option<u64> {
         .ok()
 }
 
-/// The settings store, or `None` once the app has started tearing itself down.
-///
-/// `app.store()` fails only when the store has been dropped from the app's
-/// resource table, and the thing that does that is
-/// `AppHandle::cleanup_before_exit`. The updater plugin calls it on Windows
-/// just before it launches the installer, and on Windows it also hides every
-/// window, so the main window's `Focused(false)` handler reads settings at
-/// that exact moment. That used to be an `expect`: the main thread panicked,
-/// the process died before the installer was started, and clicking Update
-/// closed the app and installed nothing.
-fn settings_store(
-    app: &AppHandle,
-) -> Option<std::sync::Arc<tauri_plugin_store::Store<tauri::Wry>>> {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    static WARNED: AtomicBool = AtomicBool::new(false);
+static SETTINGS_FILE: OnceLock<Arc<SettingsFile>> = OnceLock::new();
 
-    match app.store(crate::portable::store_path(SETTINGS_STORE_PATH)) {
-        Ok(store) => Some(store),
-        Err(e) => {
-            if !WARNED.swap(true, Ordering::Relaxed) {
-                warn!("Settings store unavailable (app shutting down?): {e}");
+/// Emitted with every current [`crate::settings_file::SettingsNotice`] when a
+/// save raises or clears one.
+pub const SETTINGS_NOTICES_EVENT: &str = "settings-notices";
+
+/// The settings file, opened on first use. See [`crate::settings_file`] for why
+/// it is not a `tauri-plugin-store` store.
+///
+/// It lives for the whole process, outside the app's resource table, so it is
+/// still there after `AppHandle::cleanup_before_exit`. The in-app Windows update
+/// calls that just before it starts the installer, and the main window's
+/// `Focused(false)` handler reads settings at that moment. With the plugin store
+/// gone from the table that read used to panic, and the update never installed.
+pub(crate) fn settings_file(app: &AppHandle) -> &'static SettingsFile {
+    SETTINGS_FILE.get_or_init(|| {
+        match crate::portable::resolve_app_data(app, SETTINGS_STORE_PATH) {
+            Ok(path) => {
+                let file = SettingsFile::open(path.clone());
+                match file.outcome() {
+                    LoadOutcome::Fresh => info!("No settings file yet at {}", path.display()),
+                    LoadOutcome::Loaded => debug!("Read settings from {}", path.display()),
+                    // The recovery paths log their own error with the details.
+                    _ => {}
+                }
+                // A notice raised before any window listens is read with
+                // `get_settings_notices`; this carries the later ones.
+                let app = app.clone();
+                file.set_notifier(move |notices| {
+                    if let Err(err) = app.emit(SETTINGS_NOTICES_EVENT, notices) {
+                        warn!("Could not send the settings notices to the window: {err}");
+                    }
+                });
+                file
             }
-            None
+            Err(err) => {
+                error!("Cannot locate the settings file ({err}); settings will not be saved");
+                SettingsFile::in_memory()
+            }
         }
+    })
+}
+
+/// Save any settings change that is still waiting for the writer thread. Runs
+/// before the app exits, so the last change before a quit is not left behind.
+pub(crate) fn flush_settings() {
+    if let Some(file) = SETTINGS_FILE.get() {
+        let _ = file.flush();
     }
 }
 
-/// The persisted `settings` value read straight from the store's file, for
-/// when the store itself is gone (see [`settings_store`]). Read-only.
-fn settings_value_from_disk(app: &AppHandle) -> Option<serde_json::Value> {
-    let path = crate::portable::resolve_app_data(app, SETTINGS_STORE_PATH).ok()?;
-    settings_value_from_store_file(&std::fs::read_to_string(path).ok()?)
-}
-
-/// The `settings` entry of a tauri-plugin-store file (a JSON object of keys).
-fn settings_value_from_store_file(text: &str) -> Option<serde_json::Value> {
-    let mut root: serde_json::Value = serde_json::from_str(text).ok()?;
-    root.get_mut("settings").map(serde_json::Value::take)
-}
-
 pub fn get_settings(app: &AppHandle) -> AppSettings {
-    let store = settings_store(app);
-    let stored = match &store {
-        Some(store) => store.get("settings"),
-        None => settings_value_from_disk(app),
-    };
+    let store = settings_file(app);
 
-    let (mut settings, mut updated) = if let Some(settings_value) = stored {
+    let (mut settings, mut updated) = if let Some(settings_value) = store.get("settings") {
         deserialize_settings_value(settings_value)
     } else {
         (get_default_settings(), true)
@@ -5295,9 +5366,7 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         updated = true;
     }
     if updated {
-        if let Some(store) = &store {
-            store.set("settings", serde_json::to_value(&settings).unwrap());
-        }
+        store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
     // Fill the in-memory secrets from the keychain (served from cache after the
@@ -5315,11 +5384,7 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
 }
 
 pub fn write_settings(app: &AppHandle, mut settings: AppSettings) {
-    // Only unavailable while the app is exiting; nothing written then would be
-    // read again by this process, and panicking would abort the exit itself.
-    let Some(store) = settings_store(app) else {
-        return;
-    };
+    let store = settings_file(app);
 
     // Keep API keys in the OS keychain, never in the on-disk store. Each key is
     // blanked from the serialized copy only after the keychain confirms it holds
@@ -5356,18 +5421,42 @@ pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
 mod tests {
     use super::*;
 
+    /// The reported failure, end to end: a launch reads good settings, the next
+    /// shutdown leaves the file empty, and the launch after that must still find
+    /// the user's custom words, shortcut and model rather than the defaults.
     #[test]
-    fn settings_can_be_read_from_the_store_file_when_the_store_is_gone() {
-        // What get_settings falls back to after cleanup_before_exit dropped the
-        // store (the in-app Windows update path): the file's own `settings`.
-        let file = r#"{"settings":{"push_to_talk":false,"main_window_width":900.0},"other":1}"#;
-        let value = settings_value_from_store_file(file).expect("settings entry");
-        let (settings, _) = deserialize_settings_value(value);
-        assert!(!settings.push_to_talk);
-        assert_eq!(settings.main_window_width, Some(900.0));
+    fn settings_survive_a_shutdown_that_left_the_file_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(SETTINGS_STORE_PATH);
 
-        assert!(settings_value_from_store_file(r#"{"other":1}"#).is_none());
-        assert!(settings_value_from_store_file("not json").is_none());
+        let mut saved = get_default_settings();
+        saved.custom_words = vec!["SpeakoFlow".to_string()];
+        saved.selected_model = "parakeet-tdt-0.6b-v3".to_string();
+        saved
+            .bindings
+            .get_mut("transcribe")
+            .unwrap()
+            .current_binding = "command_right".to_string();
+        let file = serde_json::json!({ "settings": saved });
+        std::fs::write(&path, serde_json::to_vec_pretty(&file).unwrap()).unwrap();
+        // The launch that read it keeps a backup.
+        SettingsFile::open(path.clone());
+
+        std::fs::write(&path, b"").unwrap();
+
+        let reopened = SettingsFile::open(path);
+        assert!(matches!(
+            reopened.outcome(),
+            LoadOutcome::RestoredFromBackup { .. }
+        ));
+        let (restored, _) =
+            deserialize_settings_value(reopened.get("settings").expect("settings restored"));
+        assert_eq!(restored.custom_words, vec!["SpeakoFlow".to_string()]);
+        assert_eq!(restored.selected_model, "parakeet-tdt-0.6b-v3");
+        assert_eq!(
+            restored.bindings["transcribe"].current_binding,
+            "command_right"
+        );
     }
 
     fn binding(id: &str, default: &str, current: &str) -> ShortcutBinding {

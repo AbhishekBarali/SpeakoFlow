@@ -1877,6 +1877,24 @@
         "opacityLabel": "Opacité du panneau",
         "opacityDescription": "Le degré d'opacité du panneau flottant. 100 % est totalement opaque ; des valeurs plus faibles laissent apparaître le bureau en flou."
       }
+    },
+    "thinking": {
+      "title": "Réflexion",
+      "description": {
+        "cleanup": "Le temps de réflexion d'un modèle de raisonnement avant de nettoyer votre dictée. Désactivé est le plus rapide, et les modèles qui réfléchissent toujours, comme gpt-oss, utilisent leur niveau le plus bas. Augmentez-le seulement si le nettoyage fait des erreurs, car il ajoute un délai à chaque dictée.",
+        "assistant": "Le temps de réflexion d'un modèle de raisonnement avant de répondre. Désactivé est le plus rapide, et les modèles qui réfléchissent toujours, comme gpt-oss, utilisent leur niveau le plus bas. Les niveaux élevés traitent mieux les questions difficiles, mais mettent plus de temps à commencer à répondre."
+      },
+      "unsupported": {
+        "builtin": "Les modèles sur cet ordinateur répondent toujours sans réfléchir, ce qui les rend rapides.",
+        "anthropic": "Anthropic ne permet pas aux applications de régler ceci, c'est donc Claude qui décide. Utilisez Claude via OpenRouter pour le régler.",
+        "apple": "Apple Intelligence n'a pas de réglage de réflexion."
+      },
+      "options": {
+        "off": "Désactivé",
+        "low": "Faible",
+        "medium": "Moyen",
+        "high": "Élevé"
+      }
     }
   },
   "footer": {
@@ -3292,5 +3310,16 @@
     "best": "Meilleur jour",
     "typical": "Jour type",
     "typicalSub": "Les jours où vous dictez"
+  },
+  "settingsNotice": {
+    "restored": "Vos paramètres étaient endommagés et ont été restaurés à partir d'une sauvegarde.",
+    "restoredDescription": "Vos dernières modifications peuvent manquer.",
+    "unrecoverableTitle": "Impossible de récupérer vos paramètres",
+    "unrecoverableDescription": "SpeakoFlow a démarré avec les paramètres par défaut. Le fichier endommagé a été conservé sous le nom {{file}}.",
+    "notSavingTitle": "Les modifications des paramètres ne seront pas enregistrées",
+    "notSavingDescription": "Le fichier de paramètres n'a pas pu être lu, il a donc été laissé tel quel. Redémarrez SpeakoFlow pour réessayer.",
+    "saveFailingTitle": "Les paramètres ne sont pas enregistrés",
+    "saveFailingDescription": "Vos dernières modifications ne sont pas encore enregistrées. SpeakoFlow continue d'essayer.",
+    "dismiss": "Ignorer"
   }
 }

@@ -6748,6 +6748,7 @@ dependencies = [
  "webview2-com",
  "windows 0.61.3",
  "winreg 0.55.0",
+ "wl-clipboard-rs",
  "xcap",
  "zip 2.4.2",
 ]
