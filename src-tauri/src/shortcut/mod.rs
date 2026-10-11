@@ -1044,6 +1044,15 @@ pub fn change_auto_submit_key_setting(app: AppHandle, key: String) -> Result<(),
     Ok(())
 }
 
+/// Send one trivial request to the model AI cleanup would use and report how it
+/// went, for the Test connection row on the AI cleanup page. See
+/// [`crate::actions::test_post_process_connection`].
+#[tauri::command]
+#[specta::specta]
+pub async fn post_process_test_connection(app: AppHandle) -> Result<String, String> {
+    crate::actions::test_post_process_connection(&app).await
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_post_process_readiness(app: AppHandle) -> settings::PostProcessReadiness {

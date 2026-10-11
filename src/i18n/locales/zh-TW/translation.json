@@ -1102,6 +1102,12 @@
           "placeholderWithOptions": "搜尋或選擇模型",
           "placeholderNoOptions": "輸入模型名稱",
           "refreshModels": "重新整理模型"
+        },
+        "testConnection": {
+          "title": "測試連線",
+          "description": "傳送一個簡短請求，確認 AI 整理確實能連上這個模型。裝置端模型需要先載入，因此第一次測試可能要稍等一下。",
+          "button": "測試連線",
+          "testing": "測試中…"
         }
       },
       "prompts": {

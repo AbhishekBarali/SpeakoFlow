@@ -14,6 +14,7 @@ import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeTog
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
+import { CleanupTestConnection } from "../PostProcessingSettingsApi/CleanupTestConnection";
 import { ModelCombo } from "../../ui/ModelCombo";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { useSettings } from "../../../hooks/useSettings";
@@ -190,6 +191,18 @@ const PostProcessingSettingsApiComponent: React.FC<{
             />
           </SettingContainer>
         ))}
+
+      {/* Last row on purpose: it tests whatever the rows above resolved to, in
+          either mode, the same way the assistant's card does. Apple
+          Intelligence runs on the Mac itself, so there is nothing to reach. */}
+      {!state.isAppleProvider && (
+        <CleanupTestConnection
+          providerId={state.selectedProviderId}
+          model={state.model}
+          baseUrl={state.baseUrl}
+          disabled={state.isProviderUpdating}
+        />
+      )}
     </>
   );
 };

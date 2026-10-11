@@ -501,6 +501,93 @@ fn cleanup_llm(app: &AppHandle) -> Arc<crate::managers::local_llm::LocalLlmManag
         .clone()
 }
 
+/// What to tell the user when the cleanup settings do not resolve to a model,
+/// naming the setting that needs them rather than a generic "not configured".
+fn cleanup_unavailable_message(error: &PostProcessResolutionError) -> String {
+    let provider = error
+        .provider_label
+        .as_deref()
+        .unwrap_or("the selected provider");
+    match error.reason {
+        PostProcessUnavailableReason::NoProviders
+        | PostProcessUnavailableReason::SelectedProviderMissing => {
+            "No AI cleanup provider is set up. Pick one in Models → AI cleanup.".to_string()
+        }
+        PostProcessUnavailableReason::NoModelConfigured => {
+            format!("No model is set for {provider}. Set one in Models → AI cleanup.")
+        }
+        PostProcessUnavailableReason::MissingApiKey => {
+            format!("No API key is set for {provider}. Add one in Models → AI cleanup.")
+        }
+        PostProcessUnavailableReason::NoPromptSelected
+        | PostProcessUnavailableReason::SelectedPromptMissing
+        | PostProcessUnavailableReason::SelectedPromptEmpty => {
+            "AI cleanup has no usable prompt selected. Pick one on the AI cleanup page.".to_string()
+        }
+    }
+}
+
+/// Ask the model AI cleanup would use one trivial question, so a wrong key, an
+/// empty balance or a model id the endpoint does not serve shows up here rather
+/// than as a dictation pasted without cleanup.
+///
+/// The brain comes from [`crate::settings::resolve_post_process_brain`], the
+/// same resolver dictation cleanup and its readiness indicator use, so the test
+/// cannot check a different model from the one that runs. When the cleanup
+/// selection is incomplete and cleanup borrows the assistant's model, the result
+/// says so. On the built-in provider it starts cleanup's own engine first, the
+/// one dictation cleanup talks to, which is why the first press can take a while.
+///
+/// Like the assistant's test this sends a real chat completion rather than
+/// listing `/models`, and a reply with no text still passes: the request being
+/// accepted is the signal (see `assistant_test_connection`).
+pub(crate) async fn test_post_process_connection(app: &AppHandle) -> Result<String, String> {
+    let settings = get_settings(app);
+    let (mut provider, model, api_key, source) =
+        crate::settings::resolve_post_process_brain(&settings)
+            .map_err(|error| cleanup_unavailable_message(&error))?;
+    if provider.id == APPLE_INTELLIGENCE_PROVIDER_ID {
+        return Ok(format!(
+            "{} runs on this Mac, so there is no connection to test.",
+            provider.label
+        ));
+    }
+    if provider.id == crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
+        let manager = cleanup_llm(app);
+        manager.ensure_running(&model).await?;
+        provider.base_url = manager.base_url();
+    }
+
+    let started = Instant::now();
+    let reply = crate::llm_client::send_chat_completion(
+        &provider,
+        api_key,
+        &model,
+        "Reply with just the word: ok".to_string(),
+        None,
+        None,
+    )
+    .await?;
+    let millis = started.elapsed().as_millis();
+
+    let borrowed = match source {
+        PostProcessConfigSource::AssistantFallback => " (borrowed from the assistant)",
+        PostProcessConfigSource::DedicatedCleanupSelection => "",
+    };
+    let answered = reply.as_deref().is_some_and(|text| !text.trim().is_empty());
+    if answered {
+        Ok(format!(
+            "{} replied — {}{} is reachable ({} ms).",
+            provider.label, model, borrowed, millis
+        ))
+    } else {
+        Ok(format!(
+            "{} accepted the request for {}{} ({} ms), but returned no text.",
+            provider.label, model, borrowed, millis
+        ))
+    }
+}
+
 /// When the last cleanup request was issued, prewarm or real.
 static CLEANUP_ROUTE_TOUCHED: Lazy<Mutex<Option<Instant>>> = Lazy::new(|| Mutex::new(None));
 
@@ -3944,11 +4031,11 @@ mod tests {
     };
     use super::{
         cleanup_reasoning_options as cleanup_reasoning_options_at,
-        cleanup_token_budget as cleanup_token_budget_at, prompt_echo,
+        cleanup_token_budget as cleanup_token_budget_at, cleanup_unavailable_message, prompt_echo,
         validate_cleaned_output_against_prompt, FOLDED_TRANSCRIPT_BOUNDARY,
     };
     use crate::settings::{
-        PostProcessConfigSource, PostProcessProvider, PostProcessTone,
+        PostProcessConfigSource, PostProcessProvider, PostProcessResolutionError, PostProcessTone,
         PostProcessUnavailableReason, ResolvedPostProcessConfig, ThinkingLevel,
     };
 
@@ -5864,6 +5951,45 @@ Try plugging it into a coding agent or productivity app listed on https://openro
         );
         server.join().unwrap();
         assert_eq!(requests.try_iter().count(), 1);
+    }
+
+    // The Test connection row shows these as they are, so each has to name the
+    // setting that needs attention, and the provider when one is known.
+    #[test]
+    fn cleanup_test_setup_errors_name_what_to_fix() {
+        let error = |reason, provider_label: Option<&str>| PostProcessResolutionError {
+            reason,
+            source: Some(PostProcessConfigSource::DedicatedCleanupSelection),
+            provider_id: provider_label.map(|_| "azure_openai".to_string()),
+            provider_label: provider_label.map(str::to_string),
+        };
+
+        let no_key = cleanup_unavailable_message(&error(
+            PostProcessUnavailableReason::MissingApiKey,
+            Some("Azure OpenAI"),
+        ));
+        assert!(no_key.contains("API key") && no_key.contains("Azure OpenAI"));
+
+        let no_model = cleanup_unavailable_message(&error(
+            PostProcessUnavailableReason::NoModelConfigured,
+            Some("Groq"),
+        ));
+        assert!(no_model.contains("No model") && no_model.contains("Groq"));
+
+        let unnamed =
+            cleanup_unavailable_message(&error(PostProcessUnavailableReason::MissingApiKey, None));
+        assert!(unnamed.contains("the selected provider"));
+
+        for reason in [
+            PostProcessUnavailableReason::NoProviders,
+            PostProcessUnavailableReason::SelectedProviderMissing,
+            PostProcessUnavailableReason::NoPromptSelected,
+            PostProcessUnavailableReason::SelectedPromptMissing,
+            PostProcessUnavailableReason::SelectedPromptEmpty,
+        ] {
+            let message = cleanup_unavailable_message(&error(reason, None));
+            assert!(message.contains("AI cleanup"), "{message}");
+        }
     }
 
     #[test]
