@@ -364,11 +364,69 @@ fn write_engine_stamp(engine_dir: &Path, tag: &str) -> std::io::Result<()> {
     std::fs::write(engine_dir.join(ENGINE_STAMP_FILENAME), tag)
 }
 
-fn remove_engine_stamp(engine_dir: &Path) {
-    if let Err(e) = std::fs::remove_file(engine_dir.join(ENGINE_STAMP_FILENAME)) {
-        if e.kind() != std::io::ErrorKind::NotFound {
-            debug!("Failed to remove the engine version stamp: {e}");
+/// Where a new engine build is unpacked before it takes the place of `engine/`,
+/// and where the current build waits while it does. Both sit beside `engine/`
+/// in the models directory, with hidden names so nothing that scans that
+/// directory takes them for models.
+const ENGINE_STAGING_DIRNAME: &str = ".engine-new";
+const ENGINE_RETIRED_DIRNAME: &str = ".engine-old";
+
+/// Remove `dir` and everything in it. A directory that is not there is success.
+fn remove_dir_if_present(dir: &Path) -> std::io::Result<()> {
+    match std::fs::remove_dir_all(dir) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        other => other,
+    }
+}
+
+/// Put the complete engine build in `staging` in place of `engine_dir`.
+///
+/// The current build is moved aside first rather than deleted, and moved back
+/// if the new one cannot be moved in, so a failure at any step leaves one whole
+/// build in `engine_dir`, never a mix of two. Deleting the old build afterwards
+/// is best effort: a leftover is cleared before the next swap.
+///
+/// Moving a directory is a rename within one volume, so on Windows it fails
+/// cleanly, before anything changes, when a file inside is held open.
+fn swap_in_engine(staging: &Path, engine_dir: &Path, retired: &Path) -> std::io::Result<()> {
+    remove_dir_if_present(retired)?;
+    let had_engine = engine_dir.exists();
+    if had_engine {
+        std::fs::rename(engine_dir, retired)?;
+    }
+    if let Err(e) = std::fs::rename(staging, engine_dir) {
+        if had_engine {
+            if let Err(restore) = std::fs::rename(retired, engine_dir) {
+                warn!(
+                    "Couldn't move the previous engine back from {}: {restore}",
+                    retired.display()
+                );
+            }
         }
+        return Err(e);
+    }
+    if let Err(e) = remove_dir_if_present(retired) {
+        debug!(
+            "Couldn't remove the previous engine build at {}: {e}",
+            retired.display()
+        );
+    }
+    Ok(())
+}
+
+/// Undo a swap a crash interrupted after the current build was moved aside and
+/// before the new one was moved in. With no `engine_dir` but a retired build
+/// beside it, that build is the last engine that worked, so it goes back.
+fn recover_interrupted_swap(engine_dir: &Path, retired: &Path) {
+    if engine_dir.exists() || !retired.is_dir() {
+        return;
+    }
+    match std::fs::rename(retired, engine_dir) {
+        Ok(()) => info!("Restored the previous built-in engine after an interrupted update"),
+        Err(e) => warn!(
+            "Couldn't restore the previous built-in engine from {}: {e}",
+            retired.display()
+        ),
     }
 }
 
@@ -970,10 +1028,16 @@ impl LocalLlmManager {
     /// anywhere, or when the one downloaded earlier is not the expected build.
     /// Returns the path to the binary.
     ///
+    /// A replacement never costs the user a working engine: the new build is
+    /// unpacked beside the old one and swapped in only once it is complete
+    /// (see [`swap_in_engine`]). If it cannot be downloaded, because the user
+    /// is offline when the first start after an update checks, the old engine
+    /// keeps running and the next start tries again.
+    ///
     /// The archive URLs are built from the tag, so nothing here asks
     /// `api.github.com`, whose unauthenticated limit shared school and office
-    /// networks exhaust. On total failure it returns a clear, actionable
-    /// message instead of a raw HTTP error.
+    /// networks exhaust. On total failure with nothing to fall back on it
+    /// returns a clear, actionable message instead of a raw HTTP error.
     async fn ensure_engine_installed(&self) -> Result<PathBuf, String> {
         // Both roles share the managed engine directory but each has its own
         // start lock, so without this they could delete and extract into it at
@@ -985,6 +1049,10 @@ impl LocalLlmManager {
 
         let expected = Self::expected_engine_tag();
         let engine_dir = self.engine_dir();
+        let staging = self.models_dir.join(ENGINE_STAGING_DIRNAME);
+        let retired = self.models_dir.join(ENGINE_RETIRED_DIRNAME);
+        recover_interrupted_swap(&engine_dir, &retired);
+
         let found = self.resolve_engine_binary();
         let step = engine_install_step(
             found.as_deref().map(|path| self.is_managed_engine(path)),
@@ -993,54 +1061,78 @@ impl LocalLlmManager {
             self.sibling_runs_managed_engine(),
         );
 
-        if let Some(path) = found {
-            match step {
-                EngineInstallStep::Reuse => return Ok(path),
-                EngineInstallStep::ReuseWhileInUse => {
-                    // The other role's engine is running out of this directory.
-                    // On Windows its llama-server.exe and ggml DLLs are open and
-                    // cannot be deleted, so a refresh would fail halfway and
-                    // leave a mix of two builds; elsewhere it would pull the files
-                    // out from under a live process. Stopping that engine would
-                    // drop whatever it is generating. Neither is needed: every
-                    // managed engine this process starts passes this check under
-                    // this lock first, and the expected tag cannot change while
-                    // the app runs, so a running one was either current or
-                    // installed moments ago. A stale verdict beside it means the
-                    // stamp could not be written, not that the binary is old. The
-                    // next start with nothing running checks again.
-                    warn!(
-                        "Built-in engine at {} has no current version stamp (expected {}), \
-                         but the other engine is running from it; reusing it",
-                        path.display(),
-                        expected
-                    );
-                    return Ok(path);
-                }
-                EngineInstallStep::Replace => {
-                    info!(
-                        "Cached built-in engine is not llama.cpp {} (stamp: {}); replacing it",
-                        expected,
-                        read_engine_stamp(&engine_dir).as_deref().unwrap_or("none")
-                    );
-                    if let Err(e) = std::fs::remove_dir_all(&engine_dir) {
-                        warn!(
-                            "Couldn't remove stale engine dir {} ({}); continuing with a fresh download",
-                            engine_dir.display(),
-                            e
-                        );
-                    }
-                }
-                EngineInstallStep::Download => {}
+        // The engine already on disk, kept if the expected build cannot be
+        // installed in its place.
+        let current = match (found, step) {
+            (Some(path), EngineInstallStep::Reuse) => return Ok(path),
+            (Some(path), EngineInstallStep::ReuseWhileInUse) => {
+                // The other role's engine is running out of this directory.
+                // On Windows its llama-server.exe and ggml DLLs are open and
+                // cannot be moved, so a refresh would fail; elsewhere it would
+                // pull the files out from under a live process. Stopping that
+                // engine would drop whatever it is generating. Neither is
+                // needed: every managed engine this process starts passes this
+                // check under this lock first, and the expected tag cannot
+                // change while the app runs, so a running one was either current
+                // or installed moments ago. A stale verdict beside it means the
+                // stamp could not be written, not that the binary is old. The
+                // next start with nothing running checks again.
+                warn!(
+                    "Built-in engine at {} has no current version stamp (expected {}), \
+                     but the other engine is running from it; reusing it",
+                    path.display(),
+                    expected
+                );
+                return Ok(path);
             }
+            (Some(path), EngineInstallStep::Replace) => {
+                info!(
+                    "Cached built-in engine is not llama.cpp {} (stamp: {}); replacing it",
+                    expected,
+                    read_engine_stamp(&engine_dir).as_deref().unwrap_or("none")
+                );
+                Some(path)
+            }
+            _ => None,
+        };
+
+        match self
+            .install_engine_build(&expected, &engine_dir, &staging, &retired)
+            .await
+        {
+            Ok(path) => Ok(path),
+            Err(e) => match current {
+                Some(path) => {
+                    warn!(
+                        "Keeping the current built-in engine at {} for now; llama.cpp {} will be \
+                         tried again on the next start. {}",
+                        path.display(),
+                        expected,
+                        e
+                    );
+                    // Clear the download banner: the engine the user had is
+                    // starting as before.
+                    let _ = self.app_handle.emit("local-llm-engine-status", "ready");
+                    Ok(path)
+                }
+                None => {
+                    let _ = self.app_handle.emit("local-llm-engine-status", "error");
+                    Err(e)
+                }
+            },
         }
+    }
 
-        std::fs::create_dir_all(&engine_dir)
-            .map_err(|e| format!("Failed to create engine directory: {}", e))?;
-        // No stamp while the directory is being filled: an interrupted install
-        // must never read as a finished one on the next launch.
-        remove_engine_stamp(&engine_dir);
-
+    /// Download `expected` into `staging`, then swap it in as `engine_dir`.
+    /// Nothing in `engine_dir` is touched until the new build is complete, so a
+    /// failure here leaves whatever engine was there in place.
+    async fn install_engine_build(
+        &self,
+        expected: &str,
+        engine_dir: &Path,
+        staging: &Path,
+        retired: &Path,
+    ) -> Result<PathBuf, String> {
         info!(
             "Downloading llama.cpp {} as the built-in LLM engine...",
             expected
@@ -1049,9 +1141,8 @@ impl LocalLlmManager {
             .app_handle
             .emit("local-llm-engine-status", "downloading");
 
-        let assets = engine_assets_for(&expected, std::env::consts::OS, std::env::consts::ARCH);
+        let assets = engine_assets_for(expected, std::env::consts::OS, std::env::consts::ARCH);
         if assets.is_empty() {
-            let _ = self.app_handle.emit("local-llm-engine-status", "error");
             return Err(
                 "No compatible llama.cpp prebuilt binary is available for this platform."
                     .to_string(),
@@ -1060,32 +1151,53 @@ impl LocalLlmManager {
 
         let mut last_error = String::from("unknown error");
         for asset in assets {
+            // Every attempt starts from an empty folder, so a fallback build is
+            // never unpacked over what an earlier attempt left behind.
+            remove_dir_if_present(staging)
+                .and_then(|()| std::fs::create_dir_all(staging))
+                .map_err(|e| format!("Failed to create engine directory: {}", e))?;
             let url = asset.url();
-            match self.download_and_extract_engine(&url, &engine_dir).await {
+            match self.download_and_extract_engine(&url, staging).await {
                 Ok(()) => {
-                    if let Some(resolved) =
-                        Self::find_binary_in(&engine_dir, Self::engine_filename())
-                    {
-                        // Stamp with the tag of the archive just unpacked, so the
-                        // stamp always names the build that is on disk.
-                        if let Err(e) = write_engine_stamp(&engine_dir, &asset.tag) {
-                            warn!(
-                                "Failed to write the engine version stamp in {}: {}",
-                                engine_dir.display(),
-                                e
-                            );
-                        }
-                        let _ = self.app_handle.emit("local-llm-engine-status", "ready");
-                        info!(
-                            "Built-in LLM engine llama.cpp {} installed at {}",
-                            asset.tag,
-                            resolved.display()
-                        );
-                        return Ok(resolved);
+                    if Self::find_binary_in(staging, Self::engine_filename()).is_none() {
+                        last_error =
+                            "engine archive downloaded but no llama-server binary was inside"
+                                .to_string();
+                        warn!("{} (source: {})", last_error, url);
+                        continue;
                     }
-                    last_error = "engine archive downloaded but no llama-server binary was inside"
-                        .to_string();
-                    warn!("{} (source: {})", last_error, url);
+                    // Stamp with the tag of the archive just unpacked, so the
+                    // stamp always names the build that is on disk.
+                    if let Err(e) = write_engine_stamp(staging, &asset.tag) {
+                        warn!(
+                            "Failed to write the engine version stamp in {}: {}",
+                            staging.display(),
+                            e
+                        );
+                    }
+                    if let Err(e) = swap_in_engine(staging, engine_dir, retired) {
+                        let _ = remove_dir_if_present(staging);
+                        return Err(format!(
+                            "Couldn't move the new built-in engine into {}: {}",
+                            engine_dir.display(),
+                            e
+                        ));
+                    }
+                    let resolved = Self::find_binary_in(engine_dir, Self::engine_filename())
+                        .ok_or_else(|| {
+                            format!(
+                                "the new built-in engine was moved into {} but its llama-server \
+                                 binary is missing",
+                                engine_dir.display()
+                            )
+                        })?;
+                    let _ = self.app_handle.emit("local-llm-engine-status", "ready");
+                    info!(
+                        "Built-in LLM engine llama.cpp {} installed at {}",
+                        asset.tag,
+                        resolved.display()
+                    );
+                    return Ok(resolved);
                 }
                 Err(e) => {
                     warn!("Engine download attempt failed ({}): {}", url, e);
@@ -1094,7 +1206,7 @@ impl LocalLlmManager {
             }
         }
 
-        let _ = self.app_handle.emit("local-llm-engine-status", "error");
+        let _ = remove_dir_if_present(staging);
         Err(format!(
             "Couldn't set up the built-in engine (llama.cpp {}). This is usually a network \
              problem: some school and office networks block or throttle downloads from \
@@ -2673,9 +2785,106 @@ mod tests {
         // A stamp edited by hand keeps working.
         std::fs::write(dir.path().join(ENGINE_STAMP_FILENAME), "b12000\r\n").unwrap();
         assert_eq!(read_engine_stamp(dir.path()).as_deref(), Some("b12000"));
+    }
 
-        remove_engine_stamp(dir.path());
-        assert_eq!(read_engine_stamp(dir.path()), None);
+    /// An engine directory holding one build: a binary, a backend library
+    /// named after the build, and a stamp.
+    fn fake_engine_build(dir: &Path, tag: &str) {
+        std::fs::create_dir_all(dir.join("bin")).unwrap();
+        std::fs::write(dir.join("bin").join("llama-server"), tag).unwrap();
+        std::fs::write(dir.join(format!("ggml-{tag}.so")), tag).unwrap();
+        write_engine_stamp(dir, tag).unwrap();
+    }
+
+    // The update replaces a working engine, so it must never leave the user with
+    // none: the old build is deleted only after the new one is in place.
+    #[test]
+    fn a_swap_replaces_the_whole_engine_and_removes_the_old_build() {
+        let models = tempfile::tempdir().unwrap();
+        let engine = models.path().join("engine");
+        let staging = models.path().join(ENGINE_STAGING_DIRNAME);
+        let retired = models.path().join(ENGINE_RETIRED_DIRNAME);
+        fake_engine_build(&engine, "b10075");
+        fake_engine_build(&staging, "b11429");
+
+        swap_in_engine(&staging, &engine, &retired).unwrap();
+
+        assert_eq!(read_engine_stamp(&engine).as_deref(), Some("b11429"));
+        assert!(engine.join("ggml-b11429.so").exists());
+        assert!(
+            !engine.join("ggml-b10075.so").exists(),
+            "no file of the old build may sit beside the new one"
+        );
+        assert!(!staging.exists());
+        assert!(!retired.exists());
+    }
+
+    #[test]
+    fn a_swap_with_no_engine_yet_moves_the_new_build_in() {
+        let models = tempfile::tempdir().unwrap();
+        let engine = models.path().join("engine");
+        let staging = models.path().join(ENGINE_STAGING_DIRNAME);
+        let retired = models.path().join(ENGINE_RETIRED_DIRNAME);
+        fake_engine_build(&staging, "b11429");
+
+        swap_in_engine(&staging, &engine, &retired).unwrap();
+
+        assert_eq!(read_engine_stamp(&engine).as_deref(), Some("b11429"));
+        assert!(!staging.exists());
+    }
+
+    #[test]
+    fn a_failed_swap_puts_the_old_engine_back() {
+        let models = tempfile::tempdir().unwrap();
+        let engine = models.path().join("engine");
+        let retired = models.path().join(ENGINE_RETIRED_DIRNAME);
+        fake_engine_build(&engine, "b10075");
+        // Nothing staged, so moving the new build in fails.
+        let missing = models.path().join(ENGINE_STAGING_DIRNAME);
+
+        assert!(swap_in_engine(&missing, &engine, &retired).is_err());
+
+        assert_eq!(read_engine_stamp(&engine).as_deref(), Some("b10075"));
+        assert!(engine.join("bin").join("llama-server").exists());
+        assert!(!retired.exists());
+    }
+
+    #[test]
+    fn a_leftover_from_an_earlier_swap_does_not_block_the_next() {
+        let models = tempfile::tempdir().unwrap();
+        let engine = models.path().join("engine");
+        let staging = models.path().join(ENGINE_STAGING_DIRNAME);
+        let retired = models.path().join(ENGINE_RETIRED_DIRNAME);
+        fake_engine_build(&engine, "b10075");
+        fake_engine_build(&retired, "b9000");
+        fake_engine_build(&staging, "b11429");
+
+        swap_in_engine(&staging, &engine, &retired).unwrap();
+
+        assert_eq!(read_engine_stamp(&engine).as_deref(), Some("b11429"));
+        assert!(!retired.exists());
+    }
+
+    // A crash between moving the old build aside and moving the new one in
+    // leaves no `engine/`. The old build is still whole, so it comes back
+    // rather than the next start having to download with nothing to fall back on.
+    #[test]
+    fn an_interrupted_swap_restores_the_previous_engine() {
+        let models = tempfile::tempdir().unwrap();
+        let engine = models.path().join("engine");
+        let retired = models.path().join(ENGINE_RETIRED_DIRNAME);
+        fake_engine_build(&retired, "b10075");
+
+        recover_interrupted_swap(&engine, &retired);
+
+        assert_eq!(read_engine_stamp(&engine).as_deref(), Some("b10075"));
+        assert!(!retired.exists());
+
+        // With an engine in place, a leftover is left for the next swap to
+        // clear, never moved over it.
+        fake_engine_build(&retired, "b9000");
+        recover_interrupted_swap(&engine, &retired);
+        assert_eq!(read_engine_stamp(&engine).as_deref(), Some("b10075"));
     }
 
     #[test]
