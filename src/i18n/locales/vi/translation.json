@@ -1102,6 +1102,12 @@
           "placeholderWithOptions": "Tìm kiếm hoặc chọn một mô hình",
           "placeholderNoOptions": "Nhập tên mô hình",
           "refreshModels": "Làm mới mô hình"
+        },
+        "testConnection": {
+          "title": "Kiểm tra kết nối",
+          "description": "Gửi một yêu cầu ngắn để kiểm tra tính năng dọn dẹp bằng AI có thực sự kết nối được với mô hình này. Mô hình trên thiết bị cần tải trước, nên lần kiểm tra đầu có thể mất một lúc.",
+          "button": "Kiểm tra kết nối",
+          "testing": "Đang kiểm tra…"
         }
       },
       "prompts": {

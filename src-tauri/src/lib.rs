@@ -989,6 +989,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_auto_submit_setting,
             shortcut::change_auto_submit_key_setting,
             shortcut::get_post_process_readiness,
+            shortcut::post_process_test_connection,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_post_process_on_dictation_setting,
             shortcut::set_cleanup_local_model,

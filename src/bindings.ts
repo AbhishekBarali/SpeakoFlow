@@ -195,6 +195,19 @@ async changeAutoSubmitKeySetting(key: string) : Promise<Result<null, string>> {
 async getPostProcessReadiness() : Promise<PostProcessReadiness> {
     return await TAURI_INVOKE("get_post_process_readiness");
 },
+/**
+ * Send one trivial request to the model AI cleanup would use and report how it
+ * went, for the Test connection row on the AI cleanup page. See
+ * [`crate::actions::test_post_process_connection`].
+ */
+async postProcessTestConnection() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("post_process_test_connection") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_post_process_enabled_setting", { enabled }) };

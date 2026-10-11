@@ -4,6 +4,99 @@ What changed in each SpeakoFlow release. The release page on GitHub carries the
 highlights; this file has the full list. Versions before 2.0.0 are described on
 their [GitHub releases](https://github.com/AbhishekBarali/SpeakoFlow/releases).
 
+## 2.0.1
+
+A smaller update to 2.0: a connection test for AI cleanup, a Thinking setting
+for reasoning models, and fixes for writing styles, settings that reset after a
+restart, the on-device AI engine, the macOS menu bar, and the assistant on KDE
+Wayland.
+
+**On 2.0.0?** The app offers this update by itself. On 1.4 or earlier,
+download 2.0.1 once and install it over the old version.
+
+### New
+
+**Test connection for AI cleanup.** The AI cleanup card in Models now ends with
+a Test connection row, the same as the Assistant's. It sends one short request
+to the provider and model that clean up your dictations, so a wrong key, an
+empty balance, or a model the server does not offer shows up here instead of as
+a dictation pasted without cleanup.
+
+- A missing setting is named, for example "No API key is set for Azure OpenAI".
+- When cleanup borrows the assistant's model, the result says so.
+- A key you have just pasted is saved before the test runs, so the new key is
+  the one tested.
+- With a model on this computer, the first test starts the model, so it can
+  take a moment.
+
+**Thinking.** Choose how much a reasoning model thinks before it answers: Off,
+Low, Medium, or High. It is set separately for AI cleanup (Models, AI cleanup,
+Performance) and for the assistant (under its model picker).
+
+- Off is the default and works exactly as 2.0.0 did.
+- When a provider refuses a level, the request is retried at a lower one
+  instead of failing.
+- Anthropic, Apple Intelligence, and models on this computer have no such
+  control, so the setting is disabled for them and says why.
+
+### Fixed
+
+- **Writing styles made no difference.** Formal, Professional, Concise, and the
+  other styles now change the cleaned text, while keeping every fact, name,
+  number, and request. With no style picked, cleanup is exactly as before.
+  SpeakoFlow Mini and other fine-tuned models mostly ignore styles, so the
+  Cleanup page now says so when one is in use and offers Change model.
+- **Settings could reset to defaults after a restart or shutdown** (reported on
+  macOS). Every save now writes a new file and swaps it in, so an interrupted
+  save can no longer damage your settings. If the file is ever damaged anyway,
+  SpeakoFlow keeps the damaged copy aside, restores your settings from a
+  backup, and tells you that recent changes may be missing. A new install gets
+  its first backup on its first save.
+- **The on-device AI could crash while loading Gemma 4** on computers with two
+  graphics cards, or with the model only partly on the graphics card. The
+  built-in engine is updated to llama.cpp b11429, which fixes this.
+  - The first time you use on-device AI after updating, the new engine
+    downloads once in the background, with a progress bar.
+  - The new engine is downloaded and checked before the old one is removed.
+    If you are offline or the download fails, the current engine keeps working
+    and the update is tried again next time.
+  - The assistant and cleanup can no longer install the engine over each other
+    at the same moment.
+- **AI cleanup with gpt-oss pasted the transcript unchanged.** It now cleans up
+  as expected on Azure, Groq, and OpenRouter.
+- **Text you never said could appear after a short dictation.** With the
+  built-in engine, some models answered short dictations such as "Thank you."
+  with the cleanup prompt's own examples. The prompt is now sent as a separate
+  instruction, and output that copies the prompt is discarded so your own words
+  are pasted instead. A reply that is only punctuation, such as "...", is no
+  longer pasted either.
+
+### Linux
+
+- **The assistant on KDE Plasma Wayland** can see the text you selected, and
+  its panel and the conversation bar respond to clicks again. The selection is
+  read from the desktop's own selection on Wayland desktops that support it,
+  and falls back to the old way on those that do not. On Wayland, the clear
+  margin around the panel also catches clicks now.
+
+### macOS
+
+- **The menu bar icon** shows the SpeakoFlow logo instead of a plain rounded
+  square. The recording and transcribing icons still follow a light or dark
+  menu bar.
+
+### Downloads
+
+| Platform             | File                                                                |
+| -------------------- | ------------------------------------------------------------------- |
+| Windows              | `SpeakoFlow_2.0.1_x64-setup.exe` (or the `.msi`)                    |
+| macOS, Apple silicon | `SpeakoFlow_2.0.1_aarch64.dmg`                                      |
+| macOS, Intel         | `SpeakoFlow_2.0.1_x64.dmg`                                          |
+| Linux x86_64         | `SpeakoFlow_2.0.1_amd64.deb` or `SpeakoFlow_2.0.1_amd64.AppImage`   |
+| Linux ARM64          | `SpeakoFlow_2.0.1_arm64.deb` or `SpeakoFlow_2.0.1_aarch64.AppImage` |
+
+Every commit: [v2.0.0...v2.0.1](https://github.com/AbhishekBarali/SpeakoFlow/compare/v2.0.0...v2.0.1)
+
 ## 2.0.0
 
 The largest release so far: 115 commits since 1.4.0. The app was rebuilt

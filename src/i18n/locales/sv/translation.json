@@ -1108,6 +1108,12 @@
           "placeholderWithOptions": "Sök eller välj en modell",
           "placeholderNoOptions": "Ange ett modellnamn",
           "refreshModels": "Uppdatera modeller"
+        },
+        "testConnection": {
+          "title": "Testa anslutningen",
+          "description": "Skickar en kort förfrågan för att kontrollera att AI-rensningen faktiskt når den här modellen. Modeller på enheten laddas först, så det första testet kan ta en stund.",
+          "button": "Testa anslutningen",
+          "testing": "Testar…"
         }
       },
       "prompts": {

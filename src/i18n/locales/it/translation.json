@@ -1114,6 +1114,12 @@
           "placeholderWithOptions": "Cerca o scegli un modello",
           "placeholderNoOptions": "Digita il nome di un modello",
           "refreshModels": "Aggiorna modelli"
+        },
+        "testConnection": {
+          "title": "Verifica connessione",
+          "description": "Invia una breve richiesta per verificare che la pulizia IA riesca davvero a raggiungere questo modello. I modelli sul dispositivo vengono prima caricati, quindi il primo test può richiedere un po' di tempo.",
+          "button": "Verifica connessione",
+          "testing": "Test in corso…"
         }
       },
       "prompts": {
