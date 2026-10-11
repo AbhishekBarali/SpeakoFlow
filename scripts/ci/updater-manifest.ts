@@ -154,6 +154,48 @@ export function assetUrl(repo: string, tag: string, name: string): string {
   return `https://github.com/${repo}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`;
 }
 
+const BR_TAG = /<br\s*\/?>/gi;
+const BR_ONLY_LINE = /^\s*<br\s*\/?>\s*$/i;
+const FENCE = /^\s*(```|~~~)/;
+
+/**
+ * The release body is written for GitHub, which renders raw HTML, and a
+ * `<br />` there is the usual way to add space or force a line break. The
+ * app's update card renders the same notes as plain markdown with HTML off
+ * (release notes must not inject markup into the app), so every `<br />`
+ * shows up as literal text. Rewrite them into markdown the card understands:
+ * a spacer line is dropped (the blank lines around it already separate the
+ * blocks), a break inside a table cell becomes a space, and any other break
+ * becomes a markdown hard line break. Code blocks are left exactly as written.
+ */
+export function notesForApp(body: string): string {
+  let inFence = false;
+  const lines: string[] = [];
+  for (const line of body.replace(/\r\n?/g, "\n").split("\n")) {
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      lines.push(line);
+      continue;
+    }
+    if (inFence) {
+      lines.push(line);
+      continue;
+    }
+    if (BR_ONLY_LINE.test(line)) continue;
+    if (line.trimStart().startsWith("|")) {
+      lines.push(line.replace(BR_TAG, " "));
+      continue;
+    }
+    lines.push(
+      line
+        .replace(/[ \t]*<br\s*\/?>[ \t]*$/i, "  ")
+        .replace(/[ \t]*<br\s*\/?>[ \t]*/gi, "  \n"),
+    );
+  }
+  // Dropping a spacer leaves its two blank neighbours together.
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
 export function buildManifest(input: BuildManifestInput): UpdaterManifest {
   const platforms: Record<string, ManifestPlatform> = {};
   const downloads: Record<string, string> = {};
@@ -199,10 +241,11 @@ export function buildManifest(input: BuildManifestInput): UpdaterManifest {
       platforms[primary] = platforms[key];
   }
 
+  const cardNotes = notesForApp(input.notes);
   const notes =
-    input.notes.length > MAX_NOTES_CHARS
-      ? `${input.notes.slice(0, MAX_NOTES_CHARS).trimEnd()}\n\n…`
-      : input.notes;
+    cardNotes.length > MAX_NOTES_CHARS
+      ? `${cardNotes.slice(0, MAX_NOTES_CHARS).trimEnd()}\n\n…`
+      : cardNotes;
 
   return {
     version: input.version,
