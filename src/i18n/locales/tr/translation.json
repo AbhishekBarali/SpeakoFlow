@@ -1108,6 +1108,12 @@
           "placeholderWithOptions": "Model ara veya seç",
           "placeholderNoOptions": "Model adı yazın",
           "refreshModels": "Modelleri Yenile"
+        },
+        "testConnection": {
+          "title": "Bağlantıyı test et",
+          "description": "Yapay zekâ temizlemenin bu modele gerçekten ulaşabildiğini kontrol etmek için kısa bir istek gönderir. Cihaz içi modeller önce yüklenir, bu yüzden ilk test biraz sürebilir.",
+          "button": "Bağlantıyı test et",
+          "testing": "Test ediliyor…"
         }
       },
       "prompts": {

@@ -1120,6 +1120,12 @@
           "placeholderWithOptions": "Wyszukaj lub wybierz model",
           "placeholderNoOptions": "Wpisz nazwę modelu",
           "refreshModels": "Odśwież modele"
+        },
+        "testConnection": {
+          "title": "Test połączenia",
+          "description": "Wysyła jedno krótkie zapytanie, aby sprawdzić, czy czyszczenie AI faktycznie łączy się z tym modelem. Modele na urządzeniu najpierw się wczytują, więc pierwszy test może chwilę potrwać.",
+          "button": "Testuj połączenie",
+          "testing": "Testowanie…"
         }
       },
       "prompts": {

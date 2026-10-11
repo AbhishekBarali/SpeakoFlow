@@ -1114,6 +1114,12 @@
           "placeholderWithOptions": "חפש או בחר מודל",
           "placeholderNoOptions": "הקלד שם מודל",
           "refreshModels": "רענן מודלים"
+        },
+        "testConnection": {
+          "title": "בדוק חיבור",
+          "description": "שולח בקשה קצרה אחת כדי לבדוק שניקוי ה-AI באמת מגיע למודל הזה. מודלים במכשיר נטענים קודם, כך שהבדיקה הראשונה עשויה לקחת זמן.",
+          "button": "בדוק חיבור",
+          "testing": "בודק…"
         }
       },
       "prompts": {

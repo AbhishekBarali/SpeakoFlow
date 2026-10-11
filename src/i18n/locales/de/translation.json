@@ -1108,6 +1108,12 @@
           "placeholderWithOptions": "Modell suchen oder auswählen",
           "placeholderNoOptions": "Modellnamen eingeben",
           "refreshModels": "Modelle aktualisieren"
+        },
+        "testConnection": {
+          "title": "Verbindung testen",
+          "description": "Sendet eine kurze Anfrage, um zu prüfen, ob die KI-Bereinigung dieses Modell tatsächlich erreicht. Modelle auf dem Gerät werden zuerst geladen, daher kann der erste Test etwas dauern.",
+          "button": "Verbindung testen",
+          "testing": "Wird getestet…"
         }
       },
       "prompts": {

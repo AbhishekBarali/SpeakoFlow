@@ -1120,6 +1120,12 @@
           "placeholderWithOptions": "Vyhledejte nebo vyberte model",
           "placeholderNoOptions": "Zadejte název modelu",
           "refreshModels": "Obnovit modely"
+        },
+        "testConnection": {
+          "title": "Otestovat připojení",
+          "description": "Pošle jeden krátký požadavek a ověří, že se čištění pomocí AI k tomuto modelu opravdu dostane. Modely v zařízení se nejdřív načtou, takže první test může chvíli trvat.",
+          "button": "Otestovat připojení",
+          "testing": "Testování…"
         }
       },
       "prompts": {
