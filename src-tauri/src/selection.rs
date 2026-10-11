@@ -20,9 +20,14 @@
 //!
 //! So [`capture_selection`] proves freshness before it trusts anything:
 //!
+//! * **Wayland** reads the compositor's primary selection through the
+//!   data-control protocol (KDE Plasma, wlroots compositors). It is the same
+//!   thing as X11's `PRIMARY` below, for native Wayland apps, and it is tried
+//!   first because on a Wayland desktop XWayland's `PRIMARY` does not hold their
+//!   selection (see `read_wayland_primary_selection`).
 //! * **X11** reads the `PRIMARY` selection directly. Selected text is already
 //!   there by definition, so there is no keystroke, no timing race, no clipboard
-//!   to clobber and nothing to prove. This is the best path and it is tried first.
+//!   to clobber and nothing to prove. This is the best path on an X11 desktop.
 //! * **Windows** compares `GetClipboardSequenceNumber` before and after. If the
 //!   counter did not move, the copy did not happen, and we say so.
 //! * **Anywhere the counter is unavailable** (macOS, Wayland), a sentinel is
@@ -80,6 +85,11 @@ pub enum SelectionSource {
     /// per platform and drag `cfg` noise into every match on it.
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     PrimarySelection,
+    /// The Wayland primary selection, read through the compositor's
+    /// data-control protocol: no keystroke involved. Linux only, like the
+    /// variant above.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    WaylandPrimarySelection,
     /// A synthetic Ctrl+C / Cmd+C, verified to have changed the clipboard.
     SyntheticCopy,
 }
@@ -97,7 +107,20 @@ pub struct CapturedSelection {
 /// * `Err(_)` — we could not establish either way. Callers must treat this as
 ///   "unknown", never as "nothing selected".
 pub fn capture_selection(app: &AppHandle) -> Result<Option<CapturedSelection>, String> {
-    // X11 first: the selection is already in PRIMARY, so this needs no keystroke,
+    // Wayland first, where the compositor offers it: the same no-keystroke read
+    // as X11's PRIMARY below, from the one place a native Wayland app's
+    // selection actually is.
+    #[cfg(target_os = "linux")]
+    if let Some(result) = read_wayland_primary_selection() {
+        return result.map(|text| {
+            normalize(text).map(|text| CapturedSelection {
+                text,
+                source: SelectionSource::WaylandPrimarySelection,
+            })
+        });
+    }
+
+    // Then X11: the selection is already in PRIMARY, so this needs no keystroke,
     // cannot collide with a held hotkey, and leaves the clipboard alone.
     #[cfg(target_os = "linux")]
     if let Some(text) = read_primary_selection() {
@@ -223,13 +246,146 @@ fn normalize(text: String) -> Option<String> {
     Some(truncated)
 }
 
+/// How long the application that owns the Wayland primary selection gets to
+/// hand it over.
+///
+/// Nothing waits on this: the capture has its own thread and runs while the user
+/// is still speaking. "Nothing selected" is answered by the compositor at once,
+/// so this only bounds an owner that has stopped responding, which would
+/// otherwise hold the capture thread for as long as it stays stuck.
+#[cfg(target_os = "linux")]
+const WAYLAND_PRIMARY_BUDGET: Duration = Duration::from_millis(500);
+
+/// Bytes read from the Wayland primary selection before stopping. Enough for
+/// [`MAX_SELECTION_CHARS`] of any script (UTF-8 is at most four bytes per
+/// character), so `normalize` still makes the cut, and selecting a huge document
+/// does not mean reading all of it into memory.
+#[cfg(target_os = "linux")]
+const WAYLAND_PRIMARY_MAX_BYTES: usize = MAX_SELECTION_CHARS * 4;
+
+/// Read the Wayland primary selection through the compositor's data-control
+/// protocol, which holds selected text with no copy action at all.
+///
+/// * `None`: this route is not available here (not a Wayland session, or the
+///   compositor has no data-control or no primary selection), so the caller
+///   tries the X11 route next, exactly as before this existed.
+/// * `Some(Ok(text))`: the selection, empty when nothing is selected.
+/// * `Some(Err(_))`: something is selected but could not be read.
+///
+/// This comes before the X11 read because on a Wayland desktop XWayland's
+/// `PRIMARY` is not where a native app's selection lives. KWin only shows it to
+/// X11 while an X11 window is active, so with the user in Kate or Dolphin,
+/// `PRIMARY` had no owner: `xclip` failed, `xsel` printed nothing (read as
+/// "nothing selected"), and the synthetic copy behind them sent XTest
+/// keystrokes, which only reach X11 windows. The selection was never seen.
+///
+/// The connection here is our own, separate from GTK's, so this works the same
+/// whether GTK is on Wayland or XWayland. The AppImage is always on XWayland,
+/// because its GTK hook exports `GDK_BACKEND=x11`.
+#[cfg(target_os = "linux")]
+fn read_wayland_primary_selection() -> Option<Result<String, String>> {
+    use wl_clipboard_rs::paste::{get_contents, ClipboardType, Error, MimeType, Seat};
+
+    if !crate::utils::is_wayland() {
+        return None;
+    }
+
+    match get_contents(ClipboardType::Primary, Seat::Unspecified, MimeType::Text) {
+        Ok((pipe, _mime_type)) => {
+            let deadline = Instant::now() + WAYLAND_PRIMARY_BUDGET;
+            let result =
+                read_pipe_until(pipe, deadline, WAYLAND_PRIMARY_MAX_BYTES).map(decode_selection);
+            if result.is_ok() {
+                debug!("read a selection from the Wayland primary selection");
+            }
+            Some(result)
+        }
+        // The compositor answered: nothing is selected, or the selection is not
+        // text. Don't fall through to X11, which would only find the same.
+        Err(Error::ClipboardEmpty | Error::NoMimeType) => Some(Ok(String::new())),
+        // No data-control, no primary selection, or no compositor to ask.
+        Err(e) => {
+            debug!("Wayland primary selection not readable ({e}); trying X11");
+            None
+        }
+    }
+}
+
+/// Read `pipe` to its end, giving up at `deadline` or once `limit` bytes are in.
+///
+/// A plain `read_to_end` waits for as long as the writing application takes, and
+/// one that has stopped responding never finishes. So each read waits in `poll`
+/// first, which is bounded by the deadline.
+#[cfg(target_os = "linux")]
+fn read_pipe_until(
+    mut pipe: impl std::io::Read + std::os::fd::AsRawFd,
+    deadline: Instant,
+    limit: usize,
+) -> Result<Vec<u8>, String> {
+    use std::io::ErrorKind;
+
+    let mut contents = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err("the application holding the selection did not send it in time".into());
+        }
+        let mut fd = libc::pollfd {
+            fd: pipe.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let timeout_ms = remaining.as_millis().clamp(1, i32::MAX as u128) as i32;
+        // SAFETY: `fd` is one valid `pollfd` that lives across the call, and the
+        // count passed is 1.
+        let ready = unsafe { libc::poll(&mut fd, 1, timeout_ms) };
+        if ready < 0 {
+            let err = std::io::Error::last_os_error();
+            if err.kind() == ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(format!("could not wait for the selection: {err}"));
+        }
+        if ready == 0 {
+            continue; // Timed out; the check at the top reports it.
+        }
+        // Readable, or the writer hung up: either way this read cannot block.
+        match pipe.read(&mut chunk) {
+            Ok(0) => return Ok(contents),
+            Ok(n) => {
+                contents.extend_from_slice(&chunk[..n]);
+                if contents.len() >= limit {
+                    return Ok(contents);
+                }
+            }
+            Err(e) if e.kind() == ErrorKind::Interrupted => continue,
+            Err(e) => return Err(format!("could not read the selection: {e}")),
+        }
+    }
+}
+
+/// Selection bytes as text. A read stopped at the byte limit can end partway
+/// through a character, so an incomplete sequence at the very end is dropped
+/// rather than turned into a replacement character.
+#[cfg(target_os = "linux")]
+fn decode_selection(mut bytes: Vec<u8>) -> String {
+    if let Err(e) = std::str::from_utf8(&bytes) {
+        if e.error_len().is_none() {
+            bytes.truncate(e.valid_up_to());
+        }
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
 /// Read the X11 `PRIMARY` selection, which holds selected text with no copy
 /// action at all. Returns `None` on Wayland, when no tool is present, or when
 /// nothing is selected.
 ///
 /// Note that GNOME/Wayland sessions relaunch this app under XWayland (see the
 /// overlay's stacking requirements), so the most common Linux desktop reaches
-/// this path too.
+/// this path too. On any Wayland desktop it only runs when the compositor's own
+/// primary selection could not be read (`read_wayland_primary_selection`).
 #[cfg(target_os = "linux")]
 fn read_primary_selection() -> Option<String> {
     use std::process::Command;

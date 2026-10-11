@@ -1859,6 +1859,24 @@
         "opacityLabel": "Độ mờ của bảng",
         "opacityDescription": "Bảng nổi đục đến mức nào. 100% là hoàn toàn đặc; giá trị thấp hơn cho phép thấy mờ màn hình nền phía sau."
       }
+    },
+    "thinking": {
+      "title": "Suy nghĩ",
+      "description": {
+        "cleanup": "Thời gian một mô hình suy luận suy nghĩ trước khi làm sạch nội dung đọc chính tả của bạn. Tắt là nhanh nhất, và các mô hình luôn suy nghĩ như gpt-oss sẽ dùng mức thấp nhất. Chỉ tăng lên khi phần làm sạch bị sai, vì nó làm chậm mọi lần đọc chính tả.",
+        "assistant": "Thời gian một mô hình suy luận suy nghĩ trước khi trả lời. Tắt là nhanh nhất, và các mô hình luôn suy nghĩ như gpt-oss sẽ dùng mức thấp nhất. Mức cao hơn xử lý câu hỏi khó tốt hơn nhưng mất nhiều thời gian hơn để bắt đầu trả lời."
+      },
+      "unsupported": {
+        "builtin": "Các mô hình trên máy tính này luôn trả lời mà không suy nghĩ, nhờ vậy chúng chạy nhanh.",
+        "anthropic": "Anthropic không cho ứng dụng đặt mục này, nên Claude tự quyết định. Hãy dùng Claude qua OpenRouter để đặt.",
+        "apple": "Apple Intelligence không có cài đặt suy nghĩ."
+      },
+      "options": {
+        "off": "Tắt",
+        "low": "Thấp",
+        "medium": "Trung bình",
+        "high": "Cao"
+      }
     }
   },
   "footer": {
@@ -3224,5 +3242,16 @@
     "best": "Ngày tốt nhất",
     "typical": "Ngày điển hình",
     "typicalSub": "Vào những ngày bạn đọc chính tả"
+  },
+  "settingsNotice": {
+    "restored": "Cài đặt của bạn bị hỏng và đã được khôi phục từ bản sao lưu.",
+    "restoredDescription": "Những thay đổi gần đây có thể bị thiếu.",
+    "unrecoverableTitle": "Không thể khôi phục cài đặt của bạn",
+    "unrecoverableDescription": "SpeakoFlow đã khởi động với cài đặt mặc định. Tệp bị hỏng được giữ lại với tên {{file}}.",
+    "notSavingTitle": "Các thay đổi cài đặt sẽ không được lưu",
+    "notSavingDescription": "Không thể đọc tệp cài đặt nên tệp được giữ nguyên. Hãy khởi động lại SpeakoFlow để thử lại.",
+    "saveFailingTitle": "Cài đặt không được lưu",
+    "saveFailingDescription": "Các thay đổi gần đây của bạn chưa được lưu. SpeakoFlow sẽ tiếp tục thử.",
+    "dismiss": "Đóng"
   }
 }

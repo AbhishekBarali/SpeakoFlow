@@ -1877,6 +1877,24 @@
         "opacityLabel": "Opacidad del panel",
         "opacityDescription": "Lo opaco que es el panel flotante. El 100 % es totalmente sólido; con valores más bajos se transparenta el escritorio."
       }
+    },
+    "thinking": {
+      "title": "Razonamiento",
+      "description": {
+        "cleanup": "Cuánto piensa un modelo de razonamiento antes de limpiar tu dictado. Desactivado es lo más rápido, y los modelos que siempre piensan, como gpt-oss, usan su nivel más bajo. Súbelo solo si la limpieza comete errores, porque añade un retraso a cada dictado.",
+        "assistant": "Cuánto piensa un modelo de razonamiento antes de responder. Desactivado es lo más rápido, y los modelos que siempre piensan, como gpt-oss, usan su nivel más bajo. Los niveles altos resuelven mejor las preguntas difíciles, pero tardan más en empezar a responder."
+      },
+      "unsupported": {
+        "builtin": "Los modelos de este ordenador siempre responden sin pensar, y eso los mantiene rápidos.",
+        "anthropic": "Anthropic no permite que las aplicaciones ajusten esto, así que decide Claude. Usa Claude a través de OpenRouter para ajustarlo.",
+        "apple": "Apple Intelligence no tiene un ajuste de razonamiento."
+      },
+      "options": {
+        "off": "Desactivado",
+        "low": "Bajo",
+        "medium": "Medio",
+        "high": "Alto"
+      }
     }
   },
   "footer": {
@@ -3292,5 +3310,16 @@
     "best": "Mejor día",
     "typical": "Día típico",
     "typicalSub": "Los días que dictas"
+  },
+  "settingsNotice": {
+    "restored": "Tu configuración estaba dañada y se restauró desde una copia de seguridad.",
+    "restoredDescription": "Es posible que falten tus cambios más recientes.",
+    "unrecoverableTitle": "No se pudo recuperar tu configuración",
+    "unrecoverableDescription": "SpeakoFlow se inició con la configuración predeterminada. El archivo dañado se guardó como {{file}}.",
+    "notSavingTitle": "Los cambios en la configuración no se guardarán",
+    "notSavingDescription": "No se pudo leer el archivo de configuración, así que se dejó intacto. Reinicia SpeakoFlow para volver a intentarlo.",
+    "saveFailingTitle": "La configuración no se está guardando",
+    "saveFailingDescription": "Tus cambios recientes aún no se han guardado. SpeakoFlow seguirá intentándolo.",
+    "dismiss": "Descartar"
   }
 }

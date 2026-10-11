@@ -86,17 +86,6 @@ pub fn resolve_app_data(app: &tauri::AppHandle, relative: &str) -> Result<PathBu
     Ok(app_data_dir(app)?.join(relative))
 }
 
-/// Get the path to use with `tauri-plugin-store`.
-/// Returns an absolute path in portable mode (so the store plugin writes to
-/// the portable Data dir) or the original relative path otherwise.
-pub fn store_path(relative: &str) -> PathBuf {
-    if let Some(dir) = data_dir() {
-        dir.join(relative)
-    } else {
-        PathBuf::from(relative)
-    }
-}
-
 /// Check if a marker file path contains the portable magic string. Accepts
 /// both the current `SpeakoFlow Portable Mode` string and the legacy
 /// `Handy Portable Mode` string written by portable installs created before

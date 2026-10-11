@@ -341,6 +341,11 @@ gtk = "0.18"
 # Already in the graph through wry; named here so the assistant panel can answer
 # WebKitGTK's microphone permission request (see assistant.rs).
 webkit2gtk = "=2.0.2"
+# Selection capture on Wayland (see selection.rs): reads the compositor's primary
+# selection over data-control, because XWayland's PRIMARY does not hold a native
+# Wayland app's selection. Already in the graph through arboard; pinned to the
+# version the lockfile resolves so both share one copy.
+wl-clipboard-rs = "=0.9.3"
 transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan"] }
 # transcribe.cpp Linux: dynamic (loadable) backend .so modules + Vulkan GPU
 # acceleration (the `dynamic-backends` posture, same as Windows x86_64). Ships a
