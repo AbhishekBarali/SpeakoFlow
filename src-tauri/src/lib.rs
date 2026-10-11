@@ -475,7 +475,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         )
         .tooltip(tray::tray_tooltip())
         .show_menu_on_left_click(true)
-        .icon_as_template(true)
+        // The tray starts idle, whose colour logo must not be a template image
+        // on macOS; `change_tray_icon` keeps the flag in step from here on.
+        .icon_as_template(tray::icon_is_template(&tray::TrayIconState::Idle))
         .on_menu_event(|app, event| match event.id.as_ref() {
             "home" => {
                 show_main_window(app);

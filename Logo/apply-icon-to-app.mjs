@@ -27,7 +27,12 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import pngToIco from "png-to-ico";
-import { renderSmall as small, smallIconSvg } from "./small-icon.mjs";
+import {
+  MENU_BAR_SIZE,
+  renderMenuBar,
+  renderSmall as small,
+  smallIconSvg,
+} from "./small-icon.mjs";
 
 const HERO_MASTER = path.join("final-v2", "icon-master-2048.png");
 const REPO = "..";
@@ -48,6 +53,7 @@ const render = (size) => (size <= SMALL_MAX ? small(size) : hero(size));
 const TARGETS = [
   // System tray. Windows draws 16, macOS's menu bar ~22, Linux 22-24 -- all well
   // inside the small tier, so these ship the simplified mark even at 64px source.
+  // macOS idle uses its own 36px file, written below.
   ["src-tauri/resources/tray_idle.png", 64, "tray idle (dark themes)"],
   ["src-tauri/resources/tray_idle_dark.png", 64, "tray idle (light themes)"],
   ["src-tauri/resources/speakoflow.png", 64, "tray idle (Linux)"],
@@ -72,6 +78,18 @@ for (const [rel, size, why] of TARGETS) {
   fs.writeFileSync(dest, await render(size));
   console.log(
     `${rel.padEnd(46)} ${String(size).padStart(4)}px ${size <= SMALL_MAX ? "small" : "hero "}  ${fs.statSync(dest).size}b  (${why})`,
+  );
+}
+
+// macOS menu bar: the colour tile, drawn as-is rather than as a template image
+// (see icon_is_template in src-tauri/src/tray.rs). 36px is 18pt @2x, the height
+// the tray crate scales to, with the 32px small render centred in a 2px margin.
+{
+  const rel = "src-tauri/resources/tray_idle_macos.png";
+  const dest = path.join(REPO, rel);
+  fs.writeFileSync(dest, await renderMenuBar());
+  console.log(
+    `${rel.padEnd(46)} ${String(MENU_BAR_SIZE).padStart(4)}px small  ${fs.statSync(dest).size}b  (macOS menu bar idle, 32px tile + 2px margin)`,
   );
 }
 
