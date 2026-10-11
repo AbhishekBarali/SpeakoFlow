@@ -5,6 +5,7 @@ import {
   buildManifest,
   classifyDmg,
   classifyUpdaterAsset,
+  notesForApp,
   sigAssetsToRemove,
   signaturesFromManifest,
   tagMatchesVersion,
@@ -257,6 +258,58 @@ describe("buildManifest", () => {
     });
     expect(long.notes.length).toBeLessThan(8100);
     expect(long.notes).toEndWith("…");
+  });
+});
+
+describe("notesForApp (the update card renders markdown with HTML off)", () => {
+  test("a <br /> spacer line between blocks is dropped", () => {
+    expect(
+      notesForApp("> **On 2.0.0?** It updates itself.\n\n<br />\n\n### New\n"),
+    ).toBe("> **On 2.0.0?** It updates itself.\n\n### New\n");
+  });
+
+  test("a <br /> ending a line becomes a markdown hard break", () => {
+    expect(
+      notesForApp(
+        "**Windows:** choose **Run anyway**.<br />\n**macOS:** run this once:",
+      ),
+    ).toBe("**Windows:** choose **Run anyway**.  \n**macOS:** run this once:");
+  });
+
+  test("every spelling of the tag is handled, mid-line too", () => {
+    expect(notesForApp("one<br>two<BR/>three <br /> four")).toBe(
+      "one  \ntwo  \nthree  \nfour",
+    );
+  });
+
+  test("a break inside a table cell becomes a space, not a broken row", () => {
+    expect(notesForApp("| a | line one<br>line two |")).toBe(
+      "| a | line one line two |",
+    );
+  });
+
+  test("code blocks are left exactly as written", () => {
+    const body = "```html\n<br />\n<p>a<br>b</p>\n```";
+    expect(notesForApp(body)).toBe(body);
+  });
+
+  test("notes without HTML pass through unchanged", () => {
+    const body = "## SpeakoFlow 2.0.1\n\n- **Fixed** a thing.\n\n---\n";
+    expect(notesForApp(body)).toBe(body);
+  });
+
+  test("buildManifest puts the card-ready notes in latest.json", () => {
+    const manifest = buildManifest({
+      version: "2.0.1",
+      notes: "Intro.\n\n<br />\n\n### New\n\n- Thing.<br />\n",
+      pubDate: "2026-10-11T00:00:00.000Z",
+      repo: "AbhishekBarali/SpeakoFlow",
+      tag: "v2.0.1",
+      assetNames: [],
+      signatures: new Map(),
+    });
+    expect(manifest.notes).not.toContain("<br");
+    expect(manifest.notes).toBe("Intro.\n\n### New\n\n- Thing.  \n");
   });
 });
 
