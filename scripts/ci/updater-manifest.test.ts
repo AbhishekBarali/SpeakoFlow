@@ -5,6 +5,8 @@ import {
   buildManifest,
   classifyDmg,
   classifyUpdaterAsset,
+  sigAssetsToRemove,
+  signaturesFromManifest,
   tagMatchesVersion,
   verifyUpdaterSignature,
 } from "./updater-manifest";
@@ -267,5 +269,79 @@ describe("tagMatchesVersion", () => {
     ["1.5.0", "1.5.0", false],
   ])("%s vs %s → %s", (tag, version, expected) => {
     expect(tagMatchesVersion(tag, version)).toBe(expected);
+  });
+});
+
+describe("removing the .sig files after the manifest is written", () => {
+  const repo = "AbhishekBarali/SpeakoFlow";
+  const signatures = signaturesFor(V140_ASSETS);
+  const manifest = buildManifest({
+    version: "1.5.0",
+    notes: "",
+    pubDate: "2026-09-28T00:00:00.000Z",
+    repo,
+    tag: "v1.5.0",
+    assetNames: V140_ASSETS,
+    signatures,
+  });
+
+  test("every .sig whose signature is in the manifest goes, and nothing else", () => {
+    const removed = sigAssetsToRemove(V140_ASSETS, signatures);
+    expect(removed).toEqual(
+      V140_ASSETS.filter((name) => name.endsWith(".sig")).sort(),
+    );
+    expect(removed.some((name) => !name.endsWith(".sig"))).toBe(false);
+  });
+
+  test("a .sig for a bundle left out of the manifest stays", () => {
+    const partial = new Map(signatures);
+    partial.delete("SpeakoFlow_1.5.0_x64-setup.exe");
+    expect(sigAssetsToRemove(V140_ASSETS, partial)).not.toContain(
+      "SpeakoFlow_1.5.0_x64-setup.exe.sig",
+    );
+  });
+
+  test("a re-run recovers every signature from the manifest it wrote", () => {
+    const recovered = signaturesFromManifest(manifest, repo, "v1.5.0");
+    const expected = new Map(
+      [...signatures].map(([name, sig]) => [name, sig.trim()]),
+    );
+    expect(new Map([...recovered].sort())).toEqual(
+      new Map([...expected].sort()),
+    );
+  });
+
+  test("a re-run without the .sig files writes the same platforms", () => {
+    const withoutSigs = V140_ASSETS.filter((name) => !name.endsWith(".sig"));
+    const again = buildManifest({
+      version: "1.5.0",
+      notes: "",
+      pubDate: "2026-09-28T00:00:00.000Z",
+      repo,
+      tag: "v1.5.0",
+      assetNames: withoutSigs,
+      signatures: signaturesFromManifest(manifest, repo, "v1.5.0"),
+    });
+    expect(again.platforms).toEqual(manifest.platforms);
+    expect(again.speakoflow).toEqual(manifest.speakoflow);
+  });
+
+  test("signatures for another tag or repository are not reused", () => {
+    expect(signaturesFromManifest(manifest, repo, "v1.4.0").size).toBe(0);
+    expect(
+      signaturesFromManifest(manifest, "someone/fork", "v1.5.0").size,
+    ).toBe(0);
+  });
+
+  test("a damaged manifest yields nothing instead of throwing", () => {
+    expect(signaturesFromManifest(null, repo, "v1.5.0").size).toBe(0);
+    expect(signaturesFromManifest({}, repo, "v1.5.0").size).toBe(0);
+    expect(
+      signaturesFromManifest(
+        { platforms: { "linux-x86_64": { url: 5, signature: [] } } },
+        repo,
+        "v1.5.0",
+      ).size,
+    ).toBe(0);
   });
 });

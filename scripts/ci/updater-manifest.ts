@@ -21,6 +21,13 @@
  * when an in-app install is not possible (portable build, a package manager
  * owns the install, or the install itself failed).
  *
+ * The build uploads a `.sig` beside every updater bundle only so this script
+ * can collect them. Once `latest.json` is uploaded those `.sig` files are
+ * deleted from the release, because the signatures now live in the manifest
+ * and the files would only clutter the download list. A re-run (say, after
+ * re-building one platform) reads the signatures it no longer finds as files
+ * back out of the existing `latest.json`, and verifies them the same way.
+ *
  * Usage (CI):
  *   bun scripts/ci/updater-manifest.ts --release-id <id> \
  *     --conf src-tauri/tauri.conf.json --out latest.json --upload
@@ -213,6 +220,59 @@ function sortKeys<T>(record: Record<string, T>): Record<string, T> {
   return Object.fromEntries(
     Object.entries(record).sort(([a], [b]) => a.localeCompare(b)),
   );
+}
+
+/**
+ * Updater asset name → signature, read back from a `latest.json` this script
+ * wrote earlier for the same tag.
+ *
+ * Once a manifest is uploaded the `.sig` files are deleted from the release
+ * (see `sigAssetsToRemove`), so a later run, e.g. after re-building one
+ * platform, finds no `.sig` beside the bundles it did not rebuild. Their
+ * signatures are still in the previous manifest. Entries that point at another
+ * tag are ignored, and every signature recovered here is verified against the
+ * published bytes exactly like one read from a `.sig` file, so a stale one
+ * fails the run instead of reaching an install.
+ */
+export function signaturesFromManifest(
+  manifest: unknown,
+  repo: string,
+  tag: string,
+): Map<string, string> {
+  const signatures = new Map<string, string>();
+  const platforms = (manifest as { platforms?: unknown } | null)?.platforms;
+  if (!platforms || typeof platforms !== "object") return signatures;
+  const prefix = assetUrl(repo, tag, "");
+  for (const entry of Object.values(platforms as Record<string, unknown>)) {
+    const { url, signature } = (entry ?? {}) as {
+      url?: unknown;
+      signature?: unknown;
+    };
+    if (typeof url !== "string" || typeof signature !== "string") continue;
+    if (!url.startsWith(prefix)) continue;
+    const name = decodeURIComponent(url.slice(prefix.length));
+    if (!name || name.includes("/") || !signature.trim()) continue;
+    signatures.set(name, signature.trim());
+  }
+  return signatures;
+}
+
+/**
+ * The `.sig` files to delete once the manifest is uploaded. They exist only so
+ * this script can collect the signatures; installed apps read the signature
+ * from `latest.json` and never fetch a `.sig`. Left on the release they are
+ * extra entries in the download list that nobody should click. Only the
+ * `.sig` of a bundle whose signature is now in the manifest is removed.
+ */
+export function sigAssetsToRemove(
+  assetNames: string[],
+  signed: Map<string, string>,
+): string[] {
+  const present = new Set(assetNames);
+  return [...signed.keys()]
+    .map((name) => `${name}.sig`)
+    .filter((sig) => present.has(sig))
+    .sort();
 }
 
 /**
@@ -481,20 +541,48 @@ async function main(): Promise<void> {
     `Release ${release.tag_name} (${release.draft ? "draft" : "published"}${release.prerelease ? ", prerelease" : ""}), ${assets.length} assets`,
   );
 
+  // A re-run finds no .sig beside the bundles an earlier run already put in
+  // the manifest; their signatures come from that manifest instead.
+  const previousManifest = byName.get("latest.json");
+  let previous = new Map<string, string>();
+  if (previousManifest) {
+    try {
+      const text = new TextDecoder().decode(
+        await downloadAsset(repo, previousManifest),
+      );
+      previous = signaturesFromManifest(
+        JSON.parse(text),
+        repo,
+        release.tag_name,
+      );
+    } catch (error) {
+      console.log(
+        `  ! the existing latest.json could not be read (${(error as Error).message}); using .sig files only`,
+      );
+    }
+  }
+
   const signatures = new Map<string, string>();
   const failures: string[] = [];
   for (const asset of assets) {
     if (!classifyUpdaterAsset(asset.name)) continue;
     const sigAsset = byName.get(`${asset.name}.sig`);
-    if (!sigAsset) {
+    let signature: string;
+    if (sigAsset) {
+      signature = new TextDecoder()
+        .decode(await downloadAsset(repo, sigAsset))
+        .trim();
+    } else if (previous.has(asset.name)) {
+      signature = previous.get(asset.name) as string;
+      console.log(
+        `  · ${asset.name}: no .sig, using the signature in the existing latest.json`,
+      );
+    } else {
       console.log(
         `  - ${asset.name}: no .sig on the release, not offered as an update`,
       );
       continue;
     }
-    const signature = new TextDecoder()
-      .decode(await downloadAsset(repo, sigAsset))
-      .trim();
     const bytes = await downloadAsset(repo, asset);
     const result = verifyUpdaterSignature(bytes, signature, pubkey);
     if (!result.ok) {
@@ -540,6 +628,28 @@ async function main(): Promise<void> {
   if (upload) {
     await uploadManifest(repo, release, assets, json);
     console.log(`Uploaded latest.json to ${release.tag_name}`);
+
+    // The signatures now live in latest.json, so the .sig files are only
+    // clutter in the release's download list. A failed delete leaves a stray
+    // file behind, not a broken update, so it warns instead of failing.
+    const stale = sigAssetsToRemove(
+      assets.map((asset) => asset.name),
+      signatures,
+    );
+    for (const name of stale) {
+      const asset = byName.get(name);
+      if (!asset) continue;
+      try {
+        await github(`/repos/${repo}/releases/assets/${asset.id}`, {
+          method: "DELETE",
+        });
+        console.log(`  removed ${name}`);
+      } catch (error) {
+        console.log(
+          `::warning::could not remove ${name}: ${(error as Error).message}`,
+        );
+      }
+    }
   }
 }
 
