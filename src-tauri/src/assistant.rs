@@ -2113,9 +2113,19 @@ fn tick_panel_input(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    let cursor_in_window = match (app.cursor_position(), window.outer_position()) {
-        (Ok(cursor), Ok(origin)) => Some((cursor.x - origin.x as f64, cursor.y - origin.y as f64)),
-        _ => None,
+    // An unreliable cursor counts as no cursor, which resolves to tangible. This
+    // runs on every hit-rect report, not only from the guard's polling, so
+    // skipping the polling alone still let the first report make the panel
+    // click-through.
+    let cursor_in_window = if panel_cursor_is_reliable() {
+        match (app.cursor_position(), window.outer_position()) {
+            (Ok(cursor), Ok(origin)) => {
+                Some((cursor.x - origin.x as f64, cursor.y - origin.y as f64))
+            }
+            _ => None,
+        }
+    } else {
+        None
     };
     let hit = PANEL_HIT_RECT.lock().ok().and_then(|rect| rect.clone());
     let empty_for = PANEL_HIT_EMPTY_SINCE
@@ -2176,35 +2186,40 @@ fn apply_panel_passthrough(window: &tauri::WebviewWindow, ignore: bool) {
     }
 }
 
-/// Whether GTK is talking to a Wayland compositor directly (not XWayland).
+/// Whether the cursor position this process reads is where the pointer really is.
 ///
-/// Mirrors GTK 3's own pick without touching GDK off the main thread: Wayland
-/// wins when a Wayland display is present unless `GDK_BACKEND` puts another
-/// backend first — which is what main.rs does on GNOME (`GDK_BACKEND=x11`).
-#[cfg(target_os = "linux")]
-fn gtk_backend_is_wayland() -> bool {
-    if std::env::var_os("WAYLAND_DISPLAY").is_none() {
-        return false;
+/// Not on a Wayland session, whichever backend GTK is on:
+///
+///   * **Native Wayland** gives clients no global cursor position, and tao
+///     reports `Ok((0, 0))` there instead of an error. The guard saw the pointer
+///     parked on the frame's top-left corner forever.
+///   * **XWayland** only learns where the pointer is while it is over one of its
+///     own windows. The AppImage always runs there (its GTK hook exports
+///     `GDK_BACKEND=x11`), and so does GNOME (main.rs). Once the panel goes
+///     click-through, the pointer over it belongs to the app underneath, so the
+///     reading freezes wherever it was last seen and the panel never takes the
+///     pointer back.
+///
+/// Either way the quick ask and the call came up click-through over the whole
+/// window: Copy, Insert, the text field and even the close button ignored the
+/// mouse. So on Wayland the panel stays tangible, which is how it behaved
+/// before the guard existed.
+fn panel_cursor_is_reliable() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        !crate::utils::is_wayland()
     }
-    match std::env::var("GDK_BACKEND") {
-        Ok(value) => matches!(
-            value.split(',').next().map(str::trim),
-            Some("wayland") | Some("*") | Some("")
-        ),
-        Err(_) => true,
+    #[cfg(not(target_os = "linux"))]
+    {
+        true
     }
 }
 
 /// Start watching the cursor while the panel is on screen.
 fn start_panel_input_guard(app: &AppHandle) {
-    // Native Wayland gives clients no global cursor position, and tao reports
-    // `Ok((0, 0))` there instead of an error. The guard then saw the pointer
-    // parked on the frame's top-left corner forever and made the quick-ask card
-    // click-through, so Copy, Insert and the text field could not be used.
-    // Leave the panel tangible on Wayland (the pre-guard behaviour) and skip
-    // the polling. GNOME is unaffected: main.rs runs it under XWayland.
-    #[cfg(target_os = "linux")]
-    if gtk_backend_is_wayland() {
+    // Without a cursor to compare there is nothing to poll for: leave the panel
+    // tangible (see `panel_cursor_is_reliable`).
+    if !panel_cursor_is_reliable() {
         if let Some(window) = app.get_webview_window(PANEL_LABEL) {
             apply_panel_passthrough(&window, false);
         }
