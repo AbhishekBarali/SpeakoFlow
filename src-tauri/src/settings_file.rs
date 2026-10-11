@@ -39,7 +39,11 @@
 //!   session runs on the backup's settings, or the defaults.
 //! - **A backup is kept.** `settings_store.json.bak` is refreshed (atomically)
 //!   from every launch that read a good file containing settings, and only when
-//!   it differs.
+//!   it differs. It is the settings as that launch found them, so a restore
+//!   loses the changes made after it, and the notice says so. Where there is no
+//!   backup yet (a first launch) the first save that holds settings creates one;
+//!   an existing backup is never replaced by a save, so a save can never put
+//!   bad settings over a good backup.
 //! - **The user is told.** Each of those recoveries, and saves that keep
 //!   failing, becomes a [`SettingsNotice`] the main window shows.
 //! - **Writes stay off the caller's thread.** A change marks the file dirty and a
@@ -370,7 +374,7 @@ impl SettingsFile {
         };
         let (result, notices_changed) = {
             let _saving = lock(&self.saving);
-            let bytes = {
+            let (bytes, holds_settings) = {
                 let mut state = lock(&self.state);
                 if !state.dirty {
                     return Ok(());
@@ -381,9 +385,15 @@ impl SettingsFile {
                 if bytes.is_ok() {
                     state.dirty = false;
                 }
-                bytes
+                (bytes, has_settings(&state.entries))
             };
-            let result = bytes.and_then(|bytes| write_atomically(path, &bytes));
+            let result = bytes.and_then(|bytes| {
+                write_atomically(path, &bytes)?;
+                if holds_settings {
+                    seed_backup(&backup_path(path), &bytes);
+                }
+                Ok(())
+            });
             if result.is_err() {
                 lock(&self.state).dirty = true;
             }
@@ -575,6 +585,19 @@ fn read_backup(backup: &Path) -> Option<Map<String, Value>> {
         .ok()
         .and_then(|bytes| parse_entries(&bytes).ok())
         .filter(has_settings)
+}
+
+/// Create the backup from a file just saved, when there is none yet: a first
+/// launch, or one whose backup was unusable and already lost. An existing
+/// backup is left alone; only a launch that reads a good file refreshes it
+/// ([`refresh_backup`]). Best effort: a failure here is not a failed save.
+fn seed_backup(backup: &Path, bytes: &[u8]) {
+    if backup.exists() {
+        return;
+    }
+    if let Err(err) = write_atomically(backup, bytes) {
+        warn!("Could not create the settings backup: {err}");
+    }
 }
 
 /// Make the backup hold `bytes`, unless it already does.
@@ -876,6 +899,38 @@ mod tests {
             read_json(&path),
             json!({ "settings": { "push_to_talk": false } })
         );
+        // Damage before the second launch must still have something to come
+        // back from, so the first save creates the backup.
+        assert_eq!(
+            read_json(&backup_path(&path)),
+            json!({ "settings": { "push_to_talk": false } })
+        );
+    }
+
+    /// Only a launch that reads a good file refreshes the backup. A save never
+    /// replaces it, so settings a session gets wrong cannot reach it.
+    #[test]
+    fn a_save_never_replaces_an_existing_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = store_path(&dir);
+        write_json(&path, &user_settings());
+        let file = SettingsFile::open(path.clone());
+        assert_eq!(read_json(&backup_path(&path)), user_settings());
+
+        file.set("settings", json!({ "push_to_talk": true }));
+        file.flush().unwrap();
+        assert_eq!(read_json(&backup_path(&path)), user_settings());
+    }
+
+    /// A store that only ever held other keys has nothing a backup would save.
+    #[test]
+    fn a_save_without_settings_creates_no_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = store_path(&dir);
+        let file = SettingsFile::open(path.clone());
+        file.set("meeting_pill_position", json!({ "x": 1.0 }));
+        file.flush().unwrap();
+        assert!(!backup_path(&path).exists());
     }
 
     #[test]
@@ -1394,8 +1449,19 @@ mod tests {
             file.set("settings", json!({ "n": n }));
             file.flush().unwrap();
         }
-        assert_eq!(files_in(&dir), vec!["settings_store.json".to_string()]);
+        assert_eq!(
+            files_in(&dir),
+            vec![
+                "settings_store.json".to_string(),
+                "settings_store.json.bak".to_string()
+            ]
+        );
         assert_eq!(read_json(&path), json!({ "settings": { "n": 4 } }));
+        assert_eq!(
+            read_json(&backup_path(&path)),
+            json!({ "settings": { "n": 0 } }),
+            "the backup is created once, not rewritten by every save"
+        );
     }
 
     #[test]

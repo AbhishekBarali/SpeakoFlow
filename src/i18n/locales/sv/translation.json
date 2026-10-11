@@ -3257,6 +3257,7 @@
   },
   "settingsNotice": {
     "restored": "Dina inställningar var skadade och har återställts från en säkerhetskopia.",
+    "restoredDescription": "De senaste ändringarna kan saknas.",
     "unrecoverableTitle": "Det gick inte att återställa dina inställningar",
     "unrecoverableDescription": "SpeakoFlow startade med standardinställningarna. Den skadade filen sparades som {{file}}.",
     "notSavingTitle": "Ändringar i inställningarna sparas inte",

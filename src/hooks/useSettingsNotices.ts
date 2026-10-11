@@ -13,7 +13,7 @@ import {
   settingsNoticesToTakeDown,
 } from "@/lib/settingsNotices";
 
-/** How long the restore notice stays up. It lost nothing, so it goes away. */
+/** How long the restore notice stays up. The settings are back, so it goes away. */
 const RESTORED_TOAST_MS = 10_000;
 
 /**

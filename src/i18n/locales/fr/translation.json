@@ -3291,6 +3291,7 @@
   },
   "settingsNotice": {
     "restored": "Vos paramètres étaient endommagés et ont été restaurés à partir d'une sauvegarde.",
+    "restoredDescription": "Vos dernières modifications peuvent manquer.",
     "unrecoverableTitle": "Impossible de récupérer vos paramètres",
     "unrecoverableDescription": "SpeakoFlow a démarré avec les paramètres par défaut. Le fichier endommagé a été conservé sous le nom {{file}}.",
     "notSavingTitle": "Les modifications des paramètres ne seront pas enregistrées",

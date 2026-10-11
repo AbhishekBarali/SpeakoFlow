@@ -3223,6 +3223,7 @@
   },
   "settingsNotice": {
     "restored": "設定ファイルが破損していたため、バックアップから復元しました。",
+    "restoredDescription": "最近の変更が反映されていない可能性があります。",
     "unrecoverableTitle": "設定を復元できませんでした",
     "unrecoverableDescription": "SpeakoFlow は既定の設定で起動しました。破損したファイルは {{file}} として残してあります。",
     "notSavingTitle": "設定の変更は保存されません",

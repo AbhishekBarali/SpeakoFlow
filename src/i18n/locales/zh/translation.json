@@ -3223,6 +3223,7 @@
   },
   "settingsNotice": {
     "restored": "你的设置已损坏，已从备份中恢复。",
+    "restoredDescription": "最近的更改可能已丢失。",
     "unrecoverableTitle": "无法恢复你的设置",
     "unrecoverableDescription": "SpeakoFlow 已使用默认设置启动。损坏的文件已保留为 {{file}}。",
     "notSavingTitle": "设置更改将不会保存",

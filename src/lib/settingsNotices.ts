@@ -9,7 +9,9 @@ export interface SettingsNoticeText {
   description?: string;
   /**
    * A warning stays until it is dismissed: the user lost something or is about
-   * to. A restore from the backup lost nothing, so it is an ordinary toast.
+   * to. A restore from the backup brings the settings back, so it is an
+   * ordinary toast; its description says the most recent changes may not be in
+   * the backup.
    */
   warning: boolean;
 }
@@ -21,7 +23,11 @@ export const describeSettingsNotice = (
 ): SettingsNoticeText => {
   switch (notice.kind) {
     case "restored":
-      return { title: t("settingsNotice.restored"), warning: false };
+      return {
+        title: t("settingsNotice.restored"),
+        description: t("settingsNotice.restoredDescription"),
+        warning: false,
+      };
     case "unrecoverable":
       return {
         title: t("settingsNotice.unrecoverableTitle"),

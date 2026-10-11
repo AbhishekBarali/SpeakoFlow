@@ -3223,6 +3223,7 @@
   },
   "settingsNotice": {
     "restored": "Cài đặt của bạn bị hỏng và đã được khôi phục từ bản sao lưu.",
+    "restoredDescription": "Những thay đổi gần đây có thể bị thiếu.",
     "unrecoverableTitle": "Không thể khôi phục cài đặt của bạn",
     "unrecoverableDescription": "SpeakoFlow đã khởi động với cài đặt mặc định. Tệp bị hỏng được giữ lại với tên {{file}}.",
     "notSavingTitle": "Các thay đổi cài đặt sẽ không được lưu",

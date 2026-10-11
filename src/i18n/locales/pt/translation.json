@@ -3291,6 +3291,7 @@
   },
   "settingsNotice": {
     "restored": "Suas configurações estavam danificadas e foram restauradas a partir de um backup.",
+    "restoredDescription": "As alterações mais recentes podem estar faltando.",
     "unrecoverableTitle": "Não foi possível recuperar suas configurações",
     "unrecoverableDescription": "O SpeakoFlow foi iniciado com as configurações padrão. O arquivo danificado foi mantido como {{file}}.",
     "notSavingTitle": "As alterações nas configurações não serão salvas",

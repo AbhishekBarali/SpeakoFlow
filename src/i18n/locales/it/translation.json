@@ -3291,6 +3291,7 @@
   },
   "settingsNotice": {
     "restored": "Le tue impostazioni erano danneggiate e sono state ripristinate da un backup.",
+    "restoredDescription": "Le modifiche più recenti potrebbero mancare.",
     "unrecoverableTitle": "Impossibile recuperare le tue impostazioni",
     "unrecoverableDescription": "SpeakoFlow è stato avviato con le impostazioni predefinite. Il file danneggiato è stato conservato come {{file}}.",
     "notSavingTitle": "Le modifiche alle impostazioni non verranno salvate",
