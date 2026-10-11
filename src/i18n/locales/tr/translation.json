@@ -3257,6 +3257,7 @@
   },
   "settingsNotice": {
     "restored": "Ayarlarınız bozulmuştu ve bir yedekten geri yüklendi.",
+    "restoredDescription": "Son değişiklikler eksik olabilir.",
     "unrecoverableTitle": "Ayarlarınız kurtarılamadı",
     "unrecoverableDescription": "SpeakoFlow varsayılan ayarlarla başlatıldı. Bozuk dosya {{file}} adıyla saklandı.",
     "notSavingTitle": "Ayar değişiklikleri kaydedilmeyecek",

@@ -3257,6 +3257,7 @@
   },
   "settingsNotice": {
     "restored": "Deine Einstellungen waren beschädigt und wurden aus einer Sicherung wiederhergestellt.",
+    "restoredDescription": "Die letzten Änderungen fehlen möglicherweise.",
     "unrecoverableTitle": "Deine Einstellungen konnten nicht wiederhergestellt werden",
     "unrecoverableDescription": "SpeakoFlow wurde mit den Standardeinstellungen gestartet. Die beschädigte Datei wurde als {{file}} aufbewahrt.",
     "notSavingTitle": "Änderungen an den Einstellungen werden nicht gespeichert",

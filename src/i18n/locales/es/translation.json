@@ -3291,6 +3291,7 @@
   },
   "settingsNotice": {
     "restored": "Tu configuración estaba dañada y se restauró desde una copia de seguridad.",
+    "restoredDescription": "Es posible que falten tus cambios más recientes.",
     "unrecoverableTitle": "No se pudo recuperar tu configuración",
     "unrecoverableDescription": "SpeakoFlow se inició con la configuración predeterminada. El archivo dañado se guardó como {{file}}.",
     "notSavingTitle": "Los cambios en la configuración no se guardarán",

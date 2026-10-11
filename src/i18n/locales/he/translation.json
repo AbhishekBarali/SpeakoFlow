@@ -3291,6 +3291,7 @@
   },
   "settingsNotice": {
     "restored": "ההגדרות שלך נפגמו ושוחזרו מגיבוי.",
+    "restoredDescription": "ייתכן שהשינויים האחרונים חסרים.",
     "unrecoverableTitle": "לא ניתן היה לשחזר את ההגדרות שלך",
     "unrecoverableDescription": "SpeakoFlow הופעל עם הגדרות ברירת המחדל. הקובץ הפגום נשמר בשם {{file}}.",
     "notSavingTitle": "שינויים בהגדרות לא יישמרו",

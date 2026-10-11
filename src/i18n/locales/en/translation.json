@@ -3257,6 +3257,7 @@
   },
   "settingsNotice": {
     "restored": "Your settings were damaged and have been restored from a backup.",
+    "restoredDescription": "Recent changes may be missing.",
     "unrecoverableTitle": "Your settings couldn't be recovered",
     "unrecoverableDescription": "SpeakoFlow started with its default settings. The damaged file was kept as {{file}}.",
     "notSavingTitle": "Settings changes won't be saved",

@@ -18,6 +18,13 @@ describe("describeSettingsNotice", () => {
       );
   });
 
+  test("a restore says recent changes may be missing", () => {
+    expect(
+      describeSettingsNotice({ kind: "restored", kept_as: null }, t)
+        .description,
+    ).toBe("settingsNotice.restoredDescription");
+  });
+
   test("names the kept file only when there is one", () => {
     const kept = describeSettingsNotice(
       {
