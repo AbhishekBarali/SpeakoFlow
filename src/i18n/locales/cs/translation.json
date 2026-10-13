@@ -669,6 +669,11 @@
         "description": "Podržení: nahrává se, dokud držíte zkratku pro nahrávání. Stisknutí: jeden stisk spustí, další zastaví. Platí pro všechny zkratky pro nahrávání.",
         "hold": "Podržení",
         "tap": "Stisknutí"
+      },
+      "silenceStop": {
+        "label": "Zastavit po tichu",
+        "description": "Při Stisknutí se diktování, ve kterém tak dlouho nezazní řeč, samo zastaví a vloží text, jako byste znovu stiskli zkratku. Těsně před zastavením se na pilulce zkracuje čára; když znovu promluvíte, nahrávání pokračuje.",
+        "tapOnly": "Funguje při Stisknutí. Při Podržení diktování zastaví už puštění klávesy."
       }
     },
     "models": {

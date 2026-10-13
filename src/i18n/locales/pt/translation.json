@@ -667,6 +667,11 @@
         "description": "Segurar: grava enquanto você mantém um atalho de gravação pressionado. Tocar: um toque começa, o próximo para. Vale para todos os atalhos de gravação.",
         "hold": "Segurar",
         "tap": "Toque"
+      },
+      "silenceStop": {
+        "label": "Parar após silêncio",
+        "description": "No modo Toque, um ditado que não ouve fala durante esse tempo para e cola sozinho, como se você tivesse pressionado o atalho de novo. Pouco antes, uma linha na pílula se esgota; se você voltar a falar, a gravação continua.",
+        "tapOnly": "Funciona no modo Toque. No modo Segurar, soltar a tecla já para o ditado."
       }
     },
     "models": {

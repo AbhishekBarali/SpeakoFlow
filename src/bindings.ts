@@ -29,6 +29,19 @@ async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Seconds of silence after which a tap-started dictation ends by itself; 0
+ * turns it off. Read when a recording starts, so a change applies to the next
+ * one rather than to a recording already under way.
+ */
+async changeDictationSilenceStopSetting(secs: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_dictation_silence_stop_setting", { secs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeAudioFeedbackSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_audio_feedback_setting", { enabled }) };
@@ -3569,7 +3582,15 @@ historyUpdatePayload: "history-update-payload"
  * broken field can never reset the rest of the user's configuration
  * (backport of Handy #1631).
  */
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
+/**
+ * Seconds without speech after which a dictation started with a tap ends
+ * by itself, exactly as if its shortcut had been pressed again. 0 (the
+ * default) never does: the recording runs until the next tap or the
+ * 30-minute cap. Which recordings it covers is decided in one place,
+ * `transcription_coordinator::silence_timeout_for`.
+ */
+dictation_silence_stop_secs?: number; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
 /**
  * Opt-in live/streaming transcription: while recording, feed audio into a
  * streaming transcriber and paste the merged running result at the end

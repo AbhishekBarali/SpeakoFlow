@@ -617,6 +617,18 @@ pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Seconds of silence after which a tap-started dictation ends by itself; 0
+/// turns it off. Read when a recording starts, so a change applies to the next
+/// one rather than to a recording already under way.
+#[tauri::command]
+#[specta::specta]
+pub fn change_dictation_silence_stop_setting(app: AppHandle, secs: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.dictation_silence_stop_secs = secs;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_audio_feedback_setting(app: AppHandle, enabled: bool) -> Result<(), String> {

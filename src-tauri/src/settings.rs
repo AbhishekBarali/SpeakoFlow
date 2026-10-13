@@ -1290,6 +1290,13 @@ impl fmt::Debug for SecretString {
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
     pub push_to_talk: bool,
+    /// Seconds without speech after which a dictation started with a tap ends
+    /// by itself, exactly as if its shortcut had been pressed again. 0 (the
+    /// default) never does: the recording runs until the next tap or the
+    /// 30-minute cap. Which recordings it covers is decided in one place,
+    /// `transcription_coordinator::silence_timeout_for`.
+    #[serde(default = "default_dictation_silence_stop_secs")]
+    pub dictation_silence_stop_secs: u32,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -1872,6 +1879,10 @@ fn default_model() -> String {
     // falls back to any other downloaded transcription model, so the app is
     // never stranded without a working model (PLAN.md Session 6, N1).
     crate::managers::model::RECOMMENDED_MODEL_ID.to_string()
+}
+
+fn default_dictation_silence_stop_secs() -> u32 {
+    0
 }
 
 fn default_always_on_microphone() -> bool {
@@ -4015,6 +4026,7 @@ pub fn get_default_settings() -> AppSettings {
     AppSettings {
         bindings,
         push_to_talk: true,
+        dictation_silence_stop_secs: default_dictation_silence_stop_secs(),
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),

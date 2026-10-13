@@ -663,6 +663,11 @@
         "description": "Giữ: ghi âm trong khi bạn giữ phím tắt ghi âm. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng. Áp dụng cho mọi phím tắt ghi âm.",
         "hold": "Giữ",
         "tap": "Nhấn"
+      },
+      "silenceStop": {
+        "label": "Dừng khi im lặng",
+        "description": "Ở chế độ Nhấn, nếu không nghe thấy tiếng nói trong khoảng thời gian này, việc đọc chính tả sẽ tự dừng và dán văn bản như khi bạn nhấn lại phím tắt. Ngay trước khi dừng, một vạch trên viên nhỏ sẽ ngắn dần; nói tiếp thì vẫn tiếp tục ghi âm.",
+        "tapOnly": "Dùng được ở chế độ Nhấn. Ở chế độ Giữ, thả phím là đã dừng đọc chính tả."
       }
     },
     "models": {

@@ -522,6 +522,7 @@ const settings: Json = {
     cancel: binding("cancel", "escape"),
   },
   push_to_talk: true,
+  dictation_silence_stop_secs: 0,
   audio_feedback: false,
   theme: params.get("theme") ?? "light",
   stt_engine_mode: params.get("stt") === "device" ? "local" : "cloud",
@@ -1767,6 +1768,11 @@ const handlers: Record<string, (args: Json) => unknown> = {
           "assistant_active_character_id",
         ],
         ["change_ptt_setting", "enabled", "push_to_talk"],
+        [
+          "change_dictation_silence_stop_setting",
+          "secs",
+          "dictation_silence_stop_secs",
+        ],
       ] as const
     ).map(([command, arg, key]) => [
       command,

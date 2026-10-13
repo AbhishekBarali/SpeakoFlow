@@ -1,6 +1,6 @@
 use crate::actions::ACTION_MAP;
 use crate::managers::audio::AudioRecordingManager;
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use std::sync::mpsc::{self, Receiver, RecvError, RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::thread;
@@ -61,6 +61,101 @@ fn max_duration_should_stop(
     is_recording && timer_generation == current_generation
 }
 
+/// How long before an automatic silence stop the recording pill starts
+/// counting down. Never more than half the timeout ([`silence_warning`]), so a
+/// short timeout does not spend most of every pause warning about itself.
+const SILENCE_WARNING: Duration = Duration::from_secs(2);
+
+/// How often a dictation that is counting down looks for speech again, so
+/// speaking clears the countdown at once rather than a whole warning later.
+const SILENCE_POLL: Duration = Duration::from_millis(100);
+
+/// The VAD judges 30 ms frames, so looking more often learns nothing new. Also
+/// the floor that keeps a microphone which has stopped delivering audio (whose
+/// silence then stops growing) from turning the countdown into a spin.
+const SILENCE_MIN_POLL: Duration = Duration::from_millis(30);
+
+/// The two shortcuts that dictate text (one with AI cleanup). The assistant's
+/// ask records too, but it is not dictation.
+fn is_dictation_binding(id: &str) -> bool {
+    id == "transcribe" || id == crate::settings::CLEANUP_BINDING_ID
+}
+
+/// The silence after which a recording ends by itself, if it gets one at all
+/// (`dictation_silence_stop_secs`).
+///
+/// Only a hands-free dictation: started with a tap, or by `--toggle-transcription`
+/// and the like, while the app is set to Tap. A held recording already ends when
+/// the key is let go, so stopping it under the user's finger could only surprise
+/// them. The assistant's ask, calls and meetings each have their own idea of when
+/// someone has finished, and are left to it.
+pub(crate) fn silence_timeout_for(
+    binding_id: &str,
+    mode: RecordingMode,
+    push_to_talk: bool,
+    secs: u32,
+) -> Option<Duration> {
+    (is_dictation_binding(binding_id) && mode == RecordingMode::Lock && !push_to_talk && secs > 0)
+        .then(|| Duration::from_secs(u64::from(secs)))
+}
+
+/// Where a hands-free dictation stands after `quiet_for` without speech.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SilenceVerdict {
+    /// Speech was recent: nothing to show.
+    Listening,
+    /// Quiet long enough that the pill counts down: the recording stops in
+    /// `remaining` unless speech resumes.
+    Ending { remaining: Duration },
+    /// Quiet for the whole timeout: stop, as a second tap would.
+    Stop,
+}
+
+/// The countdown before an automatic stop.
+fn silence_warning(timeout: Duration) -> Duration {
+    SILENCE_WARNING.min(timeout / 2)
+}
+
+pub(crate) fn silence_verdict(quiet_for: Duration, timeout: Duration) -> SilenceVerdict {
+    let remaining = timeout.saturating_sub(quiet_for);
+    if remaining.is_zero() {
+        SilenceVerdict::Stop
+    } else if remaining <= silence_warning(timeout) {
+        SilenceVerdict::Ending { remaining }
+    } else {
+        SilenceVerdict::Listening
+    }
+}
+
+/// How long to wait before looking at a dictation's silence again.
+///
+/// Until the countdown would begin nothing can bring the stop closer, since
+/// speech only pushes it further away, so the wait runs straight to that point.
+/// During the countdown it looks every [`SILENCE_POLL`], so speaking clears the
+/// cue promptly, and the last wait ends exactly when the timeout does instead
+/// of up to a poll after it.
+pub(crate) fn next_silence_check(quiet_for: Duration, timeout: Duration) -> Duration {
+    let until_stop = timeout.saturating_sub(quiet_for);
+    let until_countdown = until_stop.saturating_sub(silence_warning(timeout));
+    let wait = if until_countdown.is_zero() {
+        until_stop.min(SILENCE_POLL)
+    } else {
+        until_countdown
+    };
+    wait.max(SILENCE_MIN_POLL)
+}
+
+/// Whether a silence check may act. Mirrors [`max_duration_should_stop`]: only
+/// for the recording it was armed for, and only while that is still recording,
+/// so a check left over from an earlier dictation can never stop a later one.
+fn silence_check_applies(
+    check_generation: u64,
+    current_generation: u64,
+    is_recording: bool,
+) -> bool {
+    is_recording && check_generation == current_generation
+}
+
 /// Whether an expired processing cap should force the coordinator back to idle.
 /// Mirrors [`max_duration_should_stop`]: only for the pipeline it was armed for,
 /// and only while that pipeline still holds the stage.
@@ -79,6 +174,7 @@ fn processing_stall_should_reset(
 enum Deadline {
     MaxRecording { generation: u64 },
     ProcessingStalled { generation: u64 },
+    SilenceCheck { generation: u64 },
 }
 
 impl Deadline {
@@ -86,8 +182,83 @@ impl Deadline {
         match self {
             Deadline::MaxRecording { generation } => Command::MaxDuration { generation },
             Deadline::ProcessingStalled { generation } => Command::ProcessingStalled { generation },
+            Deadline::SilenceCheck { generation } => Command::SilenceCheck { generation },
         }
     }
+}
+
+/// The sooner of two deadlines. A tie goes to `first`, so a stage's cap is never
+/// held up behind a silence check due at the same instant.
+fn earliest(
+    first: Option<(Instant, Deadline)>,
+    second: Option<(Instant, Deadline)>,
+) -> Option<(Instant, Deadline)> {
+    match (first, second) {
+        (Some(a), Some(b)) => Some(if b.0 < a.0 { b } else { a }),
+        (a, None) => a,
+        (None, b) => b,
+    }
+}
+
+/// A hands-free dictation being watched for silence. Armed when such a
+/// recording starts and dropped the moment the coordinator leaves the recording
+/// stage, so no check can outlive the recording it was for. Kept apart from the
+/// stage's own deadline because it re-arms itself on every check, and the
+/// 30-minute cap must never be pushed out by that.
+struct SilenceWatch {
+    /// The recording it belongs to.
+    generation: u64,
+    timeout: Duration,
+    /// When to look again ([`next_silence_check`]).
+    next_check: Instant,
+    /// The pill is counting down to the stop.
+    counting_down: bool,
+}
+
+impl SilenceWatch {
+    fn deadline(&self) -> (Instant, Deadline) {
+        (
+            self.next_check,
+            Deadline::SilenceCheck {
+                generation: self.generation,
+            },
+        )
+    }
+}
+
+/// The silence watch for a recording that has just started, if it gets one.
+/// Settings are read here, once, so a change applies to the next recording.
+fn arm_silence_watch(
+    app: &AppHandle,
+    binding_id: &str,
+    mode: RecordingMode,
+    generation: u64,
+) -> Option<SilenceWatch> {
+    let settings = crate::settings::get_settings(app);
+    let timeout = silence_timeout_for(
+        binding_id,
+        mode,
+        settings.push_to_talk,
+        settings.dictation_silence_stop_secs,
+    )?;
+    debug!(
+        "'{binding_id}' stops after {}s without speech",
+        timeout.as_secs()
+    );
+    Some(SilenceWatch {
+        generation,
+        timeout,
+        next_check: Instant::now() + next_silence_check(Duration::ZERO, timeout),
+        counting_down: false,
+    })
+}
+
+/// Tell the recording pill how long it has before an automatic stop (`Some`),
+/// or that speech resumed and it no longer does (`None`).
+fn emit_silence_countdown(app: &AppHandle, remaining: Option<Duration>) {
+    use tauri::Emitter;
+    let millis = remaining.map(|r| u64::try_from(r.as_millis()).unwrap_or(u64::MAX));
+    let _ = app.emit("recording-silence-countdown", millis);
 }
 
 /// How a recording is driven.
@@ -143,6 +314,13 @@ enum Command {
     /// sending [`Command::ProcessingFinished`]. Forces the stage back to idle so
     /// shortcuts work again (see [`processing_stall_should_reset`]).
     ProcessingStalled {
+        generation: u64,
+    },
+    /// Fired by the coordinator's receive deadline while a hands-free dictation
+    /// is watched for silence ([`SilenceWatch`]): starts or clears the pill's
+    /// countdown, or, once the whole timeout has passed without speech, ends the
+    /// recording exactly as a second tap would.
+    SilenceCheck {
         generation: u64,
     },
     ProcessingFinished,
@@ -234,12 +412,16 @@ impl TranscriptionCoordinator {
                 // recording (see `max_duration_should_stop`).
                 let mut generation: u64 = 0;
                 let mut deadline = None;
+                // The recording's silence watch, when it has one. Woken by its
+                // own deadline, alongside the stage's.
+                let mut silence: Option<SilenceWatch> = None;
                 // When the active recording started, so the processing cap can
                 // scale with how much audio the pipeline actually has to chew on.
                 let mut recording_since = Instant::now();
 
                 loop {
-                    let Ok(cmd) = receive_command(&rx, deadline) else {
+                    let wake = earliest(deadline, silence.as_ref().map(SilenceWatch::deadline));
+                    let Ok(cmd) = receive_command(&rx, wake) else {
                         break;
                     };
                     let was = stage_kind(&stage);
@@ -399,6 +581,99 @@ impl TranscriptionCoordinator {
                                 );
                             }
                         }
+                        Command::SilenceCheck { generation: g } => {
+                            let recording = match &stage {
+                                Stage::Recording { binding_id, .. } => Some(binding_id.clone()),
+                                _ => None,
+                            };
+                            let applies = silence_check_applies(g, generation, recording.is_some());
+                            match (recording.filter(|_| applies), silence.as_mut()) {
+                                (Some(id), Some(watch)) => {
+                                    let audio = app.try_state::<Arc<AudioRecordingManager>>();
+                                    // No recorder to ask means no evidence of
+                                    // silence, and that never ends a recording.
+                                    let quiet_for = audio.as_ref().map_or(Duration::ZERO, |a| {
+                                        a.speech_activity().quiet_for()
+                                    });
+                                    match silence_verdict(quiet_for, watch.timeout) {
+                                        SilenceVerdict::Stop => {
+                                            // Re-armed before acting: a check
+                                            // whose time has passed is returned
+                                            // ahead of anything queued, so one
+                                            // that neither moved on nor left the
+                                            // recording stage would be handed
+                                            // back forever and starve the queue.
+                                            watch.next_check = Instant::now() + SILENCE_POLL;
+                                            // An Esc that landed a moment ago has
+                                            // already taken the recording
+                                            // (`cancel_recording`) and only told
+                                            // us in a message still queued behind
+                                            // this check. Stopping now would put
+                                            // "transcribing" over its Undo pill;
+                                            // that message settles it instead.
+                                            let still_recording =
+                                                audio.as_ref().is_some_and(|a| a.is_recording());
+                                            if still_recording {
+                                                // A recording in which nothing was
+                                                // said needs nothing special: its
+                                                // VAD-filtered audio is empty, and
+                                                // the pipeline already ends an
+                                                // empty recording quietly, without
+                                                // transcribing silence, pasting or
+                                                // keeping a History row.
+                                                let said_something =
+                                                    audio.as_ref().is_some_and(|a| {
+                                                        a.speech_activity().heard_speech()
+                                                    });
+                                                info!(
+                                                    "No speech for {:.1}s; ending the dictation as \
+                                                     a second tap would{}",
+                                                    quiet_for.as_secs_f32(),
+                                                    if said_something {
+                                                        ""
+                                                    } else {
+                                                        " (nothing was said, so nothing is pasted)"
+                                                    }
+                                                );
+                                                stop(&app, &mut stage, &id, "silence");
+                                            } else {
+                                                debug!(
+                                                    "Silence ran out on a recording that was \
+                                                     already cancelled; leaving it to the cancel"
+                                                );
+                                            }
+                                        }
+                                        verdict => {
+                                            let remaining = match verdict {
+                                                SilenceVerdict::Ending { remaining } => {
+                                                    Some(remaining)
+                                                }
+                                                _ => None,
+                                            };
+                                            // Only changes are sent: the pill
+                                            // runs the countdown on its own clock.
+                                            if remaining.is_some() != watch.counting_down {
+                                                watch.counting_down = remaining.is_some();
+                                                emit_silence_countdown(&app, remaining);
+                                            }
+                                            watch.next_check = Instant::now()
+                                                + next_silence_check(quiet_for, watch.timeout);
+                                        }
+                                    }
+                                }
+                                // Unreachable while the watch is dropped with its
+                                // recording, but a watch that may not act must
+                                // not stay armed either: it would fire again at
+                                // once, ahead of the queue, for as long as it
+                                // lived.
+                                _ => {
+                                    debug!(
+                                        "Ignoring stale silence check (gen {g} vs {generation})"
+                                    );
+                                    silence = None;
+                                }
+                            }
+                        }
                         Command::ProcessingFinished => {
                             stage = Stage::Idle;
                         }
@@ -434,6 +709,19 @@ impl TranscriptionCoordinator {
                                 Instant::now() + processing_budget(recording_since.elapsed()),
                                 Deadline::ProcessingStalled { generation },
                             )),
+                        };
+                        // A silence watch lives and dies with its recording,
+                        // like the cap. Whatever ended it has already moved the
+                        // pill on; taking the countdown down here as well is for
+                        // the path that one day forgets to.
+                        if silence.as_ref().is_some_and(|w| w.counting_down) {
+                            emit_silence_countdown(&app, None);
+                        }
+                        silence = match &stage {
+                            Stage::Recording { binding_id, mode } => {
+                                arm_silence_watch(&app, binding_id, *mode, generation)
+                            }
+                            _ => None,
                         };
                     }
                 }
@@ -774,5 +1062,166 @@ mod tests {
         let secs = MAX_RECORDING_DURATION.as_secs();
         assert!(secs >= 10 * 60, "cap should not cut short normal dictation");
         assert!(secs <= 60 * 60, "cap must bound a runaway recording");
+    }
+
+    const LOCK: RecordingMode = RecordingMode::Lock;
+    const TAP_MODE: bool = false;
+
+    #[test]
+    fn only_a_hands_free_dictation_stops_on_silence() {
+        let five = Some(Duration::from_secs(5));
+        assert_eq!(silence_timeout_for("transcribe", LOCK, TAP_MODE, 5), five);
+        assert_eq!(
+            silence_timeout_for("transcribe_with_post_process", LOCK, TAP_MODE, 5),
+            five
+        );
+        // Off.
+        assert_eq!(silence_timeout_for("transcribe", LOCK, TAP_MODE, 0), None);
+        // The assistant's ask decides for itself when a question is over.
+        assert_eq!(silence_timeout_for("assistant", LOCK, TAP_MODE, 5), None);
+        // A held recording ends when the key is let go.
+        assert_eq!(
+            silence_timeout_for("transcribe", RecordingMode::Hold, TAP_MODE, 5),
+            None
+        );
+        // Set to Hold, even a hands-free start (the CLI, the pill's mic) keeps
+        // running: the setting is offered for Tap only, so it applies to Tap only.
+        assert_eq!(silence_timeout_for("transcribe", LOCK, true, 5), None);
+    }
+
+    #[test]
+    fn the_stop_lands_exactly_on_the_timeout() {
+        let timeout = Duration::from_secs(5);
+        assert_eq!(
+            silence_verdict(timeout - Duration::from_millis(1), timeout),
+            SilenceVerdict::Ending {
+                remaining: Duration::from_millis(1)
+            }
+        );
+        assert_eq!(silence_verdict(timeout, timeout), SilenceVerdict::Stop);
+        assert_eq!(
+            silence_verdict(timeout + Duration::from_secs(1), timeout),
+            SilenceVerdict::Stop
+        );
+    }
+
+    #[test]
+    fn the_pill_counts_down_only_at_the_end() {
+        let timeout = Duration::from_secs(5);
+        assert_eq!(
+            silence_verdict(Duration::ZERO, timeout),
+            SilenceVerdict::Listening
+        );
+        assert_eq!(
+            silence_verdict(Duration::from_millis(2_999), timeout),
+            SilenceVerdict::Listening
+        );
+        assert_eq!(
+            silence_verdict(Duration::from_secs(3), timeout),
+            SilenceVerdict::Ending {
+                remaining: Duration::from_secs(2)
+            }
+        );
+        // A short timeout warns for half of it, not most of every pause.
+        let short = Duration::from_secs(3);
+        assert_eq!(
+            silence_verdict(Duration::from_millis(1_499), short),
+            SilenceVerdict::Listening
+        );
+        assert_eq!(
+            silence_verdict(Duration::from_millis(1_500), short),
+            SilenceVerdict::Ending {
+                remaining: Duration::from_millis(1_500)
+            }
+        );
+    }
+
+    #[test]
+    fn speech_during_the_countdown_calls_it_off() {
+        let timeout = Duration::from_secs(10);
+        // Counting down…
+        assert!(matches!(
+            silence_verdict(Duration::from_millis(9_000), timeout),
+            SilenceVerdict::Ending { .. }
+        ));
+        // …then a word: the silence starts over, and so does the whole timeout.
+        assert_eq!(
+            silence_verdict(Duration::from_millis(200), timeout),
+            SilenceVerdict::Listening
+        );
+        assert_eq!(
+            next_silence_check(Duration::from_millis(200), timeout),
+            Duration::from_millis(7_800)
+        );
+    }
+
+    #[test]
+    fn checks_sleep_until_the_countdown_then_land_on_the_stop() {
+        let timeout = Duration::from_secs(10);
+        // Nothing can bring the stop closer before the countdown starts.
+        assert_eq!(
+            next_silence_check(Duration::ZERO, timeout),
+            Duration::from_secs(8)
+        );
+        // During it: often enough to notice speech at once…
+        assert_eq!(
+            next_silence_check(Duration::from_secs(8), timeout),
+            SILENCE_POLL
+        );
+        // …and the last wait ends on the timeout, not a poll after it.
+        assert_eq!(
+            next_silence_check(Duration::from_millis(9_950), timeout),
+            Duration::from_millis(50)
+        );
+        // Never more often than the VAD can say anything new.
+        assert_eq!(
+            next_silence_check(Duration::from_millis(9_999), timeout),
+            SILENCE_MIN_POLL
+        );
+        assert_eq!(
+            next_silence_check(Duration::from_millis(7_995), timeout),
+            SILENCE_MIN_POLL
+        );
+    }
+
+    #[test]
+    fn a_stale_silence_check_never_stops_a_newer_recording() {
+        // The recording it was armed for, still recording → act.
+        assert!(silence_check_applies(6, 6, true));
+        // A newer recording has started since → leave it alone.
+        assert!(!silence_check_applies(6, 7, true));
+        // Already stopped, cancelled or processing → nothing to stop.
+        assert!(!silence_check_applies(6, 6, false));
+    }
+
+    #[test]
+    fn a_silence_check_fires_its_own_command() {
+        let (_tx, rx) = mpsc::channel();
+        assert!(matches!(
+            receive_command(
+                &rx,
+                Some((Instant::now(), Deadline::SilenceCheck { generation: 9 }))
+            )
+            .unwrap(),
+            Command::SilenceCheck { generation: 9 }
+        ));
+    }
+
+    #[test]
+    fn a_silence_check_never_delays_the_recording_cap() {
+        let now = Instant::now();
+        let cap = Some((now, Deadline::MaxRecording { generation: 1 }));
+        let check = Some((now, Deadline::SilenceCheck { generation: 1 }));
+        // Due together: the cap goes first.
+        assert_eq!(earliest(cap, check), cap);
+        // Otherwise the sooner one wakes the coordinator.
+        let later_cap = Some((
+            now + Duration::from_secs(1),
+            Deadline::MaxRecording { generation: 1 },
+        ));
+        assert_eq!(earliest(later_cap, check), check);
+        assert_eq!(earliest(None, check), check);
+        assert_eq!(earliest(cap, None), cap);
+        assert_eq!(earliest(None, None), None);
     }
 }
