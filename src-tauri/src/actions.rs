@@ -5436,14 +5436,17 @@ Try plugging it into a coding agent or productivity app listed on https://openro
     }
 
     #[test]
-    fn an_older_store_cleans_every_dictation_as_before() {
+    fn a_store_from_before_the_setting_skips_short_dictations() {
+        // On by default, for a new install and for one updating into the
+        // feature alike: the settings never existed there, so there is no
+        // choice of the user's to keep.
         let mut stored = serde_json::to_value(crate::settings::get_default_settings()).unwrap();
         let object = stored.as_object_mut().unwrap();
         assert!(object.remove("post_process_skip_short").is_some());
         assert!(object.remove("post_process_min_words").is_some());
         let settings: crate::settings::AppSettings = serde_json::from_value(stored).unwrap();
-        assert!(!settings.post_process_skip_short);
-        assert_eq!(settings.post_process_min_words, 5);
+        assert!(settings.post_process_skip_short);
+        assert_eq!(settings.post_process_min_words, 15);
     }
 
     #[test]
