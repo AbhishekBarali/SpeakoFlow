@@ -139,7 +139,7 @@ const CleanupKeysRow: React.FC = () => {
  *  `src-tauri/src/settings.rs`. */
 const MIN_WORDS = 2;
 const MAX_WORDS = 50;
-const DEFAULT_WORDS = 5;
+const DEFAULT_WORDS = 15;
 
 /**
  * Skip cleanup for short dictations. A search or a quick reply rarely has
@@ -151,7 +151,7 @@ const SkipShortRows: React.FC = () => {
   const { t } = useTranslation();
   const { getSetting, updateSetting, isUpdating } = useSettings();
   const onDictation = getSetting("post_process_on_dictation") ?? false;
-  const skip = getSetting("post_process_skip_short") ?? false;
+  const skip = getSetting("post_process_skip_short") ?? true;
   const stored = getSetting("post_process_min_words") ?? DEFAULT_WORDS;
   const [draft, setDraft] = useState(String(stored));
 
