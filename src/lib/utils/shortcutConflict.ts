@@ -38,9 +38,14 @@ export const canonicalShortcut = (binding: string): string =>
     .sort()
     .join("+");
 
+/** The hands-free key is one key that only ever goes on top of the dictation
+ *  keys (`src/lib/handsFree.ts`), so Space there is no shortcut on Space. */
+const ADD_ON_KEYS = new Set(["hands_free"]);
+
 /**
  * The id of the shortcut other than `exceptId` whose keys are `keys`, or
- * `null`. A shortcut that is turned off (no keys) never counts.
+ * `null`. A shortcut that is turned off (no keys) never counts, and neither
+ * does the hands-free key, on either side.
  */
 export const shortcutUsingKeys = (
   bindings: Record<string, { current_binding: string } | undefined>,
@@ -48,9 +53,9 @@ export const shortcutUsingKeys = (
   exceptId: string,
 ): string | null => {
   const wanted = canonicalShortcut(keys);
-  if (!wanted) return null;
+  if (!wanted || ADD_ON_KEYS.has(exceptId)) return null;
   for (const [id, binding] of Object.entries(bindings)) {
-    if (id === exceptId || !binding) continue;
+    if (id === exceptId || ADD_ON_KEYS.has(id) || !binding) continue;
     if (canonicalShortcut(binding.current_binding) === wanted) return id;
   }
   return null;

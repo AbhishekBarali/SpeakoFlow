@@ -98,8 +98,10 @@ Azure AI Speech, and OpenRouter work too.
 - **Translate to English.** Whisper, Canary, Granite Speech, and Voxtral
   models, and OpenAI or Groq in the cloud, can turn speech in another language
   into English text.
-- **Hold or tap.** Hold the keys while you talk, or switch to tap so one press
-  starts and the next one stops.
+- **Hold, tap, or go hands-free.** Hold the keys while you talk, or switch to
+  tap so one press starts and the next one stops, separately for dictation and
+  the assistant. Holding to dictate and need longer? Press Space too, let go,
+  and keep talking.
 
 ### Ask
 
@@ -221,25 +223,28 @@ Each feature has its own page in the [documentation](https://www.speakoflow.com/
 | Dictate and clean up <sup>3</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`    | `Ctrl + Shift + Space` |
 | Cancel                            | `Esc`                          | `Esc`           | Not available yet      |
 
-<sup>1</sup> Pressed while you hold the dictation keys, or all together. It
-keeps listening after you let go, until you press the dictation keys again.
+<sup>1</sup> Press Space while you hold the dictation keys, or all together.
+It keeps listening after you let go, until you press the dictation keys again.
+Pick another key, or turn it off, under **Hands-free mode** in Settings →
+Shortcuts.
 
-<sup>2</sup> Space is already part of `Ctrl + Space`, so turn on **Hands-free
-with a tap** in Settings → Shortcuts and tap the keys instead.
+<sup>2</sup> Space is already part of `Ctrl + Space`, so set dictation to
+**Tap** instead, which makes every dictation hands-free.
 
 <sup>3</sup> Only while AI cleanup is on and has its own shortcut.
 
 The pattern is the same on every platform. Add Shift to the dictation keys to
 dictate and clean up, and add C to the ask keys to start a conversation.
-Recording shortcuts work while you hold them; switch the Home page from **Hold
-to talk** to **Tap to toggle** and one press starts, the next one stops. A
-dictation that keeps listening without the keys is hands-free: the pill gets a
-ring, and hovering it shows ✕ to cancel and ✓ to finish.
+Recording shortcuts work while you hold them. Dictation and the assistant each
+have their own **Hold** or **Tap** on the Home page: with Tap, one press starts
+and the next one stops. A dictation that keeps listening without the keys is
+hands-free: the pill gets a ring, and hovering it shows ✕ to cancel and ✓ to
+finish.
 
 Esc only cancels while something is running, like a recording or a reply being
 read aloud, so other apps keep their Esc the rest of the time. To change a
-shortcut, click its keys. Cancel and the conversation shortcut can also be
-turned off from there.
+shortcut, click its keys. Cancel, the conversation shortcut and the
+hands-free key can also be turned off from there.
 
 On a Mac, set **System Settings → Keyboard → Press 🌐 key to** to **Do
 Nothing**, or the globe key opens the emoji picker as well. Macs that were on

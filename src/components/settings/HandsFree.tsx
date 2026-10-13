@@ -1,104 +1,83 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { SettingContainer } from "../ui/SettingContainer";
-import { Switch } from "../ui/Switch";
-import { Keycaps } from "../ui/Keycaps";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 import { formatKeyCombination } from "@/lib/utils/keyboard";
-import { handsFreeSpace } from "@/lib/handsFree";
+import { HANDS_FREE_ID, handsFree } from "@/lib/handsFree";
+import { ShortcutInput } from "./ShortcutInput";
 
-interface HandsFreeProps {
+interface HandsFreeShortcutProps {
   grouped?: boolean;
 }
 
 /**
- * The dictation keys plus Space (`hands_free.rs`): pressed while the keys are
- * held, the dictation keeps listening after they are let go. The row shows the
- * actual keys, because "Space" alone does not say it is Space *with* them.
- * Where there can be no such key, the switch is off and the reason is on the
- * row, not behind the (i): a disabled control needs its reason in sight.
+ * The hands-free key (`hands_free.rs`): one key, pressed while the dictation
+ * keys are held, that keeps the dictation listening after they are let go. It
+ * is changed like any shortcut, and removing it is how hands-free mode is
+ * turned off. With Tap to toggle every dictation already is hands-free, so
+ * the row is not there. Where the key cannot work, the reason is on the row
+ * rather than behind the (i): a control that does nothing needs its reason in
+ * sight.
  */
-export const HandsFreeSpaceSetting: React.FC<HandsFreeProps> = React.memo(
+export const HandsFreeShortcut: React.FC<HandsFreeShortcutProps> = React.memo(
   ({ grouped = false }) => {
     const { t } = useTranslation();
-    const { settings, getSetting, updateSetting, isUpdating } = useSettings();
+    const { settings } = useSettings();
     const osType = useOsType();
 
-    const space = handsFreeSpace(settings);
-    const enabled = getSetting("dictation_hands_free_space") ?? true;
-    const unavailable = space.state === "unavailable";
+    const state = handsFree(settings);
+    if (state.state === "tapped") return null;
+
+    const dictationKeys = formatKeyCombination(
+      settings?.bindings?.transcribe?.current_binding ?? "",
+      osType,
+    );
+    const unavailable = state.state === "unavailable";
     const reason =
-      space.state === "unavailable"
-        ? t("settings.general.handsFree.space.unavailable")
-        : space.state === "taken" && enabled
-          ? t("settings.general.handsFree.space.taken", {
-              keys: formatKeyCombination(space.keys, osType),
+      state.state === "unavailable"
+        ? state.reason === "engine"
+          ? t("settings.general.handsFree.unavailableEngine", {
+              where: `${t("settingsDialog.title")} → ${t("settingsDialog.tabs.advanced")}`,
+            })
+          : t("settings.general.handsFree.unavailableKeys", {
+              keys: dictationKeys,
+            })
+        : state.state === "taken"
+          ? t("settings.general.handsFree.taken", {
+              name: t(`settings.general.shortcut.bindings.${state.by}.name`),
+              keys: formatKeyCombination(state.keys, osType),
             })
           : undefined;
 
     return (
       <SettingContainer
-        title={t("settings.general.handsFree.space.label")}
+        title={t("settings.general.shortcut.bindings.hands_free.name")}
         description={reason}
-        info={t("settings.general.handsFree.space.description")}
+        info={t("settings.general.handsFree.description", {
+          keys: dictationKeys,
+        })}
         descriptionMode={reason ? "caption" : "tooltip"}
         grouped={grouped}
         disabled={unavailable}
       >
-        <div className="flex items-center gap-3">
-          {space.state === "ready" && enabled && (
-            <Keycaps binding={space.keys} size="sm" />
+        {/* One more key on top of the dictation keys, drawn that way, so it
+            does not read as a shortcut on Space alone. */}
+        <span className="flex items-center gap-1.5">
+          {state.state !== "off" && (
+            <span aria-hidden="true" className="text-[0.9375rem] text-muted">
+              +
+            </span>
           )}
-          <Switch
-            checked={enabled && !unavailable}
-            onChange={(on) =>
-              void updateSetting("dictation_hands_free_space", on)
-            }
-            disabled={unavailable || isUpdating("dictation_hands_free_space")}
-            label={t("settings.general.handsFree.space.label")}
+          <ShortcutInput
+            shortcutId={HANDS_FREE_ID}
+            bare
+            disabled={unavailable}
           />
-        </div>
+        </span>
       </SettingContainer>
     );
   },
 );
 
-HandsFreeSpaceSetting.displayName = "HandsFreeSpaceSetting";
-
-/**
- * With Hold to talk, a quick tap keeps the dictation listening instead of
- * ending it. With Tap to toggle every dictation already does, so the switch
- * is off and says why rather than being a setting that does nothing.
- */
-export const HandsFreeTapSetting: React.FC<HandsFreeProps> = React.memo(
-  ({ grouped = false }) => {
-    const { t } = useTranslation();
-    const { getSetting, updateSetting, isUpdating } = useSettings();
-
-    const holdToTalk = getSetting("push_to_talk") ?? true;
-    const enabled = getSetting("dictation_hands_free_tap") ?? false;
-
-    return (
-      <SettingContainer
-        title={t("settings.general.handsFree.tap.label")}
-        description={
-          holdToTalk ? undefined : t("settings.general.handsFree.tap.tapMode")
-        }
-        info={t("settings.general.handsFree.tap.description")}
-        descriptionMode={holdToTalk ? "tooltip" : "caption"}
-        grouped={grouped}
-        disabled={!holdToTalk}
-      >
-        <Switch
-          checked={holdToTalk && enabled}
-          onChange={(on) => void updateSetting("dictation_hands_free_tap", on)}
-          disabled={!holdToTalk || isUpdating("dictation_hands_free_tap")}
-          label={t("settings.general.handsFree.tap.label")}
-        />
-      </SettingContainer>
-    );
-  },
-);
-
-HandsFreeTapSetting.displayName = "HandsFreeTapSetting";
+HandsFreeShortcut.displayName = "HandsFreeShortcut";

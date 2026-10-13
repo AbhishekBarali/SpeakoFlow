@@ -23,6 +23,11 @@ pub fn init_shortcuts(app: &AppHandle) {
         if id == "cancel" {
             continue; // Skip cancel shortcut, it will be registered dynamically
         }
+        // The hands-free key only ever extends the dictation keys, and only
+        // on the other engine (`hands_free`).
+        if id == settings::HANDS_FREE_BINDING_ID {
+            continue;
+        }
         // Skip the separate cleanup shortcut unless it is the one that runs
         // cleanup: off with the feature, and off when cleanup rides on the
         // dictation shortcut instead.

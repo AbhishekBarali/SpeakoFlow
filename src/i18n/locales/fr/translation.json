@@ -643,6 +643,10 @@
           "assistant_call": {
             "name": "Lancer une conversation",
             "description": "Parlez avec l'assistant sans les mains et écoutez ses réponses. Appuyez à nouveau pour terminer."
+          },
+          "hands_free": {
+            "name": "Mode mains libres",
+            "description": "Appuyez dessus en maintenant les touches de dictée pour continuer d'enregistrer après les avoir relâchées. Appuyez à nouveau sur les touches de dictée pour terminer."
           }
         },
         "errors": {
@@ -664,22 +668,18 @@
       },
       "pushToTalk": {
         "label": "Mode d'enregistrement",
-        "description": "Maintenir : l'enregistrement dure tant que vous maintenez un raccourci d'enregistrement. Appuyer : une pression lance l'enregistrement, la suivante l'arrête. S'applique à tous les raccourcis d'enregistrement.",
+        "dictation": "Maintenir : l'enregistrement dure tant que vous maintenez les touches de dictée. Appuyer : une pression lance, la suivante arrête.",
+        "assistant": "Maintenir : écoute tant que vous maintenez les touches de question. Appuyer : une pression lance, la suivante envoie.",
         "hold": "Maintenir",
         "tap": "Appuyer"
       },
       "handsFree": {
-        "space": {
-          "label": "Mains libres avec Espace",
-          "description": "Maintenez vos touches de dictée, appuyez sur Espace puis relâchez : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur les touches.",
-          "unavailable": "Ne fonctionne que si votre raccourci de dictée n'utilise que des touches de modification.",
-          "taken": "Un autre raccourci utilise déjà {{keys}}."
-        },
-        "tap": {
-          "label": "Mains libres d'une pression",
-          "description": "Appuyez brièvement sur les touches de dictée au lieu de les maintenir : l'écoute continue jusqu'à ce que vous appuyiez à nouveau.",
-          "tapMode": "Avec « Appuyer pour activer », chaque dictée est déjà mains libres."
-        }
+        "description": "En maintenant {{keys}}, appuyez sur cette touche puis relâchez : la dictée continue d'écouter jusqu'à ce que vous appuyiez à nouveau sur {{keys}}.",
+        "unavailableKeys": "Nécessite un raccourci de dictée composé uniquement de touches de modification. Avec {{keys}}, utilisez plutôt « Appuyer pour activer ».",
+        "unavailableEngine": "Nécessite le moteur clavier SpeakoFlow Keys, dans {{where}}.",
+        "taken": "{{name}} utilise déjà {{keys}} : cette touche ne fait rien tant que l'un des deux n'a pas changé.",
+        "needsKey": "Choisissez une seule touche, comme Espace ou Entrée. Une touche de modification seule ne peut pas être la touche mains libres.",
+        "pressKey": "Appuyez sur une touche…"
       }
     },
     "models": {
@@ -2620,10 +2620,10 @@
         "hold": "Maintenez, parlez, relâchez. Vos mots s'écrivent là où se trouve votre curseur.",
         "tap": "Appuyez pour commencer, parlez, appuyez pour arrêter. Vos mots s'écrivent là où se trouve votre curseur.",
         "whatHold": "Maintenez, parlez, relâchez. Vos mots s'écrivent là où est votre curseur.",
-        "whatTap": "Appuyez, parlez, appuyez à nouveau. Vos mots s'écrivent là où est votre curseur.",
-        "handsFreeSpace": "Besoin de plus de temps ? Appuyez sur Espace en maintenant, puis relâchez : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur les touches.",
-        "handsFreeTap": "Besoin de plus de temps ? Appuyez brièvement au lieu de maintenir : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur les touches.",
-        "handsFreeBoth": "Besoin de plus de temps ? Appuyez sur Espace en maintenant, ou appuyez brièvement au lieu de maintenir : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur les touches."
+        "whatTap": "Appuyez, parlez, appuyez à nouveau. Vos mots s'écrivent là où est votre curseur."
+      },
+      "handsFree": {
+        "what": "Maintenez {{keys}}, appuyez sur {{key}} puis relâchez : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur {{keys}}."
       },
       "cleanup": {
         "title": "Dicter et nettoyer",
@@ -2633,14 +2633,15 @@
       "ask": {
         "title": "Demander à l'assistant",
         "description": "Posez une question à voix haute et obtenez la réponse dans un panneau flottant.",
-        "what": "Demandez à voix haute. La réponse s'affiche dans un panneau flottant."
+        "whatHold": "Maintenez, demandez, relâchez. La réponse s'affiche dans un panneau flottant.",
+        "whatTap": "Appuyez, demandez, appuyez à nouveau. La réponse s'affiche dans un panneau flottant."
       },
       "call": {
         "title": "Lancer une conversation",
         "description": "Une conversation mains libres avec des réponses parlées.",
         "what": "Échangez à voix haute, mains libres. Appuyez à nouveau pour terminer."
       },
-      "info": "Utilisez-les dans n'importe quelle application. Cliquez sur les touches pour les modifier.",
+      "info": "Utilisez-les dans n'importe quelle application. Cliquez sur les touches pour les modifier, et choisissez Maintenir ou Appuyer pour chaque raccourci qui enregistre.",
       "offHint": "Désactivé",
       "mode": {
         "hold": "Maintenir pour parler",

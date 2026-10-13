@@ -40,8 +40,13 @@ struct ManagerState {
     /// When each pressed modifier-only hotkey fired, for [`CHORD_CANCEL_WINDOW`].
     pressed_at: HashMap<HotkeyId, Instant>,
     /// Modifier-only hotkeys fire when their modifiers are let go, as a press
-    /// and a release together, instead of when they go down.
+    /// and a release together, instead of when they go down. The default for
+    /// every hotkey without a setting of its own in `release_overrides`.
     fire_on_release: bool,
+    /// Hotkeys that fire on release, or on press, whatever the default: a host
+    /// where some shortcuts are held and others tapped (dictation held to talk
+    /// while the ask is tapped). See [`HotkeyManager::set_fire_on_release_for`].
+    release_overrides: HashMap<HotkeyId, bool>,
     /// With `fire_on_release`: modifier-only hotkeys whose modifiers are held
     /// right now. Letting go fires one; pressing any other key first means it
     /// was the start of a longer shortcut, and it never fires.
@@ -63,6 +68,7 @@ impl ManagerState {
             pressed_hotkeys: HashSet::new(),
             pressed_at: HashMap::new(),
             fire_on_release: false,
+            release_overrides: HashMap::new(),
             pending: HashSet::new(),
             suppressed: HashSet::new(),
             continuations: HashSet::new(),
@@ -76,6 +82,7 @@ impl ManagerState {
         self.pending.remove(&id);
         self.suppressed.remove(&id);
         self.continuations.remove(&id);
+        self.release_overrides.remove(&id);
     }
 
     /// Whether `key` going down with `modifiers` held completes a continuation.
@@ -87,9 +94,22 @@ impl ManagerState {
         })
     }
 
+    /// Whether hotkey `id` fires once its modifiers are let go.
+    fn fires_on_release(&self, id: HotkeyId) -> bool {
+        self.release_overrides
+            .get(&id)
+            .copied()
+            .unwrap_or(self.fire_on_release)
+    }
+
     fn set_fire_on_release(&mut self, on: bool) {
         self.fire_on_release = on;
         self.pending.clear();
+    }
+
+    fn set_fire_on_release_for(&mut self, id: HotkeyId, on: bool) {
+        self.release_overrides.insert(id, on);
+        self.pending.remove(&id);
     }
 
     fn press(&mut self, id: HotkeyId, now: Instant) -> HotkeyEvent {
@@ -131,12 +151,13 @@ impl ManagerState {
         if event.is_key_down {
             match event.key {
                 Some(key) => {
-                    // A click counts as "something else" only while waiting
-                    // for a release. While a hotkey is being held to talk it
-                    // is ordinary use of the mouse.
-                    if is_keyboard_key(key) || self.fire_on_release {
+                    // A click counts as "something else" only for a hotkey
+                    // waiting for its release. While a hotkey is being held to
+                    // talk it is ordinary use of the mouse.
+                    let keyboard = is_keyboard_key(key);
+                    if keyboard || !self.pending.is_empty() {
                         let continues = self.completes_continuation(key, event.modifiers);
-                        self.yield_to_chord(now, continues, &mut results);
+                        self.yield_to_chord(now, continues, keyboard, &mut results);
                     }
                     let to_press: Vec<HotkeyId> = self
                         .hotkeys
@@ -220,16 +241,23 @@ impl ManagerState {
 
     /// Another key went down. Whatever modifier-only hotkey the held modifiers
     /// were waiting to fire, or fired a moment ago, was the start of another
-    /// shortcut instead.
+    /// shortcut instead. A click (not a `keyboard` key) only means that for a
+    /// hotkey still waiting: one held to talk is not ended by using the mouse.
     ///
     /// Unless the key `continues` it: then the one already running keeps
     /// running. A tap still waiting to fire never does, though, because the
     /// continuation has taken its place, and letting go of the modifiers
     /// afterwards must not fire the hotkey as well.
-    fn yield_to_chord(&mut self, now: Instant, continues: bool, results: &mut Vec<HotkeyEvent>) {
+    fn yield_to_chord(
+        &mut self,
+        now: Instant,
+        continues: bool,
+        keyboard: bool,
+        results: &mut Vec<HotkeyEvent>,
+    ) {
         let waiting: Vec<HotkeyId> = self.pending.drain().collect();
         self.suppressed.extend(waiting);
-        if continues {
+        if continues || !keyboard {
             return;
         }
 
@@ -271,11 +299,6 @@ impl ManagerState {
             return;
         }
 
-        if self.fire_on_release {
-            self.pending.extend(matched);
-            return;
-        }
-
         // Another modifier-only hotkey is already running. Fired a moment ago,
         // it was the first half of this longer one (Ctrl+Win on the way to
         // Ctrl+Win+Shift) and gives way. Held for longer, it owns the keyboard
@@ -301,8 +324,14 @@ impl ManagerState {
             });
         }
 
+        // Each one that is held fires now; each one that is tapped waits for
+        // its keys to be let go.
         for id in matched {
-            results.push(self.press(id, now));
+            if self.fires_on_release(id) {
+                self.pending.insert(id);
+            } else {
+                results.push(self.press(id, now));
+            }
         }
     }
 }
@@ -535,6 +564,16 @@ impl HotkeyManager {
     pub fn set_fire_on_release(&self, on: bool) {
         if let Ok(mut state) = self.state.lock() {
             state.set_fire_on_release(on);
+        }
+    }
+
+    /// [`Self::set_fire_on_release`] for one hotkey, for a host whose
+    /// shortcuts are not all held or all tapped: dictation held to talk while
+    /// the ask is tapped. The hotkey keeps this whatever the default becomes,
+    /// until it is unregistered.
+    pub fn set_fire_on_release_for(&self, id: HotkeyId, on: bool) {
+        if let Ok(mut state) = self.state.lock() {
+            state.set_fire_on_release_for(id, on);
         }
     }
 
@@ -1109,6 +1148,160 @@ mod tests {
             state.process_event_at(&make_modifier_event(CTRL_ALT, true, Modifiers::OPT_LEFT), t0);
             state.set_fire_on_release(false);
             assert!(state.pending.is_empty());
+        }
+
+        // Each hotkey on its own: dictation held to talk while the ask is tapped.
+
+        fn held_dictation_tapped_ask() -> (ManagerState, [HotkeyId; 4]) {
+            let (mut state, ids) = windows_defaults(false);
+            state.set_fire_on_release_for(ids[2], true);
+            (state, ids)
+        }
+
+        #[test]
+        fn a_held_dictation_fires_at_once_beside_a_tapped_ask() {
+            let (mut state, [dictate, _, ask, _]) = held_dictation_tapped_ask();
+            let t0 = Instant::now();
+            let win = state.process_event_at(
+                &make_modifier_event(CTRL_WIN, true, Modifiers::CMD_LEFT),
+                t0,
+            );
+            assert_eq!(states(&win), vec![(dictate, HotkeyState::Pressed)]);
+            let win_up = state.process_event_at(
+                &make_modifier_event(Modifiers::CTRL_LEFT, false, Modifiers::CMD_LEFT),
+                at(t0, 2000),
+            );
+            assert_eq!(states(&win_up), vec![(dictate, HotkeyState::Released)]);
+            // The ask, on the same Ctrl, waits until its keys are let go.
+            let alt = state.process_event_at(
+                &make_modifier_event(CTRL_ALT, true, Modifiers::OPT_LEFT),
+                at(t0, 2100),
+            );
+            assert!(alt.is_empty());
+            let alt_up = state.process_event_at(
+                &make_modifier_event(Modifiers::CTRL_LEFT, false, Modifiers::OPT_LEFT),
+                at(t0, 2300),
+            );
+            assert_eq!(
+                states(&alt_up),
+                vec![(ask, HotkeyState::Pressed), (ask, HotkeyState::Released)]
+            );
+        }
+
+        #[test]
+        fn a_tapped_ask_still_never_opens_on_the_way_to_the_call() {
+            let (mut state, [_, _, ask, call]) = held_dictation_tapped_ask();
+            let t0 = Instant::now();
+            state.process_event_at(&make_modifier_event(CTRL_ALT, true, Modifiers::OPT_LEFT), t0);
+            let c = state.process_event_at(
+                &make_key_event(CTRL_ALT, Some(Key::C), true),
+                at(t0, 3000),
+            );
+            assert_eq!(states(&c), vec![(call, HotkeyState::Pressed)]);
+            state.process_event_at(&make_key_event(CTRL_ALT, Some(Key::C), false), at(t0, 3100));
+            assert!(state
+                .process_event_at(
+                    &make_modifier_event(Modifiers::empty(), false, Modifiers::OPT_LEFT),
+                    at(t0, 3200),
+                )
+                .is_empty());
+            assert!(!state.pressed_hotkeys.contains(&ask));
+        }
+
+        #[test]
+        fn a_click_drops_a_waiting_tap_but_not_a_held_hotkey() {
+            let (mut state, [dictate, _, _, _]) = held_dictation_tapped_ask();
+            let t0 = Instant::now();
+            // Ctrl+Alt+click is a click, not the ask.
+            state.process_event_at(&make_modifier_event(CTRL_ALT, true, Modifiers::OPT_LEFT), t0);
+            state.process_event_at(
+                &make_key_event(CTRL_ALT, Some(Key::MouseLeft), true),
+                at(t0, 50),
+            );
+            assert!(state
+                .process_event_at(
+                    &make_modifier_event(Modifiers::CTRL_LEFT, false, Modifiers::OPT_LEFT),
+                    at(t0, 100),
+                )
+                .is_empty());
+            // Clicking while holding Ctrl+Win to talk keeps the dictation.
+            let t1 = at(t0, 1000);
+            state.process_event_at(&make_modifier_event(CTRL_WIN, true, Modifiers::CMD_LEFT), t1);
+            assert!(state
+                .process_event_at(
+                    &make_key_event(CTRL_WIN, Some(Key::MouseLeft), true),
+                    at(t1, 50),
+                )
+                .is_empty());
+            assert!(state.pressed_hotkeys.contains(&dictate));
+        }
+
+        /// The Mac defaults: dictate Fn, ask Fn+Ctrl, so the ask starts with
+        /// the dictation key.
+        fn mac_defaults_held_dictation_tapped_ask() -> (ManagerState, HotkeyId, HotkeyId) {
+            let mut state = ManagerState::new();
+            let (dictate, ask) = (HotkeyId(0), HotkeyId(1));
+            state.hotkeys.insert(dictate, "fn".parse().unwrap());
+            state.hotkeys.insert(ask, "fn+ctrl".parse().unwrap());
+            state.set_fire_on_release_for(ask, true);
+            (state, dictate, ask)
+        }
+
+        #[test]
+        fn a_tapped_ask_takes_over_from_the_held_dictation_it_starts_with() {
+            let (mut state, dictate, ask) = mac_defaults_held_dictation_tapped_ask();
+            let t0 = Instant::now();
+            let fn_down = state.process_event_at(
+                &make_modifier_event(Modifiers::FN, true, Modifiers::FN),
+                t0,
+            );
+            assert_eq!(states(&fn_down), vec![(dictate, HotkeyState::Pressed)]);
+            let ctrl = state.process_event_at(
+                &make_modifier_event(Modifiers::FN | Modifiers::CTRL_LEFT, true, Modifiers::CTRL_LEFT),
+                at(t0, 120),
+            );
+            assert_eq!(states(&ctrl), vec![(dictate, HotkeyState::Cancelled)]);
+            let ctrl_up = state.process_event_at(
+                &make_modifier_event(Modifiers::FN, false, Modifiers::CTRL_LEFT),
+                at(t0, 400),
+            );
+            assert_eq!(
+                states(&ctrl_up),
+                vec![(ask, HotkeyState::Pressed), (ask, HotkeyState::Released)]
+            );
+        }
+
+        #[test]
+        fn ctrl_long_into_a_held_dictation_starts_no_tapped_ask() {
+            let (mut state, dictate, _) = mac_defaults_held_dictation_tapped_ask();
+            let t0 = Instant::now();
+            state.process_event_at(&make_modifier_event(Modifiers::FN, true, Modifiers::FN), t0);
+            let late = t0 + CHORD_CANCEL_WINDOW;
+            assert!(state
+                .process_event_at(
+                    &make_modifier_event(Modifiers::FN | Modifiers::CTRL_LEFT, true, Modifiers::CTRL_LEFT),
+                    late,
+                )
+                .is_empty());
+            assert!(state.pending.is_empty());
+            assert!(state.pressed_hotkeys.contains(&dictate));
+        }
+
+        #[test]
+        fn holding_one_hotkey_again_forgets_its_waiting_tap() {
+            let (mut state, [_, _, ask, _]) = held_dictation_tapped_ask();
+            let t0 = Instant::now();
+            state.process_event_at(&make_modifier_event(CTRL_ALT, true, Modifiers::OPT_LEFT), t0);
+            assert!(state.pending.contains(&ask));
+            state.set_fire_on_release_for(ask, false);
+            assert!(state.pending.is_empty());
+        }
+
+        #[test]
+        fn unregistering_forgets_a_hotkeys_own_setting() {
+            let (mut state, [_, _, ask, _]) = held_dictation_tapped_ask();
+            state.forget(ask);
+            assert!(!state.fires_on_release(ask));
         }
 
         // ---- Port of upstream handy-keys #23 ------------------------------

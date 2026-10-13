@@ -1473,7 +1473,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             icon={AudioLines}
             tone="indigo"
           />
-          <PushToTalk grouped={true} />
+          <PushToTalk grouped={true} setting="assistant_push_to_talk" />
         </SettingsGroup>
       )}
 

@@ -45,6 +45,17 @@ describe("shortcutUsingKeys", () => {
     expect(shortcutUsingKeys(off, "", "transcribe")).toBeNull();
     expect(shortcutUsingKeys(off, "c", "transcribe")).toBeNull();
   });
+
+  test("the hands-free key only goes on top of the dictation keys", () => {
+    // Its Space is not a shortcut on Space, either way round.
+    const withSpace = { ...bindings, hands_free: { current_binding: "space" } };
+    expect(shortcutUsingKeys(withSpace, "space", "transcribe")).toBeNull();
+    const cancelOnSpace = {
+      ...withSpace,
+      cancel: { current_binding: "space" },
+    };
+    expect(shortcutUsingKeys(cancelOnSpace, "space", "hands_free")).toBeNull();
+  });
 });
 
 describe("canonicalShortcut", () => {

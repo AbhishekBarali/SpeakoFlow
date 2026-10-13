@@ -643,6 +643,10 @@
           "assistant_call": {
             "name": "Iniciar una conversación",
             "description": "Habla con el asistente con manos libres y escucha sus respuestas. Pulsa de nuevo para terminar."
+          },
+          "hands_free": {
+            "name": "Modo manos libres",
+            "description": "Púlsala mientras mantienes las teclas de dictado para seguir grabando al soltarlas. Vuelve a pulsar las teclas de dictado para terminar."
           }
         },
         "errors": {
@@ -664,22 +668,18 @@
       },
       "pushToTalk": {
         "label": "Modo de grabación",
-        "description": "Mantener: se graba mientras mantienes pulsado un atajo de grabación. Tocar: una pulsación empieza y la siguiente detiene. Se aplica a todos los atajos de grabación.",
+        "dictation": "Mantener: se graba mientras mantienes pulsadas las teclas de dictado. Tocar: una pulsación empieza y la siguiente detiene.",
+        "assistant": "Mantener: escucha mientras mantienes pulsadas las teclas de pregunta. Tocar: una pulsación empieza y la siguiente envía.",
         "hold": "Mantener presionado",
         "tap": "Tocar"
       },
       "handsFree": {
-        "space": {
-          "label": "Manos libres con Espacio",
-          "description": "Mantén pulsadas las teclas de dictado, pulsa Espacio y suelta: sigue escuchando hasta que vuelvas a pulsar las teclas.",
-          "unavailable": "Solo funciona si el atajo de dictado son solo teclas modificadoras.",
-          "taken": "Otro atajo ya usa {{keys}}."
-        },
-        "tap": {
-          "label": "Manos libres con un toque",
-          "description": "Pulsa las teclas de dictado en lugar de mantenerlas y sigue escuchando hasta que vuelvas a pulsarlas.",
-          "tapMode": "Con «Pulsa para activar o desactivar», cada dictado ya es manos libres."
-        }
+        "description": "Mientras mantienes {{keys}}, pulsa esta tecla y suelta: el dictado sigue escuchando hasta que vuelvas a pulsar {{keys}}.",
+        "unavailableKeys": "Necesita un atajo de dictado solo con teclas modificadoras. Con {{keys}}, usa «Pulsa para activar o desactivar».",
+        "unavailableEngine": "Necesita el motor de teclado SpeakoFlow Keys, en {{where}}.",
+        "taken": "{{name}} ya usa {{keys}}, así que esta tecla no hace nada hasta que cambie uno de los dos.",
+        "needsKey": "Elige una sola tecla, como Espacio o Intro. Una tecla modificadora sola no puede ser la tecla de manos libres.",
+        "pressKey": "Pulsa una tecla…"
       }
     },
     "models": {
@@ -2620,10 +2620,10 @@
         "hold": "Mantén pulsado, habla y suelta. Tus palabras se escriben donde está el cursor.",
         "tap": "Pulsa para empezar, habla y pulsa para parar. Tus palabras se escriben donde está el cursor.",
         "whatHold": "Mantén pulsado, habla y suelta. Tus palabras se escriben donde está el cursor.",
-        "whatTap": "Pulsa, habla y vuelve a pulsar. Tus palabras se escriben donde está el cursor.",
-        "handsFreeSpace": "¿Necesitas más tiempo? Pulsa Espacio mientras mantienes y suelta: sigue escuchando hasta que vuelvas a pulsar las teclas.",
-        "handsFreeTap": "¿Necesitas más tiempo? Pulsa en lugar de mantener: sigue escuchando hasta que vuelvas a pulsar las teclas.",
-        "handsFreeBoth": "¿Necesitas más tiempo? Pulsa Espacio mientras mantienes, o pulsa en lugar de mantener: sigue escuchando hasta que vuelvas a pulsar las teclas."
+        "whatTap": "Pulsa, habla y vuelve a pulsar. Tus palabras se escriben donde está el cursor."
+      },
+      "handsFree": {
+        "what": "Mantén {{keys}}, pulsa {{key}} y suelta: sigue escuchando hasta que vuelvas a pulsar {{keys}}."
       },
       "cleanup": {
         "title": "Dictar y limpiar",
@@ -2633,14 +2633,15 @@
       "ask": {
         "title": "Preguntar al asistente",
         "description": "Haz una pregunta en voz alta y recibe la respuesta en un panel flotante.",
-        "what": "Pregunta en voz alta. La respuesta aparece en un panel flotante."
+        "whatHold": "Mantén pulsado, pregunta y suelta. La respuesta aparece en un panel flotante.",
+        "whatTap": "Pulsa, pregunta y vuelve a pulsar. La respuesta aparece en un panel flotante."
       },
       "call": {
         "title": "Iniciar una conversación",
         "description": "Una conversación con manos libres y respuestas habladas.",
         "what": "Conversa con manos libres. Pulsa de nuevo para terminar."
       },
-      "info": "Púlsalos en cualquier aplicación. Haz clic en las teclas para cambiarlas.",
+      "info": "Púlsalos en cualquier aplicación. Haz clic en las teclas para cambiarlas y elige Mantener o Tocar en cada atajo que graba.",
       "offHint": "Desactivado",
       "mode": {
         "hold": "Mantén pulsado para hablar",

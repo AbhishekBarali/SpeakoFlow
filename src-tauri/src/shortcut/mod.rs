@@ -85,6 +85,12 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
 
 /// Register a shortcut using the appropriate implementation
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    // The hands-free key is never a shortcut of its own: registered alone it
+    // would take its key, Space by default, from every app. It only ever goes
+    // on top of the dictation keys (`hands_free`).
+    if binding.id == settings::HANDS_FREE_BINDING_ID {
+        return Ok(());
+    }
     let settings = get_settings(app);
     // The assistant's master switch owns its two hotkeys: while it is off they
     // stay unregistered no matter who asks. The Settings shortcut editor calls
@@ -114,6 +120,10 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
 
 /// Unregister a shortcut using the appropriate implementation
 pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    // Never registered on its own (see `register_shortcut`).
+    if binding.id == settings::HANDS_FREE_BINDING_ID {
+        return Ok(());
+    }
     let settings = get_settings(app);
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => tauri_impl::unregister_shortcut(app, binding),
@@ -188,6 +198,29 @@ pub fn change_binding(
                 error: None,
             });
         }
+    }
+
+    // The hands-free key is one key that only ever extends the dictation keys
+    // (`hands_free`), so it is stored, never registered on its own, and put
+    // back on top of the dictation keys from here. Recorded while the
+    // dictation keys were held, it arrives with them; what is kept is the key.
+    if id == settings::HANDS_FREE_BINDING_ID {
+        let key = if removing {
+            String::new()
+        } else {
+            crate::hands_free::main_key(&binding)
+                .ok_or_else(|| "The hands-free key has to be a key, not a modifier".to_string())?
+        };
+        let mut updated = binding_to_modify;
+        updated.current_binding = key;
+        settings.bindings.insert(id, updated.clone());
+        settings::write_settings(&app, settings);
+        handy_keys::sync_hands_free_keys(&app);
+        return Ok(BindingResponse {
+            success: true,
+            binding: Some(updated),
+            error: None,
+        });
     }
 
     // Validate the new shortcut before touching the old one. A validation failure
@@ -459,8 +492,9 @@ fn unregister_all_shortcuts(app: &AppHandle, implementation: KeyboardImplementat
     let bindings = settings::get_bindings(app);
 
     for (id, binding) in bindings {
-        // Skip cancel shortcut as it's dynamically registered
-        if id == "cancel" {
+        // Skip cancel shortcut as it's dynamically registered, and the
+        // hands-free key, which only ever extends the dictation keys
+        if id == "cancel" || id == settings::HANDS_FREE_BINDING_ID {
             continue;
         }
 
@@ -488,8 +522,9 @@ fn register_all_shortcuts_for_implementation(
     let mut current_settings = settings::get_settings(app);
 
     for (id, default_binding) in &default_bindings {
-        // Skip cancel shortcut as it's dynamically registered
-        if id == "cancel" {
+        // Skip cancel shortcut as it's dynamically registered, and the
+        // hands-free key, which only ever extends the dictation keys
+        if id == "cancel" || id == settings::HANDS_FREE_BINDING_ID {
             continue;
         }
 
@@ -607,6 +642,7 @@ fn initialize_handy_keys_with_rollback(app: &AppHandle) -> Result<bool, String> 
 // General Settings Commands
 // ============================================================================
 
+/// Hold to talk or Tap to toggle for dictation (and the cleanup shortcut).
 #[tauri::command]
 #[specta::specta]
 pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
@@ -617,26 +653,15 @@ pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Whether the dictation keys plus Space make a dictation hands-free
-/// (`hands_free`). Registers or releases those keys at once.
+/// Hold to talk or Tap to toggle for the ask, which no longer has to match
+/// dictation (`settings::holds_to_record`).
 #[tauri::command]
 #[specta::specta]
-pub fn change_hands_free_space_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+pub fn change_assistant_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.dictation_hands_free_space = enabled;
+    settings.assistant_push_to_talk = enabled;
     settings::write_settings(&app, settings);
-    handy_keys::sync_hands_free_keys(&app);
-    Ok(())
-}
-
-/// Whether, with Hold to talk, a quick tap of the dictation keys makes the
-/// dictation hands-free instead of ending it (`hands_free::QUICK_TAP`).
-#[tauri::command]
-#[specta::specta]
-pub fn change_hands_free_tap_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.dictation_hands_free_tap = enabled;
-    settings::write_settings(&app, settings);
+    handy_keys::apply_recording_mode(&app);
     Ok(())
 }
 

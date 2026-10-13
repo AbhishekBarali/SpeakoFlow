@@ -643,6 +643,10 @@
           "assistant_call": {
             "name": "Avvia una conversazione",
             "description": "Parla con l'assistente a mani libere e ascolta le sue risposte. Premi di nuovo per terminare."
+          },
+          "hands_free": {
+            "name": "Modalità a mani libere",
+            "description": "Premilo mentre tieni premuti i tasti di dettatura per continuare a registrare dopo averli rilasciati. Premi di nuovo i tasti di dettatura per finire."
           }
         },
         "errors": {
@@ -664,22 +668,18 @@
       },
       "pushToTalk": {
         "label": "Modalità di registrazione",
-        "description": "Tieni premuto: registri finché tieni premuta una scorciatoia di registrazione. Tocca: una pressione avvia, la successiva ferma. Vale per tutte le scorciatoie di registrazione.",
+        "dictation": "Tieni premuto: registri finché tieni premuti i tasti di dettatura. Tocca: una pressione avvia, la successiva ferma.",
+        "assistant": "Tieni premuto: ascolta finché tieni premuti i tasti della domanda. Tocca: una pressione avvia, la successiva invia.",
         "hold": "Tieni premuto",
         "tap": "Tocca"
       },
       "handsFree": {
-        "space": {
-          "label": "Mani libere con Spazio",
-          "description": "Tieni premuti i tasti di dettatura, premi Spazio e rilascia: continua ad ascoltare finché non premi di nuovo i tasti.",
-          "unavailable": "Funziona solo se la scorciatoia di dettatura usa solo tasti modificatori.",
-          "taken": "Un'altra scorciatoia usa già {{keys}}."
-        },
-        "tap": {
-          "label": "Mani libere con un tocco",
-          "description": "Tocca i tasti di dettatura invece di tenerli premuti: continua ad ascoltare finché non li premi di nuovo.",
-          "tapMode": "Con «Tocca per avviare e fermare», ogni dettatura è già a mani libere."
-        }
+        "description": "Mentre tieni premuto {{keys}}, premi questo tasto e rilascia: la dettatura continua ad ascoltare finché non premi di nuovo {{keys}}.",
+        "unavailableKeys": "Serve una scorciatoia di dettatura fatta solo di tasti modificatori. Con {{keys}}, usa invece «Tocca per avviare e fermare».",
+        "unavailableEngine": "Serve il motore della tastiera SpeakoFlow Keys, in {{where}}.",
+        "taken": "{{name}} usa già {{keys}}, quindi questo tasto non fa nulla finché uno dei due non cambia.",
+        "needsKey": "Scegli un solo tasto, come Spazio o Invio. Un tasto modificatore da solo non può essere il tasto mani libere.",
+        "pressKey": "Premi un tasto…"
       }
     },
     "models": {
@@ -2620,10 +2620,10 @@
         "hold": "Tieni premuto, parla, rilascia. Le tue parole vengono scritte dove si trova il cursore.",
         "tap": "Tocca per iniziare, parla, tocca per fermare. Le tue parole vengono scritte dove si trova il cursore.",
         "whatHold": "Tieni premuto, parla, rilascia. Le parole compaiono dove si trova il cursore.",
-        "whatTap": "Tocca, parla, tocca di nuovo. Le parole compaiono dove si trova il cursore.",
-        "handsFreeSpace": "Ti serve più tempo? Premi Spazio mentre tieni premuto e rilascia: continua ad ascoltare finché non premi di nuovo i tasti.",
-        "handsFreeTap": "Ti serve più tempo? Tocca invece di tenere premuto: continua ad ascoltare finché non premi di nuovo i tasti.",
-        "handsFreeBoth": "Ti serve più tempo? Premi Spazio mentre tieni premuto, oppure tocca invece di tenere premuto: continua ad ascoltare finché non premi di nuovo i tasti."
+        "whatTap": "Tocca, parla, tocca di nuovo. Le parole compaiono dove si trova il cursore."
+      },
+      "handsFree": {
+        "what": "Tieni premuto {{keys}}, premi {{key}} e rilascia: continua ad ascoltare finché non premi di nuovo {{keys}}."
       },
       "cleanup": {
         "title": "Detta e ripulisci",
@@ -2633,14 +2633,15 @@
       "ask": {
         "title": "Chiedi all'assistente",
         "description": "Fai una domanda a voce e ricevi la risposta in un pannello flottante.",
-        "what": "Chiedi a voce. La risposta compare in un pannello flottante."
+        "whatHold": "Tieni premuto, chiedi, rilascia. La risposta compare in un pannello flottante.",
+        "whatTap": "Tocca, chiedi, tocca di nuovo. La risposta compare in un pannello flottante."
       },
       "call": {
         "title": "Avvia una conversazione",
         "description": "Una conversazione a mani libere con risposte vocali.",
         "what": "Parla e ascolta, a mani libere. Premi di nuovo per terminare."
       },
-      "info": "Premili in qualsiasi app. Fai clic sui tasti per cambiarli.",
+      "info": "Premili in qualsiasi app. Fai clic sui tasti per cambiarli e scegli Tieni premuto o Tocca per ogni scorciatoia che registra.",
       "offHint": "Disattivata",
       "mode": {
         "hold": "Tieni premuto per parlare",
