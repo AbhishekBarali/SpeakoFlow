@@ -90,6 +90,32 @@ pub struct ShortcutBinding {
     pub description: String,
     pub default_binding: String,
     pub current_binding: String,
+    /// A second set of keys that does exactly what `current_binding` does, or
+    /// empty for none: a mouse button, or a combo a mouse's own software can
+    /// send. Both are registered under this binding's id, so everything that
+    /// acts on a shortcut by id (the coordinator, Cancel, the chord hold-back)
+    /// takes one for the other, and a recording started with either stops
+    /// with either. Only armed while `current_binding` is set: a shortcut that
+    /// is turned off is off by both.
+    #[serde(default)]
+    pub alternate_binding: String,
+}
+
+impl ShortcutBinding {
+    /// Every set of keys this shortcut answers to, its own first. Empty when
+    /// the shortcut is turned off.
+    pub fn combos(&self) -> Vec<&str> {
+        let primary = self.current_binding.trim();
+        if primary.is_empty() {
+            return Vec::new();
+        }
+        let alternate = self.alternate_binding.trim();
+        if alternate.is_empty() {
+            vec![primary]
+        } else {
+            vec![primary, alternate]
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
@@ -1580,6 +1606,12 @@ pub struct AppSettings {
     pub lazy_stream_close: bool,
     #[serde(default)]
     pub keyboard_implementation: KeyboardImplementation,
+    /// Experimental: let the middle, Back and Forward mouse buttons be a
+    /// shortcut's keys. Off, a stored mouse button is kept but not registered,
+    /// and the shortcut editor ignores the mouse. Only the SpeakoFlow Keys
+    /// engine can see mouse buttons at all.
+    #[serde(default)]
+    pub mouse_button_shortcuts: bool,
     #[serde(default = "default_show_tray_icon")]
     pub show_tray_icon: bool,
     #[serde(default)]
@@ -3910,6 +3942,7 @@ pub fn get_default_settings() -> AppSettings {
                 .to_string(),
             default_binding: default_shortcut.to_string(),
             current_binding: default_shortcut.to_string(),
+            alternate_binding: String::new(),
         },
     );
     // The dictation keys plus Shift. Only registered while cleanup is on and
@@ -3932,6 +3965,7 @@ pub fn get_default_settings() -> AppSettings {
                 .to_string(),
             default_binding: default_post_process_shortcut.to_string(),
             current_binding: default_post_process_shortcut.to_string(),
+            alternate_binding: String::new(),
         },
     );
     bindings.insert(
@@ -3946,6 +3980,7 @@ pub fn get_default_settings() -> AppSettings {
             // rather never lose an Esc to it (`OPTIONAL_BINDINGS`).
             default_binding: "escape".to_string(),
             current_binding: "escape".to_string(),
+            alternate_binding: String::new(),
         },
     );
 
@@ -3988,6 +4023,7 @@ pub fn get_default_settings() -> AppSettings {
                     .to_string(),
             default_binding: default_assistant_shortcut.to_string(),
             current_binding: default_assistant_shortcut.to_string(),
+            alternate_binding: String::new(),
         },
     );
 
@@ -4009,6 +4045,7 @@ pub fn get_default_settings() -> AppSettings {
             // which is not a discoverable way to find a feature.
             default_binding: default_assistant_call_shortcut.to_string(),
             current_binding: default_assistant_call_shortcut.to_string(),
+            alternate_binding: String::new(),
         },
     );
 
@@ -4093,6 +4130,7 @@ pub fn get_default_settings() -> AppSettings {
         experimental_enabled: false,
         lazy_stream_close: false,
         keyboard_implementation: KeyboardImplementation::default(),
+        mouse_button_shortcuts: false,
         show_tray_icon: default_show_tray_icon(),
         close_behavior: CloseBehavior::default(),
         paste_delay_ms: default_paste_delay_ms(),
@@ -5466,6 +5504,7 @@ mod tests {
             description: String::new(),
             default_binding: default.to_string(),
             current_binding: current.to_string(),
+            alternate_binding: String::new(),
         }
     }
 
@@ -5507,6 +5546,52 @@ mod tests {
         stored.get_mut("cancel").unwrap().current_binding = String::new();
         assert!(!migrate_binding_defaults(&mut stored, &defaults));
         assert_eq!(stored["cancel"].current_binding, "");
+    }
+
+    /// Moving a default onto new keys is about the shortcut's own keys. The
+    /// other keys someone added never came from a default, so no migration
+    /// may touch them.
+    #[test]
+    fn a_default_migration_leaves_the_other_keys_alone() {
+        let defaults = get_default_settings().bindings;
+        let mut untouched = binding("assistant_call", "an+old+default", "an+old+default");
+        untouched.alternate_binding = "mousex2".to_string();
+        let mut customised = binding("assistant", "an+old+default", "ctrl+f9");
+        customised.alternate_binding = "f13".to_string();
+        let mut stored = HashMap::from([
+            ("assistant_call".to_string(), untouched),
+            ("assistant".to_string(), customised),
+        ]);
+        assert!(migrate_binding_defaults(&mut stored, &defaults));
+        assert_eq!(stored["assistant_call"].alternate_binding, "mousex2");
+        assert_eq!(stored["assistant"].alternate_binding, "f13");
+    }
+
+    /// Every store written before shortcuts had other keys must still parse,
+    /// with none.
+    #[test]
+    fn a_binding_stored_before_other_keys_existed_has_none() {
+        let stored = serde_json::json!({
+            "id": "transcribe",
+            "name": "Transcribe",
+            "description": "",
+            "default_binding": "ctrl_left+super",
+            "current_binding": "f13"
+        });
+        let parsed: ShortcutBinding = serde_json::from_value(stored).unwrap();
+        assert_eq!(parsed.alternate_binding, "");
+        assert_eq!(parsed.combos(), vec!["f13"]);
+    }
+
+    #[test]
+    fn a_shortcut_answers_to_its_own_keys_first_and_nothing_when_off() {
+        let mut dictate = binding("transcribe", "ctrl_left+super", "ctrl_left+super");
+        assert_eq!(dictate.combos(), vec!["ctrl_left+super"]);
+        dictate.alternate_binding = " mousex1 ".to_string();
+        assert_eq!(dictate.combos(), vec!["ctrl_left+super", "mousex1"]);
+        // Turned off, it is off by both.
+        dictate.current_binding = String::new();
+        assert!(dictate.combos().is_empty());
     }
 
     #[test]

@@ -645,6 +645,7 @@
           "restore": "無法還原原本的快捷鍵。",
           "set": "無法設定快捷鍵：{{error}}",
           "inUse": "「{{name}}」已在使用 {{keys}}。請選擇其他按鍵，或先修改那個快捷鍵。",
+          "sameAsOther": "{{keys}} 已經是這個快捷鍵的按鍵。",
           "reset": "無法重設該快捷鍵。"
         },
         "clickToChange": "點一下以變更",
@@ -817,6 +818,13 @@
       "lazyStreamClose": {
         "label": "在兩次轉錄之間保持麥克風開啟",
         "description": "連續語音輸入更快。可能影響藍牙音訊品質。"
+      },
+      "mouseButtonShortcuts": {
+        "label": "將滑鼠按鈕當作快捷鍵",
+        "description": "將滑鼠中鍵、上一頁鍵或下一頁鍵當作快捷鍵：點按快捷鍵的按鍵，然後按下該滑鼠按鈕。作為快捷鍵期間，該按鈕不會執行其他動作。",
+        "linux": "在 Linux 上只有滑鼠中鍵可用。",
+        "needsEngine": "需要使用 SpeakoFlow Keys 鍵盤實作方式。",
+        "reset": "使用滑鼠按鈕的快捷鍵已恢復為預設按鍵。"
       },
       "liveTranscription": {
         "label": "即時轉錄",
@@ -3156,7 +3164,19 @@
     "useDefault": "使用預設值",
     "turnOff": "關閉",
     "turnedOff": "已關閉{{name}}快速鍵",
-    "undo": "復原"
+    "undo": "復原",
+    "addAnother": "新增另一組",
+    "addAnotherHint": "為這個快捷鍵再設一組按鍵，例如滑鼠按鈕",
+    "remove": "移除",
+    "or": "或",
+    "changeOther": "變更「{{name}}」快捷鍵的另一組按鍵",
+    "pressKeysOrButton": "請按下按鍵或滑鼠按鈕…",
+    "mouseNeedsKeysEngine": "滑鼠按鈕需要使用 SpeakoFlow Keys 鍵盤實作方式（設定 → 進階 → 實驗性）。",
+    "mouse": {
+      "middle": "滑鼠中鍵",
+      "back": "滑鼠上一頁鍵",
+      "forward": "滑鼠下一頁鍵"
+    }
   },
   "memoryManager": {
     "status": {

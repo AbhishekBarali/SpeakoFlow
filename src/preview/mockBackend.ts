@@ -501,18 +501,22 @@ const simulateDownload = (modelId: string): Promise<null> => {
   return promise;
 };
 
-const binding = (id: string, current: string): Json => ({
+const binding = (id: string, current: string, alternate = ""): Json => ({
   id,
   name: id,
   description: "",
   default_binding: current,
   current_binding: current,
+  alternate_binding: alternate,
 });
+
+// `?otherKeys=mousex1` gives Dictate other keys, to see a row with two sets.
+const otherKeys = params.get("otherKeys") ?? "";
 
 const settings: Json = {
   // The Windows defaults from `settings::get_default_settings`.
   bindings: {
-    transcribe: binding("transcribe", "ctrl_left+super"),
+    transcribe: binding("transcribe", "ctrl_left+super", otherKeys),
     transcribe_with_post_process: binding(
       "transcribe_with_post_process",
       "ctrl_left+super+shift",
@@ -687,7 +691,12 @@ const settings: Json = {
   assistant_response_length: "default",
   local_llm_context_size: 16384,
   local_llm_unload_timeout: "min5",
-  experimental_enabled: false,
+  experimental_enabled: params.get("experimental") === "1",
+  // `?engine=handy_keys` shows the editor Windows and macOS really use.
+  ...(params.get("engine")
+    ? { keyboard_implementation: params.get("engine") }
+    : {}),
+  mouse_button_shortcuts: otherKeys.includes("mouse"),
   debug_mode: false,
   ui_text_size: "medium",
   external_script_path: null,
@@ -1780,6 +1789,23 @@ const handlers: Record<string, (args: Json) => unknown> = {
     settings.custom_words = words;
     return null;
   },
+  change_alternate_binding: ({ id, binding: keys }) => {
+    const stored = (settings.bindings as Json)[id as string] as
+      | Json
+      | undefined;
+    if (!stored) return { success: false, binding: null, error: "not found" };
+    stored.alternate_binding = keys;
+    return { success: true, binding: structuredClone(stored), error: null };
+  },
+  change_mouse_button_shortcuts_setting: ({ enabled }) => {
+    settings.mouse_button_shortcuts = enabled;
+    return null;
+  },
+  // Real IPC answers after the click that asked has finished. Answering
+  // inside it let the shortcut editor's click-outside handler see the very
+  // click that opened the editor, and close it again.
+  start_handy_keys_recording: () =>
+    new Promise((resolve) => window.setTimeout(() => resolve(null), 0)),
   // The pill harness plays the window: Rust's sizing and mode, as DOM events.
   fit_meeting_pill: ({ height }) => {
     window.dispatchEvent(
