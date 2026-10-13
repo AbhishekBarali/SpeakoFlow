@@ -2825,6 +2825,15 @@
       "separate": "Son propre raccourci",
       "dictation": "Le même que la dictée"
     },
+    "skipShort": {
+      "title": "Ne pas nettoyer les dictées courtes",
+      "info": "Les dictées courtes, comme une recherche ou une réponse rapide, sont écrites telles que vous les avez dites, sans attendre le modèle. Les plus longues sont toujours nettoyées.",
+      "limit": "Moins de",
+      "limitInfo": "Le décompte se fait en mots. Pour les langues écrites sans espaces, comme le chinois, le japonais ou le thaï, le nombre de mots est estimé d'après le nombre de caractères.",
+      "words_one": "mot",
+      "words_many": "mots",
+      "words_other": "mots"
+    },
     "shortcutRow": "Raccourci"
   },
   "dictionary": {
