@@ -665,6 +665,11 @@
         "description": "Håll: inspelningen pågår medan du håller ned ett inspelningskortkommando. Tryck: en tryckning startar, nästa stoppar. Gäller alla inspelningskortkommandon.",
         "hold": "Håll",
         "tap": "Tryck"
+      },
+      "silenceStop": {
+        "label": "Stoppa efter tystnad",
+        "description": "Med Tryck stoppas en diktering som inte hör något tal på så här länge och klistras in av sig själv, som om du hade tryckt på kortkommandot igen. Strax innan krymper en linje på rutan; börjar du prata igen fortsätter inspelningen.",
+        "tapOnly": "Fungerar med Tryck. Med Håll stoppas dikteringen redan när du släpper tangenten."
       }
     },
     "models": {

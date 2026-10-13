@@ -667,6 +667,11 @@
         "description": "Maintenir : l'enregistrement dure tant que vous maintenez un raccourci d'enregistrement. Appuyer : une pression lance l'enregistrement, la suivante l'arrête. S'applique à tous les raccourcis d'enregistrement.",
         "hold": "Maintenir",
         "tap": "Appuyer"
+      },
+      "silenceStop": {
+        "label": "Arrêter après un silence",
+        "description": "En mode « Appuyer », une dictée qui n'entend aucune parole pendant cette durée s'arrête et se colle d'elle-même, comme si vous appuyiez de nouveau sur le raccourci. Juste avant, une ligne s'épuise sur la pastille ; reprendre la parole poursuit l'enregistrement.",
+        "tapOnly": "Fonctionne avec « Appuyer ». Avec « Maintenir », relâcher la touche arrête déjà la dictée."
       }
     },
     "models": {

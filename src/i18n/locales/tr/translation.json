@@ -665,6 +665,11 @@
         "description": "Basılı tut: bir kayıt kısayolunu basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki basış durdurur. Tüm kayıt kısayollarına uygulanır.",
         "hold": "Basılı tut",
         "tap": "Dokun"
+      },
+      "silenceStop": {
+        "label": "Sessizlikte durdur",
+        "description": "Dokun modunda, bu süre boyunca konuşma duyulmayan bir dikte kendiliğinden durur ve kısayola yeniden basmışsınız gibi yapıştırılır. Durmadan hemen önce kapsüldeki çizgi kısalır; yeniden konuşursanız kayıt devam eder.",
+        "tapOnly": "Dokun modunda çalışır. Basılı tut modunda tuşu bırakmak dikteyi zaten durdurur."
       }
     },
     "models": {

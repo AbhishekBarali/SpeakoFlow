@@ -667,6 +667,11 @@
         "description": "Mantener: se graba mientras mantienes pulsado un atajo de grabación. Tocar: una pulsación empieza y la siguiente detiene. Se aplica a todos los atajos de grabación.",
         "hold": "Mantener presionado",
         "tap": "Tocar"
+      },
+      "silenceStop": {
+        "label": "Detener tras un silencio",
+        "description": "Con «Tocar», un dictado que no oye voz durante este tiempo se detiene y se pega solo, como si hubieras pulsado el atajo otra vez. Justo antes, una línea de la píldora se agota; si vuelves a hablar, la grabación sigue.",
+        "tapOnly": "Funciona con «Tocar». Con «Mantener presionado», soltar la tecla ya detiene el dictado."
       }
     },
     "models": {
