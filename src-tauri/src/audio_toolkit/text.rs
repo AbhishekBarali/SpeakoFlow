@@ -608,7 +608,8 @@ pub fn is_speechless_transcription(text: &str) -> bool {
 ///   than meanings, so their words run longer: ありがとうございます is two words
 ///   in ten kana.
 /// - Thai, Lao, Khmer and Myanmar: 4 characters a word. A syllable is a
-///   consonant plus its vowel signs, and most words are one or two syllables.
+///   consonant plus its vowel signs and tone mark, and most words are one or
+///   two syllables.
 ///
 /// An estimate is all the threshold needs. It has to tell a search query from
 /// a paragraph, not five words from six.
@@ -623,7 +624,7 @@ pub fn count_words(text: &str) -> usize {
             match unspaced_script(c) {
                 Some(script) => {
                     in_word = false;
-                    if c.is_alphanumeric() {
+                    if is_word_char(c, script) {
                         match script {
                             UnspacedScript::Han => han += 1,
                             UnspacedScript::Kana => kana += 1,
@@ -631,11 +632,9 @@ pub fn count_words(text: &str) -> usize {
                         }
                     }
                 }
-                None if c.is_alphanumeric() => {
-                    if !in_word {
-                        words += 1;
-                        in_word = true;
-                    }
+                None if c.is_alphanumeric() && !in_word => {
+                    words += 1;
+                    in_word = true;
                 }
                 None => {}
             }
@@ -645,6 +644,34 @@ pub fn count_words(text: &str) -> usize {
         + estimated_words(han, 15)
         + estimated_words(kana, 25)
         + estimated_words(southeast_asian, 40)
+}
+
+/// Whether `c`, a character of an unspaced script, belongs to a word rather
+/// than being punctuation. Tone marks and some signs of the Thai-family
+/// scripts (Thai ่ ้, Myanmar ်, Khmer ្) are combining marks, not letters, so
+/// `is_alphanumeric` skipped them: five tone marks in a five-word Thai
+/// sentence left 15 of its 20 characters, an estimate of four words.
+fn is_word_char(c: char, script: UnspacedScript) -> bool {
+    match script {
+        UnspacedScript::SoutheastAsian => !is_southeast_asian_punctuation(c),
+        UnspacedScript::Han | UnspacedScript::Kana => c.is_alphanumeric(),
+    }
+}
+
+/// Punctuation and currency signs in the Thai, Lao, Myanmar and Khmer blocks.
+/// Everything else there is a letter, a digit or a mark on a letter.
+fn is_southeast_asian_punctuation(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x0E3F                  // Thai baht sign
+        | 0x0E4F                // Thai fongman
+        | 0x0E5A..=0x0E5B       // Thai angkhankhu, khomut
+        | 0x0EAF                // Lao ellipsis
+        | 0x104A..=0x104F       // Myanmar section marks
+        | 0x109E..=0x109F       // Myanmar symbols
+        | 0x17D4..=0x17D6       // Khmer khan, bariyoosan, camnuc pii kuuh
+        | 0x17D8..=0x17DB       // Khmer beyyal, phnaek muan, koomuut, riel sign
+    )
 }
 
 /// Words in `chars` characters of an unspaced script whose words average
@@ -1296,6 +1323,25 @@ mod tests {
         assert!(sentence >= 10, "{sentence}");
         // Thai still separates phrases with spaces.
         assert!(count_words("สวัสดีครับ ขอบคุณครับ") > greeting);
+    }
+
+    #[test]
+    fn thai_family_marks_count_toward_a_word() {
+        // บ้าน / ใหม่ / ใกล้ / ร้าน / เก่า: five words whose five tone marks
+        // are combining marks. Dropping them read four, under the default
+        // threshold, so cleanup was skipped for a five-word dictation.
+        assert_eq!(count_words("บ้านใหม่ใกล้ร้านเก่า"), 5);
+        // ผม / จะ / ไป / ทำงาน / พรุ่งนี้
+        assert_eq!(count_words("ผมจะไปทำงานพรุ่งนี้"), 5);
+        // วันนี้ / อากาศ / ดี / มาก
+        assert_eq!(count_words("วันนี้อากาศดีมาก"), 4);
+        // Khmer: ខ្ញុំ / ស្រលាញ់ / អ្នក. Its coeng (្) stacks consonants, so
+        // its words run long and this reads a word over, which errs toward
+        // cleaning rather than skipping.
+        let khmer = count_words("ខ្ញុំស្រលាញ់អ្នក");
+        assert!((3..=4).contains(&khmer), "{khmer}");
+        // Their punctuation is still not a word.
+        assert_eq!(count_words("๏ ๚ ๛ ។ ៕ ၊ ။"), 0);
     }
 
     #[test]

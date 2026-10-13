@@ -135,6 +135,24 @@ fn runs_cleanup(context: DictationContext, settings: &AppSettings, transcription
     context.post_process && !skips_short_cleanup(settings, context.explicit_cleanup, transcription)
 }
 
+/// [`runs_cleanup`] for a History row being recovered or retried. The row
+/// stores whether cleanup was asked for (`post_process_requested`), not
+/// whether it ran, so a short dictation that skipped it is judged again on
+/// the new transcript: a retranscription that comes back long is cleaned.
+///
+/// The row does not remember which shortcut asked. While cleanup rides on the
+/// dictation shortcut, that is the one that did (the dedicated shortcut is not
+/// even registered then); otherwise it was the dedicated one, which always
+/// cleans.
+pub(crate) fn rerun_runs_cleanup(
+    settings: &AppSettings,
+    requested: bool,
+    transcription: &str,
+) -> bool {
+    let explicit = !crate::settings::cleanup_on_dictation(settings);
+    requested && !skips_short_cleanup(settings, explicit, transcription)
+}
+
 /// Return the UI to rest: overlay down, tray idle.
 ///
 /// Every exit from the post-recording pipeline has to end here. The paths that
@@ -3210,8 +3228,9 @@ async fn deliver_transcription(d: Dictation, transcription: String) {
     }
 
     // A dictation shorter than the user's threshold is pasted as spoken. The
-    // model is never asked, the pill never says "processing", and the row reads
-    // like any dictation without cleanup, because that is what it was.
+    // model is never asked and the pill never says "processing". Its row still
+    // records that cleanup was asked for, so a History retry decides again on
+    // the new transcript (`rerun_runs_cleanup`).
     let settings = get_settings(&ah);
     let post_process = runs_cleanup(d.context, &settings, &transcription);
     if d.context.post_process && !post_process {
@@ -3256,7 +3275,7 @@ async fn deliver_transcription(d: Dictation, transcription: String) {
             transcription_text: transcription,
             post_processed_text: processed.post_processed_text,
             post_process_prompt: processed.post_process_prompt,
-            post_process_requested: post_process,
+            post_process_requested: d.context.post_process,
             dismissed: false,
         },
     );
@@ -4095,7 +4114,7 @@ mod tests {
         cleanup_token_budget as cleanup_token_budget_at, cleanup_unavailable_message, prompt_echo,
         validate_cleaned_output_against_prompt, FOLDED_TRANSCRIPT_BOUNDARY,
     };
-    use super::{runs_cleanup, skips_short_cleanup, DictationContext};
+    use super::{rerun_runs_cleanup, runs_cleanup, skips_short_cleanup, DictationContext};
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessResolutionError, PostProcessTone,
         PostProcessUnavailableReason, ResolvedPostProcessConfig, ThinkingLevel,
@@ -5390,6 +5409,30 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             &settings,
             "我们明天早上九点在公司开会讨论预算"
         ));
+    }
+
+    #[test]
+    fn a_retried_dictation_is_judged_on_its_new_transcript() {
+        let settings = skipping_under(5);
+        // Skipped the first time, but the row still says cleanup was asked
+        // for, so a retranscription that comes back long is cleaned.
+        assert!(!rerun_runs_cleanup(&settings, true, "send it to Sam"));
+        assert!(rerun_runs_cleanup(
+            &settings,
+            true,
+            "send it to Sam before the meeting on Thursday"
+        ));
+        // A row that never asked for cleanup gets none.
+        assert!(!rerun_runs_cleanup(
+            &settings,
+            false,
+            "send it to Sam before the meeting on Thursday"
+        ));
+        // With cleanup on its own shortcut, the row came from that shortcut,
+        // which cleans however short.
+        let mut own_shortcut = settings.clone();
+        own_shortcut.post_process_on_dictation = false;
+        assert!(rerun_runs_cleanup(&own_shortcut, true, "ok"));
     }
 
     #[test]
