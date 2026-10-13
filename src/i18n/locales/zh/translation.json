@@ -1180,6 +1180,24 @@
           "azureDescription": "您的 Azure 资源端点，可在 Azure 门户的“密钥和终结点”中找到。MAI-Transcribe 需要位于印度中部、东南亚、美国东部、美国西部、美国西部 2 或北欧区域的资源。",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS 访问密钥",
+            "missing": "尚未保存密钥。请使用有权调用 transcribe:StartStreamTranscriptionWebSocket 的 IAM 用户或角色的访问密钥。",
+            "keyId": "访问密钥 ID",
+            "secret": "秘密访问密钥",
+            "sessionToken": "会话令牌（仅限临时凭证）",
+            "invalid": "这看起来不像 AWS 密钥。访问密钥 ID 只包含字母和数字，任何字段都不能包含空格或冒号。",
+            "permission": "所需权限"
+          },
+          "region": {
+            "title": "区域",
+            "description": "Amazon Transcribe 运行的位置。离您最近的区域响应最快。"
+          },
+          "streaming": "始终开启：Amazon Transcribe 只支持实时转录。如果录音中途连接断开，录音会按说话速度重新发送，因此完成所需的时间与录音时长相同。",
+          "language": "需要告诉 Amazon Transcribe 使用哪种语言。“自动”只会在英语、应用语言和其他几种常用语言之间选择，如果您说的是其他语言，请选择您的语言。",
+          "unsupportedLanguage": "Amazon Transcribe 无法在 {{region}} 实时转录这种语言。请选择其他语言或区域。在此之前，听写不会使用 Amazon Transcribe。"
+        },
         "model": {
           "title": "模型",
           "info": "输入提供商提供的任意模型，或加载列表。对于 ElevenLabs，选择 scribe_v2_realtime 可边说边转录，选择 scribe_v2 则在您说完后再转录。",
@@ -1192,7 +1210,8 @@
         },
         "keyterms": {
           "label": "发送我的自定义词汇",
-          "description": "把您的自定义词汇传给提供商，让它优先采用这些写法。"
+          "description": "把您的自定义词汇传给提供商，让它优先采用这些写法。",
+          "unsupported": "{{provider}} 无法接收词汇列表，因此您的自定义词汇会改为在这台电脑上校正。"
         },
         "noVerbatim": {
           "label": "去除口头语",

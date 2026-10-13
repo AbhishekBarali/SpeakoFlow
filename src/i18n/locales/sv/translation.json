@@ -1186,6 +1186,24 @@
           "azureDescription": "Slutpunkten för din Azure-resurs, från Nycklar och slutpunkt i Azure-portalen. MAI-Transcribe kräver en resurs i Central India, Southeast Asia, East US, West US, West US 2 eller North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS-åtkomstnyckel",
+            "missing": "Ingen nyckel sparad än. Använd en åtkomstnyckel för en IAM-användare eller IAM-roll som får anropa transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Åtkomstnyckel-ID",
+            "secret": "Hemlig åtkomstnyckel",
+            "sessionToken": "Sessionstoken (bara för tillfälliga autentiseringsuppgifter)",
+            "invalid": "Det här ser inte ut som en AWS-nyckel. Åtkomstnyckel-ID:t består av bokstäver och siffror, och inget fält får innehålla mellanslag eller kolon.",
+            "permission": "Behörighet som krävs"
+          },
+          "region": {
+            "title": "AWS-region",
+            "description": "Var Amazon Transcribe körs. Den region som ligger närmast dig svarar snabbast."
+          },
+          "streaming": "Alltid på: Amazon Transcribe transkriberar bara live. Om anslutningen bryts mitt i inspelningen skickas den igen i talhastighet, så det tar lika lång tid att bli klar som inspelningen tog.",
+          "language": "Amazon Transcribe måste veta språket. Automatiskt väljer mellan engelska, appens språk och några andra vanliga språk, så välj ditt om du talar något annat.",
+          "unsupportedLanguage": "Amazon Transcribe kan inte transkribera det här språket live i {{region}}. Välj ett annat språk eller en annan region. Tills dess använder dikteringen inte Amazon Transcribe."
+        },
         "model": {
           "title": "Modell",
           "info": "Skriv valfri modell som leverantören erbjuder, eller ladda listan. För ElevenLabs väljer du scribe_v2_realtime för att transkribera medan du talar och scribe_v2 för att transkribera när du har slutat.",
@@ -1198,7 +1216,8 @@
         },
         "keyterms": {
           "label": "Skicka mina anpassade ord",
-          "description": "Skickar ditt anpassade ordförråd till leverantören så att den föredrar de stavningarna."
+          "description": "Skickar ditt anpassade ordförråd till leverantören så att den föredrar de stavningarna.",
+          "unsupported": "{{provider}} kan inte ta emot en ordlista, så dina anpassade ord rättas på den här datorn i stället."
         },
         "noVerbatim": {
           "label": "Ta bort utfyllnadsord",

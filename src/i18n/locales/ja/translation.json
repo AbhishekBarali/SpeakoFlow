@@ -1180,6 +1180,24 @@
           "azureDescription": "Azureリソースのエンドポイント。Azureポータルの「キーとエンドポイント」で確認できます。MAI-Transcribeには、インド中部、東南アジア、米国東部、米国西部、米国西部2、北ヨーロッパのいずれかのリソースが必要です。",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS アクセスキー",
+            "missing": "まだキーが保存されていません。transcribe:StartStreamTranscriptionWebSocket の呼び出しを許可された IAM ユーザーまたはロールのアクセスキーを使用してください。",
+            "keyId": "アクセスキー ID",
+            "secret": "シークレットアクセスキー",
+            "sessionToken": "セッショントークン（一時的な認証情報の場合のみ）",
+            "invalid": "AWS のキーではないようです。アクセスキー ID は英字と数字のみで構成され、どの欄にもスペースやコロンは使えません。",
+            "permission": "必要な権限"
+          },
+          "region": {
+            "title": "リージョン",
+            "description": "Amazon Transcribe を実行する場所です。最も近いリージョンが最も速く応答します。"
+          },
+          "streaming": "常にオン：Amazon Transcribe はライブでのみ文字起こしします。録音中に接続が切れると、録音が話す速さで再送されるため、完了まで録音と同じ時間がかかります。",
+          "language": "Amazon Transcribe には言語を指定する必要があります。「自動」では英語、アプリの言語、その他いくつかの主要言語の中から判別するため、それ以外の言語を話す場合はその言語を選んでください。",
+          "unsupportedLanguage": "Amazon Transcribe は {{region}} ではこの言語をライブで文字起こしできません。別の言語かリージョンを選んでください。それまで音声入力では Amazon Transcribe を使用しません。"
+        },
         "model": {
           "title": "モデル",
           "info": "プロバイダーが提供するモデル名を入力するか、一覧を読み込んでください。ElevenLabsの場合、話しながら文字起こしするには scribe_v2_realtime を、話し終えてから文字起こしするには scribe_v2 を選びます。",
@@ -1192,7 +1210,8 @@
         },
         "keyterms": {
           "label": "カスタム単語を送信",
-          "description": "カスタム単語をプロバイダーに渡し、その表記を優先して認識させます。"
+          "description": "カスタム単語をプロバイダーに渡し、その表記を優先して認識させます。",
+          "unsupported": "{{provider}} は単語リストを受け付けないため、カスタム単語はこのコンピューター上で補正されます。"
         },
         "noVerbatim": {
           "label": "フィラーを除去",

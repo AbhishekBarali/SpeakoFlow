@@ -1186,6 +1186,24 @@
           "azureDescription": "Der Endpunkt deiner Azure-Ressource, zu finden unter „Schlüssel und Endpunkt“ im Azure-Portal. MAI-Transcribe braucht eine Ressource in Central India, Southeast Asia, East US, West US, West US 2 oder North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS-Zugriffsschlüssel",
+            "missing": "Noch kein Schlüssel gespeichert. Verwende einen Zugriffsschlüssel für einen IAM-Benutzer oder eine IAM-Rolle mit der Berechtigung transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Zugriffsschlüssel-ID",
+            "secret": "Geheimer Zugriffsschlüssel",
+            "sessionToken": "Sitzungstoken (nur bei temporären Anmeldedaten)",
+            "invalid": "Das sieht nicht nach einem AWS-Schlüssel aus. Die Zugriffsschlüssel-ID besteht aus Buchstaben und Ziffern, und kein Feld darf Leerzeichen oder Doppelpunkte enthalten.",
+            "permission": "Benötigte Berechtigung"
+          },
+          "region": {
+            "title": "AWS-Region",
+            "description": "Wo Amazon Transcribe läuft. Die Region, die dir am nächsten liegt, antwortet am schnellsten."
+          },
+          "streaming": "Immer an: Amazon Transcribe transkribiert nur live. Bricht die Verbindung während der Aufnahme ab, wird die Aufnahme in Sprechgeschwindigkeit erneut gesendet – das Fertigstellen dauert dann so lange wie die Aufnahme selbst.",
+          "language": "Amazon Transcribe muss die Sprache kennen. „Automatisch“ wählt zwischen Englisch, deiner App-Sprache und einigen weiteren verbreiteten Sprachen – wähle deine Sprache aus, wenn du etwas anderes sprichst.",
+          "unsupportedLanguage": "Amazon Transcribe kann diese Sprache in {{region}} nicht live transkribieren. Wähle eine andere Sprache oder Region. Bis dahin nutzt das Diktieren Amazon Transcribe nicht."
+        },
         "model": {
           "title": "Modell",
           "info": "Gib ein beliebiges Modell des Anbieters ein oder lade die Liste. Bei ElevenLabs wählst du scribe_v2_realtime für die Transkription beim Sprechen und scribe_v2 für die Transkription nach dem Stoppen.",
@@ -1198,7 +1216,8 @@
         },
         "keyterms": {
           "label": "Meine benutzerdefinierten Wörter senden",
-          "description": "Übergibt deinen eigenen Wortschatz an den Anbieter, damit er diese Schreibweisen bevorzugt."
+          "description": "Übergibt deinen eigenen Wortschatz an den Anbieter, damit er diese Schreibweisen bevorzugt.",
+          "unsupported": "{{provider}} kann keine Wortliste entgegennehmen, deshalb werden deine eigenen Wörter stattdessen auf diesem Computer korrigiert."
         },
         "noVerbatim": {
           "label": "Füllwörter entfernen",

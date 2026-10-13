@@ -525,7 +525,7 @@ const settings: Json = {
   audio_feedback: false,
   theme: params.get("theme") ?? "light",
   stt_engine_mode: params.get("stt") === "device" ? "local" : "cloud",
-  cloud_stt_provider_id: "elevenlabs",
+  cloud_stt_provider_id: params.get("cloudProvider") ?? "elevenlabs",
   cloud_stt_models: {
     elevenlabs: "scribe_v2_realtime",
     openrouter: "microsoft/mai-transcribe-2",
@@ -743,6 +743,7 @@ const cloudProviders: Json[] = [
     kind: "eleven_labs",
     default_model: "scribe_v2",
     models: ["scribe_v2", "scribe_v2_realtime"],
+    honors_keyterms: true,
     supports_streaming: true,
   },
   {
@@ -752,6 +753,7 @@ const cloudProviders: Json[] = [
     kind: "open_ai_compatible",
     default_model: "openai/whisper-large-v3",
     models: ["microsoft/mai-transcribe-2", "openai/whisper-large-v3"],
+    honors_keyterms: false,
     supports_streaming: false,
     api_key_url: "https://openrouter.ai/keys",
   },
@@ -761,6 +763,7 @@ const cloudProviders: Json[] = [
     base_url: "https://api.openai.com/v1",
     kind: "open_ai_compatible",
     default_model: "gpt-4o-transcribe",
+    honors_keyterms: true,
     supports_translation: true,
   },
   {
@@ -769,6 +772,7 @@ const cloudProviders: Json[] = [
     base_url: "https://api.deepgram.com",
     kind: "deepgram",
     default_model: "nova-3",
+    honors_keyterms: true,
     supports_streaming: true,
   },
   {
@@ -780,6 +784,20 @@ const cloudProviders: Json[] = [
     default_model: "MAI-Transcribe-2",
     models: ["MAI-Transcribe-2", "MAI-Transcribe-1.5"],
     honors_keyterms: true,
+  },
+  {
+    id: "amazon_transcribe",
+    label: "Amazon Transcribe",
+    base_url: "us-east-1",
+    allow_base_url_edit: true,
+    kind: "amazon_transcribe",
+    default_model: "standard",
+    models: ["standard"],
+    models_endpoint: null,
+    honors_keyterms: false,
+    supports_streaming: true,
+    api_key_url:
+      "https://docs.aws.amazon.com/transcribe/latest/dg/streaming-setting-up.html#streaming-websocket",
   },
 ];
 
@@ -1569,6 +1587,33 @@ const handlers: Record<string, (args: Json) => unknown> = {
     settings.cloud_stt_provider_id = providerId;
     return null;
   },
+  set_cloud_stt_api_key: ({ providerId, apiKey }) => {
+    (settings.cloud_stt_api_keys as Json)[providerId as string] = apiKey;
+    return null;
+  },
+  set_cloud_stt_base_url: ({ providerId, baseUrl }) => {
+    const urls = settings.cloud_stt_base_urls as Json;
+    if (baseUrl) urls[providerId as string] = baseUrl;
+    else delete urls[providerId as string];
+    return null;
+  },
+  // `?cloudReadiness=unsupported_language` shows the Amazon Transcribe language
+  // warning; anything else reads as ready.
+  get_cloud_stt_readiness: () =>
+    params.get("cloudReadiness") === "unsupported_language"
+      ? {
+          state: "unavailable",
+          reason: "unsupported_language",
+          provider_id: settings.cloud_stt_provider_id,
+          provider_label: null,
+        }
+      : {
+          state: "ready",
+          provider_id: settings.cloud_stt_provider_id,
+          provider_label: "",
+          model: "",
+          streaming: true,
+        },
   set_active_model: ({ modelId }) => {
     const entry = models.find((item) => item.id === modelId);
     if (!entry?.is_downloaded)

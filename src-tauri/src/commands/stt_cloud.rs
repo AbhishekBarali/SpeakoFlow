@@ -230,11 +230,26 @@ fn describe_unavailable(error: crate::settings::CloudSttResolutionError) -> Stri
                 .provider_label
                 .unwrap_or_else(|| "this provider".to_string())
         ),
+        // Amazon Transcribe's endpoint slot is a region picked from a list, so
+        // "add the endpoint of your resource" would describe something that
+        // does not exist there.
+        Reason::MissingEndpoint
+            if error.provider_id.as_deref() == Some(crate::settings::CLOUD_STT_AMAZON) =>
+        {
+            "Choose a region for Amazon Transcribe first".to_string()
+        }
         Reason::MissingEndpoint => format!(
             "Add the endpoint of your {} resource first",
             error
                 .provider_label
                 .unwrap_or_else(|| "provider".to_string())
+        ),
+        Reason::UnsupportedLanguage => format!(
+            "{} can't transcribe the selected language live in this region. Choose \
+             another language or region",
+            error
+                .provider_label
+                .unwrap_or_else(|| "This provider".to_string())
         ),
     }
 }

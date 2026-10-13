@@ -86,7 +86,7 @@ SpeakoFlow 内置简体中文和繁体中文界面，也支持中文语音转文
 
 ### 语音输入
 
-按住按键，说话，松开。文字会出现在光标所在的位置，录音浮窗还可以在你说话时实时显示文字。转写在你的显卡或处理器上用本地模型完成：英语默认使用 Parakeet，Nemotron 支持 28 种语言并能自动识别，Whisper 支持 99 种语言，模型目录中共有 65 个语音模型。如果你更想用云端，ElevenLabs 和 Deepgram 可以边说边出字，OpenAI、Groq、Mistral、Azure AI Speech 和 OpenRouter 也都能用。
+按住按键，说话，松开。文字会出现在光标所在的位置，录音浮窗还可以在你说话时实时显示文字。转写在你的显卡或处理器上用本地模型完成：英语默认使用 Parakeet，Nemotron 支持 28 种语言并能自动识别，Whisper 支持 99 种语言，模型目录中共有 65 个语音模型。如果你更想用云端，ElevenLabs、Deepgram 和 Amazon Transcribe 可以边说边出字，OpenAI、Groq、Mistral、Azure AI Speech 和 OpenRouter 也都能用。
 
 - **撤销。** 不小心取消了录音？浮窗会在几秒内提供“撤销”，历史记录也会保留这段录音，之后仍可恢复。转写失败时则会提供“重试”。
 - **按你的方式拼写。** 把人名和专业术语加入词典，或者设置文本替换规则。在 Windows 上，它还能学习你修改过的词。
@@ -188,7 +188,7 @@ Esc 只在有任务进行时（例如正在录音，或正在朗读回答）才�
 
 | 任务             | 在你的电脑上                                                                                                                                   | 在云端（使用你的密钥）                                                                                                                                                                           |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 语音转文字       | Parakeet、Nemotron、Canary、Cohere Transcribe、Whisper、Moonshine、Voxtral、Qwen3-ASR、GigaAM、Granite Speech、SenseVoice 等（目录中共 65 个） | ElevenLabs、Deepgram、OpenAI、Groq、Mistral (Voxtral)、Azure AI Speech、OpenRouter，或任何兼容 OpenAI 的服务器                                                                                   |
+| 语音转文字       | Parakeet、Nemotron、Canary、Cohere Transcribe、Whisper、Moonshine、Voxtral、Qwen3-ASR、GigaAM、Granite Speech、SenseVoice 等（目录中共 65 个） | ElevenLabs、Deepgram、OpenAI、Groq、Mistral (Voxtral)、Azure AI Speech、Amazon Transcribe、OpenRouter，或任何兼容 OpenAI 的服务器                                                                |
 | 助手与清理       | 内置引擎（llama.cpp，完全离线）、Ollama、LM Studio、用于清理的 SpeakoFlow Mini、Apple 芯片上用于清理的 Apple Intelligence                      | OpenAI、Anthropic、Google Gemini、Azure OpenAI、AWS Bedrock、OpenRouter、Groq、Cerebras、xAI、DeepSeek、Mistral、Moonshot、Together AI、Fireworks AI、Perplexity、Z.AI，或任何兼容 OpenAI 的接口 |
 | 语音回答         | Kokoro、Kitten、Pocket TTS、Supertonic                                                                                                         | OpenAI、ElevenLabs、OpenRouter、Deepgram、Cartesia、Google Cloud、Azure AI Speech、Groq、xAI、Mistral、Inworld，或你自己的服务器                                                                 |
 | 网络搜索（可选） |                                                                                                                                                | Serper、Brave、Tavily、Exa、SerpAPI、TinyFish                                                                                                                                                    |

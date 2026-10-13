@@ -87,8 +87,8 @@ the recording pill can show them as you speak. Transcription runs on your
 graphics card or processor with a local model: Parakeet by default for English,
 Nemotron for 28 languages with automatic detection, Whisper for 99, and 65
 speech models in the catalog altogether. If you'd rather use the cloud,
-ElevenLabs and Deepgram stream text while you talk, and OpenAI, Groq, Mistral,
-Azure AI Speech, and OpenRouter work too.
+ElevenLabs, Deepgram, and Amazon Transcribe stream text while you talk, and
+OpenAI, Groq, Mistral, Azure AI Speech, and OpenRouter work too.
 
 - **Undo.** Cancelled a recording by accident? The pill offers Undo for a few
   seconds, and History keeps the recording so you can recover it later. A
@@ -247,7 +247,7 @@ providers use your own API key, stored in your system keychain.
 
 | Job                   | On your computer                                                                                                                                        | In the cloud, with your key                                                                                                                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Speech to text        | Parakeet, Nemotron, Canary, Cohere Transcribe, Whisper, Moonshine, Voxtral, Qwen3-ASR, GigaAM, Granite Speech, SenseVoice, and more (65 in the catalog) | ElevenLabs, Deepgram, OpenAI, Groq, Mistral (Voxtral), Azure AI Speech, OpenRouter, or any OpenAI-compatible server                                                                                       |
+| Speech to text        | Parakeet, Nemotron, Canary, Cohere Transcribe, Whisper, Moonshine, Voxtral, Qwen3-ASR, GigaAM, Granite Speech, SenseVoice, and more (65 in the catalog) | ElevenLabs, Deepgram, OpenAI, Groq, Mistral (Voxtral), Azure AI Speech, Amazon Transcribe, OpenRouter, or any OpenAI-compatible server                                                                    |
 | Assistant and cleanup | Built-in engine (llama.cpp, fully offline), Ollama, LM Studio, SpeakoFlow Mini for cleanup, Apple Intelligence for cleanup on Apple silicon             | OpenAI, Anthropic, Google Gemini, Azure OpenAI, AWS Bedrock, OpenRouter, Groq, Cerebras, xAI, DeepSeek, Mistral, Moonshot, Together AI, Fireworks AI, Perplexity, Z.AI, or any OpenAI-compatible endpoint |
 | Spoken replies        | Kokoro, Kitten, Pocket TTS, Supertonic                                                                                                                  | OpenAI, ElevenLabs, OpenRouter, Deepgram, Cartesia, Google Cloud, Azure AI Speech, Groq, xAI, Mistral, Inworld, or your own server                                                                        |
 | Web search (optional) |                                                                                                                                                         | Serper, Brave, Tavily, Exa, SerpAPI, TinyFish                                                                                                                                                             |

@@ -23,15 +23,25 @@
 //!
 //! ## Committed versus partial
 //!
-//! Both providers distinguish a stable prefix from a revisable tail, which maps
-//! exactly onto the overlay's existing `committed` / `tentative` split — so a
-//! partial result can be shown immediately and still be corrected without the
-//! text ever visibly rewriting itself behind the cursor.
+//! Every provider here distinguishes a stable prefix from a revisable tail,
+//! which maps exactly onto the overlay's existing `committed` / `tentative`
+//! split — so a partial result can be shown immediately and still be corrected
+//! without the text ever visibly rewriting itself behind the cursor.
 //!
 //! Every failure here is non-fatal: a session that cannot connect, stalls, or
 //! errors mid-recording returns `None`, and the manager re-transcribes the
 //! complete recording through the batch path. The user waits slightly longer and
 //! loses nothing, which is the only acceptable behaviour for dictation.
+//!
+//! ## Amazon Transcribe, the provider with no batch path
+//!
+//! AWS speaks binary event-stream frames over a SigV4-presigned URL
+//! ([`crate::stt_aws`]) where the others speak JSON with an auth header, and its
+//! "batch path" is this same session run again over the finished recording
+//! ([`transcribe_by_streaming`]). AWS processes a stream at speaking speed and
+//! asks for recorded audio to be sent at that rate, so a replay takes as long as
+//! the recording — which is why this provider always streams live, and why the
+//! replay is only the fallback.
 
 use std::time::{Duration, Instant};
 
@@ -99,6 +109,19 @@ const SEND_TIMEOUT: Duration = Duration::from_secs(5);
 /// clean close.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
 
+/// Where an Amazon Transcribe session connects in tests: a local stand-in for
+/// AWS. The real URL is signed for AWS's own host, so the whole URL is swapped.
+#[cfg(test)]
+static AMAZON_TEST_URL: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Quiet period that ends Amazon Transcribe's finalize once a segment has been
+/// committed. AWS closes the socket itself after the last transcript of a
+/// stream, so this is only the backstop for a close that never comes — and it
+/// is longer than [`FINALIZE_QUIET_PERIOD`] because AWS can finalize two
+/// segments a second or more apart, and breaking between them would drop the
+/// second.
+const AMAZON_FINALIZE_QUIET_PERIOD: Duration = Duration::from_millis(2000);
+
 /// Whether this provider has a realtime endpoint wired up here.
 ///
 /// Checks the model too, not just the provider: ElevenLabs' realtime and batch
@@ -107,9 +130,16 @@ const CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
 pub(crate) fn supports_streaming(cfg: &ResolvedCloudStt) -> bool {
     match cfg.provider.kind {
         CloudSttKind::ElevenLabs => cfg.model.contains("realtime"),
-        CloudSttKind::Deepgram => true,
+        CloudSttKind::Deepgram | CloudSttKind::AmazonTranscribe => true,
         CloudSttKind::OpenAiCompatible | CloudSttKind::AzureSpeech => false,
     }
+}
+
+/// Whether streaming is this provider's *only* way to transcribe, so a finished
+/// recording has to be replayed through a stream ([`transcribe_by_streaming`])
+/// instead of sent as one request.
+pub(crate) fn streams_only(cfg: &ResolvedCloudStt) -> bool {
+    cfg.provider.kind == CloudSttKind::AmazonTranscribe
 }
 
 /// Where a session publishes its running transcript.
@@ -131,6 +161,9 @@ pub(crate) struct CloudStreamSession {
     transcript: LiveTranscript,
     /// Set once the socket has failed, so later calls stop trying.
     failed: bool,
+    /// Why it failed, for a caller that reports the reason rather than falling
+    /// back silently (the replay, and the Settings test).
+    last_error: Option<String>,
 }
 
 /// The running transcript of one session: an append-only committed prefix plus
@@ -289,6 +322,7 @@ type WebSocket =
 enum Protocol {
     ElevenLabs,
     Deepgram,
+    AmazonTranscribe,
 }
 
 impl CloudStreamSession {
@@ -304,6 +338,7 @@ impl CloudStreamSession {
         let protocol = match cfg.provider.kind {
             CloudSttKind::ElevenLabs => Protocol::ElevenLabs,
             CloudSttKind::Deepgram => Protocol::Deepgram,
+            CloudSttKind::AmazonTranscribe => Protocol::AmazonTranscribe,
             CloudSttKind::OpenAiCompatible | CloudSttKind::AzureSpeech => {
                 return Err("This provider has no realtime endpoint".to_string())
             }
@@ -317,33 +352,63 @@ impl CloudStreamSession {
         let url = match protocol {
             Protocol::ElevenLabs => elevenlabs_url(cfg),
             Protocol::Deepgram => deepgram_url(cfg),
+            Protocol::AmazonTranscribe => {
+                let amazon = cfg
+                    .amazon
+                    .as_ref()
+                    .ok_or_else(|| format!("{} is not fully configured", cfg.provider.label))?;
+                if !crate::stt_aws::STREAMING_REGIONS.contains(&amazon.region.as_str()) {
+                    warn!(
+                        "{} is not a region AWS lists for Transcribe streaming; trying it anyway",
+                        amazon.region
+                    );
+                }
+                // Signed fresh for each session: the signature is only valid
+                // for five minutes, and it is in the URL, so the URL itself is
+                // never logged — only its host.
+                debug!(
+                    "Realtime cloud STT connecting: wss://{} (presigned)",
+                    crate::stt_aws::streaming_host(&amazon.region)
+                );
+                let signed =
+                    crate::stt_aws::streaming_url(amazon, WHISPER_SAMPLE_RATE, chrono::Utc::now());
+                #[cfg(test)]
+                let signed = AMAZON_TEST_URL
+                    .lock()
+                    .ok()
+                    .and_then(|url| url.clone())
+                    .unwrap_or(signed);
+                signed
+            }
         };
-        debug!("Realtime cloud STT connecting: {url}");
+        if protocol != Protocol::AmazonTranscribe {
+            debug!("Realtime cloud STT connecting: {url}");
+        }
 
         let mut request = url
             .into_client_request()
             .map_err(|e| format!("Invalid realtime URL: {e}"))?;
-        let auth_value = match protocol {
-            Protocol::ElevenLabs => cfg.api_key.clone(),
-            Protocol::Deepgram => format!("Token {}", cfg.api_key),
+        let auth = match protocol {
+            Protocol::ElevenLabs => Some(("xi-api-key", cfg.api_key.clone())),
+            Protocol::Deepgram => Some(("Authorization", format!("Token {}", cfg.api_key))),
+            // The credentials are signed into the URL instead.
+            Protocol::AmazonTranscribe => None,
         };
-        let auth_header = match protocol {
-            Protocol::ElevenLabs => "xi-api-key",
-            Protocol::Deepgram => "Authorization",
-        };
-        request.headers_mut().insert(
-            auth_header,
-            auth_value
-                .parse()
-                .map_err(|_| "API key contains characters that cannot be sent".to_string())?,
-        );
+        if let Some((auth_header, auth_value)) = auth {
+            request.headers_mut().insert(
+                auth_header,
+                auth_value
+                    .parse()
+                    .map_err(|_| "API key contains characters that cannot be sent".to_string())?,
+            );
+        }
 
         let socket = runtime.block_on(async {
             match tokio::time::timeout(CONNECT_TIMEOUT, tokio_tungstenite::connect_async(request))
                 .await
             {
                 Ok(Ok((socket, _response))) => Ok(socket),
-                Ok(Err(e)) => Err(format!("Realtime connection refused: {e}")),
+                Ok(Err(e)) => Err(describe_connect_error(protocol, e)),
                 Err(_) => Err("Realtime connection timed out".to_string()),
             }
         })?;
@@ -356,6 +421,7 @@ impl CloudStreamSession {
             pending: Vec::with_capacity(CHUNK_SAMPLES * 2),
             transcript: LiveTranscript::default(),
             failed: false,
+            last_error: None,
         };
 
         // ElevenLabs acknowledges a session before it will accept audio, and
@@ -421,7 +487,7 @@ impl CloudStreamSession {
             let chunk: Vec<f32> = self.pending.drain(..CHUNK_SAMPLES).collect();
             if let Err(e) = self.send_audio(&chunk, false) {
                 warn!("Realtime cloud STT send failed: {e}");
-                self.failed = true;
+                self.fail_after_send(format!("sending audio failed: {e}"));
                 return;
             }
         }
@@ -437,16 +503,71 @@ impl CloudStreamSession {
             debug!("Realtime cloud STT: session already failed; using batch instead");
             return None;
         }
+        match self.finalize() {
+            Ok(text) => text,
+            Err(e) => {
+                // The session cannot vouch for a complete transcript. Answering
+                // `None` costs the user one extra batch request; answering with a
+                // truncated transcript costs them the end of their sentence,
+                // silently.
+                warn!("Realtime cloud STT failed during finalize ({e}); using the complete batch result");
+                None
+            }
+        }
+    }
+
+    /// [`finish`](Self::finish) for a caller with no batch path behind it: the
+    /// transcript (empty when nothing was said), or why the session failed.
+    fn finish_result(mut self) -> Result<String, String> {
+        self.finalize().map(Option::unwrap_or_default)
+    }
+
+    /// Whether the session has failed. A replay checks this between chunks so a
+    /// dead socket is not fed for the rest of the recording.
+    fn has_failed(&self) -> bool {
+        self.failed
+    }
+
+    /// Mark the session dead. The first reason is kept: later errors are
+    /// usually consequences of it (a send after the provider closed).
+    fn mark_failed(&mut self, reason: String) {
+        self.failed = true;
+        if self.last_error.is_none() {
+            self.last_error = Some(reason);
+        }
+    }
+
+    /// A send failed, which usually means the provider already closed the
+    /// socket — and Amazon Transcribe says why in a frame just before closing.
+    /// Read what has arrived first, so that reason wins over "connection
+    /// closed".
+    fn fail_after_send(&mut self, reason: String) {
+        self.drain_ready();
+        self.mark_failed(reason);
+    }
+
+    fn failure_reason(&self) -> String {
+        self.last_error
+            .clone()
+            .unwrap_or_else(|| "the realtime session failed".to_string())
+    }
+
+    /// Send the tail, end the stream, and wait for the closing transcript.
+    /// `Err` means the session cannot vouch for a complete transcript.
+    fn finalize(&mut self) -> Result<Option<String>, String> {
+        if self.failed {
+            return Err(self.failure_reason());
+        }
 
         // Send whatever is left with the commit flag, so a recording that ends
         // mid-sentence still gets its last words closed out.
         let tail: Vec<f32> = std::mem::take(&mut self.pending);
         if let Err(e) = self.send_audio(&tail, true) {
-            warn!("Realtime cloud STT final commit failed: {e}");
             // The tail never reached the provider, so the transcript stops
-            // short of what the user said. Batch the whole recording instead.
+            // short of what the user said.
+            self.fail_after_send(format!("the final commit failed: {e}"));
             self.close_socket();
-            return None;
+            return Err(self.failure_reason());
         }
         if self.protocol == Protocol::Deepgram {
             // Deepgram has no per-chunk commit flag; closing the stream is what
@@ -461,11 +582,15 @@ impl CloudStreamSession {
             });
         }
 
+        let quiet_period = match self.protocol {
+            Protocol::AmazonTranscribe => AMAZON_FINALIZE_QUIET_PERIOD,
+            Protocol::ElevenLabs | Protocol::Deepgram => FINALIZE_QUIET_PERIOD,
+        };
         let deadline = Instant::now() + FINALIZE_TIMEOUT;
         let mut last_commit: Option<Instant> = None;
         loop {
             if let Some(at) = last_commit {
-                if at.elapsed() >= FINALIZE_QUIET_PERIOD {
+                if at.elapsed() >= quiet_period {
                     break;
                 }
             }
@@ -475,7 +600,7 @@ impl CloudStreamSession {
                 break;
             }
             // Bounded so the quiet-period check runs even while messages flow.
-            let wait = remaining.min(FINALIZE_QUIET_PERIOD);
+            let wait = remaining.min(quiet_period);
             let socket = &mut self.socket;
             let received = self
                 .runtime
@@ -495,13 +620,12 @@ impl CloudStreamSession {
                     // in hand may be missing the end of the sentence. Treat it
                     // as a failed session rather than pasting a truncated
                     // transcript as if it were complete.
-                    self.failed = true;
+                    self.mark_failed(format!("the connection dropped before the last words: {e}"));
                     break;
                 }
                 Ok(Some(Ok(message))) => {
-                    if let Some(event) = self.decode(&message) {
-                        let committed = self.apply(event);
-                        if committed {
+                    for event in self.decode(&message) {
+                        if self.apply(event) {
                             last_commit = Some(Instant::now());
                         }
                     }
@@ -515,15 +639,10 @@ impl CloudStreamSession {
 
         self.close_socket();
 
-        // A session that broke during the flush cannot promise a complete
-        // transcript. Answering `None` costs the user one extra batch request;
-        // answering with a truncated transcript costs them the end of their
-        // sentence, silently.
         if self.failed {
-            warn!("Realtime cloud STT failed during finalize; using the complete batch result");
-            return None;
+            return Err(self.failure_reason());
         }
-        self.transcript.text()
+        Ok(self.transcript.text())
     }
 
     /// Abandon the session without producing a result (the user cancelled).
@@ -542,13 +661,14 @@ impl CloudStreamSession {
     }
 
     /// Encode and send one audio chunk. `commit` asks the provider to close the
-    /// current segment (ElevenLabs only; Deepgram commits on stream close).
+    /// current segment (ElevenLabs), or ends the stream (Amazon Transcribe);
+    /// Deepgram commits on stream close.
     fn send_audio(&mut self, samples: &[f32], commit: bool) -> Result<(), String> {
         if samples.is_empty() && !commit {
             return Ok(());
         }
         let pcm = to_pcm16_le(samples);
-        let message = match self.protocol {
+        let messages = match self.protocol {
             Protocol::ElevenLabs => {
                 let payload = serde_json::json!({
                     "message_type": "input_audio_chunk",
@@ -556,23 +676,41 @@ impl CloudStreamSession {
                     "commit": commit,
                     "sample_rate": WHISPER_SAMPLE_RATE,
                 });
-                Message::Text(payload.to_string().into())
+                vec![Message::Text(payload.to_string().into())]
             }
             // Raw PCM frames; an empty frame is how this protocol signals the
             // end of audio, so it must not be skipped.
-            Protocol::Deepgram => Message::Binary(pcm.into()),
+            Protocol::Deepgram => vec![Message::Binary(pcm.into())],
+            // One `AudioEvent` per chunk. The commit is an empty `AudioEvent`
+            // after the tail: that is how AWS is told the stream is over, and it
+            // answers with the last transcripts and closes the socket itself.
+            Protocol::AmazonTranscribe => {
+                let mut frames = Vec::with_capacity(2);
+                if !pcm.is_empty() {
+                    frames.push(Message::Binary(crate::stt_aws::audio_event(&pcm).into()));
+                }
+                if commit {
+                    frames.push(Message::Binary(crate::stt_aws::audio_event(&[]).into()));
+                }
+                frames
+            }
         };
-        let socket = &mut self.socket;
-        match self
-            .runtime
-            .block_on(async { tokio::time::timeout(SEND_TIMEOUT, socket.send(message)).await })
-        {
-            Ok(result) => result.map_err(|e| e.to_string()),
-            Err(_) => Err(format!(
-                "the provider stopped accepting audio within {}s",
-                SEND_TIMEOUT.as_secs()
-            )),
+        for message in messages {
+            let socket = &mut self.socket;
+            match self
+                .runtime
+                .block_on(async { tokio::time::timeout(SEND_TIMEOUT, socket.send(message)).await })
+            {
+                Ok(result) => result.map_err(|e| e.to_string())?,
+                Err(_) => {
+                    return Err(format!(
+                        "the provider stopped accepting audio within {}s",
+                        SEND_TIMEOUT.as_secs()
+                    ))
+                }
+            }
         }
+        Ok(())
     }
 
     /// Consume messages that have already arrived. Bounded by [`DRAIN_BUDGET`],
@@ -595,37 +733,40 @@ impl CloudStreamSession {
                 Err(_) => return,
                 Ok(None) => {
                     debug!("Realtime cloud STT stream ended early");
-                    self.failed = true;
+                    self.mark_failed("the provider closed the stream".to_string());
                     return;
                 }
                 Ok(Some(Err(e))) => {
                     warn!("Realtime cloud STT receive failed: {e}");
-                    self.failed = true;
+                    self.mark_failed(format!("receiving failed: {e}"));
                     return;
                 }
                 Ok(Some(Ok(message))) => {
-                    if let Some(event) = self.decode(&message) {
+                    for event in self.decode(&message) {
                         self.apply(event);
-                    }
-                    // A protocol-level error is terminal; stop reading.
-                    if self.failed {
-                        return;
+                        // A protocol-level error is terminal; stop reading.
+                        if self.failed {
+                            return;
+                        }
                     }
                 }
             }
         }
     }
 
-    fn decode(&mut self, message: &Message) -> Option<ServerEvent> {
-        let text = match message {
-            Message::Text(text) => text.as_str(),
-            // Neither protocol sends binary payloads to the client; pings are
-            // answered by the library.
-            _ => return None,
-        };
-        match self.protocol {
-            Protocol::ElevenLabs => parse_elevenlabs(text),
-            Protocol::Deepgram => parse_deepgram(text),
+    /// The events in one socket message. ElevenLabs and Deepgram send JSON text;
+    /// Amazon Transcribe sends binary event-stream frames, which can carry more
+    /// than one result. Pings are answered by the library.
+    fn decode(&mut self, message: &Message) -> Vec<ServerEvent> {
+        match (self.protocol, message) {
+            (Protocol::ElevenLabs, Message::Text(text)) => {
+                parse_elevenlabs(text.as_str()).into_iter().collect()
+            }
+            (Protocol::Deepgram, Message::Text(text)) => {
+                parse_deepgram(text.as_str()).into_iter().collect()
+            }
+            (Protocol::AmazonTranscribe, Message::Binary(bytes)) => parse_amazon(bytes),
+            _ => Vec::new(),
         }
     }
 
@@ -640,7 +781,7 @@ impl CloudStreamSession {
                 // Errors here are terminal for the socket but not for the
                 // dictation: mark the session dead and let the caller batch.
                 warn!("Realtime cloud STT error: {message}");
-                self.failed = true;
+                self.mark_failed(message);
                 return false;
             }
         };
@@ -659,12 +800,85 @@ impl CloudStreamSession {
     }
 }
 
-/// Normalised view of the events both providers send.
+/// Normalised view of the events every provider sends.
 enum ServerEvent {
     SessionStarted,
     Partial(String),
     Committed(String),
     Error(String),
+}
+
+/// A refused or failed connection, in words. Amazon Transcribe rejects a bad
+/// signature, an unknown key or a missing permission at the upgrade, with an
+/// HTTP status and a JSON body, so that case gets AWS's own reason; the others
+/// keep the library's message.
+fn describe_connect_error(
+    protocol: Protocol,
+    error: tokio_tungstenite::tungstenite::Error,
+) -> String {
+    match (protocol, &error) {
+        (Protocol::AmazonTranscribe, tokio_tungstenite::tungstenite::Error::Http(response)) => {
+            crate::stt_aws::describe_handshake_failure(
+                response.status().as_u16(),
+                response.body().as_deref().unwrap_or_default(),
+            )
+        }
+        _ => format!("Realtime connection refused: {error}"),
+    }
+}
+
+/// Transcribe a finished recording through a fresh realtime session: the batch
+/// path of a provider that has no batch endpoint ([`streams_only`]).
+///
+/// The audio is paced at speaking speed. AWS's own streaming SDK says the
+/// service processes a stream in real time and that pre-recorded audio "should
+/// be rate limited to match the appropriate realtime bitrate"; sending it faster
+/// only queues it on AWS's side. So this takes as long as the recording, plus the
+/// connection and the closing transcript. Every wait inside is bounded (connect,
+/// each send, the finalize), so the call is bounded by the recording's length.
+///
+/// The session runs on a thread of its own because it drives its own runtime,
+/// and this is called from inside async tasks as well as from blocking threads.
+pub(crate) fn transcribe_by_streaming(
+    cfg: &ResolvedCloudStt,
+    samples: &[f32],
+) -> Result<String, String> {
+    let cfg = cfg.clone();
+    let samples = samples.to_vec();
+    std::thread::Builder::new()
+        .name("cloud-stt-replay".to_string())
+        .spawn(move || replay(&cfg, &samples))
+        .map_err(|e| format!("Could not start the transcription thread: {e}"))?
+        .join()
+        .map_err(|_| "The transcription thread stopped unexpectedly".to_string())?
+}
+
+fn replay(cfg: &ResolvedCloudStt, samples: &[f32]) -> Result<String, String> {
+    let label = cfg.provider.label.clone();
+    // Errors that already name the provider are AWS's own, described; the rest
+    // come from the socket and need saying whose socket it was.
+    let named = move |error: String| {
+        if error.contains(&label) {
+            error
+        } else {
+            format!("{label}: {error}")
+        }
+    };
+    let mut session = CloudStreamSession::connect(Box::new(|_, _| {}), cfg).map_err(&named)?;
+    let started = Instant::now();
+    for (index, chunk) in samples.chunks(CHUNK_SAMPLES).enumerate() {
+        let due = started + Duration::from_millis((index * CHUNK_MS) as u64);
+        if let Some(wait) = due.checked_duration_since(Instant::now()) {
+            std::thread::sleep(wait);
+        }
+        session.feed(chunk);
+        if session.has_failed() {
+            let reason = session.failure_reason();
+            session.abort();
+            return Err(named(reason));
+        }
+    }
+    session.finish_result().map_err(named)
 }
 
 /// `wss://api.elevenlabs.io/v1/speech-to-text/realtime`
@@ -842,6 +1056,50 @@ fn parse_deepgram(text: &str) -> Option<ServerEvent> {
         // Metadata / SpeechStarted / UtteranceEnd carry no transcript.
         _ => None,
     }
+}
+
+/// Amazon Transcribe's binary frames, as the same events the JSON providers
+/// produce. A result's `IsPartial` draft is the segment's tentative tail and its
+/// final version is the commit, exactly the split [`LiveTranscript`] keeps. One
+/// frame can carry several results — a segment closing and the next one's first
+/// draft — and they are applied in the order AWS listed them.
+fn parse_amazon(bytes: &[u8]) -> Vec<ServerEvent> {
+    use crate::stt_aws::ServerMessage;
+    let messages = match crate::stt_aws::decode_messages(bytes) {
+        Ok(messages) => messages,
+        // A frame that fails its checksum cannot be trusted for anything,
+        // including the transcript it seems to carry.
+        Err(e) => {
+            return vec![ServerEvent::Error(format!(
+                "Amazon Transcribe sent an unreadable frame: {e}"
+            ))]
+        }
+    };
+    let mut events = Vec::new();
+    for message in &messages {
+        match crate::stt_aws::interpret(message) {
+            ServerMessage::Results(results) => {
+                for result in results {
+                    if result.is_partial {
+                        // An empty draft is a heartbeat, not a correction.
+                        if !result.text.is_empty() {
+                            events.push(ServerEvent::Partial(result.text));
+                        }
+                    } else {
+                        if let Some(language) = &result.language {
+                            debug!("Amazon Transcribe identified the language as {language}");
+                        }
+                        events.push(ServerEvent::Committed(result.text));
+                    }
+                }
+            }
+            ServerMessage::Exception { kind, message } => events.push(ServerEvent::Error(
+                crate::stt_aws::describe_failure(&kind, &message),
+            )),
+            ServerMessage::Ignored => {}
+        }
+    }
+    events
 }
 
 #[cfg(test)]
@@ -1106,5 +1364,231 @@ mod tests {
             &transcript_words("thank")
         ));
         assert!(!is_replay_of(&segment, &[]));
+    }
+
+    fn amazon_config() -> ResolvedCloudStt {
+        let mut settings = get_default_settings();
+        settings.stt_engine_mode = SttEngineMode::Cloud;
+        settings.cloud_stt_provider_id = crate::settings::CLOUD_STT_AMAZON.to_string();
+        settings.cloud_stt_api_keys.insert(
+            crate::settings::CLOUD_STT_AMAZON.to_string(),
+            "AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+        );
+        settings.selected_language = "en".to_string();
+        crate::stt_cloud::resolve_cloud_stt(&settings).expect("should resolve")
+    }
+
+    fn transcript_frame(json: &str) -> Vec<u8> {
+        crate::stt_aws::encode_message(
+            &[
+                (":content-type", "application/json"),
+                (":event-type", "TranscriptEvent"),
+                (":message-type", "event"),
+            ],
+            json.as_bytes(),
+        )
+    }
+
+    fn exception_frame(kind: &str, message: &str) -> Vec<u8> {
+        crate::stt_aws::encode_message(
+            &[
+                (":content-type", "application/json"),
+                (":exception-type", kind),
+                (":message-type", "exception"),
+            ],
+            serde_json::json!({ "Message": message })
+                .to_string()
+                .as_bytes(),
+        )
+    }
+
+    #[test]
+    fn amazon_transcribe_streams_and_has_nothing_else() {
+        let amazon = amazon_config();
+        assert!(supports_streaming(&amazon));
+        assert!(streams_only(&amazon));
+        assert!(!streams_only(&config_for("deepgram", "nova-3")));
+        assert!(!streams_only(&config_for(
+            "elevenlabs",
+            "scribe_v2_realtime"
+        )));
+    }
+
+    #[test]
+    fn amazon_results_fold_into_the_live_transcript() {
+        let frames = [
+            r#"{"Transcript":{"Results":[{"Alternatives":[{"Transcript":"The Amazon"}],"IsPartial":true,"ResultId":"a"}]}}"#,
+            r#"{"Transcript":{"Results":[]}}"#,
+            r#"{"Transcript":{"Results":[
+                {"Alternatives":[{"Transcript":"The Amazon is the largest rainforest."}],"IsPartial":false,"ResultId":"a"},
+                {"Alternatives":[{"Transcript":"On"}],"IsPartial":true,"ResultId":"b"}
+            ]}}"#,
+            r#"{"Transcript":{"Results":[{"Alternatives":[{"Transcript":"On the planet."}],"IsPartial":false,"ResultId":"b"}]}}"#,
+        ];
+        let mut transcript = LiveTranscript::default();
+        for frame in frames {
+            for event in parse_amazon(&transcript_frame(frame)) {
+                match event {
+                    ServerEvent::Partial(text) => {
+                        transcript.apply_partial(text);
+                    }
+                    ServerEvent::Committed(text) => {
+                        transcript.apply_commit(&text);
+                    }
+                    _ => panic!("only transcript events were sent"),
+                }
+            }
+        }
+        assert_eq!(
+            transcript.text().as_deref(),
+            Some("The Amazon is the largest rainforest. On the planet.")
+        );
+    }
+
+    #[test]
+    fn an_amazon_exception_or_a_corrupt_frame_ends_the_session() {
+        let events = parse_amazon(&exception_frame(
+            "UnrecognizedClientException",
+            "The security token included in the request is invalid.",
+        ));
+        assert!(
+            matches!(events.as_slice(), [ServerEvent::Error(message)] if message.contains("access key")),
+            "an exception should end the session with a reason"
+        );
+
+        let mut corrupt = transcript_frame(r#"{"Transcript":{"Results":[]}}"#);
+        let last = corrupt.len() - 1;
+        corrupt[last] ^= 0xFF;
+        assert!(matches!(
+            parse_amazon(&corrupt).as_slice(),
+            [ServerEvent::Error(message)] if message.contains("unreadable")
+        ));
+
+        // An empty draft is a heartbeat, not a correction.
+        assert!(parse_amazon(&transcript_frame(
+            r#"{"Transcript":{"Results":[{"Alternatives":[{"Transcript":""}],"IsPartial":true}]}}"#
+        ))
+        .is_empty());
+    }
+
+    /// What a stand-in AWS server received.
+    struct StandInReport {
+        audio_bytes: usize,
+        ended: bool,
+    }
+
+    /// The stand-in tests share [`AMAZON_TEST_URL`], so they take turns.
+    static STAND_IN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Serve one Amazon Transcribe session on a local port, the way AWS does:
+    /// every client frame is decoded with the real event-stream decoder and must
+    /// be an `AudioEvent`; the stream's end (an empty one) is answered with
+    /// `replies` and a close. With `reply_at_once`, the replies go back after the
+    /// first audio frame instead — how AWS ends a session with an exception.
+    fn stand_in_aws(
+        replies: Vec<Vec<u8>>,
+        reply_at_once: bool,
+    ) -> (String, std::thread::JoinHandle<StandInReport>) {
+        let (port_tx, port_rx) = std::sync::mpsc::channel();
+        let server = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async move {
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                port_tx.send(listener.local_addr().unwrap().port()).unwrap();
+                let (stream, _) = listener.accept().await.unwrap();
+                let mut socket = tokio_tungstenite::accept_async(stream).await.unwrap();
+                let mut report = StandInReport {
+                    audio_bytes: 0,
+                    ended: false,
+                };
+                while let Some(Ok(message)) = socket.next().await {
+                    let Message::Binary(bytes) = message else {
+                        continue;
+                    };
+                    for frame in crate::stt_aws::decode_messages(&bytes)
+                        .expect("every frame the client sends must decode")
+                    {
+                        assert_eq!(frame.header_str(":event-type"), Some("AudioEvent"));
+                        assert_eq!(frame.header_str(":message-type"), Some("event"));
+                        report.audio_bytes += frame.payload.len();
+                        report.ended |= frame.payload.is_empty();
+                        if report.ended || reply_at_once {
+                            for reply in &replies {
+                                socket
+                                    .send(Message::Binary(reply.clone().into()))
+                                    .await
+                                    .unwrap();
+                            }
+                            let _ = socket.close(None).await;
+                            return report;
+                        }
+                    }
+                }
+                report
+            })
+        });
+        let port = port_rx.recv().unwrap();
+        (
+            format!("ws://127.0.0.1:{port}/stream-transcription-websocket"),
+            server,
+        )
+    }
+
+    /// The whole replay path, offline: framing, pacing, the end of the stream,
+    /// and AWS closing the socket after the last transcript.
+    #[test]
+    fn a_recording_replays_through_a_stand_in_aws_session() {
+        let _turn = STAND_IN.lock().unwrap_or_else(|e| e.into_inner());
+        let (url, server) = stand_in_aws(
+            vec![
+                transcript_frame(
+                    r#"{"Transcript":{"Results":[{"Alternatives":[{"Transcript":"Hello"}],"IsPartial":true}]}}"#,
+                ),
+                transcript_frame(
+                    r#"{"Transcript":{"Results":[{"Alternatives":[{"Transcript":"Hello there."}],"IsPartial":false}]}}"#,
+                ),
+            ],
+            false,
+        );
+        *AMAZON_TEST_URL.lock().unwrap() = Some(url);
+
+        // Half a second of audio: five 100 ms chunks.
+        let samples = vec![0.1f32; 8_000];
+        let started = Instant::now();
+        let text = transcribe_by_streaming(&amazon_config(), &samples);
+        let elapsed = started.elapsed();
+        *AMAZON_TEST_URL.lock().unwrap() = None;
+        let report = server.join().unwrap();
+
+        assert_eq!(text.as_deref(), Ok("Hello there."));
+        assert_eq!(report.audio_bytes, 16_000, "every sample, as 16-bit PCM");
+        assert!(
+            report.ended,
+            "the stream has to end with an empty AudioEvent"
+        );
+        // Paced at speaking speed: the fifth chunk is due at 400 ms.
+        assert!(elapsed >= Duration::from_millis(400), "took {elapsed:?}");
+    }
+
+    #[test]
+    fn an_exception_from_aws_is_what_a_replay_reports() {
+        let _turn = STAND_IN.lock().unwrap_or_else(|e| e.into_inner());
+        let (url, server) = stand_in_aws(
+            vec![exception_frame(
+                "UnrecognizedClientException",
+                "The security token included in the request is invalid.",
+            )],
+            true,
+        );
+        *AMAZON_TEST_URL.lock().unwrap() = Some(url);
+        let result = transcribe_by_streaming(&amazon_config(), &vec![0.1f32; 16_000]);
+        *AMAZON_TEST_URL.lock().unwrap() = None;
+        server.join().unwrap();
+
+        let error = result.expect_err("an exception must not read as a transcript");
+        assert!(error.contains("did not accept the access key"), "{error}");
     }
 }

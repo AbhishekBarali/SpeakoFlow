@@ -4411,8 +4411,12 @@ export type CloseBehavior = "minimize_to_tray" | "quit"
  * `Ocp-Apim-Subscription-Key` header and a multipart body of `audio` plus a
  * JSON `definition`. The model is not a form field: MAI-Transcribe is chosen
  * by `definition.enhancedMode.model`.
+ * - [`AmazonTranscribe`](Self::AmazonTranscribe): Amazon Transcribe's
+ * streaming WebSocket, with a SigV4-presigned URL instead of an auth header
+ * and binary event-stream frames instead of JSON. Streaming only: its batch
+ * API needs an S3 upload and a polled job (see `crate::stt_aws`).
  */
-export type CloudSttKind = "eleven_labs" | "open_ai_compatible" | "deepgram" | "azure_speech"
+export type CloudSttKind = "eleven_labs" | "open_ai_compatible" | "deepgram" | "azure_speech" | "amazon_transcribe"
 /**
  * A configurable cloud speech-to-text endpoint. Seeded from
  * [`default_cloud_stt_providers`] and repaired on load, so a provider added in
@@ -4506,7 +4510,14 @@ export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missi
 /**
  * The provider's endpoint is the user's own resource and none is set.
  */
-"missing_endpoint"
+"missing_endpoint" |
+/**
+ * The provider cannot transcribe the selected language. Amazon Transcribe
+ * streams a fixed list of languages, and a few of them not in every region;
+ * sending the audio to another language's model instead would paste a
+ * confident transcript in the wrong language.
+ */
+"unsupported_language"
 /**
  * Where a conversation happened. The quick ask is one question and one answer;
  * a call is a back-and-forth conversation. History lists them separately and
