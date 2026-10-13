@@ -1290,6 +1290,15 @@ impl fmt::Debug for SecretString {
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
     pub push_to_talk: bool,
+    /// The dictation keys plus Space make a dictation hands-free: pressed while
+    /// they are held, or all together to start one (see `hands_free`). Only
+    /// exists for dictation keys that are modifiers alone.
+    #[serde(default = "default_true")]
+    pub dictation_hands_free_space: bool,
+    /// With Hold to talk, a quick tap of the dictation keys makes the dictation
+    /// hands-free instead of ending it (see `hands_free::QUICK_TAP`). Off by
+    /// default: a stray tap would leave the microphone open.
+    pub dictation_hands_free_tap: bool,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -4015,6 +4024,8 @@ pub fn get_default_settings() -> AppSettings {
     AppSettings {
         bindings,
         push_to_talk: true,
+        dictation_hands_free_space: true,
+        dictation_hands_free_tap: false,
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),

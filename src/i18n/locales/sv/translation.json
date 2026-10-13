@@ -665,6 +665,19 @@
         "description": "Håll: inspelningen pågår medan du håller ned ett inspelningskortkommando. Tryck: en tryckning startar, nästa stoppar. Gäller alla inspelningskortkommandon.",
         "hold": "Håll",
         "tap": "Tryck"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Handsfree med mellanslag",
+          "description": "Håll ned dikteringstangenterna, tryck på mellanslag och släpp: den fortsätter lyssna tills du trycker på tangenterna igen.",
+          "unavailable": "Fungerar bara när kortkommandot för diktering bara består av modifierartangenter.",
+          "taken": "Ett annat kortkommando använder redan {{keys}}."
+        },
+        "tap": {
+          "label": "Handsfree med ett tryck",
+          "description": "Tryck på dikteringstangenterna i stället för att hålla dem nedtryckta, så fortsätter den lyssna tills du trycker igen.",
+          "tapMode": "Med ”Tryck för att växla” är varje diktering redan handsfree."
+        }
       }
     },
     "models": {
@@ -2193,12 +2206,14 @@
     },
     "listening": "Lyssnar…",
     "locked": "Spelar in handsfree — tryck på kortkommandot igen för att stoppa",
+    "handsFree": "Handsfree",
     "cancel": "Avbryt",
     "copy": "Kopiera transkriptionen",
     "transcript": "Transkription",
     "copied": "Kopierat",
     "copyFailed": "Kunde inte kopiera — försök igen",
     "done": "Klar",
+    "finish": "Avsluta",
     "askAssistant": "Fråga assistenten i stället för att skriva in det här",
     "recovery": {
       "dismissed": "Avbruten",
@@ -2584,7 +2599,10 @@
         "hold": "Håll ned, prata, släpp. Dina ord skrivs där markören är.",
         "tap": "Tryck för att starta, prata, tryck för att stoppa. Dina ord skrivs där markören är.",
         "whatHold": "Håll ned, prata, släpp. Dina ord skrivs där markören är.",
-        "whatTap": "Tryck, prata, tryck igen. Dina ord skrivs där markören är."
+        "whatTap": "Tryck, prata, tryck igen. Dina ord skrivs där markören är.",
+        "handsFreeSpace": "Behöver du längre tid? Tryck på mellanslag medan du håller ned och släpp: den fortsätter lyssna tills du trycker på tangenterna igen.",
+        "handsFreeTap": "Behöver du längre tid? Tryck i stället för att hålla ned: den fortsätter lyssna tills du trycker på tangenterna igen.",
+        "handsFreeBoth": "Behöver du längre tid? Tryck på mellanslag medan du håller ned, eller tryck i stället för att hålla ned: den fortsätter lyssna tills du trycker på tangenterna igen."
       },
       "cleanup": {
         "title": "Diktera och rensa",

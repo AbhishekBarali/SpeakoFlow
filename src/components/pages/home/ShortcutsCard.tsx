@@ -8,6 +8,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { useNavigation, type PageId } from "@/components/shell/navigation";
+import { handsFreeSpace } from "@/lib/handsFree";
 import { LinuxShortcutHelp } from "./LinuxShortcutHelp";
 
 interface ShortcutRow {
@@ -28,7 +29,7 @@ interface ShortcutRow {
  */
 export const ShortcutsCard: React.FC = () => {
   const { t } = useTranslation();
-  const { getSetting, updateSetting, isUpdating } = useSettings();
+  const { settings, getSetting, updateSetting, isUpdating } = useSettings();
   const { navigate } = useNavigation();
   const os = useOsType();
   const holdToTalk = getSetting("push_to_talk") ?? true;
@@ -39,17 +40,37 @@ export const ShortcutsCard: React.FC = () => {
     cleanupOn && (getSetting("post_process_on_dictation") ?? false);
   const assistantOn = getSetting("assistant_enabled") ?? true;
 
+  // With Hold, a dictation can still be made hands-free (`hands_free.rs`), and
+  // the dictation rows say how, in the sentence after what the keys do. With
+  // Tap every dictation already is, so there is nothing to add.
+  const handsFreeHint = (bindingId: string) => {
+    if (!holdToTalk) return "";
+    const space =
+      (getSetting("dictation_hands_free_space") ?? true) &&
+      handsFreeSpace(settings, bindingId).state === "ready";
+    const tap = getSetting("dictation_hands_free_tap") ?? false;
+    if (space && tap) return t("home.shortcuts.dictate.handsFreeBoth");
+    if (space) return t("home.shortcuts.dictate.handsFreeSpace");
+    if (tap) return t("home.shortcuts.dictate.handsFreeTap");
+    return "";
+  };
+  const withHint = (what: string, bindingId: string) =>
+    [what, handsFreeHint(bindingId)].filter(Boolean).join(" ");
+
   const rows: ShortcutRow[] = [
     {
       id: "transcribe",
       title: cleanupOnDictation
         ? t("home.shortcuts.cleanup.title")
         : t("home.shortcuts.dictate.title"),
-      info: cleanupOnDictation
-        ? t("home.shortcuts.cleanup.what")
-        : holdToTalk
-          ? t("home.shortcuts.dictate.whatHold")
-          : t("home.shortcuts.dictate.whatTap"),
+      info: withHint(
+        cleanupOnDictation
+          ? t("home.shortcuts.cleanup.what")
+          : holdToTalk
+            ? t("home.shortcuts.dictate.whatHold")
+            : t("home.shortcuts.dictate.whatTap"),
+        "transcribe",
+      ),
     },
     ...(cleanupOnDictation
       ? []
@@ -57,7 +78,10 @@ export const ShortcutsCard: React.FC = () => {
           {
             id: "transcribe_with_post_process",
             title: t("home.shortcuts.cleanup.title"),
-            info: t("home.shortcuts.cleanup.what"),
+            info: withHint(
+              t("home.shortcuts.cleanup.what"),
+              "transcribe_with_post_process",
+            ),
             off: cleanupOn ? undefined : ("cleanup" as PageId),
           },
         ]),

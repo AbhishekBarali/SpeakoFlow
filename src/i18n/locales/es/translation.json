@@ -667,6 +667,19 @@
         "description": "Mantener: se graba mientras mantienes pulsado un atajo de grabación. Tocar: una pulsación empieza y la siguiente detiene. Se aplica a todos los atajos de grabación.",
         "hold": "Mantener presionado",
         "tap": "Tocar"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Manos libres con Espacio",
+          "description": "Mantén pulsadas las teclas de dictado, pulsa Espacio y suelta: sigue escuchando hasta que vuelvas a pulsar las teclas.",
+          "unavailable": "Solo funciona si el atajo de dictado son solo teclas modificadoras.",
+          "taken": "Otro atajo ya usa {{keys}}."
+        },
+        "tap": {
+          "label": "Manos libres con un toque",
+          "description": "Pulsa las teclas de dictado en lugar de mantenerlas y sigue escuchando hasta que vuelvas a pulsarlas.",
+          "tapMode": "Con «Pulsa para activar o desactivar», cada dictado ya es manos libres."
+        }
       }
     },
     "models": {
@@ -2205,12 +2218,14 @@
     },
     "listening": "Escuchando…",
     "locked": "Grabando con manos libres: pulsa el atajo de nuevo para detener",
+    "handsFree": "Manos libres",
     "cancel": "Cancelar",
     "copy": "Copiar la transcripción",
     "transcript": "Transcripción",
     "copied": "Copiado",
     "copyFailed": "No se pudo copiar: vuelve a intentarlo",
     "done": "Listo",
+    "finish": "Terminar",
     "askAssistant": "Preguntar al asistente en lugar de escribir esto",
     "recovery": {
       "dismissed": "Descartado",
@@ -2605,7 +2620,10 @@
         "hold": "Mantén pulsado, habla y suelta. Tus palabras se escriben donde está el cursor.",
         "tap": "Pulsa para empezar, habla y pulsa para parar. Tus palabras se escriben donde está el cursor.",
         "whatHold": "Mantén pulsado, habla y suelta. Tus palabras se escriben donde está el cursor.",
-        "whatTap": "Pulsa, habla y vuelve a pulsar. Tus palabras se escriben donde está el cursor."
+        "whatTap": "Pulsa, habla y vuelve a pulsar. Tus palabras se escriben donde está el cursor.",
+        "handsFreeSpace": "¿Necesitas más tiempo? Pulsa Espacio mientras mantienes y suelta: sigue escuchando hasta que vuelvas a pulsar las teclas.",
+        "handsFreeTap": "¿Necesitas más tiempo? Pulsa en lugar de mantener: sigue escuchando hasta que vuelvas a pulsar las teclas.",
+        "handsFreeBoth": "¿Necesitas más tiempo? Pulsa Espacio mientras mantienes, o pulsa en lugar de mantener: sigue escuchando hasta que vuelvas a pulsar las teclas."
       },
       "cleanup": {
         "title": "Dictar y limpiar",

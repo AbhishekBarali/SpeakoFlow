@@ -13,6 +13,7 @@ mod commands;
 mod dictation_recovery;
 mod feedback;
 mod flow;
+mod hands_free;
 mod helpers;
 mod huggingface;
 mod input;
@@ -967,6 +968,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_binding,
             shortcut::reset_binding,
             shortcut::change_ptt_setting,
+            shortcut::change_hands_free_space_setting,
+            shortcut::change_hands_free_tap_setting,
             shortcut::change_audio_feedback_setting,
             shortcut::change_audio_feedback_volume_setting,
             shortcut::change_sound_theme_setting,

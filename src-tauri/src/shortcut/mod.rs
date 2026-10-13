@@ -617,6 +617,29 @@ pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether the dictation keys plus Space make a dictation hands-free
+/// (`hands_free`). Registers or releases those keys at once.
+#[tauri::command]
+#[specta::specta]
+pub fn change_hands_free_space_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.dictation_hands_free_space = enabled;
+    settings::write_settings(&app, settings);
+    handy_keys::sync_hands_free_keys(&app);
+    Ok(())
+}
+
+/// Whether, with Hold to talk, a quick tap of the dictation keys makes the
+/// dictation hands-free instead of ending it (`hands_free::QUICK_TAP`).
+#[tauri::command]
+#[specta::specta]
+pub fn change_hands_free_tap_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.dictation_hands_free_tap = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_audio_feedback_setting(app: AppHandle, enabled: bool) -> Result<(), String> {

@@ -669,6 +669,19 @@
         "description": "Przytrzymanie: nagrywanie trwa, dopóki trzymasz skrót nagrywania. Naciśnięcie: jedno naciśnięcie zaczyna, następne kończy. Dotyczy wszystkich skrótów nagrywania.",
         "hold": "Przytrzymanie",
         "tap": "Naciśnięcie"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Bez trzymania ze spacją",
+          "description": "Przytrzymaj klawisze dyktowania, naciśnij spację i puść: nasłuchiwanie trwa, dopóki nie naciśniesz klawiszy ponownie.",
+          "unavailable": "Działa tylko wtedy, gdy skrót dyktowania składa się wyłącznie z klawiszy modyfikujących.",
+          "taken": "{{keys}} jest już używany przez inny skrót."
+        },
+        "tap": {
+          "label": "Bez trzymania po stuknięciu",
+          "description": "Stuknij klawisze dyktowania zamiast je trzymać, a nasłuchiwanie potrwa, dopóki nie naciśniesz ich ponownie.",
+          "tapMode": "W trybie „Stuknij, aby przełączyć” każde dyktowanie jest już bez trzymania."
+        }
       }
     },
     "models": {
@@ -2217,12 +2230,14 @@
     },
     "listening": "Słucham…",
     "locked": "Nagrywanie bez trzymania klawisza — naciśnij skrót ponownie, aby zakończyć",
+    "handsFree": "Bez trzymania",
     "cancel": "Anuluj",
     "copy": "Kopiuj transkrypcję",
     "transcript": "Transkrypcja",
     "copied": "Skopiowano",
     "copyFailed": "Nie udało się skopiować — spróbuj ponownie",
     "done": "Gotowe",
+    "finish": "Zakończ",
     "askAssistant": "Zapytaj asystenta, zamiast to wpisywać",
     "recovery": {
       "dismissed": "Odrzucono",
@@ -2626,7 +2641,10 @@
         "hold": "Przytrzymaj, mów, puść. Twoje słowa pojawią się tam, gdzie jest kursor.",
         "tap": "Stuknij, aby zacząć, mów, stuknij, aby zakończyć. Twoje słowa pojawią się tam, gdzie jest kursor.",
         "whatHold": "Przytrzymaj, mów, puść. Słowa wpiszą się tam, gdzie jest kursor.",
-        "whatTap": "Stuknij, mów, stuknij ponownie. Słowa wpiszą się tam, gdzie jest kursor."
+        "whatTap": "Stuknij, mów, stuknij ponownie. Słowa wpiszą się tam, gdzie jest kursor.",
+        "handsFreeSpace": "Potrzebujesz więcej czasu? Naciśnij spację, trzymając klawisze, i puść: nasłuchiwanie trwa, dopóki nie naciśniesz ich ponownie.",
+        "handsFreeTap": "Potrzebujesz więcej czasu? Stuknij zamiast trzymać: nasłuchiwanie trwa, dopóki nie naciśniesz klawiszy ponownie.",
+        "handsFreeBoth": "Potrzebujesz więcej czasu? Naciśnij spację, trzymając klawisze, albo stuknij zamiast trzymać: nasłuchiwanie trwa, dopóki nie naciśniesz klawiszy ponownie."
       },
       "cleanup": {
         "title": "Dyktuj i oczyść",

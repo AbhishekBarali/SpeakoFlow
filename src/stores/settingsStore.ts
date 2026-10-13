@@ -169,6 +169,10 @@ const settingUpdaters: {
   update_checks_enabled: (value) =>
     commands.changeUpdateChecksSetting(value as boolean),
   push_to_talk: (value) => commands.changePttSetting(value as boolean),
+  dictation_hands_free_space: (value) =>
+    commands.changeHandsFreeSpaceSetting(value as boolean),
+  dictation_hands_free_tap: (value) =>
+    commands.changeHandsFreeTapSetting(value as boolean),
   selected_microphone: (value) =>
     commands.setSelectedMicrophone(
       (value as string) === "Default" || value === null

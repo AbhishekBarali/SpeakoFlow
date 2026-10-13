@@ -50,6 +50,9 @@ struct ManagerState {
     /// quiet until their modifiers stop matching, so letting go of the chord's
     /// last key while still holding the modifiers does not fire them.
     suppressed: HashSet<HotkeyId>,
+    /// Hotkeys that carry on a held modifier-only hotkey instead of replacing
+    /// it (see [`HotkeyManager::register_continuation`]).
+    continuations: HashSet<HotkeyId>,
 }
 
 impl ManagerState {
@@ -62,6 +65,7 @@ impl ManagerState {
             fire_on_release: false,
             pending: HashSet::new(),
             suppressed: HashSet::new(),
+            continuations: HashSet::new(),
         }
     }
 
@@ -71,6 +75,16 @@ impl ManagerState {
         self.pressed_at.remove(&id);
         self.pending.remove(&id);
         self.suppressed.remove(&id);
+        self.continuations.remove(&id);
+    }
+
+    /// Whether `key` going down with `modifiers` held completes a continuation.
+    fn completes_continuation(&self, key: Key, modifiers: Modifiers) -> bool {
+        self.continuations.iter().any(|id| {
+            self.hotkeys
+                .get(id)
+                .is_some_and(|h| h.key == Some(key) && h.modifiers.matches(modifiers))
+        })
     }
 
     fn set_fire_on_release(&mut self, on: bool) {
@@ -121,7 +135,8 @@ impl ManagerState {
                     // for a release. While a hotkey is being held to talk it
                     // is ordinary use of the mouse.
                     if is_keyboard_key(key) || self.fire_on_release {
-                        self.yield_to_chord(now, &mut results);
+                        let continues = self.completes_continuation(key, event.modifiers);
+                        self.yield_to_chord(now, continues, &mut results);
                     }
                     let to_press: Vec<HotkeyId> = self
                         .hotkeys
@@ -206,9 +221,17 @@ impl ManagerState {
     /// Another key went down. Whatever modifier-only hotkey the held modifiers
     /// were waiting to fire, or fired a moment ago, was the start of another
     /// shortcut instead.
-    fn yield_to_chord(&mut self, now: Instant, results: &mut Vec<HotkeyEvent>) {
+    ///
+    /// Unless the key `continues` it: then the one already running keeps
+    /// running. A tap still waiting to fire never does, though, because the
+    /// continuation has taken its place, and letting go of the modifiers
+    /// afterwards must not fire the hotkey as well.
+    fn yield_to_chord(&mut self, now: Instant, continues: bool, results: &mut Vec<HotkeyEvent>) {
         let waiting: Vec<HotkeyId> = self.pending.drain().collect();
         self.suppressed.extend(waiting);
+        if continues {
+            return;
+        }
 
         let withdrawn: Vec<HotkeyId> = self
             .pressed_hotkeys
@@ -417,6 +440,25 @@ impl HotkeyManager {
     ///
     /// Returns an error if the hotkey is already registered.
     pub fn register(&self, hotkey: Hotkey) -> Result<HotkeyId> {
+        self.register_with(hotkey, false)
+    }
+
+    /// Register a hotkey that carries on the modifier-only hotkey it extends,
+    /// instead of taking over from it.
+    ///
+    /// Normally a key typed onto a modifier-only hotkey that fired a moment ago
+    /// withdraws it ([`HotkeyState::Cancelled`]): Ctrl+Alt was only the start
+    /// of Ctrl+Alt+C. A continuation is the opposite case, Ctrl+Win+Space while
+    /// Ctrl+Win is being held to dictate: Space changes how the running hotkey
+    /// behaves, so that hotkey keeps its press and the continuation fires
+    /// beside it, however quickly the key follows. With
+    /// [`HotkeyManager::set_fire_on_release`] on, a waiting tap of the shorter
+    /// hotkey is still dropped, since the continuation replaced it.
+    pub fn register_continuation(&self, hotkey: Hotkey) -> Result<HotkeyId> {
+        self.register_with(hotkey, true)
+    }
+
+    fn register_with(&self, hotkey: Hotkey, continues: bool) -> Result<HotkeyId> {
         let mut state = self.state.lock().map_err(|_| Error::MutexPoisoned)?;
 
         // Check if already registered
@@ -432,6 +474,9 @@ impl HotkeyManager {
         let id = HotkeyId(state.next_id);
         state.next_id += 1;
         state.hotkeys.insert(id, hotkey);
+        if continues {
+            state.continuations.insert(id);
+        }
 
         // Add to blocking set
         if let Some(blocking_hotkeys) = &self.blocking_hotkeys {
@@ -908,6 +953,119 @@ mod tests {
                 .is_empty());
             assert!(state.pressed_hotkeys.contains(&dictate));
             assert!(!state.pressed_hotkeys.contains(&cleanup));
+        }
+
+        // Continuations: a key that carries on the held hotkey.
+
+        /// The Windows defaults plus their hands-free keys: dictation's
+        /// Ctrl+Win+Space and cleanup's Ctrl+Win+Shift+Space.
+        fn with_hands_free(fire_on_release: bool) -> (ManagerState, [HotkeyId; 4], [HotkeyId; 2]) {
+            let (mut state, ids) = windows_defaults(fire_on_release);
+            let continuations = [HotkeyId(4), HotkeyId(5)];
+            for (id, hotkey) in continuations
+                .iter()
+                .zip(["ctrl_left+super+space", "ctrl_left+super+shift+space"])
+            {
+                state.hotkeys.insert(*id, hotkey.parse().unwrap());
+                state.continuations.insert(*id);
+            }
+            (state, ids, continuations)
+        }
+
+        #[test]
+        fn space_right_after_dictation_fired_keeps_dictation_running() {
+            let (mut state, [dictate, ..], [hands_free, _]) = with_hands_free(false);
+            let t0 = Instant::now();
+            state.process_event_at(&make_modifier_event(CTRL_WIN, true, Modifiers::CMD_LEFT), t0);
+            // Well inside the window in which any other key withdraws it.
+            let space = state.process_event_at(
+                &make_key_event(CTRL_WIN, Some(Key::Space), true),
+                at(t0, 80),
+            );
+            assert_eq!(states(&space), vec![(hands_free, HotkeyState::Pressed)]);
+            assert!(state.pressed_hotkeys.contains(&dictate));
+            // Letting go releases each once; nothing is withdrawn.
+            let space_up = state.process_event_at(
+                &make_key_event(CTRL_WIN, Some(Key::Space), false),
+                at(t0, 200),
+            );
+            assert_eq!(states(&space_up), vec![(hands_free, HotkeyState::Released)]);
+            let ctrl_up = state.process_event_at(
+                &make_modifier_event(Modifiers::CMD_LEFT, false, Modifiers::CTRL_LEFT),
+                at(t0, 260),
+            );
+            assert_eq!(states(&ctrl_up), vec![(dictate, HotkeyState::Released)]);
+        }
+
+        #[test]
+        fn another_key_right_after_dictation_still_withdraws_it() {
+            let (mut state, [dictate, ..], _) = with_hands_free(false);
+            let t0 = Instant::now();
+            state.process_event_at(&make_modifier_event(CTRL_WIN, true, Modifiers::CMD_LEFT), t0);
+            let arrow = state.process_event_at(
+                &make_key_event(CTRL_WIN, Some(Key::RightArrow), true),
+                at(t0, 80),
+            );
+            assert_eq!(states(&arrow), vec![(dictate, HotkeyState::Cancelled)]);
+        }
+
+        #[test]
+        fn space_while_tapping_fires_the_continuation_and_no_tap() {
+            let (mut state, _, [hands_free, _]) = with_hands_free(true);
+            let t0 = Instant::now();
+            assert!(state
+                .process_event_at(&make_modifier_event(CTRL_WIN, true, Modifiers::CMD_LEFT), t0)
+                .is_empty());
+            let space = state.process_event_at(
+                &make_key_event(CTRL_WIN, Some(Key::Space), true),
+                at(t0, 60),
+            );
+            assert_eq!(states(&space), vec![(hands_free, HotkeyState::Pressed)]);
+            state.process_event_at(&make_key_event(CTRL_WIN, Some(Key::Space), false), at(t0, 120));
+            // Letting go of Ctrl+Win is not also a tap of dictation, which would
+            // stop the recording Space just started.
+            assert!(state
+                .process_event_at(
+                    &make_modifier_event(Modifiers::CMD_LEFT, false, Modifiers::CTRL_LEFT),
+                    at(t0, 180),
+                )
+                .is_empty());
+            assert!(state
+                .process_event_at(
+                    &make_modifier_event(Modifiers::empty(), false, Modifiers::CMD_LEFT),
+                    at(t0, 200),
+                )
+                .is_empty());
+        }
+
+        #[test]
+        fn a_continuation_answers_only_to_its_own_modifiers() {
+            let (mut state, [_, cleanup, ..], [_, cleanup_hands_free]) = with_hands_free(false);
+            let t0 = Instant::now();
+            state.process_event_at(&make_modifier_event(CTRL_WIN, true, Modifiers::CMD_LEFT), t0);
+            let shift = CTRL_WIN | Modifiers::SHIFT_LEFT;
+            state.process_event_at(&make_modifier_event(shift, true, Modifiers::SHIFT_LEFT), at(t0, 50));
+            assert!(state.pressed_hotkeys.contains(&cleanup));
+            let space = state.process_event_at(
+                &make_key_event(shift, Some(Key::Space), true),
+                at(t0, 120),
+            );
+            assert_eq!(states(&space), vec![(cleanup_hands_free, HotkeyState::Pressed)]);
+            assert!(state.pressed_hotkeys.contains(&cleanup));
+        }
+
+        #[test]
+        fn unregistering_a_continuation_forgets_it() {
+            let (mut state, [dictate, ..], [hands_free, _]) = with_hands_free(false);
+            state.hotkeys.remove(&hands_free);
+            state.forget(hands_free);
+            let t0 = Instant::now();
+            state.process_event_at(&make_modifier_event(CTRL_WIN, true, Modifiers::CMD_LEFT), t0);
+            let space = state.process_event_at(
+                &make_key_event(CTRL_WIN, Some(Key::Space), true),
+                at(t0, 80),
+            );
+            assert_eq!(states(&space), vec![(dictate, HotkeyState::Cancelled)]);
         }
 
         // Both modes.

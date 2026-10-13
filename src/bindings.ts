@@ -29,6 +29,30 @@ async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Whether the dictation keys plus Space make a dictation hands-free
+ * (`hands_free`). Registers or releases those keys at once.
+ */
+async changeHandsFreeSpaceSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_hands_free_space_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether, with Hold to talk, a quick tap of the dictation keys makes the
+ * dictation hands-free instead of ending it (`hands_free::QUICK_TAP`).
+ */
+async changeHandsFreeTapSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_hands_free_tap_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeAudioFeedbackSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_audio_feedback_setting", { enabled }) };
@@ -3569,7 +3593,19 @@ historyUpdatePayload: "history-update-payload"
  * broken field can never reset the rest of the user's configuration
  * (backport of Handy #1631).
  */
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
+/**
+ * The dictation keys plus Space make a dictation hands-free: pressed while
+ * they are held, or all together to start one (see `hands_free`). Only
+ * exists for dictation keys that are modifiers alone.
+ */
+dictation_hands_free_space?: boolean; 
+/**
+ * With Hold to talk, a quick tap of the dictation keys makes the dictation
+ * hands-free instead of ending it (see `hands_free::QUICK_TAP`). Off by
+ * default: a stray tap would leave the microphone open.
+ */
+dictation_hands_free_tap: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
 /**
  * Opt-in live/streaming transcription: while recording, feed audio into a
  * streaming transcriber and paste the merged running result at the end

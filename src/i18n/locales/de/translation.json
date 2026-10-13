@@ -665,6 +665,19 @@
         "description": "Halten: Die Aufnahme läuft, solange du ein Aufnahme-Tastenkürzel gedrückt hältst. Antippen: Ein Druck startet, der nächste stoppt. Gilt für alle Aufnahme-Tastenkürzel.",
         "hold": "Halten",
         "tap": "Antippen"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Freihändig mit Leertaste",
+          "description": "Halte deine Diktiertasten, drücke die Leertaste und lass los: Es hört weiter zu, bis du die Tasten erneut drückst.",
+          "unavailable": "Funktioniert nur, wenn dein Diktierkürzel nur aus Sondertasten besteht.",
+          "taken": "{{keys}} ist bereits ein anderes Tastenkürzel."
+        },
+        "tap": {
+          "label": "Freihändig per Antippen",
+          "description": "Tippe die Diktiertasten an, statt sie zu halten, und es hört weiter zu, bis du sie erneut drückst.",
+          "tapMode": "Mit „Antippen zum Umschalten“ ist jedes Diktat bereits freihändig."
+        }
       }
     },
     "models": {
@@ -2193,12 +2206,14 @@
     },
     "listening": "Hört zu…",
     "locked": "Freihändige Aufnahme — drücke das Tastenkürzel erneut zum Stoppen",
+    "handsFree": "Freihändig",
     "cancel": "Abbrechen",
     "copy": "Transkript kopieren",
     "transcript": "Transkript",
     "copied": "Kopiert",
     "copyFailed": "Kopieren fehlgeschlagen – versuche es erneut",
     "done": "Fertig",
+    "finish": "Abschließen",
     "askAssistant": "Den Assistenten fragen, statt das zu tippen",
     "recovery": {
       "dismissed": "Verworfen",
@@ -2584,7 +2599,10 @@
         "hold": "Halten, sprechen, loslassen. Deine Worte werden dort getippt, wo dein Cursor ist.",
         "tap": "Antippen zum Starten, sprechen, antippen zum Stoppen. Deine Worte werden dort getippt, wo dein Cursor ist.",
         "whatHold": "Halten, sprechen, loslassen. Deine Worte erscheinen dort, wo dein Cursor ist.",
-        "whatTap": "Antippen, sprechen, erneut antippen. Deine Worte erscheinen dort, wo dein Cursor ist."
+        "whatTap": "Antippen, sprechen, erneut antippen. Deine Worte erscheinen dort, wo dein Cursor ist.",
+        "handsFreeSpace": "Brauchst du länger? Drücke beim Halten die Leertaste und lass los: Es hört weiter zu, bis du die Tasten erneut drückst.",
+        "handsFreeTap": "Brauchst du länger? Tippe an, statt zu halten: Es hört weiter zu, bis du die Tasten erneut drückst.",
+        "handsFreeBoth": "Brauchst du länger? Drücke beim Halten die Leertaste oder tippe an, statt zu halten: Es hört weiter zu, bis du die Tasten erneut drückst."
       },
       "cleanup": {
         "title": "Diktieren und bereinigen",
