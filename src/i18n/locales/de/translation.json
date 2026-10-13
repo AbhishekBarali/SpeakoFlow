@@ -2620,12 +2620,8 @@
         "description": "Ein freihändiges Gespräch mit gesprochenen Antworten.",
         "what": "Sprich im Wechsel, freihändig. Zum Beenden erneut drücken."
       },
-      "info": "Drück sie in einer beliebigen App. Klicke auf die Tasten, um sie zu ändern, und wähle bei jedem Aufnahme-Kürzel Halten oder Antippen.",
+      "info": "Drück sie in einer beliebigen App. Klicke auf die Tasten, um sie zu ändern.",
       "offHint": "Ausgeschaltet",
-      "mode": {
-        "hold": "Zum Sprechen halten",
-        "tap": "Antippen zum Umschalten"
-      },
       "cancel": {
         "title": "Abbrechen",
         "what": "Beendet eine Aufnahme oder eine Antwort, die vorgelesen wird."

@@ -2641,12 +2641,8 @@
         "description": "Una conversazione a mani libere con risposte vocali.",
         "what": "Parla e ascolta, a mani libere. Premi di nuovo per terminare."
       },
-      "info": "Premili in qualsiasi app. Fai clic sui tasti per cambiarli e scegli Tieni premuto o Tocca per ogni scorciatoia che registra.",
+      "info": "Premili in qualsiasi app. Fai clic sui tasti per cambiarli.",
       "offHint": "Disattivata",
-      "mode": {
-        "hold": "Tieni premuto per parlare",
-        "tap": "Tocca per avviare e fermare"
-      },
       "cancel": {
         "title": "Annulla",
         "what": "Ferma una registrazione o una risposta letta ad alta voce."

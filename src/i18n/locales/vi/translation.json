@@ -2599,12 +2599,8 @@
         "description": "Trò chuyện rảnh tay với câu trả lời bằng giọng nói.",
         "what": "Trò chuyện qua lại, rảnh tay. Nhấn lần nữa để kết thúc."
       },
-      "info": "Nhấn các phím này trong bất kỳ ứng dụng nào. Nhấp vào phím để thay đổi, và chọn Giữ hoặc Nhấn cho từng phím tắt ghi âm.",
+      "info": "Nhấn các phím này trong bất kỳ ứng dụng nào. Nhấp vào phím để thay đổi.",
       "offHint": "Đã tắt",
-      "mode": {
-        "hold": "Giữ để nói",
-        "tap": "Nhấn để bật/tắt"
-      },
       "cancel": {
         "title": "Hủy",
         "what": "Dừng ghi âm, hoặc dừng câu trả lời đang được đọc to."

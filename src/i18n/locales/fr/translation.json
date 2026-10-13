@@ -2641,12 +2641,8 @@
         "description": "Une conversation mains libres avec des réponses parlées.",
         "what": "Échangez à voix haute, mains libres. Appuyez à nouveau pour terminer."
       },
-      "info": "Utilisez-les dans n'importe quelle application. Cliquez sur les touches pour les modifier, et choisissez Maintenir ou Appuyer pour chaque raccourci qui enregistre.",
+      "info": "Utilisez-les dans n'importe quelle application. Cliquez sur les touches pour les modifier.",
       "offHint": "Désactivé",
-      "mode": {
-        "hold": "Maintenir pour parler",
-        "tap": "Appuyer pour activer"
-      },
       "cancel": {
         "title": "Annuler",
         "what": "Arrête un enregistrement ou une réponse en cours de lecture."

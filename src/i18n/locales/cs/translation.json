@@ -2662,12 +2662,8 @@
         "description": "Konverzace bez použití rukou s mluvenými odpověďmi.",
         "what": "Povídejte si bez použití rukou. Dalším stiskem ukončíte."
       },
-      "info": "Stiskněte je v jakékoli aplikaci. Kliknutím na klávesy je změníte. U zkratek, které nahrávají, zvolte Podržení nebo Stisknutí.",
+      "info": "Stiskněte je v jakékoli aplikaci. Kliknutím na klávesy je změníte.",
       "offHint": "Vypnuto",
-      "mode": {
-        "hold": "Podržte a mluvte",
-        "tap": "Stiskem zapnout/vypnout"
-      },
       "cancel": {
         "title": "Zrušit",
         "what": "Zastaví nahrávání nebo předčítanou odpověď."

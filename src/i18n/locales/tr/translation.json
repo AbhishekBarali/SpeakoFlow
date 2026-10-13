@@ -2620,12 +2620,8 @@
         "description": "Sesli yanıtlarla, elleriniz serbest bir sohbet.",
         "what": "Elleriniz serbest, karşılıklı konuşun. Bitirmek için yine basın."
       },
-      "info": "Bunlara herhangi bir uygulamada basın. Değiştirmek için tuşlara tıklayın ve kayıt yapan her kısayol için Basılı tut ya da Dokun seçin.",
+      "info": "Bunlara herhangi bir uygulamada basın. Değiştirmek için tuşlara tıklayın.",
       "offHint": "Kapalı",
-      "mode": {
-        "hold": "Konuşmak için basılı tut",
-        "tap": "Açıp kapatmak için dokun"
-      },
       "cancel": {
         "title": "İptal",
         "what": "Bir kaydı ya da sesli okunan bir yanıtı durdurun."

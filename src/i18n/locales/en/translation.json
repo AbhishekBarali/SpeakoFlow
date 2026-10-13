@@ -2620,12 +2620,8 @@
         "description": "A hands-free conversation with spoken replies.",
         "what": "Talk back and forth, hands-free. Press again to end."
       },
-      "info": "Press these in any app. Click the keys to change them, and choose Hold or Tap for each one that records.",
+      "info": "Press these in any app. Click the keys to change them.",
       "offHint": "Turned off",
-      "mode": {
-        "hold": "Hold to talk",
-        "tap": "Tap to toggle"
-      },
       "cancel": {
         "title": "Cancel",
         "what": "Stop a recording, or a reply being read aloud."

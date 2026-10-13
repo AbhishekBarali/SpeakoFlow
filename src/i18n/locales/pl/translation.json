@@ -2662,12 +2662,8 @@
         "description": "Rozmowa bez użycia rąk z odpowiedziami na głos.",
         "what": "Rozmawiaj swobodnie, bez użycia rąk. Naciśnij ponownie, aby zakończyć."
       },
-      "info": "Używaj ich w dowolnej aplikacji. Kliknij klawisze, aby je zmienić, i wybierz Przytrzymanie lub Naciśnięcie dla każdego skrótu, który nagrywa.",
+      "info": "Używaj ich w dowolnej aplikacji. Kliknij klawisze, aby je zmienić.",
       "offHint": "Wyłączony",
-      "mode": {
-        "hold": "Przytrzymaj, aby mówić",
-        "tap": "Stuknij, aby przełączyć"
-      },
       "cancel": {
         "title": "Anuluj",
         "what": "Zatrzymaj nagrywanie albo czytaną na głos odpowiedź."
