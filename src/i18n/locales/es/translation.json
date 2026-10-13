@@ -2641,12 +2641,8 @@
         "description": "Una conversación con manos libres y respuestas habladas.",
         "what": "Conversa con manos libres. Pulsa de nuevo para terminar."
       },
-      "info": "Púlsalos en cualquier aplicación. Haz clic en las teclas para cambiarlas y elige Mantener o Tocar en cada atajo que graba.",
+      "info": "Púlsalos en cualquier aplicación. Haz clic en las teclas para cambiarlas.",
       "offHint": "Desactivado",
-      "mode": {
-        "hold": "Mantén pulsado para hablar",
-        "tap": "Pulsa para activar o desactivar"
-      },
       "cancel": {
         "title": "Cancelar",
         "what": "Detén una grabación o una respuesta que se está leyendo en voz alta."

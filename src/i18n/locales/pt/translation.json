@@ -2641,12 +2641,8 @@
         "description": "Uma conversa sem usar as mãos, com respostas faladas.",
         "what": "Converse sem usar as mãos. Pressione de novo para encerrar."
       },
-      "info": "Use em qualquer app. Clique nas teclas para mudá-las e escolha Segurar ou Tocar em cada atalho que grava.",
+      "info": "Use em qualquer app. Clique nas teclas para mudá-las.",
       "offHint": "Desativado",
-      "mode": {
-        "hold": "Segure para falar",
-        "tap": "Toque para alternar"
-      },
       "cancel": {
         "title": "Cancelar",
         "what": "Para uma gravação ou uma resposta sendo lida em voz alta."

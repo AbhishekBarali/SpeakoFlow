@@ -2620,12 +2620,8 @@
         "description": "En handsfree-konversation med talade svar.",
         "what": "Prata fram och tillbaka, handsfree. Tryck igen för att avsluta."
       },
-      "info": "Tryck på dessa i valfri app. Klicka på tangenterna för att ändra dem, och välj Håll eller Tryck för varje kortkommando som spelar in.",
+      "info": "Tryck på dessa i valfri app. Klicka på tangenterna för att ändra dem.",
       "offHint": "Avstängt",
-      "mode": {
-        "hold": "Håll ned för att tala",
-        "tap": "Tryck för att växla"
-      },
       "cancel": {
         "title": "Avbryt",
         "what": "Stoppa en inspelning eller ett svar som läses upp."
