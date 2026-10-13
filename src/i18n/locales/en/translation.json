@@ -2802,6 +2802,14 @@
       "separate": "Its own shortcut",
       "dictation": "Same as dictation"
     },
+    "skipShort": {
+      "title": "Skip cleanup for short dictations",
+      "info": "Short dictations, like a search or a quick reply, are typed as you said them, without waiting for the model. Longer ones are still cleaned up.",
+      "limit": "Shorter than",
+      "limitInfo": "Counted in words. In languages written without spaces, like Chinese, Japanese or Thai, words are estimated from the number of characters.",
+      "words_one": "word",
+      "words_other": "words"
+    },
     "shortcutRow": "Shortcut"
   },
   "dictionary": {

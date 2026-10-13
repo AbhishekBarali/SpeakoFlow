@@ -2802,6 +2802,14 @@
       "separate": "Eget kortkommando",
       "dictation": "Samma som diktering"
     },
+    "skipShort": {
+      "title": "Hoppa över rensning för korta dikteringar",
+      "info": "Korta dikteringar, som en sökning eller ett snabbt svar, skrivs ut som du sa dem utan att vänta på modellen. Längre dikteringar rensas som vanligt.",
+      "limit": "Kortare än",
+      "limitInfo": "Räknas i ord. För språk som skrivs utan mellanslag, som kinesiska, japanska eller thailändska, uppskattas antalet ord utifrån antalet tecken.",
+      "words_one": "ord",
+      "words_other": "ord"
+    },
     "shortcutRow": "Kortkommando"
   },
   "dictionary": {

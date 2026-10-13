@@ -2825,6 +2825,15 @@
       "separate": "Atalho próprio",
       "dictation": "O mesmo do ditado"
     },
+    "skipShort": {
+      "title": "Pular a limpeza em ditados curtos",
+      "info": "Ditados curtos, como uma busca ou uma resposta rápida, são digitados do jeito que você falou, sem esperar o modelo. Os mais longos continuam sendo limpos.",
+      "limit": "Menos de",
+      "limitInfo": "A contagem é em palavras. Em idiomas escritos sem espaços, como chinês, japonês ou tailandês, as palavras são estimadas pelo número de caracteres.",
+      "words_one": "palavra",
+      "words_many": "palavras",
+      "words_other": "palavras"
+    },
     "shortcutRow": "Atalho"
   },
   "dictionary": {

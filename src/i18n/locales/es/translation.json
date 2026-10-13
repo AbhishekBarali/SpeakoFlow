@@ -2825,6 +2825,15 @@
       "separate": "Atajo propio",
       "dictation": "El mismo que el dictado"
     },
+    "skipShort": {
+      "title": "Omitir la limpieza en dictados cortos",
+      "info": "Los dictados cortos, como una búsqueda o una respuesta rápida, se escriben tal como los dijiste, sin esperar al modelo. Los más largos se siguen limpiando.",
+      "limit": "Menos de",
+      "limitInfo": "Se cuenta en palabras. En idiomas que se escriben sin espacios, como el chino, el japonés o el tailandés, las palabras se estiman a partir del número de caracteres.",
+      "words_one": "palabra",
+      "words_many": "palabras",
+      "words_other": "palabras"
+    },
     "shortcutRow": "Atajo"
   },
   "dictionary": {

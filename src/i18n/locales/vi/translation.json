@@ -2779,6 +2779,13 @@
       "separate": "Phím tắt riêng",
       "dictation": "Giống đọc chính tả"
     },
+    "skipShort": {
+      "title": "Bỏ qua dọn dẹp với lần đọc ngắn",
+      "info": "Những lần đọc ngắn, như một truy vấn tìm kiếm hay một câu trả lời nhanh, được gõ đúng như bạn nói mà không phải chờ mô hình. Những lần đọc dài hơn vẫn được dọn dẹp.",
+      "limit": "Ngắn hơn",
+      "limitInfo": "Tính theo số từ. Với các ngôn ngữ viết không có dấu cách như tiếng Trung, tiếng Nhật hay tiếng Thái, số từ được ước tính từ số ký tự.",
+      "words_other": "từ"
+    },
     "shortcutRow": "Phím tắt"
   },
   "dictionary": {
