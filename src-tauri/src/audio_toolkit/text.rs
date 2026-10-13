@@ -1278,8 +1278,9 @@ mod tests {
         assert_eq!(count_words("我们明天早上九点在公司开会讨论预算"), 11);
         // Japanese: kanji at 1.5, kana at 2.5 characters a word.
         assert_eq!(count_words("ありがとうございます"), 4);
-        assert_eq!(count_words("東京に行きます"), 4); // 東京 / に / 行き / ます
-                                                      // Punctuation in these scripts counts for nothing, as anywhere else.
+        // 東京 / に / 行き / ます
+        assert_eq!(count_words("東京に行きます"), 4);
+        // Punctuation in these scripts counts for nothing, as anywhere else.
         assert_eq!(count_words("。、！？「」"), 0);
         // Any such text at all is at least a word.
         assert_eq!(count_words("ね"), 1);
@@ -1301,8 +1302,9 @@ mod tests {
     fn mixed_scripts_add_up() {
         // The Latin words between Han characters count as words of their own.
         assert_eq!(count_words("我用iPhone和Mac"), 4);
-        assert_eq!(count_words("Pythonで書く"), 3); // Python / で / 書く
-                                                    // Korean and Hindi are written with spaces.
+        // Python / で / 書く
+        assert_eq!(count_words("Pythonで書く"), 3);
+        // Korean and Hindi are written with spaces.
         assert_eq!(count_words("안녕하세요 반갑습니다"), 2);
         assert_eq!(count_words("नमस्ते दुनिया"), 2);
     }
