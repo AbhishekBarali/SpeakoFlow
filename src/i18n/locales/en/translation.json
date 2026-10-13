@@ -665,6 +665,19 @@
         "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Applies to every recording shortcut.",
         "hold": "Hold",
         "tap": "Tap"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Hands-free with Space",
+          "description": "Hold your dictation keys and press Space, then let go: it keeps listening until you press the keys again.",
+          "unavailable": "Works only when your dictation shortcut is modifier keys alone.",
+          "taken": "Another shortcut already uses {{keys}}."
+        },
+        "tap": {
+          "label": "Hands-free with a tap",
+          "description": "Tap the dictation keys instead of holding them, and it keeps listening until you press them again.",
+          "tapMode": "With Tap to toggle, every dictation is already hands-free."
+        }
       }
     },
     "models": {
@@ -2192,13 +2205,15 @@
       "noSpeechModel": "No speech model yet. Pick one on the Models page"
     },
     "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
+    "locked": "Recording hands-free — press your shortcut again to finish",
+    "handsFree": "Hands-free",
     "cancel": "Cancel",
     "copy": "Copy the transcript",
     "transcript": "Transcript",
     "copied": "Copied",
     "copyFailed": "Could not copy — try again",
     "done": "Done",
+    "finish": "Finish",
     "askAssistant": "Ask the assistant instead of typing this",
     "recovery": {
       "dismissed": "Dismissed",
@@ -2584,7 +2599,10 @@
         "hold": "Hold, talk, let go. Your words are typed where your cursor is.",
         "tap": "Tap to start, talk, tap to stop. Your words are typed where your cursor is.",
         "whatHold": "Hold, talk, let go. Your words type where your cursor is.",
-        "whatTap": "Tap, talk, tap again. Your words type where your cursor is."
+        "whatTap": "Tap, talk, tap again. Your words type where your cursor is.",
+        "handsFreeSpace": "Need longer? Press Space while holding, then let go: it keeps listening until you press the keys again.",
+        "handsFreeTap": "Need longer? Tap instead of holding: it keeps listening until you press the keys again.",
+        "handsFreeBoth": "Need longer? Press Space while holding, or tap instead of holding: it keeps listening until you press the keys again."
       },
       "cleanup": {
         "title": "Dictate and clean up",

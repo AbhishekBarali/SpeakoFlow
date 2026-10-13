@@ -665,6 +665,19 @@
         "description": "Basılı tut: bir kayıt kısayolunu basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki basış durdurur. Tüm kayıt kısayollarına uygulanır.",
         "hold": "Basılı tut",
         "tap": "Dokun"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Boşluk ile eller serbest",
+          "description": "Dikte tuşlarını basılı tutup Boşluk'a basın ve bırakın: tuşlara yeniden basana kadar dinlemeye devam eder.",
+          "unavailable": "Yalnızca dikte kısayolu sadece değiştirici tuşlardan oluşuyorsa çalışır.",
+          "taken": "{{keys}} zaten başka bir kısayolda kullanılıyor."
+        },
+        "tap": {
+          "label": "Tek dokunuşla eller serbest",
+          "description": "Dikte tuşlarını basılı tutmak yerine dokunun; yeniden basana kadar dinlemeye devam eder.",
+          "tapMode": "“Açıp kapatmak için dokun” ile her dikte zaten eller serbesttir."
+        }
       }
     },
     "models": {
@@ -2193,12 +2206,14 @@
     },
     "listening": "Dinleniyor…",
     "locked": "Eller serbest kaydediliyor — durdurmak için kısayola tekrar basın",
+    "handsFree": "Eller serbest",
     "cancel": "İptal",
     "copy": "Transkripti kopyala",
     "transcript": "Transkript",
     "copied": "Kopyalandı",
     "copyFailed": "Kopyalanamadı — tekrar deneyin",
     "done": "Bitti",
+    "finish": "Bitir",
     "askAssistant": "Bunu yazmak yerine asistana sor",
     "recovery": {
       "dismissed": "İptal edildi",
@@ -2584,7 +2599,10 @@
         "hold": "Basılı tutun, konuşun, bırakın. Sözleriniz imlecinizin olduğu yere yazılır.",
         "tap": "Başlatmak için dokunun, konuşun, durdurmak için dokunun. Sözleriniz imlecinizin olduğu yere yazılır.",
         "whatHold": "Basılı tutun, konuşun, bırakın. Sözleriniz imlecin olduğu yere yazılır.",
-        "whatTap": "Dokunun, konuşun, yeniden dokunun. Sözleriniz imlecin olduğu yere yazılır."
+        "whatTap": "Dokunun, konuşun, yeniden dokunun. Sözleriniz imlecin olduğu yere yazılır.",
+        "handsFreeSpace": "Daha uzun mu konuşacaksınız? Basılı tutarken Boşluk'a basıp bırakın: tuşlara yeniden basana kadar dinlemeye devam eder.",
+        "handsFreeTap": "Daha uzun mu konuşacaksınız? Basılı tutmak yerine dokunun: tuşlara yeniden basana kadar dinlemeye devam eder.",
+        "handsFreeBoth": "Daha uzun mu konuşacaksınız? Basılı tutarken Boşluk'a basın ya da basılı tutmak yerine dokunun: tuşlara yeniden basana kadar dinlemeye devam eder."
       },
       "cleanup": {
         "title": "Dikte et ve temizle",

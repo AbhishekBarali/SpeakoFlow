@@ -667,6 +667,19 @@
         "description": "Tieni premuto: registri finché tieni premuta una scorciatoia di registrazione. Tocca: una pressione avvia, la successiva ferma. Vale per tutte le scorciatoie di registrazione.",
         "hold": "Tieni premuto",
         "tap": "Tocca"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Mani libere con Spazio",
+          "description": "Tieni premuti i tasti di dettatura, premi Spazio e rilascia: continua ad ascoltare finché non premi di nuovo i tasti.",
+          "unavailable": "Funziona solo se la scorciatoia di dettatura usa solo tasti modificatori.",
+          "taken": "Un'altra scorciatoia usa già {{keys}}."
+        },
+        "tap": {
+          "label": "Mani libere con un tocco",
+          "description": "Tocca i tasti di dettatura invece di tenerli premuti: continua ad ascoltare finché non li premi di nuovo.",
+          "tapMode": "Con «Tocca per avviare e fermare», ogni dettatura è già a mani libere."
+        }
       }
     },
     "models": {
@@ -2205,12 +2218,14 @@
     },
     "listening": "In ascolto…",
     "locked": "Registrazione a mani libere — premi di nuovo la scorciatoia per fermarti",
+    "handsFree": "A mani libere",
     "cancel": "Annulla",
     "copy": "Copia la trascrizione",
     "transcript": "Trascrizione",
     "copied": "Copiato",
     "copyFailed": "Impossibile copiare: riprova",
     "done": "Fatto",
+    "finish": "Termina",
     "askAssistant": "Chiedi all'assistente invece di digitare questo testo",
     "recovery": {
       "dismissed": "Annullato",
@@ -2605,7 +2620,10 @@
         "hold": "Tieni premuto, parla, rilascia. Le tue parole vengono scritte dove si trova il cursore.",
         "tap": "Tocca per iniziare, parla, tocca per fermare. Le tue parole vengono scritte dove si trova il cursore.",
         "whatHold": "Tieni premuto, parla, rilascia. Le parole compaiono dove si trova il cursore.",
-        "whatTap": "Tocca, parla, tocca di nuovo. Le parole compaiono dove si trova il cursore."
+        "whatTap": "Tocca, parla, tocca di nuovo. Le parole compaiono dove si trova il cursore.",
+        "handsFreeSpace": "Ti serve più tempo? Premi Spazio mentre tieni premuto e rilascia: continua ad ascoltare finché non premi di nuovo i tasti.",
+        "handsFreeTap": "Ti serve più tempo? Tocca invece di tenere premuto: continua ad ascoltare finché non premi di nuovo i tasti.",
+        "handsFreeBoth": "Ti serve più tempo? Premi Spazio mentre tieni premuto, oppure tocca invece di tenere premuto: continua ad ascoltare finché non premi di nuovo i tasti."
       },
       "cleanup": {
         "title": "Detta e ripulisci",

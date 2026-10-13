@@ -7,7 +7,7 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, RotateCcw, Undo2 } from "lucide-react";
+import { Check, Copy, RotateCcw, Undo2, X } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import AudioWaveform from "../components/shared/AudioWaveform";
 import {
@@ -68,6 +68,10 @@ type ShowOverlayPayload = {
   download?: string;
   /** For `transcribing`: AI cleanup follows, so the fill leaves it room. */
   cleanupNext?: boolean;
+  /** For `recording`: the dictation keeps listening after its keys are let go
+   * (`hands_free.rs`), so the surface wears its ring and, where it takes the
+   * pointer, offers ✕ and ✓. */
+  handsFree?: boolean;
   /** Opaque fingerprints of what does the transcription and the cleanup, so
    * the fill learns each setup's timing separately (`workProgress.ts`). */
   sttSetup?: string;
@@ -302,7 +306,10 @@ const RecordingOverlay: React.FC = () => {
    * (null until its first progress event), and which model that is. */
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
   const downloadId = useRef<string | null>(null);
-  const [locked, setLocked] = useState(false);
+  /** The dictation keeps listening after its keys are let go. */
+  const [handsFree, setHandsFree] = useState(false);
+  /** ✕ or ✓ was clicked; the backend answers by replacing the recording. */
+  const [ending, setEnding] = useState(false);
   const levelStore = useRef<LevelStore | null>(null);
   levelStore.current ??= createLevelStore();
   const levels = levelStore.current;
@@ -535,11 +542,12 @@ const RecordingOverlay: React.FC = () => {
         setStreamingWindow(payload.streamingWindow);
         setInteractive(!!payload.interactive);
         setJustify(parseJustify(payload.justify));
+        setEnding(false);
         if (recording) {
           endPress();
           follow.current = true;
           lastTop.current = 0;
-          setLocked(false);
+          setHandsFree(!!payload.handsFree);
           setMicLive(false);
           levels.set(EMPTY_LEVELS);
           replaceText(EMPTY_TRANSCRIPT, true);
@@ -569,7 +577,8 @@ const RecordingOverlay: React.FC = () => {
         setDownloadPercent(null);
         setIsVisible(false);
         setInteractive(false);
-        setLocked(false);
+        setHandsFree(false);
+        setEnding(false);
         setMicLive(false);
         levels.set(EMPTY_LEVELS);
         replaceText(EMPTY_TRANSCRIPT, true);
@@ -618,9 +627,16 @@ const RecordingOverlay: React.FC = () => {
       listen<number>("restore-overlay", ({ payload }) => {
         if (completionEpoch.current === payload) setFading(false);
       }).then(register),
-      listen<boolean>("recording-locked", ({ payload }) => {
-        if (recording) setLocked(payload);
-      }).then(register),
+      // A held dictation turned hands-free while on screen: the keys plus
+      // Space, or a quick tap. The window has taken the pointer if it can.
+      listen<{ interactive: boolean }>(
+        "recording-hands-free",
+        ({ payload }) => {
+          if (!recording) return;
+          setHandsFree(true);
+          if (payload?.interactive) setInteractive(true);
+        },
+      ).then(register),
       listen<"out" | "in">("overlay-hop", ({ payload }) => {
         if (visible) setHop(payload === "out");
       }).then(register),
@@ -751,6 +767,12 @@ const RecordingOverlay: React.FC = () => {
   const isRecording = state === "recording" && !completed;
   const hasLiveText = !!(transcript.committed || transcript.tentative);
   const live = isRecording && micLive;
+  // Hands-free wears a ring, and offers ✕ and ✓ when the pointer is over it:
+  // nothing holds the keys any more, so it needs a way to end that a held
+  // dictation does not. Only where the window takes the pointer; elsewhere a
+  // button would pass the click straight to the app underneath.
+  const handsFreeNow = isRecording && handsFree;
+  const controls = handsFreeNow && interactive;
   const recovery = RECOVERY.includes(state);
   const labeled = LABELED.includes(state);
   const downloading = state === "downloading";
@@ -793,15 +815,16 @@ const RecordingOverlay: React.FC = () => {
     ? doneLabel
     : isRecording
       ? live
-        ? t("overlay.recording")
+        ? handsFreeNow
+          ? t("overlay.handsFree")
+          : t("overlay.recording")
         : t("overlay.preparing")
       : busyLabel;
-  const ariaLabel =
-    isRecording && locked
-      ? t("overlay.locked")
-      : completed
-        ? cardLabel
-        : pillLabel;
+  const ariaLabel = handsFreeNow
+    ? t("overlay.locked")
+    : completed
+      ? cardLabel
+      : pillLabel;
 
   const reportHover = (hovered: boolean) => {
     if (!holdsOnHover) return;
@@ -830,6 +853,46 @@ const RecordingOverlay: React.FC = () => {
 
   const copyTranscript = () =>
     copyText(`${transcript.committed}${transcript.tentative}`.trim());
+
+  /** ✕ is Esc: the dictation stops, and is offered back for a few seconds.
+   *  ✓ is the keys pressed again: it stops, and is typed out. Either way the
+   *  backend replaces the recording a moment later, so one click is enough. */
+  const endDictation = async (
+    command: "cancel_operation" | "commit_recording",
+  ) => {
+    if (ending) return;
+    setEnding(true);
+    try {
+      await invoke<void>(command);
+    } catch (error) {
+      console.error(`Could not ${command}:`, error);
+      setEnding(false);
+    }
+  };
+  const cancelButton = (className: string) => (
+    <button
+      type="button"
+      className={`${className} is-cancel`}
+      aria-label={t("overlay.cancel")}
+      title={t("overlay.cancel")}
+      onClick={() => void endDictation("cancel_operation")}
+      disabled={ending}
+    >
+      <X size={11} strokeWidth={2.2} aria-hidden="true" />
+    </button>
+  );
+  const finishButton = (className: string) => (
+    <button
+      type="button"
+      className={`${className} is-finish`}
+      aria-label={t("overlay.finish")}
+      title={t("overlay.finish")}
+      onClick={() => void endDictation("commit_recording")}
+      disabled={ending}
+    >
+      <Check size={12} strokeWidth={2.4} aria-hidden="true" />
+    </button>
+  );
 
   const onBodyScroll = () => {
     const body = cardBodyRef.current;
@@ -921,7 +984,7 @@ const RecordingOverlay: React.FC = () => {
       {streamingWindow && !recovery ? (
         <div
           ref={cardRef}
-          className={`overlay-card ${state}${completed ? " completed" : ""}`}
+          className={`overlay-card ${state}${completed ? " completed" : ""}${handsFreeNow ? " hands-free" : ""}`}
           role="group"
           aria-label={ariaLabel}
           onMouseEnter={() => reportHover(true)}
@@ -970,6 +1033,12 @@ const RecordingOverlay: React.FC = () => {
                     <Copy size={12} strokeWidth={1.5} />
                   )}
                 </button>
+              )}
+              {controls && (
+                <span className="card-controls">
+                  {cancelButton("hands-free-control")}
+                  {finishButton("hands-free-control")}
+                </span>
               )}
             </div>
           </div>
@@ -1039,10 +1108,11 @@ const RecordingOverlay: React.FC = () => {
         <div
           className={`overlay-pill ${state}${labeled ? " labeled" : ""}${
             !labeled && hasLiveText && !working ? " has-text" : ""
-          }`}
+          }${handsFreeNow ? " hands-free" : ""}${controls ? " has-controls" : ""}`}
           role="group"
           aria-label={ariaLabel}
         >
+          {controls && cancelButton("hands-free-control pill-control")}
           {downloading ? (
             <>
               <DownloadRing percent={downloadPercent} />
@@ -1073,6 +1143,7 @@ const RecordingOverlay: React.FC = () => {
               {indicator(PILL_WAVE)}
             </div>
           )}
+          {controls && finishButton("hands-free-control pill-control")}
         </div>
       )}
     </div>

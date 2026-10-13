@@ -663,6 +663,19 @@
         "description": "Giữ: ghi âm trong khi bạn giữ phím tắt ghi âm. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng. Áp dụng cho mọi phím tắt ghi âm.",
         "hold": "Giữ",
         "tap": "Nhấn"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Rảnh tay với phím cách",
+          "description": "Giữ phím đọc chính tả, nhấn phím cách rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím.",
+          "unavailable": "Chỉ hoạt động khi phím tắt đọc chính tả chỉ gồm các phím bổ trợ.",
+          "taken": "Một phím tắt khác đã dùng {{keys}}."
+        },
+        "tap": {
+          "label": "Rảnh tay bằng một lần nhấn",
+          "description": "Nhấn nhanh phím đọc chính tả thay vì giữ, ứng dụng sẽ tiếp tục nghe cho đến khi bạn nhấn lại.",
+          "tapMode": "Với “Nhấn để bật/tắt”, mọi lần đọc chính tả đều đã rảnh tay."
+        }
       }
     },
     "models": {
@@ -2181,12 +2194,14 @@
     },
     "listening": "Đang lắng nghe…",
     "locked": "Đang ghi âm rảnh tay — nhấn lại phím tắt để dừng",
+    "handsFree": "Rảnh tay",
     "cancel": "Hủy",
     "copy": "Sao chép bản chép lời",
     "transcript": "Bản chép lời",
     "copied": "Đã sao chép",
     "copyFailed": "Không thể sao chép — hãy thử lại",
     "done": "Xong",
+    "finish": "Hoàn tất",
     "askAssistant": "Hỏi trợ lý thay vì gõ nội dung này",
     "recovery": {
       "dismissed": "Đã hủy",
@@ -2563,7 +2578,10 @@
         "hold": "Giữ, nói, thả ra. Lời bạn nói được gõ tại vị trí con trỏ.",
         "tap": "Nhấn để bắt đầu, nói, nhấn để dừng. Lời bạn nói được gõ tại vị trí con trỏ.",
         "whatHold": "Giữ, nói, thả ra. Lời bạn nói được gõ tại vị trí con trỏ.",
-        "whatTap": "Nhấn, nói, nhấn lại. Lời bạn nói được gõ tại vị trí con trỏ."
+        "whatTap": "Nhấn, nói, nhấn lại. Lời bạn nói được gõ tại vị trí con trỏ.",
+        "handsFreeSpace": "Cần nói lâu hơn? Nhấn phím cách khi đang giữ rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím.",
+        "handsFreeTap": "Cần nói lâu hơn? Nhấn nhanh thay vì giữ: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím.",
+        "handsFreeBoth": "Cần nói lâu hơn? Nhấn phím cách khi đang giữ, hoặc nhấn nhanh thay vì giữ: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím."
       },
       "cleanup": {
         "title": "Đọc chính tả và dọn dẹp",

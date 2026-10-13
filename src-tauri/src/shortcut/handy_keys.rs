@@ -28,7 +28,7 @@
 //! via Tauri's event system.
 
 use handy_keys::{Hotkey, HotkeyEvent, HotkeyId, HotkeyManager, HotkeyState, KeyboardListener};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use serde::Serialize;
 use specta::Type;
 use std::collections::HashMap;
@@ -38,7 +38,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::settings::{self, get_settings, ShortcutBinding};
+use crate::hands_free;
+use crate::settings::{self, get_settings, AppSettings, ShortcutBinding};
 
 use super::handler::{handle_shortcut_cancelled, handle_shortcut_event};
 
@@ -55,6 +56,9 @@ enum ManagerCommand {
     Register {
         binding_id: String,
         hotkey_string: String,
+        /// Carries on the modifier-only hotkey it extends instead of replacing
+        /// it (`HotkeyManager::register_continuation`).
+        continues: bool,
         response: Sender<Result<(), String>>,
     },
     Unregister {
@@ -81,6 +85,11 @@ pub struct HandyKeysState {
     recording_binding_id: Mutex<Option<String>>,
     /// Flag to stop recording loop
     recording_running: Arc<AtomicBool>,
+    /// The keys each shortcut is registered on right now. A hands-free key is
+    /// derived from its dictation shortcut's live keys, which while that
+    /// shortcut is being changed are not yet the stored ones, and while it is
+    /// being edited are none at all.
+    registered: Mutex<HashMap<String, String>>,
 }
 
 /// Key event sent to frontend during recording mode
@@ -115,6 +124,7 @@ impl HandyKeysState {
             is_recording: AtomicBool::new(false),
             recording_binding_id: Mutex::new(None),
             recording_running: Arc::new(AtomicBool::new(false)),
+            registered: Mutex::new(HashMap::new()),
         })
     }
 
@@ -168,6 +178,7 @@ impl HandyKeysState {
                 ManagerCommand::Register {
                     binding_id,
                     hotkey_string,
+                    continues,
                     response,
                 } => {
                     let result = Self::do_register(
@@ -176,6 +187,7 @@ impl HandyKeysState {
                         &mut hotkey_to_binding,
                         &binding_id,
                         &hotkey_string,
+                        continues,
                     );
                     let _ = response.send(result);
                 }
@@ -209,14 +221,18 @@ impl HandyKeysState {
         hotkey_to_binding: &mut HashMap<HotkeyId, (String, String)>,
         binding_id: &str,
         hotkey_string: &str,
+        continues: bool,
     ) -> Result<(), String> {
         let hotkey: Hotkey = hotkey_string
             .parse()
             .map_err(|e| format!("Failed to parse hotkey '{}': {}", hotkey_string, e))?;
 
-        let id = manager
-            .register(hotkey)
-            .map_err(|e| format!("Failed to register hotkey: {}", e))?;
+        let registered = if continues {
+            manager.register_continuation(hotkey)
+        } else {
+            manager.register(hotkey)
+        };
+        let id = registered.map_err(|e| format!("Failed to register hotkey: {}", e))?;
 
         binding_to_hotkey.insert(binding_id.to_string(), id);
         hotkey_to_binding.insert(id, (binding_id.to_string(), hotkey_string.to_string()));
@@ -247,13 +263,28 @@ impl HandyKeysState {
 
     /// Register a shortcut binding
     pub fn register(&self, binding: &ShortcutBinding) -> Result<(), String> {
+        self.send_register(&binding.id, &binding.current_binding, false)?;
+        if let Ok(mut registered) = self.registered.lock() {
+            registered.insert(binding.id.clone(), binding.current_binding.clone());
+        }
+        Ok(())
+    }
+
+    /// Register `keys` under `id` as a continuation of the modifier-only
+    /// shortcut they extend (`HotkeyManager::register_continuation`).
+    fn register_continuation(&self, id: &str, keys: &str) -> Result<(), String> {
+        self.send_register(id, keys, true)
+    }
+
+    fn send_register(&self, id: &str, keys: &str, continues: bool) -> Result<(), String> {
         let (tx, rx) = mpsc::channel();
         self.command_sender
             .lock()
             .map_err(|_| "Failed to lock command_sender")?
             .send(ManagerCommand::Register {
-                binding_id: binding.id.clone(),
-                hotkey_string: binding.current_binding.clone(),
+                binding_id: id.to_string(),
+                hotkey_string: keys.to_string(),
+                continues,
                 response: tx,
             })
             .map_err(|_| "Failed to send register command")?;
@@ -264,18 +295,64 @@ impl HandyKeysState {
 
     /// Unregister a shortcut binding
     pub fn unregister(&self, binding: &ShortcutBinding) -> Result<(), String> {
+        self.unregister_id(&binding.id)?;
+        if let Ok(mut registered) = self.registered.lock() {
+            registered.remove(&binding.id);
+        }
+        Ok(())
+    }
+
+    /// Unregister whatever is registered under `id`. Nothing there is fine.
+    fn unregister_id(&self, id: &str) -> Result<(), String> {
         let (tx, rx) = mpsc::channel();
         self.command_sender
             .lock()
             .map_err(|_| "Failed to lock command_sender")?
             .send(ManagerCommand::Unregister {
-                binding_id: binding.id.clone(),
+                binding_id: id.to_string(),
                 response: tx,
             })
             .map_err(|_| "Failed to send unregister command")?;
 
         rx.recv_timeout(MANAGER_REPLY_TIMEOUT)
             .map_err(|_| "Timed out waiting for the hotkey engine to unregister".to_string())?
+    }
+
+    /// Release both dictation shortcuts' hands-free keys, so a shortcut about
+    /// to be registered on the same keys is not refused as a duplicate. The
+    /// next [`Self::sync_hands_free_keys`] puts back whichever still belong.
+    fn release_hands_free_keys(&self) {
+        for binding_id in ["transcribe", settings::CLEANUP_BINDING_ID] {
+            let _ = self.unregister_id(&hands_free::key_id(binding_id));
+        }
+    }
+
+    /// Bring both dictation shortcuts' hands-free keys (`hands_free`) in line
+    /// with `settings` and with what is registered: one for each dictation
+    /// shortcut that is live and can have one, on its live keys, and none for a
+    /// shortcut that is off, being edited, or whose keys plus Space another
+    /// live shortcut holds. Releases first, so it is safe to repeat.
+    fn sync_hands_free_keys(&self, settings: &AppSettings) {
+        self.release_hands_free_keys();
+        let live = match self.registered.lock() {
+            Ok(registered) => registered.clone(),
+            Err(_) => return,
+        };
+        let pairs = || live.iter().map(|(id, keys)| (id.as_str(), keys.as_str()));
+        for binding_id in ["transcribe", settings::CLEANUP_BINDING_ID] {
+            let Some(keys) = live.get(binding_id) else {
+                continue;
+            };
+            let Some(extended) = hands_free::space_keys_for(settings, binding_id, keys, pairs())
+            else {
+                continue;
+            };
+            let id = hands_free::key_id(binding_id);
+            match self.register_continuation(&id, &extended) {
+                Ok(()) => debug!("Hands-free key for '{binding_id}': {extended}"),
+                Err(e) => warn!("Could not register the hands-free key {extended}: {e}"),
+            }
+        }
     }
 
     /// Start recording mode for a specific binding
@@ -484,10 +561,21 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
             );
         }
     }
+    // Once every shortcut is in, so whether one of them holds a hands-free
+    // key's keys never depends on the order they were registered in.
+    state.sync_hands_free_keys(&user_settings);
 
     app.manage(state);
     info!("handy-keys shortcuts initialized");
     Ok(())
+}
+
+/// Re-derive the dictation shortcuts' hands-free keys after a setting that
+/// decides them has changed. No-op when this engine is not running.
+pub fn sync_hands_free_keys(app: &AppHandle) {
+    if let Some(state) = app.try_state::<HandyKeysState>() {
+        state.sync_hands_free_keys(&get_settings(app));
+    }
 }
 
 /// Tell the hotkey engine whether recording shortcuts are held or tapped, so it
@@ -561,7 +649,13 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
     let state = app
         .try_state::<HandyKeysState>()
         .ok_or("HandyKeysState not initialized")?;
-    state.register(&binding)
+    // A hands-free key on these very keys would get this shortcut refused as a
+    // duplicate. It steps aside, and the sync puts back whichever still belong
+    // (a dictation shortcut's own among them).
+    state.release_hands_free_keys();
+    let result = state.register(&binding);
+    state.sync_hands_free_keys(&get_settings(app));
+    result
 }
 
 /// Unregister a shortcut
@@ -572,7 +666,11 @@ pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<
     let state = app
         .try_state::<HandyKeysState>()
         .ok_or("HandyKeysState not initialized")?;
-    state.unregister(&binding)
+    let result = state.unregister(&binding);
+    // A dictation shortcut takes its hands-free key with it; any other may have
+    // been holding the keys one would use.
+    state.sync_hands_free_keys(&get_settings(app));
+    result
 }
 
 /// Start key recording mode

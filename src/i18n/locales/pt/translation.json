@@ -667,6 +667,19 @@
         "description": "Segurar: grava enquanto você mantém um atalho de gravação pressionado. Tocar: um toque começa, o próximo para. Vale para todos os atalhos de gravação.",
         "hold": "Segurar",
         "tap": "Toque"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Mãos livres com Espaço",
+          "description": "Segure as teclas de ditado, pressione Espaço e solte: ele continua ouvindo até você pressionar as teclas de novo.",
+          "unavailable": "Só funciona quando o atalho de ditado usa apenas teclas modificadoras.",
+          "taken": "Outro atalho já usa {{keys}}."
+        },
+        "tap": {
+          "label": "Mãos livres com um toque",
+          "description": "Toque nas teclas de ditado em vez de segurá-las, e ele continua ouvindo até você pressioná-las de novo.",
+          "tapMode": "Com “Toque para alternar”, todo ditado já é mãos livres."
+        }
       }
     },
     "models": {
@@ -2205,12 +2218,14 @@
     },
     "listening": "Ouvindo…",
     "locked": "Gravando mãos livres — pressione a tecla de atalho novamente para parar",
+    "handsFree": "Mãos livres",
     "cancel": "Cancelar",
     "copy": "Copiar a transcrição",
     "transcript": "Transcrição",
     "copied": "Copiado",
     "copyFailed": "Não foi possível copiar — tente novamente",
     "done": "Concluído",
+    "finish": "Concluir",
     "askAssistant": "Perguntar ao assistente em vez de digitar isso",
     "recovery": {
       "dismissed": "Descartado",
@@ -2605,7 +2620,10 @@
         "hold": "Segure, fale, solte. Suas palavras são digitadas onde está o cursor.",
         "tap": "Toque para começar, fale, toque para parar. Suas palavras são digitadas onde está o cursor.",
         "whatHold": "Segure, fale, solte. Suas palavras aparecem onde está o cursor.",
-        "whatTap": "Toque, fale, toque de novo. Suas palavras aparecem onde está o cursor."
+        "whatTap": "Toque, fale, toque de novo. Suas palavras aparecem onde está o cursor.",
+        "handsFreeSpace": "Precisa de mais tempo? Pressione Espaço enquanto segura e solte: ele continua ouvindo até você pressionar as teclas de novo.",
+        "handsFreeTap": "Precisa de mais tempo? Toque em vez de segurar: ele continua ouvindo até você pressionar as teclas de novo.",
+        "handsFreeBoth": "Precisa de mais tempo? Pressione Espaço enquanto segura, ou toque em vez de segurar: ele continua ouvindo até você pressionar as teclas de novo."
       },
       "cleanup": {
         "title": "Ditar e limpar",

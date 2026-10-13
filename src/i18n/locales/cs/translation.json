@@ -669,6 +669,19 @@
         "description": "Podržení: nahrává se, dokud držíte zkratku pro nahrávání. Stisknutí: jeden stisk spustí, další zastaví. Platí pro všechny zkratky pro nahrávání.",
         "hold": "Podržení",
         "tap": "Stisknutí"
+      },
+      "handsFree": {
+        "space": {
+          "label": "Bez držení s mezerníkem",
+          "description": "Podržte klávesy diktování, stiskněte mezerník a pusťte: poslouchá dál, dokud klávesy nestisknete znovu.",
+          "unavailable": "Funguje jen tehdy, když zkratku diktování tvoří jen modifikační klávesy.",
+          "taken": "{{keys}} už používá jiná zkratka."
+        },
+        "tap": {
+          "label": "Bez držení klepnutím",
+          "description": "Klávesy diktování stiskněte místo držení a poslouchá dál, dokud je nestisknete znovu.",
+          "tapMode": "S volbou „Stiskem zapnout/vypnout“ je každé diktování už bez držení."
+        }
       }
     },
     "models": {
@@ -2217,12 +2230,14 @@
     },
     "listening": "Poslouchám…",
     "locked": "Nahrávám bez držení — dalším stiskem zkratky nahrávání zastavíte",
+    "handsFree": "Bez držení",
     "cancel": "Zrušit",
     "copy": "Zkopírovat přepis",
     "transcript": "Přepis",
     "copied": "Zkopírováno",
     "copyFailed": "Nepodařilo se zkopírovat — zkuste to znovu",
     "done": "Hotovo",
+    "finish": "Dokončit",
     "askAssistant": "Zeptat se asistenta místo vypsání tohoto textu",
     "recovery": {
       "dismissed": "Zrušeno",
@@ -2626,7 +2641,10 @@
         "hold": "Podržte, mluvte, pusťte. Vaše slova se napíšou tam, kde je kurzor.",
         "tap": "Stiskem spusťte, mluvte, stiskem zastavte. Vaše slova se napíšou tam, kde je kurzor.",
         "whatHold": "Podržte, mluvte, pusťte. Slova se napíšou tam, kde je kurzor.",
-        "whatTap": "Stiskněte, mluvte, stiskněte znovu. Slova se napíšou tam, kde je kurzor."
+        "whatTap": "Stiskněte, mluvte, stiskněte znovu. Slova se napíšou tam, kde je kurzor.",
+        "handsFreeSpace": "Potřebujete víc času? Při držení stiskněte mezerník a pusťte: poslouchá dál, dokud klávesy nestisknete znovu.",
+        "handsFreeTap": "Potřebujete víc času? Místo držení klepněte: poslouchá dál, dokud klávesy nestisknete znovu.",
+        "handsFreeBoth": "Potřebujete víc času? Při držení stiskněte mezerník, nebo místo držení klepněte: poslouchá dál, dokud klávesy nestisknete znovu."
       },
       "cleanup": {
         "title": "Diktovat a vyčistit",

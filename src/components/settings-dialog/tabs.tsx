@@ -42,6 +42,10 @@ import {
 import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { PushToTalk } from "@/components/settings/PushToTalk";
+import {
+  HandsFreeSpaceSetting,
+  HandsFreeTapSetting,
+} from "@/components/settings/HandsFree";
 import { MicrophoneSelector } from "@/components/settings/MicrophoneSelector";
 import { AlwaysOnMicrophone } from "@/components/settings/AlwaysOnMicrophone";
 import { MuteWhileRecording } from "@/components/settings/MuteWhileRecording";
@@ -187,6 +191,8 @@ export const ShortcutsTab: React.FC = () => {
           />
         )}
         <PushToTalk descriptionMode="inline" grouped={true} />
+        <HandsFreeSpaceSetting grouped={true} />
+        <HandsFreeTapSetting grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settingsDialog.shortcuts.assistant")}>

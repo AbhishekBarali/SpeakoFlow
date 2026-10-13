@@ -34,6 +34,18 @@ pub fn handle_shortcut_event(
 ) {
     let base_id = binding_id;
 
+    // The dictation keys plus Space (`hands_free`). Only the press means
+    // anything: the release of the dictation keys is what matters to a held
+    // dictation, and they are released after it either way.
+    if let Some(dictation) = crate::hands_free::dictation_of(base_id) {
+        if is_pressed {
+            if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
+                coordinator.send_hands_free(dictation, hotkey_string);
+            }
+        }
+        return;
+    }
+
     // The assistant is switched off: its hotkeys do nothing. They are also
     // unregistered at the OS level when the setting changes, so this is the
     // belt-and-braces path for a shortcut that was already in flight.

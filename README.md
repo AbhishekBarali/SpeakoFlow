@@ -215,17 +215,26 @@ Each feature has its own page in the [documentation](https://www.speakoflow.com/
 | Action                            | Windows                        | macOS           | Linux                  |
 | --------------------------------- | ------------------------------ | --------------- | ---------------------- |
 | Dictate                           | `Left Ctrl + Left Win`         | `Fn` (🌐)       | `Ctrl + Space`         |
+| Dictate hands-free <sup>1</sup>   | `Left Ctrl + Left Win + Space` | `Fn + Space`    | Tap <sup>2</sup>       |
 | Ask the assistant                 | `Left Ctrl + Left Alt`         | `Fn + Ctrl`     | `Ctrl + Alt + Space`   |
 | Start or end a conversation       | `Left Ctrl + Left Alt + C`     | `Fn + Ctrl + C` | `Ctrl + Alt + C`       |
-| Dictate and clean up <sup>1</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`    | `Ctrl + Shift + Space` |
+| Dictate and clean up <sup>3</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`    | `Ctrl + Shift + Space` |
 | Cancel                            | `Esc`                          | `Esc`           | Not available yet      |
 
-<sup>1</sup> Only while AI cleanup is on and has its own shortcut.
+<sup>1</sup> Pressed while you hold the dictation keys, or all together. It
+keeps listening after you let go, until you press the dictation keys again.
+
+<sup>2</sup> Space is already part of `Ctrl + Space`, so turn on **Hands-free
+with a tap** in Settings → Shortcuts and tap the keys instead.
+
+<sup>3</sup> Only while AI cleanup is on and has its own shortcut.
 
 The pattern is the same on every platform. Add Shift to the dictation keys to
 dictate and clean up, and add C to the ask keys to start a conversation.
 Recording shortcuts work while you hold them; switch the Home page from **Hold
-to talk** to **Tap to toggle** and one press starts, the next one stops.
+to talk** to **Tap to toggle** and one press starts, the next one stops. A
+dictation that keeps listening without the keys is hands-free: the pill gets a
+ring, and hovering it shows ✕ to cancel and ✓ to finish.
 
 Esc only cancels while something is running, like a recording or a reply being
 read aloud, so other apps keep their Esc the rest of the time. To change a
