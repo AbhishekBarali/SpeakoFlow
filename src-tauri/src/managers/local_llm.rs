@@ -264,6 +264,48 @@ fn select_engine_device_arg(
     }
 }
 
+/// `ld_library_path` without the entries under the AppImage mount `appdir`.
+/// `None` when nothing is left, so the caller can drop the variable.
+#[cfg(target_os = "linux")]
+fn without_appdir_entries(ld_library_path: &str, appdir: &Path) -> Option<String> {
+    // `Path::starts_with` compares whole components, so `/tmp/.mount_a2` is not
+    // mistaken for a child of `/tmp/.mount_a`. Empty entries mean "the current
+    // directory" to the loader and are never intentional here.
+    let kept: Vec<&str> = ld_library_path
+        .split(':')
+        .filter(|entry| !entry.is_empty() && !Path::new(entry).starts_with(appdir))
+        .collect();
+    if kept.is_empty() {
+        None
+    } else {
+        Some(kept.join(":"))
+    }
+}
+
+/// Keep the AppImage's library directories out of the engine's environment.
+///
+/// The AppImage launcher exports `LD_LIBRARY_PATH=$APPDIR/usr/lib:...` so the
+/// app finds its bundled libraries, and every child process inherits it. The
+/// loader searches `LD_LIBRARY_PATH` before a binary's own `RUNPATH`, so the
+/// engine then loads the AppImage's `libggml` (the older one Whisper uses)
+/// instead of the newer copy shipped beside `llama-server`. `libllama` then
+/// fails on an undefined `ggml_*` symbol and the engine exits with status 127.
+/// Entries the user set themselves are kept, for engines pointed to by
+/// `HANDY_LLAMA_SERVER`.
+#[cfg(target_os = "linux")]
+fn scrub_appimage_library_path(cmd: &mut Command) {
+    let Some(appdir) = std::env::var_os("APPDIR").filter(|dir| !dir.is_empty()) else {
+        return;
+    };
+    let Ok(current) = std::env::var("LD_LIBRARY_PATH") else {
+        return;
+    };
+    match without_appdir_entries(&current, Path::new(&appdir)) {
+        Some(kept) => cmd.env("LD_LIBRARY_PATH", kept),
+        None => cmd.env_remove("LD_LIBRARY_PATH"),
+    };
+}
+
 /// Ask the engine binary which devices it can see, once per app run.
 fn engine_devices(engine: &Path) -> &'static [EngineDevice] {
     ENGINE_DEVICES.get_or_init(|| {
@@ -273,6 +315,8 @@ fn engine_devices(engine: &Path) -> &'static [EngineDevice] {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
+        #[cfg(target_os = "linux")]
+        scrub_appimage_library_path(&mut command);
         // llama-server is a console program: without this, a terminal window
         // flashes up on screen while it lists devices, the same as the server
         // spawn below guards against.
@@ -1749,6 +1793,10 @@ impl LocalLlmManager {
         };
         cmd.stdout(stdout).stderr(stderr);
 
+        // Inside an AppImage, don't let its bundled libggml shadow the engine's own.
+        #[cfg(target_os = "linux")]
+        scrub_appimage_library_path(&mut cmd);
+
         // Don't pop up a console window on Windows.
         #[cfg(windows)]
         {
@@ -2964,5 +3012,37 @@ mod tests {
         assert_eq!(log_tail("a\nb\nc\n", 2).as_deref(), Some("b\nc"));
         assert_eq!(log_tail("\n  \n", 5), None);
         assert_eq!(log_tail("", 5), None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn appdir_entries_are_dropped_and_user_entries_kept() {
+        let appdir = Path::new("/tmp/.mount_Speako1");
+        let path = "/tmp/.mount_Speako1/usr/lib/:/tmp/.mount_Speako1/lib64/:/opt/custom/lib";
+        assert_eq!(
+            without_appdir_entries(path, appdir).as_deref(),
+            Some("/opt/custom/lib")
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn appdir_prefix_match_respects_path_components() {
+        let appdir = Path::new("/tmp/.mount_Speako1");
+        assert_eq!(
+            without_appdir_entries("/tmp/.mount_Speako12/usr/lib", appdir).as_deref(),
+            Some("/tmp/.mount_Speako12/usr/lib")
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn library_path_made_only_of_appdir_entries_is_removed() {
+        let appdir = Path::new("/tmp/.mount_Speako1");
+        assert_eq!(
+            without_appdir_entries("/tmp/.mount_Speako1/usr/lib/:", appdir),
+            None
+        );
+        assert_eq!(without_appdir_entries("", appdir), None);
     }
 }
