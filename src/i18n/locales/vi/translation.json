@@ -639,6 +639,10 @@
           "assistant_call": {
             "name": "Bắt đầu trò chuyện",
             "description": "Trò chuyện rảnh tay với trợ lý và nghe câu trả lời. Nhấn lần nữa để kết thúc."
+          },
+          "hands_free": {
+            "name": "Chế độ rảnh tay",
+            "description": "Nhấn phím này khi đang giữ các phím đọc chính tả để tiếp tục ghi âm sau khi thả tay. Nhấn lại các phím đọc chính tả để kết thúc."
           }
         },
         "errors": {
@@ -660,22 +664,18 @@
       },
       "pushToTalk": {
         "label": "Cách ghi âm",
-        "description": "Giữ: ghi âm trong khi bạn giữ phím tắt ghi âm. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng. Áp dụng cho mọi phím tắt ghi âm.",
+        "dictation": "Giữ: ghi âm trong khi bạn giữ các phím đọc chính tả. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng.",
+        "assistant": "Giữ: lắng nghe trong khi bạn giữ các phím đặt câu hỏi. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để gửi.",
         "hold": "Giữ",
         "tap": "Nhấn"
       },
       "handsFree": {
-        "space": {
-          "label": "Rảnh tay với phím cách",
-          "description": "Giữ phím đọc chính tả, nhấn phím cách rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím.",
-          "unavailable": "Chỉ hoạt động khi phím tắt đọc chính tả chỉ gồm các phím bổ trợ.",
-          "taken": "Một phím tắt khác đã dùng {{keys}}."
-        },
-        "tap": {
-          "label": "Rảnh tay bằng một lần nhấn",
-          "description": "Nhấn nhanh phím đọc chính tả thay vì giữ, ứng dụng sẽ tiếp tục nghe cho đến khi bạn nhấn lại.",
-          "tapMode": "Với “Nhấn để bật/tắt”, mọi lần đọc chính tả đều đã rảnh tay."
-        }
+        "description": "Khi đang giữ {{keys}}, nhấn phím này rồi thả ra: chế độ đọc chính tả tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}.",
+        "unavailableKeys": "Cần phím tắt đọc chính tả chỉ gồm các phím bổ trợ. Với {{keys}}, hãy dùng “Nhấn để bật/tắt” thay thế.",
+        "unavailableEngine": "Cần bộ xử lý bàn phím SpeakoFlow Keys, trong {{where}}.",
+        "taken": "{{name}} đã dùng {{keys}}, nên phím này không có tác dụng cho đến khi một trong hai thay đổi.",
+        "needsKey": "Hãy chọn một phím, như phím cách hoặc Enter. Một phím bổ trợ riêng lẻ không thể là phím rảnh tay.",
+        "pressKey": "Nhấn một phím…"
       }
     },
     "models": {
@@ -2578,10 +2578,10 @@
         "hold": "Giữ, nói, thả ra. Lời bạn nói được gõ tại vị trí con trỏ.",
         "tap": "Nhấn để bắt đầu, nói, nhấn để dừng. Lời bạn nói được gõ tại vị trí con trỏ.",
         "whatHold": "Giữ, nói, thả ra. Lời bạn nói được gõ tại vị trí con trỏ.",
-        "whatTap": "Nhấn, nói, nhấn lại. Lời bạn nói được gõ tại vị trí con trỏ.",
-        "handsFreeSpace": "Cần nói lâu hơn? Nhấn phím cách khi đang giữ rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím.",
-        "handsFreeTap": "Cần nói lâu hơn? Nhấn nhanh thay vì giữ: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím.",
-        "handsFreeBoth": "Cần nói lâu hơn? Nhấn phím cách khi đang giữ, hoặc nhấn nhanh thay vì giữ: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại các phím."
+        "whatTap": "Nhấn, nói, nhấn lại. Lời bạn nói được gõ tại vị trí con trỏ."
+      },
+      "handsFree": {
+        "what": "Giữ {{keys}}, nhấn {{key}} rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}."
       },
       "cleanup": {
         "title": "Đọc chính tả và dọn dẹp",
@@ -2591,14 +2591,15 @@
       "ask": {
         "title": "Hỏi trợ lý",
         "description": "Hỏi thành tiếng và nhận câu trả lời trong một bảng nổi.",
-        "what": "Hỏi thành tiếng. Câu trả lời hiện trong một bảng nổi."
+        "whatHold": "Giữ, hỏi, thả ra. Câu trả lời hiện trong một bảng nổi.",
+        "whatTap": "Nhấn, hỏi, nhấn lại. Câu trả lời hiện trong một bảng nổi."
       },
       "call": {
         "title": "Bắt đầu trò chuyện",
         "description": "Trò chuyện rảnh tay với câu trả lời bằng giọng nói.",
         "what": "Trò chuyện qua lại, rảnh tay. Nhấn lần nữa để kết thúc."
       },
-      "info": "Nhấn các phím này trong bất kỳ ứng dụng nào. Nhấp vào phím để thay đổi.",
+      "info": "Nhấn các phím này trong bất kỳ ứng dụng nào. Nhấp vào phím để thay đổi, và chọn Giữ hoặc Nhấn cho từng phím tắt ghi âm.",
       "offHint": "Đã tắt",
       "mode": {
         "hold": "Giữ để nói",

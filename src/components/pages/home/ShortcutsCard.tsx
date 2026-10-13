@@ -7,8 +7,10 @@ import { SectionTitle } from "@/components/ui/Page";
 import { Segmented } from "@/components/ui/Segmented";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
+import type { RecordingModeSetting } from "@/components/settings/PushToTalk";
 import { useNavigation, type PageId } from "@/components/shell/navigation";
-import { handsFreeSpace } from "@/lib/handsFree";
+import { HANDS_FREE_ID, handsFree } from "@/lib/handsFree";
+import { formatKeyCombination } from "@/lib/utils/keyboard";
 import { LinuxShortcutHelp } from "./LinuxShortcutHelp";
 
 interface ShortcutRow {
@@ -18,21 +20,28 @@ interface ShortcutRow {
   info: string;
   /** Where to turn the feature on, when it is off. */
   off?: PageId;
+  /** Held or tapped, for the shortcuts that record. */
+  mode?: RecordingModeSetting;
+  /** A key pressed on top of the dictation keys, not a shortcut of its own. */
+  addOn?: boolean;
 }
 
 /**
  * Every shortcut, one line each: a name, an (i) for what it does, and the
  * keys — which are also the button that changes them. Dictate comes first,
- * because it is the one people press all day. Hold-or-tap applies to every
- * recording shortcut at once (that is how the backend treats `push_to_talk`),
- * so it is one switch in the header rather than a setting repeated per row.
+ * because it is the one people press all day. Dictation and the ask are each
+ * held or tapped on their own (`settings::holds_to_record`), so each carries
+ * its own Hold · Tap; the call has none, because a call is a press to start
+ * and a press to hang up. With Hold, the hands-free key sits under Dictate,
+ * drawn as what it is: one more key on top of the dictation keys.
  */
 export const ShortcutsCard: React.FC = () => {
   const { t } = useTranslation();
   const { settings, getSetting, updateSetting, isUpdating } = useSettings();
   const { navigate } = useNavigation();
   const os = useOsType();
-  const holdToTalk = getSetting("push_to_talk") ?? true;
+  const dictationHeld = getSetting("push_to_talk") ?? true;
+  const askHeld = getSetting("assistant_push_to_talk") ?? true;
   const cleanupOn = getSetting("post_process_enabled") ?? false;
   // Cleanup that rides on the dictation shortcut has no keys of its own, so
   // the dictation row says "Dictate and clean up" instead of listing both.
@@ -40,22 +49,35 @@ export const ShortcutsCard: React.FC = () => {
     cleanupOn && (getSetting("post_process_on_dictation") ?? false);
   const assistantOn = getSetting("assistant_enabled") ?? true;
 
-  // With Hold, a dictation can still be made hands-free (`hands_free.rs`), and
-  // the dictation rows say how, in the sentence after what the keys do. With
-  // Tap every dictation already is, so there is nothing to add.
-  const handsFreeHint = (bindingId: string) => {
-    if (!holdToTalk) return "";
-    const space =
-      (getSetting("dictation_hands_free_space") ?? true) &&
-      handsFreeSpace(settings, bindingId).state === "ready";
-    const tap = getSetting("dictation_hands_free_tap") ?? false;
-    if (space && tap) return t("home.shortcuts.dictate.handsFreeBoth");
-    if (space) return t("home.shortcuts.dictate.handsFreeSpace");
-    if (tap) return t("home.shortcuts.dictate.handsFreeTap");
-    return "";
-  };
-  const withHint = (what: string, bindingId: string) =>
-    [what, handsFreeHint(bindingId)].filter(Boolean).join(" ");
+  const bindings = getSetting("bindings") ?? {};
+  const keysOf = (id: string) =>
+    formatKeyCombination(bindings[id]?.current_binding ?? "", os);
+
+  // Only where it works: removed, or impossible with these keys or this
+  // engine, it is Settings' to explain, not a row here that does nothing.
+  const hands = handsFree(settings);
+  const handsFreeRow: ShortcutRow[] =
+    hands.state === "ready" || hands.state === "taken"
+      ? [
+          {
+            id: HANDS_FREE_ID,
+            title: t("settings.general.shortcut.bindings.hands_free.name"),
+            info:
+              hands.state === "taken"
+                ? t("settings.general.handsFree.taken", {
+                    name: t(
+                      `settings.general.shortcut.bindings.${hands.by}.name`,
+                    ),
+                    keys: formatKeyCombination(hands.keys, os),
+                  })
+                : t("home.shortcuts.handsFree.what", {
+                    keys: keysOf("transcribe"),
+                    key: formatKeyCombination(hands.key, os),
+                  }),
+            addOn: true,
+          },
+        ]
+      : [];
 
   const rows: ShortcutRow[] = [
     {
@@ -63,33 +85,32 @@ export const ShortcutsCard: React.FC = () => {
       title: cleanupOnDictation
         ? t("home.shortcuts.cleanup.title")
         : t("home.shortcuts.dictate.title"),
-      info: withHint(
-        cleanupOnDictation
-          ? t("home.shortcuts.cleanup.what")
-          : holdToTalk
-            ? t("home.shortcuts.dictate.whatHold")
-            : t("home.shortcuts.dictate.whatTap"),
-        "transcribe",
-      ),
+      info: cleanupOnDictation
+        ? t("home.shortcuts.cleanup.what")
+        : dictationHeld
+          ? t("home.shortcuts.dictate.whatHold")
+          : t("home.shortcuts.dictate.whatTap"),
+      mode: "push_to_talk",
     },
+    ...handsFreeRow,
     ...(cleanupOnDictation
       ? []
       : [
           {
             id: "transcribe_with_post_process",
             title: t("home.shortcuts.cleanup.title"),
-            info: withHint(
-              t("home.shortcuts.cleanup.what"),
-              "transcribe_with_post_process",
-            ),
+            info: t("home.shortcuts.cleanup.what"),
             off: cleanupOn ? undefined : ("cleanup" as PageId),
           },
         ]),
     {
       id: "assistant",
       title: t("home.shortcuts.ask.title"),
-      info: t("home.shortcuts.ask.what"),
+      info: askHeld
+        ? t("home.shortcuts.ask.whatHold")
+        : t("home.shortcuts.ask.whatTap"),
       off: assistantOn ? undefined : "assistant",
+      mode: "assistant_push_to_talk",
     },
     {
       id: "assistant_call",
@@ -108,16 +129,16 @@ export const ShortcutsCard: React.FC = () => {
   }
 
   // Linux names the actions in its desktop-shortcut list the way these rows
-  // do, Cancel included although it has no row there.
+  // do, Cancel included although it has no row there. The hands-free key is
+  // not an action a desktop shortcut can run.
   const labels: Record<string, string> = Object.fromEntries([
-    ...rows.map((row) => [row.id, row.title]),
+    ...rows.filter((row) => !row.addOn).map((row) => [row.id, row.title]),
     ["cancel", t("home.shortcuts.cancel.title")],
   ]);
 
   // On a Mac the dictation default is the globe key, which macOS also acts on
   // unless "Press 🌐 key to" is Do Nothing. Checked again when the window
   // regains focus, which is when someone comes back from System Settings.
-  const bindings = getSetting("bindings") ?? {};
   const usesGlobe =
     os === "macos" &&
     rows.some(
@@ -147,25 +168,36 @@ export const ShortcutsCard: React.FC = () => {
     };
   }, [usesGlobe]);
 
+  const modeControl = (row: ShortcutRow, setting: RecordingModeSetting) => {
+    const held = setting === "push_to_talk" ? dictationHeld : askHeld;
+    return (
+      <Segmented
+        size="sm"
+        label={`${row.title}: ${t("settings.general.pushToTalk.label")}`}
+        value={held ? "hold" : "tap"}
+        onChange={(mode) => void updateSetting(setting, mode === "hold")}
+        disabled={isUpdating(setting)}
+        options={[
+          {
+            value: "hold",
+            label: t("settings.general.pushToTalk.hold"),
+            title: t("home.shortcuts.mode.hold"),
+          },
+          {
+            value: "tap",
+            label: t("settings.general.pushToTalk.tap"),
+            title: t("home.shortcuts.mode.tap"),
+          },
+        ]}
+      />
+    );
+  };
+
   return (
     <section>
       <SectionTitle
         title={t("home.shortcuts.title")}
         description={t("home.shortcuts.info")}
-        action={
-          <Segmented
-            label={t("settings.general.pushToTalk.label")}
-            value={holdToTalk ? "hold" : "tap"}
-            onChange={(mode) =>
-              void updateSetting("push_to_talk", mode === "hold")
-            }
-            disabled={isUpdating("push_to_talk")}
-            options={[
-              { value: "hold", label: t("home.shortcuts.mode.hold") },
-              { value: "tap", label: t("home.shortcuts.mode.tap") },
-            ]}
-          />
-        }
       />
       <ul className="divide-y divide-hairline rounded-2xl border border-hairline bg-surface elev-card">
         {rows.map((row) => (
@@ -190,7 +222,24 @@ export const ShortcutsCard: React.FC = () => {
                 {t("home.shortcuts.turnOn")}
               </button>
             ) : (
-              <ShortcutInput shortcutId={row.id} bare size="md" />
+              <span className="flex shrink-0 items-center gap-3">
+                {row.mode && modeControl(row, row.mode)}
+                {/* The keys, right-aligned in a column wide enough for two
+                    keycaps, so the Hold · Tap of every row lines up. */}
+                <span
+                  className={`flex items-center justify-end gap-1.5 ${row.mode ? "min-w-[8rem]" : ""}`}
+                >
+                  {row.addOn && (
+                    <span
+                      aria-hidden="true"
+                      className="text-[0.9375rem] text-muted"
+                    >
+                      +
+                    </span>
+                  )}
+                  <ShortcutInput shortcutId={row.id} bare size="md" />
+                </span>
+              </span>
             )}
           </li>
         ))}

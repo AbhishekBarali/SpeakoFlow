@@ -65,9 +65,11 @@ enum ManagerCommand {
         binding_id: String,
         response: Sender<Result<(), String>>,
     },
-    /// Fire modifier-only hotkeys on release (Tap to toggle) or on press
-    /// (Hold to talk). See `HotkeyManager::set_fire_on_release`.
-    FireOnRelease(bool),
+    /// Fire each shortcut's modifier-only hotkey on release (Tap to toggle) or
+    /// on press (Hold to talk), by its own setting
+    /// (`settings::holds_to_record`). See
+    /// `HotkeyManager::set_fire_on_release_for`.
+    ApplyRecordingModes,
     Shutdown,
 }
 
@@ -146,10 +148,6 @@ impl HandyKeysState {
                 return;
             }
         };
-        // With Tap to toggle, a modifier-only shortcut fires when its keys are
-        // let go, so the ask never starts on the way to the call's Ctrl+Alt+C.
-        manager.set_fire_on_release(!get_settings(&app).push_to_talk);
-
         // Maps binding IDs to HotkeyIds and hotkey strings
         let mut binding_to_hotkey: HashMap<String, HotkeyId> = HashMap::new();
         let mut hotkey_to_binding: HashMap<HotkeyId, (String, String)> = HashMap::new(); // (binding_id, hotkey_string)
@@ -189,6 +187,14 @@ impl HandyKeysState {
                         &hotkey_string,
                         continues,
                     );
+                    if result.is_ok() {
+                        Self::apply_recording_mode_to(
+                            &manager,
+                            &binding_to_hotkey,
+                            &get_settings(&app),
+                            &binding_id,
+                        );
+                    }
                     let _ = response.send(result);
                 }
                 ManagerCommand::Unregister {
@@ -203,7 +209,17 @@ impl HandyKeysState {
                     );
                     let _ = response.send(result);
                 }
-                ManagerCommand::FireOnRelease(on) => manager.set_fire_on_release(on),
+                ManagerCommand::ApplyRecordingModes => {
+                    let settings = get_settings(&app);
+                    for binding_id in binding_to_hotkey.keys() {
+                        Self::apply_recording_mode_to(
+                            &manager,
+                            &binding_to_hotkey,
+                            &settings,
+                            binding_id,
+                        );
+                    }
+                }
                 ManagerCommand::Shutdown => {
                     info!("handy-keys manager thread shutting down");
                     break;
@@ -242,6 +258,23 @@ impl HandyKeysState {
             binding_id, hotkey
         );
         Ok(())
+    }
+
+    /// With Tap to toggle a modifier-only shortcut fires when its keys are let
+    /// go, so the ask never starts on the way to the call's Ctrl+Alt+C; with
+    /// Hold to talk it fires at once. Dictation and the ask each have their own
+    /// setting, and every other shortcut fires on release, which only matters
+    /// for one made of modifiers alone: a press that might be the start of
+    /// another shortcut must not start a call.
+    fn apply_recording_mode_to(
+        manager: &HotkeyManager,
+        binding_to_hotkey: &HashMap<String, HotkeyId>,
+        settings: &AppSettings,
+        binding_id: &str,
+    ) {
+        if let Some(&id) = binding_to_hotkey.get(binding_id) {
+            manager.set_fire_on_release_for(id, !settings::holds_to_record(settings, binding_id));
+        }
     }
 
     /// Unregister a hotkey
@@ -327,11 +360,12 @@ impl HandyKeysState {
         }
     }
 
-    /// Bring both dictation shortcuts' hands-free keys (`hands_free`) in line
-    /// with `settings` and with what is registered: one for each dictation
-    /// shortcut that is live and can have one, on its live keys, and none for a
-    /// shortcut that is off, being edited, or whose keys plus Space another
-    /// live shortcut holds. Releases first, so it is safe to repeat.
+    /// Bring both dictation shortcuts' hands-free hotkeys (`hands_free`) in
+    /// line with `settings` and with what is registered: one for each dictation
+    /// shortcut that is live, held to talk, and can have one, on its live keys,
+    /// and none for a shortcut that is off, being edited, tapped, or whose keys
+    /// plus the hands-free key another live shortcut holds. Releases first, so
+    /// it is safe to repeat.
     fn sync_hands_free_keys(&self, settings: &AppSettings) {
         self.release_hands_free_keys();
         let live = match self.registered.lock() {
@@ -343,8 +377,7 @@ impl HandyKeysState {
             let Some(keys) = live.get(binding_id) else {
                 continue;
             };
-            let Some(extended) = hands_free::space_keys_for(settings, binding_id, keys, pairs())
-            else {
+            let Some(extended) = hands_free::keys_for(settings, binding_id, keys, pairs()) else {
                 continue;
             };
             let id = hands_free::key_id(binding_id);
@@ -524,9 +557,10 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
     let default_bindings = settings::get_default_settings().bindings;
     let user_settings = settings::load_or_create_app_settings(app);
 
-    // Register all bindings except cancel (which is dynamic)
+    // Register all bindings except cancel (which is dynamic) and the
+    // hands-free key (which only ever extends the dictation keys).
     for (id, default_binding) in default_bindings {
-        if id == "cancel" {
+        if id == "cancel" || id == settings::HANDS_FREE_BINDING_ID {
             continue;
         }
         // Skip the separate cleanup shortcut unless it is the one that runs
@@ -578,17 +612,18 @@ pub fn sync_hands_free_keys(app: &AppHandle) {
     }
 }
 
-/// Tell the hotkey engine whether recording shortcuts are held or tapped, so it
-/// fires modifier-only ones on press or on release. No-op when this engine is
-/// not running.
+/// Tell the hotkey engine whether each recording shortcut is held or tapped,
+/// so it fires its modifier-only hotkey on press or on release, and give a
+/// held dictation its hands-free hotkey (a tapped one has none). No-op when
+/// this engine is not running.
 pub fn apply_recording_mode(app: &AppHandle) {
     let Some(state) = app.try_state::<HandyKeysState>() else {
         return;
     };
-    let on = !get_settings(app).push_to_talk;
     if let Ok(sender) = state.command_sender.lock() {
-        let _ = sender.send(ManagerCommand::FireOnRelease(on));
+        let _ = sender.send(ManagerCommand::ApplyRecordingModes);
     };
+    state.sync_hands_free_keys(&get_settings(app));
 }
 
 /// Register the cancel shortcut (called when recording starts)

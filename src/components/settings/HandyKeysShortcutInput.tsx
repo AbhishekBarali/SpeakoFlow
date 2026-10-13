@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { formatKeyCombination } from "../../lib/utils/keyboard";
 import { shortcutUsingKeys } from "../../lib/utils/shortcutConflict";
+import { HANDS_FREE_ID, keysToSave } from "../../lib/handsFree";
 import { SettingContainer } from "../ui/SettingContainer";
 import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
@@ -116,14 +117,22 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
             currentKeysRef.current = hotkey_string;
             setCurrentKeys(hotkey_string);
           } else if (!is_key_down && currentKeysRef.current) {
-            // Key released - commit the shortcut using the ref value
-            const keysToCommit = currentKeysRef.current;
-            const takenBy = shortcutUsingKeys(
-              bindingsRef.current,
-              keysToCommit,
-              shortcutId,
-            );
-            if (takenBy) {
+            // Key released - commit the shortcut using the ref value. The
+            // hands-free key keeps only its key, so it can be recorded
+            // while holding the dictation keys or on its own.
+            const keysToCommit = keysToSave(shortcutId, currentKeysRef.current);
+            const takenBy =
+              keysToCommit === null
+                ? null
+                : shortcutUsingKeys(
+                    bindingsRef.current,
+                    keysToCommit,
+                    shortcutId,
+                  );
+            if (keysToCommit === null) {
+              // Modifiers alone: nothing was changed.
+              toast.error(t("settings.general.handsFree.needsKey"));
+            } else if (takenBy) {
               // Nothing was changed, so the shortcut keeps its keys.
               toast.error(
                 t("settings.general.shortcut.errors.inUse", {
@@ -241,7 +250,10 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
 
   // Format the current shortcut keys being recorded
   const formatCurrentKeys = (): string => {
-    if (!currentKeys) return t("settings.general.shortcut.pressKeys");
+    if (!currentKeys)
+      return shortcutId === HANDS_FREE_ID
+        ? t("settings.general.handsFree.pressKey")
+        : t("settings.general.shortcut.pressKeys");
     return formatKeyCombination(currentKeys, osType);
   };
 

@@ -1,12 +1,17 @@
 import type { AppSettings } from "@/bindings";
 
 /**
- * The dictation keys plus Space, as Settings and Home describe them. Mirrors
- * `src-tauri/src/hands_free.rs` (`space_keys` / `space_keys_for`), which is
- * what actually registers them: the keys exist only for a dictation shortcut
- * of modifier keys alone, only on the SpeakoFlow Keys engine, and only while no
- * other live shortcut is on those very keys.
+ * The hands-free key, as Settings and Home describe it. Mirrors
+ * `src-tauri/src/hands_free.rs` (`main_key`, `extend`, `keys_for`), which is
+ * what registers it: one key, pressed while the dictation keys are held, that
+ * keeps the dictation listening after they are let go. It goes on top of a
+ * dictation shortcut of modifier keys alone, on the SpeakoFlow Keys engine,
+ * while dictation is held to talk, and only where no other live shortcut is on
+ * those keys.
  */
+
+/** Binding id of the hands-free key. Mirrors `HANDS_FREE_BINDING_ID`. */
+export const HANDS_FREE_ID = "hands_free";
 
 const MODIFIERS = new Set([
   "ctrl",
@@ -42,43 +47,59 @@ const keyName = (part: string) =>
     .toLowerCase()
     .replace(/_(left|right)$/, "");
 
-const pressed = (keys: string) =>
-  keys
+const parts = (keys: string | null | undefined) =>
+  (keys ?? "")
     .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const pressed = (keys: string) =>
+  parts(keys)
     .map(keyName)
-    .filter(Boolean)
     .map((key) => ALIASES[key] ?? key)
     .sort()
     .join("+");
 
-/** `ctrl_left+super` gives `ctrl_left+super+space`; keys with a main key of
- *  their own (Linux's `ctrl+space`) give nothing. */
-export function spaceKeys(keys: string | null | undefined): string | null {
-  const parts = (keys ?? "")
-    .split("+")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (
-    parts.length === 0 ||
-    !parts.every((part) => MODIFIERS.has(keyName(part)))
-  )
-    return null;
-  return `${parts.join("+")}+space`;
+/**
+ * The one main key in `keys`, which is all the hands-free key keeps:
+ * recorded while the dictation keys were held, `ctrl_left+super+space` is
+ * Space. `null` for modifiers alone.
+ */
+export function mainKey(keys: string | null | undefined): string | null {
+  const main = parts(keys).filter((part) => !MODIFIERS.has(keyName(part)));
+  return main.length === 1 ? main[0].toLowerCase() : null;
 }
 
-export type HandsFreeSpace =
-  /** Registered on `keys`, or would be once switched on. */
-  | { state: "ready"; keys: string }
-  /** These dictation keys, or this engine, cannot have one. */
-  | { state: "unavailable" }
-  /** Another shortcut the user chose is on `keys`, so it steps aside. */
-  | { state: "taken"; keys: string };
+/** `ctrl_left+super` with `space` gives `ctrl_left+super+space`; keys with a
+ *  main key of their own (Linux's `ctrl+space`) give nothing. */
+export function extendKeys(
+  keys: string | null | undefined,
+  key: string | null | undefined,
+): string | null {
+  const own = parts(keys);
+  if (own.length === 0 || !own.every((part) => MODIFIERS.has(keyName(part))))
+    return null;
+  const main = mainKey(key);
+  return main ? `${own.join("+")}+${main}` : null;
+}
+
+export type HandsFree =
+  /** Registered on `keys`: the dictation keys plus `key`. */
+  | { state: "ready"; keys: string; key: string }
+  /** The key was removed. */
+  | { state: "off" }
+  /** Tap to toggle: every dictation already is hands-free. */
+  | { state: "tapped" }
+  /** This engine, or these dictation keys, cannot have one. */
+  | { state: "unavailable"; reason: "engine" | "keys" }
+  /** Shortcut `by`, chosen by the user, is on `keys`, so it steps aside. */
+  | { state: "taken"; keys: string; key: string; by: string };
 
 /** Whether a shortcut is registered: the separate cleanup shortcut only while
  *  it is the one that cleans up, the assistant's only while it is on, and
  *  Cancel only during a recording (never counted here). */
 const isLive = (settings: AppSettings, id: string) => {
-  if (id === "cancel") return false;
+  if (id === "cancel" || id === HANDS_FREE_ID) return false;
   if (id === "transcribe_with_post_process")
     return (
       !!settings.post_process_enabled && !settings.post_process_on_dictation
@@ -89,20 +110,33 @@ const isLive = (settings: AppSettings, id: string) => {
 };
 
 /** The hands-free key of dictation shortcut `bindingId`, as it stands. */
-export function handsFreeSpace(
+export function handsFree(
   settings: AppSettings | null | undefined,
   bindingId = "transcribe",
-): HandsFreeSpace {
-  if (!settings || settings.keyboard_implementation !== "handy_keys")
-    return { state: "unavailable" };
-  const keys = spaceKeys(settings.bindings?.[bindingId]?.current_binding);
-  if (!keys) return { state: "unavailable" };
-  const taken = Object.entries(settings.bindings ?? {}).some(
+): HandsFree {
+  if (!settings) return { state: "off" };
+  if (!(settings.push_to_talk ?? true)) return { state: "tapped" };
+  const key = mainKey(settings.bindings?.[HANDS_FREE_ID]?.current_binding);
+  if (!key) return { state: "off" };
+  if (settings.keyboard_implementation !== "handy_keys")
+    return { state: "unavailable", reason: "engine" };
+  const keys = extendKeys(settings.bindings?.[bindingId]?.current_binding, key);
+  if (!keys) return { state: "unavailable", reason: "keys" };
+  const by = Object.entries(settings.bindings ?? {}).find(
     ([id, binding]) =>
       id !== bindingId &&
       isLive(settings, id) &&
       !!binding?.current_binding &&
       pressed(binding.current_binding) === pressed(keys),
-  );
-  return taken ? { state: "taken", keys } : { state: "ready", keys };
+  )?.[0];
+  return by ? { state: "taken", keys, key, by } : { state: "ready", keys, key };
+}
+
+/**
+ * What the shortcut editor saves for `shortcutId` when `keys` were pressed:
+ * the keys as they are, except for the hands-free key, which keeps only its
+ * main key and is `null` when there is none (modifiers alone).
+ */
+export function keysToSave(shortcutId: string, keys: string): string | null {
+  return shortcutId === HANDS_FREE_ID ? mainKey(keys) : keys;
 }

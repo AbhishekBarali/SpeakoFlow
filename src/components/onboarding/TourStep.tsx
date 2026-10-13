@@ -82,7 +82,11 @@ export const TourStep: React.FC<{
     Math.min(Math.max(0, initialIndex), ORDER.length - 1),
   );
   const scene = ORDER[index];
-  const holdToTalk = settings?.push_to_talk ?? true;
+  // Dictation and the ask are each held or tapped on their own setting.
+  const holdToTalk =
+    (scene === "ask"
+      ? settings?.assistant_push_to_talk
+      : settings?.push_to_talk) ?? true;
   const binding = settings?.bindings?.[BINDING[scene]]?.current_binding;
   const compactOverlay = settings?.overlay_style === "minimal";
   const hint =

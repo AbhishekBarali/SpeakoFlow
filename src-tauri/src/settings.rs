@@ -1289,16 +1289,16 @@ impl fmt::Debug for SecretString {
 #[serde(default)]
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
+    /// Hold to talk (true) or Tap to toggle (false) for the dictation
+    /// shortcuts: dictation and the separate cleanup shortcut. With Hold, the
+    /// hands-free key makes a dictation keep listening (`hands_free`). See
+    /// [`holds_to_record`].
     pub push_to_talk: bool,
-    /// The dictation keys plus Space make a dictation hands-free: pressed while
-    /// they are held, or all together to start one (see `hands_free`). Only
-    /// exists for dictation keys that are modifiers alone.
+    /// Hold to talk or Tap to toggle for the ask. It used to share
+    /// `push_to_talk`, so holding to dictate meant holding to ask too. A store
+    /// from before the split gets the shared value (`normalize_settings_json`).
     #[serde(default = "default_true")]
-    pub dictation_hands_free_space: bool,
-    /// With Hold to talk, a quick tap of the dictation keys makes the dictation
-    /// hands-free instead of ending it (see `hands_free::QUICK_TAP`). Off by
-    /// default: a stray tap would leave the microphone open.
-    pub dictation_hands_free_tap: bool,
+    pub assistant_push_to_talk: bool,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -2022,12 +2022,30 @@ pub fn cleanup_binding_active(settings: &AppSettings) -> bool {
 /// Binding id of the separate cleanup shortcut.
 pub const CLEANUP_BINDING_ID: &str = "transcribe_with_post_process";
 
+/// Binding id of the hands-free key: one key, pressed while the dictation keys
+/// are held (`hands_free`). Never registered on its own.
+pub const HANDS_FREE_BINDING_ID: &str = "hands_free";
+
 /// Shortcuts the user may remove entirely, leaving them unbound. Dictation and
 /// the quick ask are the app's two front doors and always keep a key; the
 /// cleanup shortcut is turned off with its own switch on the cleanup page.
 /// Cancel is here because a global Esc, even one only registered while
-/// something is running, is one some people would rather not have at all.
-pub const OPTIONAL_BINDINGS: [&str; 2] = ["cancel", "assistant_call"];
+/// something is running, is one some people would rather not have at all. The
+/// hands-free key, because removing it is how hands-free mode is turned off.
+pub const OPTIONAL_BINDINGS: [&str; 3] = ["cancel", "assistant_call", HANDS_FREE_BINDING_ID];
+
+/// Whether the recording shortcut `binding_id` records while its keys are held
+/// (Hold to talk) instead of from one press to the next (Tap to toggle).
+/// Dictation and the cleanup shortcut follow `push_to_talk`, the ask follows
+/// `assistant_push_to_talk`. Any other shortcut acts on a press and has nothing
+/// to hold: the call starts on one press and hangs up on the next.
+pub fn holds_to_record(settings: &AppSettings, binding_id: &str) -> bool {
+    match binding_id {
+        "transcribe" | CLEANUP_BINDING_ID => settings.push_to_talk,
+        "assistant" => settings.assistant_push_to_talk,
+        _ => false,
+    }
+}
 
 /// Whether a shortcut may be left without a key.
 pub fn is_optional_binding(id: &str) -> bool {
@@ -4021,11 +4039,28 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
 
+    // Hands-free mode: a key pressed while the dictation keys are held, so the
+    // dictation keeps listening after they are let go (`hands_free`). Space on
+    // every platform, as in Wispr Flow (Ctrl+Win+Space, Fn+Space). It is not a
+    // shortcut of its own: only ever registered on top of the dictation keys,
+    // and only while dictation is held to talk.
+    bindings.insert(
+        HANDS_FREE_BINDING_ID.to_string(),
+        ShortcutBinding {
+            id: HANDS_FREE_BINDING_ID.to_string(),
+            name: "Hands-free mode".to_string(),
+            description: "Press while holding the dictation keys to keep recording after \
+                 you let go."
+                .to_string(),
+            default_binding: "space".to_string(),
+            current_binding: "space".to_string(),
+        },
+    );
+
     AppSettings {
         bindings,
         push_to_talk: true,
-        dictation_hands_free_space: true,
-        dictation_hands_free_tap: false,
+        assistant_push_to_talk: true,
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),
@@ -5007,10 +5042,19 @@ fn hydrate_secrets(settings: &mut AppSettings) {
 /// press the camera button") turns them off, because switching it on would
 /// start sending screenshots to a provider the user never agreed to send them
 /// to. Idempotent: once either new key exists, nothing is rewritten.
+///
+/// Hold or Tap was one setting for every recording shortcut too; see
+/// [`split_recording_modes`].
 fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bool) {
     let Some(settings) = raw.as_object_mut() else {
         return (raw, false);
     };
+    let screen = migrate_screen_access(settings);
+    let modes = split_recording_modes(settings);
+    (raw, screen || modes)
+}
+
+fn migrate_screen_access(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
     const LEGACY_KEYS: [&str; 2] = [
         "assistant_screen_access_mode",
         "assistant_screenshot_enabled",
@@ -5019,7 +5063,7 @@ fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bo
         || settings.contains_key("assistant_call_screen_access");
     let has_legacy = LEGACY_KEYS.iter().any(|key| settings.contains_key(*key));
     if migrated || !has_legacy {
-        return (raw, false);
+        return false;
     }
 
     let agent_decided = settings
@@ -5035,7 +5079,28 @@ fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bo
     ] {
         settings.insert(key.to_string(), serde_json::Value::Bool(agent_decided));
     }
-    (raw, true)
+    true
+}
+
+/// `push_to_talk` used to be Hold or Tap for every recording shortcut. The ask
+/// has its own now (`assistant_push_to_talk`), and a store from before the
+/// split gives it the shared value, so nobody's ask changes on update.
+/// Idempotent: a store that has the key is left alone.
+fn split_recording_modes(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
+    if settings.contains_key("assistant_push_to_talk") {
+        return false;
+    }
+    let Some(shared) = settings
+        .get("push_to_talk")
+        .and_then(serde_json::Value::as_bool)
+    else {
+        return false;
+    };
+    settings.insert(
+        "assistant_push_to_talk".to_string(),
+        serde_json::Value::Bool(shared),
+    );
+    true
 }
 
 /// One-time switch of the two meeting settings to their opt-in defaults.
@@ -5521,9 +5586,10 @@ mod tests {
     }
 
     #[test]
-    fn only_cancel_and_the_call_can_be_left_unbound() {
+    fn only_cancel_the_call_and_the_hands_free_key_can_be_left_unbound() {
         assert!(is_optional_binding("cancel"));
         assert!(is_optional_binding("assistant_call"));
+        assert!(is_optional_binding(HANDS_FREE_BINDING_ID));
         assert!(!is_optional_binding("transcribe"));
         assert!(!is_optional_binding("assistant"));
         assert!(!is_optional_binding(CLEANUP_BINDING_ID));
@@ -5943,6 +6009,42 @@ mod tests {
         assert!(salvaged.assistant_call_screen_access);
         assert_eq!(salvaged.selected_model, "keep-this-model");
         assert_eq!(salvaged.sound_theme, default_sound_theme());
+    }
+
+    #[test]
+    fn the_ask_keeps_the_recording_mode_it_shared_before_the_split() {
+        for shared in [true, false] {
+            let (normalized, changed) =
+                normalize_settings_json(serde_json::json!({ "push_to_talk": shared }));
+            assert!(changed);
+            let settings: AppSettings = serde_json::from_value(normalized).unwrap();
+            assert_eq!(settings.push_to_talk, shared);
+            assert_eq!(settings.assistant_push_to_talk, shared);
+        }
+
+        // Once apart, they stay apart.
+        let split = serde_json::json!({
+            "push_to_talk": true,
+            "assistant_push_to_talk": false
+        });
+        let (normalized, changed) = normalize_settings_json(split.clone());
+        assert!(!changed);
+        assert_eq!(normalized, split);
+    }
+
+    #[test]
+    fn dictation_and_the_ask_are_held_or_tapped_on_their_own() {
+        let mut settings = get_default_settings();
+        settings.push_to_talk = true;
+        settings.assistant_push_to_talk = false;
+        assert!(holds_to_record(&settings, "transcribe"));
+        assert!(holds_to_record(&settings, CLEANUP_BINDING_ID));
+        assert!(!holds_to_record(&settings, "assistant"));
+        // The call is a press, whatever either mode is.
+        assert!(!holds_to_record(&settings, "assistant_call"));
+        settings.assistant_push_to_talk = true;
+        assert!(!holds_to_record(&settings, "assistant_call"));
+        assert!(!holds_to_record(&settings, "cancel"));
     }
 
     #[test]

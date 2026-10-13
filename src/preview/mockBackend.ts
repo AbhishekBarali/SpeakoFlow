@@ -520,10 +520,10 @@ const settings: Json = {
     assistant: binding("assistant", "ctrl_left+alt_left"),
     assistant_call: binding("assistant_call", "ctrl_left+alt_left+c"),
     cancel: binding("cancel", "escape"),
+    hands_free: binding("hands_free", "space"),
   },
   push_to_talk: true,
-  dictation_hands_free_space: true,
-  dictation_hands_free_tap: false,
+  assistant_push_to_talk: true,
   // Windows' default engine, the one modifier-only keys need.
   keyboard_implementation: "handy_keys",
   audio_feedback: false,
@@ -1771,16 +1771,7 @@ const handlers: Record<string, (args: Json) => unknown> = {
           "assistant_active_character_id",
         ],
         ["change_ptt_setting", "enabled", "push_to_talk"],
-        [
-          "change_hands_free_space_setting",
-          "enabled",
-          "dictation_hands_free_space",
-        ],
-        [
-          "change_hands_free_tap_setting",
-          "enabled",
-          "dictation_hands_free_tap",
-        ],
+        ["change_assistant_ptt_setting", "enabled", "assistant_push_to_talk"],
       ] as const
     ).map(([command, arg, key]) => [
       command,

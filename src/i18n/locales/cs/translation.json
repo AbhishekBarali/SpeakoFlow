@@ -645,6 +645,10 @@
           "assistant_call": {
             "name": "Zahájit konverzaci",
             "description": "Mluvte s asistentem bez použití rukou a poslouchejte jeho odpovědi. Dalším stisknutím ukončíte."
+          },
+          "hands_free": {
+            "name": "Režim bez držení",
+            "description": "Stiskněte při držení kláves diktování a nahrávání bude pokračovat i po jejich puštění. Dalším stiskem kláves diktování skončíte."
           }
         },
         "errors": {
@@ -666,22 +670,18 @@
       },
       "pushToTalk": {
         "label": "Způsob nahrávání",
-        "description": "Podržení: nahrává se, dokud držíte zkratku pro nahrávání. Stisknutí: jeden stisk spustí, další zastaví. Platí pro všechny zkratky pro nahrávání.",
+        "dictation": "Podržení: nahrává se, dokud držíte klávesy diktování. Stisknutí: jeden stisk spustí, další zastaví.",
+        "assistant": "Podržení: poslouchá, dokud držíte klávesy pro dotaz. Stisknutí: jeden stisk spustí, další odešle.",
         "hold": "Podržení",
         "tap": "Stisknutí"
       },
       "handsFree": {
-        "space": {
-          "label": "Bez držení s mezerníkem",
-          "description": "Podržte klávesy diktování, stiskněte mezerník a pusťte: poslouchá dál, dokud klávesy nestisknete znovu.",
-          "unavailable": "Funguje jen tehdy, když zkratku diktování tvoří jen modifikační klávesy.",
-          "taken": "{{keys}} už používá jiná zkratka."
-        },
-        "tap": {
-          "label": "Bez držení klepnutím",
-          "description": "Klávesy diktování stiskněte místo držení a poslouchá dál, dokud je nestisknete znovu.",
-          "tapMode": "S volbou „Stiskem zapnout/vypnout“ je každé diktování už bez držení."
-        }
+        "description": "Při držení {{keys}} stiskněte tuto klávesu a pusťte: diktování poslouchá dál, dokud znovu nestisknete {{keys}}.",
+        "unavailableKeys": "Vyžaduje zkratku diktování jen z modifikačních kláves. S {{keys}} použijte místo toho „Stiskem zapnout/vypnout“.",
+        "unavailableEngine": "Vyžaduje klávesnicový modul SpeakoFlow Keys, v části {{where}}.",
+        "taken": "{{name}} už používá {{keys}}, takže tato klávesa nic nedělá, dokud se jedno z nich nezmění.",
+        "needsKey": "Vyberte jednu klávesu, například mezerník nebo Enter. Samotná modifikační klávesa nemůže být klávesou pro režim bez držení.",
+        "pressKey": "Stiskněte klávesu…"
       }
     },
     "models": {
@@ -2641,10 +2641,10 @@
         "hold": "Podržte, mluvte, pusťte. Vaše slova se napíšou tam, kde je kurzor.",
         "tap": "Stiskem spusťte, mluvte, stiskem zastavte. Vaše slova se napíšou tam, kde je kurzor.",
         "whatHold": "Podržte, mluvte, pusťte. Slova se napíšou tam, kde je kurzor.",
-        "whatTap": "Stiskněte, mluvte, stiskněte znovu. Slova se napíšou tam, kde je kurzor.",
-        "handsFreeSpace": "Potřebujete víc času? Při držení stiskněte mezerník a pusťte: poslouchá dál, dokud klávesy nestisknete znovu.",
-        "handsFreeTap": "Potřebujete víc času? Místo držení klepněte: poslouchá dál, dokud klávesy nestisknete znovu.",
-        "handsFreeBoth": "Potřebujete víc času? Při držení stiskněte mezerník, nebo místo držení klepněte: poslouchá dál, dokud klávesy nestisknete znovu."
+        "whatTap": "Stiskněte, mluvte, stiskněte znovu. Slova se napíšou tam, kde je kurzor."
+      },
+      "handsFree": {
+        "what": "Podržte {{keys}}, stiskněte {{key}} a pusťte: poslouchá dál, dokud znovu nestisknete {{keys}}."
       },
       "cleanup": {
         "title": "Diktovat a vyčistit",
@@ -2654,14 +2654,15 @@
       "ask": {
         "title": "Zeptat se asistenta",
         "description": "Položte otázku nahlas a odpověď dostanete v plovoucím panelu.",
-        "what": "Ptejte se nahlas. Odpověď se zobrazí v plovoucím panelu."
+        "whatHold": "Podržte, zeptejte se, pusťte. Odpověď se zobrazí v plovoucím panelu.",
+        "whatTap": "Stiskněte, zeptejte se, stiskněte znovu. Odpověď se zobrazí v plovoucím panelu."
       },
       "call": {
         "title": "Zahájit konverzaci",
         "description": "Konverzace bez použití rukou s mluvenými odpověďmi.",
         "what": "Povídejte si bez použití rukou. Dalším stiskem ukončíte."
       },
-      "info": "Stiskněte je v jakékoli aplikaci. Kliknutím na klávesy je změníte.",
+      "info": "Stiskněte je v jakékoli aplikaci. Kliknutím na klávesy je změníte. U zkratek, které nahrávají, zvolte Podržení nebo Stisknutí.",
       "offHint": "Vypnuto",
       "mode": {
         "hold": "Podržte a mluvte",
