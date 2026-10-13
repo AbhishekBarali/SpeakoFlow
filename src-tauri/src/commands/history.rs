@@ -140,38 +140,26 @@ async fn rerun_entry(
     let is_flow_entry =
         entry.post_process_prompt.as_deref() == Some(crate::flow::FLOW_HISTORY_MARKER);
     let reuse_processed = had_transcript && !retranscribe && entry.post_processed_text.is_some();
-    let (post_processed_text, post_process_prompt, post_process_requested) =
-        if is_flow_entry || reuse_processed {
-            // Re-running speech recognition should repair only the transcript. A
-            // Flow output is a completed generated artifact; keep it and its marker
-            // instead of silently converting the row into ordinary dictation. The
-            // same goes for cleanup a dismissed dictation already finished.
-            (
-                entry.post_processed_text.clone(),
-                entry.post_process_prompt.clone(),
-                entry.post_process_requested,
-            )
-        } else {
-            // A short dictation is left as spoken here exactly as it would have
-            // been when it was dictated. The row does not remember which shortcut
-            // asked for its cleanup; while cleanup rides on the dictation shortcut
-            // that is the one that did (the dedicated shortcut is not even
-            // registered then), and otherwise it was the dedicated one, which
-            // always cleans.
-            let settings = crate::settings::get_settings(app);
-            let post_process = entry.post_process_requested
-                && !crate::actions::skips_short_cleanup(
-                    &settings,
-                    !crate::settings::cleanup_on_dictation(&settings),
-                    &transcription,
-                );
-            let processed = process_transcription_output(app, &transcription, post_process).await;
-            (
-                processed.post_processed_text,
-                processed.post_process_prompt,
-                post_process,
-            )
-        };
+    let (post_processed_text, post_process_prompt) = if is_flow_entry || reuse_processed {
+        // Re-running speech recognition should repair only the transcript. A
+        // Flow output is a completed generated artifact; keep it and its marker
+        // instead of silently converting the row into ordinary dictation. The
+        // same goes for cleanup a dismissed dictation already finished.
+        (
+            entry.post_processed_text.clone(),
+            entry.post_process_prompt.clone(),
+        )
+    } else {
+        // A short dictation is left as spoken here exactly as it would have
+        // been when it was dictated, judged on the transcript it has now.
+        let post_process = crate::actions::rerun_runs_cleanup(
+            &crate::settings::get_settings(app),
+            entry.post_process_requested,
+            &transcription,
+        );
+        let processed = process_transcription_output(app, &transcription, post_process).await;
+        (processed.post_processed_text, processed.post_process_prompt)
+    };
 
     history_manager
         .record_outcome(
@@ -180,7 +168,9 @@ async fn rerun_entry(
                 transcription_text: transcription,
                 post_processed_text,
                 post_process_prompt,
-                post_process_requested,
+                // What was asked for, not what ran, so a later retry can still
+                // clean a transcript that comes back longer.
+                post_process_requested: entry.post_process_requested,
                 dismissed: false,
             },
         )
