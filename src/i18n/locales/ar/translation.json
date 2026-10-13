@@ -1210,6 +1210,24 @@
           "azureDescription": "نقطة نهاية مورد Azure الخاص بك، من قسم Keys and Endpoint في بوابة Azure. يحتاج MAI-Transcribe إلى مورد في Central India أو Southeast Asia أو East US أو West US أو West US 2 أو North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "مفتاح وصول AWS",
+            "missing": "لم يُحفَظ أي مفتاح بعد. استخدم مفتاح وصول لمستخدم أو دور IAM مسموح له باستدعاء transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "معرّف مفتاح الوصول",
+            "secret": "مفتاح الوصول السري",
+            "sessionToken": "رمز الجلسة (لبيانات الاعتماد المؤقتة فقط)",
+            "invalid": "لا يبدو هذا مفتاح AWS. معرّف مفتاح الوصول يتكوّن من حروف وأرقام، ولا يجوز أن يحتوي أي حقل على مسافات أو نقطتين رأسيتين.",
+            "permission": "الإذن المطلوب"
+          },
+          "region": {
+            "title": "المنطقة",
+            "description": "مكان تشغيل Amazon Transcribe. المنطقة الأقرب إليك تستجيب بأسرع وقت."
+          },
+          "streaming": "مفعّل دائمًا: لا يفرّغ Amazon Transcribe إلا مباشرةً. إذا انقطع الاتصال أثناء التسجيل، يُرسَل التسجيل من جديد بسرعة الكلام، فيستغرق الإنهاء مدة التسجيل نفسها.",
+          "language": "يجب إخبار Amazon Transcribe باللغة. يختار الوضع التلقائي بين الإنجليزية ولغة التطبيق وبضع لغات شائعة أخرى، فاختر لغتك إن كنت تتحدث غيرها.",
+          "unsupportedLanguage": "لا يستطيع Amazon Transcribe تفريغ هذه اللغة مباشرةً في {{region}}. اختر لغة أو منطقة أخرى. وحتى ذلك الحين لن يستخدم الإملاء Amazon Transcribe."
+        },
         "model": {
           "title": "النموذج",
           "info": "اكتب أي نموذج يقدّمه المزوّد، أو حمّل القائمة. مع ElevenLabs، اختر scribe_v2_realtime للتفريغ أثناء حديثك، وscribe_v2 للتفريغ بعد أن تتوقف.",
@@ -1222,7 +1240,8 @@
         },
         "keyterms": {
           "label": "إرسال كلماتي المخصصة",
-          "description": "يمرّر مفرداتك المخصصة إلى المزوّد ليميل إلى تلك التهجئات."
+          "description": "يمرّر مفرداتك المخصصة إلى المزوّد ليميل إلى تلك التهجئات.",
+          "unsupported": "لا يقبل {{provider}} قائمة كلمات، لذا تُصحَّح كلماتك المخصصة على هذا الكمبيوتر بدلًا من ذلك."
         },
         "noVerbatim": {
           "label": "إزالة كلمات الحشو",

@@ -1198,6 +1198,24 @@
           "azureDescription": "Koncový bod vašeho prostředku Azure, najdete ho v části Klíče a koncový bod na portálu Azure. MAI-Transcribe vyžaduje prostředek v oblasti Central India, Southeast Asia, East US, West US, West US 2 nebo North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Přístupový klíč AWS",
+            "missing": "Zatím není uložen žádný klíč. Použijte přístupový klíč uživatele nebo role IAM s oprávněním volat transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID přístupového klíče",
+            "secret": "Tajný přístupový klíč",
+            "sessionToken": "Token relace (jen pro dočasné přihlašovací údaje)",
+            "invalid": "Tohle nevypadá jako klíč AWS. ID přístupového klíče obsahuje jen písmena a číslice a žádné pole nesmí obsahovat mezery ani dvojtečky.",
+            "permission": "Potřebné oprávnění"
+          },
+          "region": {
+            "title": "Oblast",
+            "description": "Kde Amazon Transcribe běží. Nejrychleji odpovídá oblast, která je vám nejblíž."
+          },
+          "streaming": "Vždy zapnuto: Amazon Transcribe přepisuje jen živě. Když se spojení během nahrávání přeruší, nahrávka se odešle znovu rychlostí řeči, takže dokončení trvá stejně dlouho jako nahrávka.",
+          "language": "Amazon Transcribe musí znát jazyk. Automatický režim vybírá mezi angličtinou, jazykem aplikace a několika dalšími běžnými jazyky, proto zvolte svůj jazyk, pokud mluvíte jiným.",
+          "unsupportedLanguage": "Amazon Transcribe neumí tento jazyk přepisovat živě v oblasti {{region}}. Zvolte jiný jazyk nebo oblast. Do té doby diktování Amazon Transcribe nepoužije."
+        },
         "model": {
           "title": "Model",
           "info": "Zadejte jakýkoli model, který poskytovatel nabízí, nebo načtěte seznam. U ElevenLabs zvolte scribe_v2_realtime pro přepis během mluvení a scribe_v2 pro přepis až po skončení.",
@@ -1210,7 +1228,8 @@
         },
         "keyterms": {
           "label": "Posílat moje vlastní slova",
-          "description": "Předá poskytovateli váš vlastní slovník, aby dával přednost tomuto pravopisu."
+          "description": "Předá poskytovateli váš vlastní slovník, aby dával přednost tomuto pravopisu.",
+          "unsupported": "{{provider}} nepřijímá seznam slov, proto se vaše vlastní slova opravují místo toho na tomto počítači."
         },
         "noVerbatim": {
           "label": "Odstranit vycpávková slova",

@@ -178,6 +178,12 @@ tar = "0.4.44"
 flate2 = "1.0"
 zip = "2"
 sha2 = "0.10"
+# Amazon Transcribe streaming (stt_aws.rs) without the AWS SDK: HMAC-SHA256 for
+# the SigV4-presigned WebSocket URL, CRC32 for its event-stream framing. Both are
+# already in the graph through other crates; pinned to the versions the lockfile
+# resolves, so they add no new build.
+hmac = "=0.12.1"
+crc32fast = "=1.5.0"
 # Native local voice (native_tts.rs). sherpa-onnx is downloaded with the first
 # voice pack and loaded at runtime rather than linked, because the app already
 # links ONNX Runtime statically through `ort`. Both crates are already in the

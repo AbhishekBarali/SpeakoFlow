@@ -1180,6 +1180,24 @@
           "azureDescription": "Endpoint của tài nguyên Azure của bạn, lấy trong mục Keys and Endpoint trên cổng Azure. MAI-Transcribe cần một tài nguyên ở Central India, Southeast Asia, East US, West US, West US 2 hoặc North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Khóa truy cập AWS",
+            "missing": "Chưa lưu khóa nào. Hãy dùng khóa truy cập của một người dùng hoặc vai trò IAM được phép gọi transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID khóa truy cập",
+            "secret": "Khóa truy cập bí mật",
+            "sessionToken": "Mã thông báo phiên (chỉ cho thông tin xác thực tạm thời)",
+            "invalid": "Đây có vẻ không phải khóa AWS. ID khóa truy cập chỉ gồm chữ và số, và không ô nào được chứa dấu cách hoặc dấu hai chấm.",
+            "permission": "Quyền cần có"
+          },
+          "region": {
+            "title": "Khu vực",
+            "description": "Nơi Amazon Transcribe chạy. Khu vực gần bạn nhất phản hồi nhanh nhất."
+          },
+          "streaming": "Luôn bật: Amazon Transcribe chỉ chuyển đổi trực tiếp. Nếu kết nối bị ngắt giữa lúc ghi âm, bản ghi sẽ được gửi lại theo tốc độ nói, nên việc hoàn tất mất bằng thời gian ghi âm.",
+          "language": "Amazon Transcribe cần được cho biết ngôn ngữ. Chế độ Tự động chọn giữa tiếng Anh, ngôn ngữ của ứng dụng và một vài ngôn ngữ phổ biến khác, vì vậy hãy chọn ngôn ngữ của bạn nếu bạn nói thứ tiếng khác.",
+          "unsupportedLanguage": "Amazon Transcribe không thể chuyển đổi trực tiếp ngôn ngữ này ở {{region}}. Hãy chọn ngôn ngữ hoặc khu vực khác. Cho đến lúc đó, tính năng đọc chính tả sẽ không dùng Amazon Transcribe."
+        },
         "model": {
           "title": "Mô hình",
           "info": "Nhập bất kỳ mô hình nào nhà cung cấp hỗ trợ, hoặc tải danh sách. Với ElevenLabs, chọn scribe_v2_realtime để chuyển đổi ngay khi bạn nói và scribe_v2 để chuyển đổi sau khi bạn dừng.",
@@ -1192,7 +1210,8 @@
         },
         "keyterms": {
           "label": "Gửi từ tùy chỉnh của tôi",
-          "description": "Gửi từ vựng tùy chỉnh của bạn cho nhà cung cấp để họ ưu tiên đúng cách viết đó."
+          "description": "Gửi từ vựng tùy chỉnh của bạn cho nhà cung cấp để họ ưu tiên đúng cách viết đó.",
+          "unsupported": "{{provider}} không nhận danh sách từ, nên các từ tùy chỉnh của bạn được sửa ngay trên máy tính này."
         },
         "noVerbatim": {
           "label": "Bỏ từ đệm",

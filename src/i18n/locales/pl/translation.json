@@ -1198,6 +1198,24 @@
           "azureDescription": "Punkt końcowy Twojego zasobu Azure, z sekcji Keys and Endpoint w portalu Azure. MAI-Transcribe wymaga zasobu w regionie Central India, Southeast Asia, East US, West US, West US 2 lub North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Klucz dostępu AWS",
+            "missing": "Nie zapisano jeszcze klucza. Użyj klucza dostępu użytkownika lub roli IAM z uprawnieniem do wywołania transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Identyfikator klucza dostępu",
+            "secret": "Tajny klucz dostępu",
+            "sessionToken": "Token sesji (tylko dla tymczasowych poświadczeń)",
+            "invalid": "To nie wygląda na klucz AWS. Identyfikator klucza dostępu składa się z liter i cyfr, a żadne pole nie może zawierać spacji ani dwukropków.",
+            "permission": "Wymagane uprawnienie"
+          },
+          "region": {
+            "title": "Region AWS",
+            "description": "Gdzie działa Amazon Transcribe. Region najbliżej Ciebie odpowiada najszybciej."
+          },
+          "streaming": "Zawsze włączone: Amazon Transcribe transkrybuje tylko na żywo. Jeśli połączenie zerwie się w trakcie nagrania, nagranie zostanie wysłane ponownie w tempie mowy, więc dokończenie trwa tyle, ile trwało nagranie.",
+          "language": "Amazon Transcribe musi znać język. Tryb automatyczny wybiera spośród angielskiego, języka aplikacji i kilku innych popularnych języków, więc wybierz swój, jeśli mówisz w innym.",
+          "unsupportedLanguage": "Amazon Transcribe nie może transkrybować tego języka na żywo w regionie {{region}}. Wybierz inny język lub region. Do tego czasu dyktowanie nie będzie korzystać z Amazon Transcribe."
+        },
         "model": {
           "title": "Model",
           "info": "Wpisz dowolny model oferowany przez dostawcę albo wczytaj listę. W ElevenLabs wybierz scribe_v2_realtime, aby transkrybować w trakcie mówienia, lub scribe_v2, aby transkrybować po zakończeniu.",
@@ -1210,7 +1228,8 @@
         },
         "keyterms": {
           "label": "Wysyłaj moje własne słowa",
-          "description": "Przekazuje Twoje własne słownictwo dostawcy, aby preferował taką pisownię."
+          "description": "Przekazuje Twoje własne słownictwo dostawcy, aby preferował taką pisownię.",
+          "unsupported": "{{provider}} nie przyjmuje listy słów, więc Twoje własne słowa są poprawiane na tym komputerze."
         },
         "noVerbatim": {
           "label": "Usuwaj słowa wypełniające",

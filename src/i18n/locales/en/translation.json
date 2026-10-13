@@ -1186,6 +1186,24 @@
           "azureDescription": "Your Azure resource's endpoint, from Keys and Endpoint in the Azure portal. MAI-Transcribe needs a resource in Central India, Southeast Asia, East US, West US, West US 2, or North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS access key",
+            "missing": "No key saved yet. Use an access key for an IAM user or role allowed to call transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Access key ID",
+            "secret": "Secret access key",
+            "sessionToken": "Session token (temporary credentials only)",
+            "invalid": "This doesn't look like an AWS key. The access key ID is letters and digits, and no field can contain spaces or colons.",
+            "permission": "Permission it needs"
+          },
+          "region": {
+            "title": "Region",
+            "description": "Where Amazon Transcribe runs. The one closest to you answers fastest."
+          },
+          "streaming": "Always on: Amazon Transcribe only transcribes live. If the connection drops mid-recording, the recording is sent again at speaking speed, so finishing takes as long as the recording did.",
+          "language": "Amazon Transcribe has to be told the language. Auto picks among English, your app language and a few other common languages, so choose yours if you speak something else.",
+          "unsupportedLanguage": "Amazon Transcribe can't transcribe this language live in {{region}}. Choose another language or region. Until then, dictation won't use Amazon Transcribe."
+        },
         "model": {
           "title": "Model",
           "info": "Type any model the provider offers, or load the list. For ElevenLabs, pick scribe_v2_realtime to transcribe as you speak and scribe_v2 to transcribe once you stop.",
@@ -1198,7 +1216,8 @@
         },
         "keyterms": {
           "label": "Send my custom words",
-          "description": "Passes your custom vocabulary to the provider so it biases toward those spellings."
+          "description": "Passes your custom vocabulary to the provider so it biases toward those spellings.",
+          "unsupported": "{{provider}} can't take a word list, so your custom words are corrected on this computer instead."
         },
         "noVerbatim": {
           "label": "Remove filler words",

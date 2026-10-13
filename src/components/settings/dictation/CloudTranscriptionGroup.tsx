@@ -10,14 +10,27 @@ import { ProviderGrid } from "@/components/ui/ProviderGrid";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { ModelCombo } from "@/components/ui/ModelCombo";
 import { prettyModelName } from "@/lib/utils/prettyModelName";
 import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
 import { LanguageSelector } from "../LanguageSelector";
 import { TranslateToEnglish } from "../TranslateToEnglish";
 import { useSettings } from "@/hooks/useSettings";
-import { commands, type CloudSttProvider } from "@/bindings";
-import { cloudSttKeyOptional, cloudSttNeedsEndpoint } from "@/lib/cloudStt";
+import {
+  commands,
+  type CloudSttProvider,
+  type CloudSttReadiness,
+} from "@/bindings";
+import {
+  AMAZON_TRANSCRIBE_REGIONS,
+  cloudSttFixedModel,
+  cloudSttKeyOptional,
+  cloudSttNeedsEndpoint,
+  cloudSttStreamsOnly,
+  composeAwsCredentials,
+  isAmazonTranscribe,
+} from "@/lib/cloudStt";
 
 /**
  * "Where transcription runs" — the on-device engine, or a hosted one.
@@ -62,7 +75,7 @@ export const CloudTranscriptionGroup: React.FC<{
   const showSetup = !section || section === "setup";
   const showOptions = !section || section === "options";
   const { t } = useTranslation();
-  const { settings, getSetting, refreshSettings } = useSettings();
+  const { settings, getSetting, refreshSettings, isUpdating } = useSettings();
 
   const [providers, setProviders] = useState<CloudSttProvider[]>([]);
   const [keyStatus, setKeyStatus] = useState<Record<string, boolean>>({});
@@ -73,6 +86,12 @@ export const CloudTranscriptionGroup: React.FC<{
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Amazon Transcribe takes its key in parts; they are joined into the one
+  // stored secret only on Save (`composeAwsCredentials`).
+  const [awsKeyId, setAwsKeyId] = useState("");
+  const [awsSecret, setAwsSecret] = useState("");
+  const [awsToken, setAwsToken] = useState("");
+  const [readiness, setReadiness] = useState<CloudSttReadiness | null>(null);
 
   const isCloud = getSetting("stt_engine_mode") === "cloud";
   const providerId = getSetting("cloud_stt_provider_id") ?? "elevenlabs";
@@ -80,6 +99,7 @@ export const CloudTranscriptionGroup: React.FC<{
     () => providers.find((entry) => entry.id === providerId),
     [providers, providerId],
   );
+  const isAmazon = isAmazonTranscribe(provider);
 
   const loadProviders = useCallback(async () => {
     const [list, keys] = await Promise.all([
@@ -106,6 +126,9 @@ export const CloudTranscriptionGroup: React.FC<{
     setModels(registryModels ?? []);
     setModelsError(null);
     setKeyDraft("");
+    setAwsKeyId("");
+    setAwsSecret("");
+    setAwsToken("");
   }, [providerId]);
 
   const hasKey = keyStatus[providerId] ?? false;
@@ -116,6 +139,49 @@ export const CloudTranscriptionGroup: React.FC<{
   // Azure's endpoint is the user's own resource, not a server they host, so it
   // gets its own wording and an example of the URL the portal shows.
   const isAzure = provider?.kind === "azure_speech";
+  // Amazon Transcribe's endpoint slot holds a region, shipped as us-east-1.
+  const awsRegion = baseUrlOverride.trim() || provider?.base_url || "";
+  const awsCredentials = composeAwsCredentials(awsKeyId, awsSecret, awsToken);
+  const awsCredentialsInvalid =
+    !!awsKeyId.trim() && !!awsSecret.trim() && awsCredentials === null;
+  const selectedLanguage = getSetting("selected_language") ?? "auto";
+  // The language picker updates the store before the backend has saved, so
+  // the question waits for the save rather than asking about the old language.
+  const languageSaving = isUpdating("selected_language");
+
+  // Whether Amazon Transcribe can stream the chosen language in this region is
+  // the backend's call (`stt_aws::streaming_language`), so it is asked rather
+  // than mirrored here. Refreshed whenever an input to that answer changes.
+  useEffect(() => {
+    if (!isCloud || !isAmazon) {
+      setReadiness(null);
+      return;
+    }
+    if (languageSaving) return;
+    let cancelled = false;
+    commands
+      .getCloudSttReadiness()
+      .then((result) => {
+        if (!cancelled) setReadiness(result);
+      })
+      .catch(() => {
+        if (!cancelled) setReadiness(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isCloud,
+    isAmazon,
+    providerId,
+    selectedLanguage,
+    languageSaving,
+    awsRegion,
+    hasKey,
+  ]);
+  const languageUnsupported =
+    readiness?.state === "unavailable" &&
+    readiness.reason === "unsupported_language";
 
   /** Run a settings write and pull the authoritative state back. */
   const commit = async (write: () => Promise<unknown>) => {
@@ -142,9 +208,27 @@ export const CloudTranscriptionGroup: React.FC<{
     }
   };
 
+  const saveAwsCredentials = async () => {
+    if (!awsCredentials) return;
+    setSavingKey(true);
+    try {
+      await commands.setCloudSttApiKey(providerId, awsCredentials);
+      setAwsKeyId("");
+      setAwsSecret("");
+      setAwsToken("");
+      await Promise.all([loadProviders(), refreshSettings()]);
+      toast.success(t("settings.dictation.cloud.key.saved"));
+    } finally {
+      setSavingKey(false);
+    }
+  };
+
   const clearKey = async () => {
     await commands.setCloudSttApiKey(providerId, "");
     setKeyDraft("");
+    setAwsKeyId("");
+    setAwsSecret("");
+    setAwsToken("");
     await Promise.all([loadProviders(), refreshSettings()]);
   };
 
@@ -189,10 +273,13 @@ export const CloudTranscriptionGroup: React.FC<{
     ready:
       (!!keyStatus[entry.id] || cloudSttKeyOptional(entry)) &&
       !cloudSttNeedsEndpoint(entry, settings?.cloud_stt_base_urls?.[entry.id]),
-    hint:
-      prettyModelName(
-        settings?.cloud_stt_models?.[entry.id]?.trim() || entry.default_model,
-      ) || undefined,
+    // A fixed model says nothing under the tile; Amazon Transcribe's region
+    // is what tells two setups apart.
+    hint: isAmazonTranscribe(entry)
+      ? settings?.cloud_stt_base_urls?.[entry.id]?.trim() || entry.base_url
+      : prettyModelName(
+          settings?.cloud_stt_models?.[entry.id]?.trim() || entry.default_model,
+        ) || undefined,
   }));
 
   const modelOptions = models.map((id) => ({ value: id, label: id }));
@@ -206,6 +293,18 @@ export const CloudTranscriptionGroup: React.FC<{
     provider?.kind === "eleven_labs"
       ? selectedModel.includes("realtime")
       : providerStreams;
+  // Amazon Transcribe has no batch endpoint, so streaming is not a choice
+  // there: with it off, a finished recording would be sent again at speaking
+  // speed. The switch shows as on and locked, with that reason.
+  const streamsOnly = cloudSttStreamsOnly(provider);
+  const fixedModel = cloudSttFixedModel(provider);
+  // Assumed until the provider list has loaded, so the row does not flash the
+  // "cannot take a word list" wording on the way in.
+  const honorsKeyterms = provider ? !!provider.honors_keyterms : true;
+  const regionOptions = AMAZON_TRANSCRIBE_REGIONS.map((region) => ({
+    value: region.code,
+    label: `${region.name} · ${region.code}`,
+  }));
 
   // Whether "Translate to English" has anywhere to go on this provider. Only the
   // OpenAI schema has a translation route, and its output language is fixed to
@@ -258,56 +357,166 @@ export const CloudTranscriptionGroup: React.FC<{
         />
       </SettingContainer>
 
-      <SettingContainer
-        title={t("settings.dictation.cloud.key.title")}
-        description={
-          hasKey
-            ? t("settings.dictation.cloud.key.stored")
-            : t("settings.dictation.cloud.key.missing")
-        }
-        descriptionMode="caption"
-        grouped={true}
-        layout="stacked"
-      >
-        <div className="flex w-full flex-wrap items-center gap-2">
-          <Input
-            type="password"
-            value={keyDraft}
-            onChange={(event) => setKeyDraft(event.target.value)}
-            placeholder={
-              hasKey
-                ? t("settings.dictation.cloud.key.replacePlaceholder")
-                : t("settings.dictation.cloud.key.placeholder")
-            }
-            variant="compact"
-            className="min-w-[260px] flex-1"
-          />
-          <Button
-            size="sm"
-            onClick={() => void saveKey()}
-            disabled={!keyDraft.trim() || savingKey}
-          >
-            {t("settings.dictation.cloud.key.save")}
-          </Button>
-          {hasKey && (
-            <Button size="sm" variant="ghost" onClick={() => void clearKey()}>
-              {t("settings.dictation.cloud.key.clear")}
-            </Button>
-          )}
-          {provider?.api_key_url && (
-            <button
-              type="button"
-              onClick={() => void openUrl(provider.api_key_url as string)}
-              className="inline-flex items-center gap-1 text-xs text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
+      {isAmazon ? (
+        <SettingContainer
+          title={t("settings.dictation.cloud.amazon.credentials.title")}
+          description={
+            hasKey
+              ? t("settings.dictation.cloud.key.stored")
+              : t("settings.dictation.cloud.amazon.credentials.missing")
+          }
+          descriptionMode="caption"
+          grouped={true}
+          layout="stacked"
+        >
+          <div className="flex w-full flex-col gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Input
+                value={awsKeyId}
+                onChange={(event) => setAwsKeyId(event.target.value)}
+                placeholder={t(
+                  "settings.dictation.cloud.amazon.credentials.keyId",
+                )}
+                aria-label={t(
+                  "settings.dictation.cloud.amazon.credentials.keyId",
+                )}
+                autoComplete="off"
+                spellCheck={false}
+                variant="compact"
+                className="min-w-[200px] flex-1"
+              />
+              <Input
+                type="password"
+                value={awsSecret}
+                onChange={(event) => setAwsSecret(event.target.value)}
+                placeholder={t(
+                  "settings.dictation.cloud.amazon.credentials.secret",
+                )}
+                aria-label={t(
+                  "settings.dictation.cloud.amazon.credentials.secret",
+                )}
+                variant="compact"
+                className="min-w-[200px] flex-1"
+              />
+            </div>
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Input
+                type="password"
+                value={awsToken}
+                onChange={(event) => setAwsToken(event.target.value)}
+                placeholder={t(
+                  "settings.dictation.cloud.amazon.credentials.sessionToken",
+                )}
+                aria-label={t(
+                  "settings.dictation.cloud.amazon.credentials.sessionToken",
+                )}
+                variant="compact"
+                className="min-w-[200px] flex-1"
+              />
+              <Button
+                size="sm"
+                onClick={() => void saveAwsCredentials()}
+                disabled={!awsCredentials || savingKey}
+              >
+                {t("settings.dictation.cloud.key.save")}
+              </Button>
+              {hasKey && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void clearKey()}
+                >
+                  {t("settings.dictation.cloud.key.clear")}
+                </Button>
+              )}
+              {provider?.api_key_url && (
+                <button
+                  type="button"
+                  onClick={() => void openUrl(provider.api_key_url as string)}
+                  className="inline-flex items-center gap-1 text-xs text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
+                >
+                  {t("settings.dictation.cloud.amazon.credentials.permission")}
+                  <ExternalLink size={11} />
+                </button>
+              )}
+            </div>
+            {awsCredentialsInvalid && (
+              <span className="text-xs text-red-500">
+                {t("settings.dictation.cloud.amazon.credentials.invalid")}
+              </span>
+            )}
+          </div>
+        </SettingContainer>
+      ) : (
+        <SettingContainer
+          title={t("settings.dictation.cloud.key.title")}
+          description={
+            hasKey
+              ? t("settings.dictation.cloud.key.stored")
+              : t("settings.dictation.cloud.key.missing")
+          }
+          descriptionMode="caption"
+          grouped={true}
+          layout="stacked"
+        >
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <Input
+              type="password"
+              value={keyDraft}
+              onChange={(event) => setKeyDraft(event.target.value)}
+              placeholder={
+                hasKey
+                  ? t("settings.dictation.cloud.key.replacePlaceholder")
+                  : t("settings.dictation.cloud.key.placeholder")
+              }
+              variant="compact"
+              className="min-w-[260px] flex-1"
+            />
+            <Button
+              size="sm"
+              onClick={() => void saveKey()}
+              disabled={!keyDraft.trim() || savingKey}
             >
-              {t("settings.dictation.cloud.key.getOne")}
-              <ExternalLink size={11} />
-            </button>
-          )}
-        </div>
-      </SettingContainer>
+              {t("settings.dictation.cloud.key.save")}
+            </Button>
+            {hasKey && (
+              <Button size="sm" variant="ghost" onClick={() => void clearKey()}>
+                {t("settings.dictation.cloud.key.clear")}
+              </Button>
+            )}
+            {provider?.api_key_url && (
+              <button
+                type="button"
+                onClick={() => void openUrl(provider.api_key_url as string)}
+                className="inline-flex items-center gap-1 text-xs text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
+              >
+                {t("settings.dictation.cloud.key.getOne")}
+                <ExternalLink size={11} />
+              </button>
+            )}
+          </div>
+        </SettingContainer>
+      )}
 
-      {provider?.allow_base_url_edit && (
+      {isAmazon && (
+        <SettingContainer
+          title={t("settings.dictation.cloud.amazon.region.title")}
+          description={t("settings.dictation.cloud.amazon.region.description")}
+          grouped={true}
+        >
+          <Dropdown
+            className="min-w-[300px]"
+            options={regionOptions}
+            selectedValue={awsRegion}
+            onSelect={(value) =>
+              void commit(() => commands.setCloudSttBaseUrl(providerId, value))
+            }
+            disabled={busy}
+          />
+        </SettingContainer>
+      )}
+
+      {provider?.allow_base_url_edit && !isAmazon && (
         <SettingContainer
           title={t("settings.dictation.cloud.endpoint.title")}
           description={
@@ -339,25 +548,29 @@ export const CloudTranscriptionGroup: React.FC<{
         </SettingContainer>
       )}
 
-      <SettingContainer
-        title={t("settings.dictation.cloud.model.title")}
-        info={t("settings.dictation.cloud.model.info")}
-        grouped={true}
-      >
-        <ModelCombo
-          value={selectedModel}
-          options={modelOptions}
-          onCommit={(value) =>
-            void commit(() => commands.setCloudSttModel(providerId, value))
-          }
-          onLoad={() => void loadModels()}
-          loading={loadingModels}
-          error={modelsError}
-          placeholder={provider?.default_model}
-          loadLabel={t("settings.dictation.cloud.model.load")}
-          disabled={busy}
-        />
-      </SettingContainer>
+      {/* A provider with one model has nothing to pick: Amazon Transcribe runs
+              the one AWS serves. */}
+      {!fixedModel && (
+        <SettingContainer
+          title={t("settings.dictation.cloud.model.title")}
+          info={t("settings.dictation.cloud.model.info")}
+          grouped={true}
+        >
+          <ModelCombo
+            value={selectedModel}
+            options={modelOptions}
+            onCommit={(value) =>
+              void commit(() => commands.setCloudSttModel(providerId, value))
+            }
+            onLoad={() => void loadModels()}
+            loading={loadingModels}
+            error={modelsError}
+            placeholder={provider?.default_model}
+            loadLabel={t("settings.dictation.cloud.model.load")}
+            disabled={busy}
+          />
+        </SettingContainer>
+      )}
 
       {/* Language rows live here, not in the local model card above, because
               in cloud mode that model is unloaded and its capabilities describe
@@ -371,8 +584,20 @@ export const CloudTranscriptionGroup: React.FC<{
         grouped={true}
         icon={Globe}
         tone="emerald"
-        description={t("settings.dictation.cloud.language.description")}
+        description={
+          isAmazon
+            ? t("settings.dictation.cloud.amazon.language")
+            : t("settings.dictation.cloud.language.description")
+        }
       />
+
+      {isAmazon && languageUnsupported && (
+        <Alert variant="warning" contained>
+          {t("settings.dictation.cloud.amazon.unsupportedLanguage", {
+            region: awsRegion,
+          })}
+        </Alert>
+      )}
 
       <TranslateToEnglish
         descriptionMode="inline"
@@ -397,30 +622,45 @@ export const CloudTranscriptionGroup: React.FC<{
     <>
       {providerStreams && (
         <ToggleSwitch
-          checked={getSetting("cloud_stt_streaming") ?? true}
+          checked={streamsOnly || (getSetting("cloud_stt_streaming") ?? true)}
           onChange={(value) =>
             void commit(() => commands.setCloudSttStreaming(value))
           }
+          disabled={streamsOnly}
           isUpdating={busy}
           label={t("settings.dictation.cloud.streaming.label")}
           description={
-            modelStreams
-              ? t("settings.dictation.cloud.streaming.description")
-              : t("settings.dictation.cloud.streaming.needsRealtimeModel")
+            streamsOnly
+              ? t("settings.dictation.cloud.amazon.streaming")
+              : modelStreams
+                ? t("settings.dictation.cloud.streaming.description")
+                : t("settings.dictation.cloud.streaming.needsRealtimeModel")
           }
           descriptionMode="inline"
           grouped={true}
         />
       )}
 
+      {/* A provider that cannot take a word list (`honors_keyterms` false) gets
+              the app's own correction pass instead, so the switch would claim
+              something that does not happen there. */}
       <ToggleSwitch
-        checked={getSetting("cloud_stt_send_custom_words") ?? true}
+        checked={
+          honorsKeyterms && (getSetting("cloud_stt_send_custom_words") ?? true)
+        }
         onChange={(value) =>
           void commit(() => commands.setCloudSttSendCustomWords(value))
         }
+        disabled={!honorsKeyterms}
         isUpdating={busy}
         label={t("settings.dictation.cloud.keyterms.label")}
-        description={t("settings.dictation.cloud.keyterms.description")}
+        description={
+          honorsKeyterms
+            ? t("settings.dictation.cloud.keyterms.description")
+            : t("settings.dictation.cloud.keyterms.unsupported", {
+                provider: provider?.label ?? "",
+              })
+        }
         grouped={true}
       />
 
