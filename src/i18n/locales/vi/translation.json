@@ -645,6 +645,7 @@
           "restore": "Không thể khôi phục phím tắt ban đầu.",
           "set": "Không thể đặt phím tắt: {{error}}",
           "inUse": "“{{name}}” đã dùng {{keys}}. Hãy chọn phím khác, hoặc đổi phím tắt đó trước.",
+          "sameAsOther": "{{keys}} đã được đặt cho phím tắt này.",
           "reset": "Không thể đặt lại phím tắt."
         },
         "clickToChange": "Nhấp để thay đổi",
@@ -817,6 +818,13 @@
       "lazyStreamClose": {
         "label": "Giữ micrô mở giữa các lần chép lời",
         "description": "Đọc chính tả liên tiếp nhanh hơn. Có thể ảnh hưởng đến chất lượng âm thanh Bluetooth."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Dùng nút chuột làm phím tắt",
+        "description": "Dùng nút giữa, nút Lùi hoặc nút Tiến của chuột làm phím tắt: bấm vào phím của một phím tắt rồi nhấn nút đó. Khi đã là phím tắt, nút đó không làm gì khác.",
+        "linux": "Trên Linux chỉ nút giữa hoạt động.",
+        "needsEngine": "Cần cơ chế bàn phím SpeakoFlow Keys.",
+        "reset": "Các phím tắt dùng nút chuột đã trở về phím mặc định."
       },
       "liveTranscription": {
         "label": "Chuyển đổi trực tiếp",
@@ -3156,7 +3164,19 @@
     "useDefault": "Dùng mặc định",
     "turnOff": "Tắt",
     "turnedOff": "Đã tắt phím tắt {{name}}",
-    "undo": "Hoàn tác"
+    "undo": "Hoàn tác",
+    "addAnother": "Thêm phím khác",
+    "addAnotherHint": "Gán cho phím tắt này bộ phím thứ hai, ví dụ một nút chuột",
+    "remove": "Xóa",
+    "or": "hoặc",
+    "changeOther": "Đổi phím khác của phím tắt {{name}}",
+    "pressKeysOrButton": "Nhấn phím hoặc một nút chuột…",
+    "mouseNeedsKeysEngine": "Nút chuột cần cơ chế bàn phím SpeakoFlow Keys (Cài đặt → Nâng cao → Thử nghiệm).",
+    "mouse": {
+      "middle": "Nút giữa chuột",
+      "back": "Nút Lùi của chuột",
+      "forward": "Nút Tiến của chuột"
+    }
   },
   "memoryManager": {
     "status": {

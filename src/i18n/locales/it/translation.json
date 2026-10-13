@@ -649,6 +649,7 @@
           "restore": "Impossibile ripristinare la scorciatoia originale.",
           "set": "Impossibile impostare la scorciatoia: {{error}}",
           "inUse": "«{{name}}» usa già {{keys}}. Scegli altri tasti, oppure cambia prima quella scorciatoia.",
+          "sameAsOther": "{{keys}} è già impostato per questa scorciatoia.",
           "reset": "Impossibile ripristinare la scorciatoia."
         },
         "clickToChange": "Fai clic per cambiare",
@@ -829,6 +830,13 @@
       "lazyStreamClose": {
         "label": "Mantieni il microfono aperto tra le trascrizioni",
         "description": "Dettature consecutive più rapide. Potrebbe influire sulla qualità audio Bluetooth."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Tasti del mouse come scorciatoie",
+        "description": "Usa il tasto centrale, Indietro o Avanti del mouse come scorciatoia: fai clic sui tasti di una scorciatoia, poi premi il tasto. Finché è una scorciatoia, il tasto non fa nient'altro.",
+        "linux": "Su Linux funziona solo il tasto centrale.",
+        "needsEngine": "Richiede l'implementazione della tastiera SpeakoFlow Keys.",
+        "reset": "Le scorciatoie che usavano un tasto del mouse sono tornate ai tasti predefiniti."
       },
       "liveTranscription": {
         "label": "Trascrizione in tempo reale",
@@ -3212,7 +3220,19 @@
     "useDefault": "Usa predefinita",
     "turnOff": "Disattiva",
     "turnedOff": "Scorciatoia {{name}} disattivata",
-    "undo": "Annulla"
+    "undo": "Annulla",
+    "addAnother": "Aggiungi un'altra",
+    "addAnotherHint": "Assegna a questa scorciatoia una seconda combinazione, ad esempio un tasto del mouse",
+    "remove": "Rimuovi",
+    "or": "o",
+    "changeOther": "Cambia gli altri tasti della scorciatoia {{name}}",
+    "pressKeysOrButton": "Premi i tasti o un tasto del mouse…",
+    "mouseNeedsKeysEngine": "I tasti del mouse richiedono l'implementazione della tastiera SpeakoFlow Keys (Impostazioni → Avanzate → Sperimentale).",
+    "mouse": {
+      "middle": "Tasto centrale",
+      "back": "Tasto Indietro",
+      "forward": "Tasto Avanti"
+    }
   },
   "memoryManager": {
     "status": {

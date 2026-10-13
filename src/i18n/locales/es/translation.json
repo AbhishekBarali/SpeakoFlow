@@ -649,6 +649,7 @@
           "restore": "No se pudo restaurar el atajo original.",
           "set": "No se pudo configurar el atajo: {{error}}",
           "inUse": "«{{name}}» ya usa {{keys}}. Elige otras teclas o cambia primero ese atajo.",
+          "sameAsOther": "{{keys}} ya está asignado a este atajo.",
           "reset": "No se pudo restablecer el atajo."
         },
         "clickToChange": "Haz clic para cambiarlo",
@@ -829,6 +830,13 @@
       "lazyStreamClose": {
         "label": "Mantener micrófono abierto entre transcripciones",
         "description": "Dictados consecutivos más rápidos. Puede afectar a la calidad del audio Bluetooth."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Botones del ratón como atajos",
+        "description": "Usa el botón central, Atrás o Adelante del ratón como atajo: haz clic en las teclas de un atajo y luego pulsa el botón. Mientras sea un atajo, el botón no hace nada más.",
+        "linux": "En Linux solo funciona el botón central.",
+        "needsEngine": "Requiere la implementación de teclado SpeakoFlow Keys.",
+        "reset": "Los atajos que usaban un botón del ratón volvieron a sus teclas predeterminadas."
       },
       "liveTranscription": {
         "label": "Transcripción en directo",
@@ -3212,7 +3220,19 @@
     "useDefault": "Usar predeterminado",
     "turnOff": "Desactivar",
     "turnedOff": "Atajo de {{name}} desactivado",
-    "undo": "Deshacer"
+    "undo": "Deshacer",
+    "addAnother": "Añadir otro",
+    "addAnotherHint": "Dale a este atajo una segunda combinación de teclas, como un botón del ratón",
+    "remove": "Quitar",
+    "or": "o",
+    "changeOther": "Cambiar las otras teclas del atajo de {{name}}",
+    "pressKeysOrButton": "Presiona teclas o un botón del ratón…",
+    "mouseNeedsKeysEngine": "Los botones del ratón necesitan la implementación de teclado SpeakoFlow Keys (Ajustes → Avanzado → Experimental).",
+    "mouse": {
+      "middle": "Botón central",
+      "back": "Botón Atrás",
+      "forward": "Botón Adelante"
+    }
   },
   "memoryManager": {
     "status": {

@@ -649,6 +649,7 @@
           "restore": "Impossible de restaurer le raccourci d'origine.",
           "set": "Impossible de définir le raccourci : {{error}}",
           "inUse": "« {{name}} » utilise déjà {{keys}}. Choisissez d'autres touches, ou modifiez d'abord ce raccourci.",
+          "sameAsOther": "{{keys}} est déjà défini pour ce raccourci.",
           "reset": "Impossible de réinitialiser le raccourci."
         },
         "clickToChange": "Cliquez pour modifier",
@@ -829,6 +830,13 @@
       "lazyStreamClose": {
         "label": "Garder le micro ouvert entre les transcriptions",
         "description": "Dictées consécutives plus rapides. Peut affecter la qualité audio Bluetooth."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Boutons de la souris comme raccourcis",
+        "description": "Utilisez le bouton central, Précédent ou Suivant de votre souris comme raccourci : cliquez sur les touches d'un raccourci, puis appuyez sur le bouton. Tant qu'il sert de raccourci, le bouton ne fait rien d'autre.",
+        "linux": "Sous Linux, seul le bouton central fonctionne.",
+        "needsEngine": "Nécessite la gestion du clavier SpeakoFlow Keys.",
+        "reset": "Les raccourcis qui utilisaient un bouton de la souris ont retrouvé leurs touches par défaut."
       },
       "liveTranscription": {
         "label": "Transcription en direct",
@@ -3212,7 +3220,19 @@
     "useDefault": "Par défaut",
     "turnOff": "Désactiver",
     "turnedOff": "Raccourci {{name}} désactivé",
-    "undo": "Annuler"
+    "undo": "Annuler",
+    "addAnother": "Ajouter un autre",
+    "addAnotherHint": "Donner à ce raccourci une seconde combinaison, par exemple un bouton de la souris",
+    "remove": "Supprimer",
+    "or": "ou",
+    "changeOther": "Modifier les autres touches du raccourci {{name}}",
+    "pressKeysOrButton": "Appuyez sur des touches ou un bouton de la souris…",
+    "mouseNeedsKeysEngine": "Les boutons de la souris nécessitent la gestion du clavier SpeakoFlow Keys (Paramètres → Avancé → Expérimental).",
+    "mouse": {
+      "middle": "Bouton central",
+      "back": "Bouton Précédent",
+      "forward": "Bouton Suivant"
+    }
   },
   "memoryManager": {
     "status": {

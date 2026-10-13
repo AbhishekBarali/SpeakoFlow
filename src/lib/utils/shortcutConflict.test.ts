@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { canonicalShortcut, shortcutUsingKeys } from "./shortcutConflict";
+import {
+  canonicalShortcut,
+  shortcutCombos,
+  shortcutUsingKeys,
+} from "./shortcutConflict";
 
 const bindings = {
   transcribe: { current_binding: "ctrl_left+super" },
@@ -53,5 +57,73 @@ describe("canonicalShortcut", () => {
       canonicalShortcut("space+alt+ctrl"),
     );
     expect(canonicalShortcut("command_left+k")).toBe("k+super_left");
+  });
+
+  test("a mouse button is the same button by any of its names", () => {
+    expect(canonicalShortcut("back")).toBe(canonicalShortcut("mousex1"));
+    expect(canonicalShortcut("Mouse5+ctrl_left")).toBe(
+      canonicalShortcut("ctrl_left+mousex2"),
+    );
+    expect(canonicalShortcut("mmb")).toBe("mousemiddle");
+  });
+});
+
+describe("other keys", () => {
+  const withOther = {
+    ...bindings,
+    transcribe: {
+      current_binding: "ctrl_left+super",
+      alternate_binding: "mousex1",
+    },
+  };
+
+  test("another shortcut's other keys are as taken as its own", () => {
+    expect(shortcutUsingKeys(withOther, "back", "assistant", "alternate")).toBe(
+      "transcribe",
+    );
+    expect(shortcutUsingKeys(withOther, "mousex1", "assistant")).toBe(
+      "transcribe",
+    );
+  });
+
+  test("a shortcut's two sets of keys must differ", () => {
+    expect(
+      shortcutUsingKeys(
+        withOther,
+        "ctrl_left+super",
+        "transcribe",
+        "alternate",
+      ),
+    ).toBe("transcribe");
+    expect(
+      shortcutUsingKeys(withOther, "mouse4", "transcribe", "primary"),
+    ).toBe("transcribe");
+    // Its own keys, set again, are its own.
+    expect(
+      shortcutUsingKeys(withOther, "ctrl_left+super", "transcribe", "primary"),
+    ).toBeNull();
+  });
+
+  test("a shortcut that is turned off holds no other keys either", () => {
+    const off = {
+      ...bindings,
+      cancel: { current_binding: "", alternate_binding: "f13" },
+    };
+    expect(shortcutUsingKeys(off, "f13", "transcribe", "alternate")).toBeNull();
+  });
+});
+
+describe("shortcutCombos", () => {
+  test("own keys first, then the other keys, and none when off", () => {
+    expect(
+      shortcutCombos({
+        current_binding: "f13",
+        alternate_binding: " mousex2 ",
+      }),
+    ).toEqual(["f13", "mousex2"]);
+    expect(shortcutCombos({ current_binding: "f13" })).toEqual(["f13"]);
+    expect(
+      shortcutCombos({ current_binding: "", alternate_binding: "mousex2" }),
+    ).toEqual([]);
   });
 });

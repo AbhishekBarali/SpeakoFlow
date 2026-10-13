@@ -7,10 +7,9 @@ use log::{error, warn};
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-#[cfg(not(target_os = "linux"))]
-use crate::settings::get_settings;
-use crate::settings::{self, ShortcutBinding};
+use crate::settings::{self, get_settings, KeyboardImplementation, ShortcutBinding};
 
+use super::combos::{self, Armed};
 use super::handler::handle_shortcut_event;
 
 /// Initialize shortcuts using Tauri's global-shortcut plugin
@@ -152,6 +151,12 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
         }
     }
 
+    // A mouse button would otherwise count as the main key below, and then
+    // fail to parse at registration.
+    if combos::has_mouse_button(raw) {
+        return Err("Mouse buttons are not supported by Tauri global shortcuts".into());
+    }
+
     // Check for at least one non-modifier key
     let has_non_modifier = parts.iter().any(|part| !MODIFIERS.contains(&part.as_str()));
 
@@ -162,13 +167,22 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
     }
 }
 
-/// Register a shortcut using Tauri's global-shortcut plugin.
+/// Register a shortcut using Tauri's global-shortcut plugin: its own keys, and
+/// its other keys when it has them. Fails only when its own keys could not be
+/// registered (see `Armed`).
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
-    // An empty binding means "disabled" — nothing to register.
-    if binding.current_binding.trim().is_empty() {
-        return Ok(());
-    }
-    register_one(app, &binding.id, &binding.current_binding)
+    arm(app, &binding).into_result(&binding.id)
+}
+
+/// Register a shortcut's keys and report on each set separately. An empty
+/// binding means "disabled", and registers nothing.
+pub fn arm(app: &AppHandle, binding: &ShortcutBinding) -> Armed {
+    combos::arm_with(
+        &get_settings(app),
+        binding,
+        KeyboardImplementation::Tauri,
+        |combo| register_one(app, &binding.id, combo),
+    )
 }
 
 /// Register a single (id, hotkey) pair with Tauri's global-shortcut plugin.
@@ -226,12 +240,18 @@ fn register_one(app: &AppHandle, binding_id: &str, hotkey: &str) -> Result<(), S
     Ok(())
 }
 
-/// Unregister a shortcut from Tauri's global-shortcut plugin.
+/// Unregister a shortcut from Tauri's global-shortcut plugin: every set of keys
+/// registering it would arm. One that fails does not keep the rest registered.
 pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
-    if binding.current_binding.trim().is_empty() {
-        return Ok(());
+    let mut result = Ok(());
+    for (_, combo) in combos::armed(&get_settings(app), &binding, KeyboardImplementation::Tauri) {
+        if let Err(e) = unregister_one(app, &combo) {
+            if result.is_ok() {
+                result = Err(e);
+            }
+        }
     }
-    unregister_one(app, &binding.current_binding)
+    result
 }
 
 /// Unregister a single hotkey from Tauri's global-shortcut plugin.
@@ -254,6 +274,12 @@ fn unregister_one(app: &AppHandle, hotkey: &str) -> Result<(), String> {
             return Err(error_msg);
         }
     };
+
+    // Keys that never registered (another app held them, or the shortcut was
+    // suspended for editing) have nothing to release.
+    if !app.global_shortcut().is_registered(shortcut) {
+        return Ok(());
+    }
 
     app.global_shortcut().unregister(shortcut).map_err(|e| {
         let error_msg = format!("Failed to unregister shortcut '{}': {}", hotkey, e);

@@ -2,7 +2,32 @@
  * Keyboard utility functions for handling keyboard events
  */
 
+import i18next from "i18next";
+
 export type OSType = "macos" | "windows" | "linux" | "unknown";
+
+/**
+ * The mouse buttons a shortcut can use, by the name the engine records them
+ * with, and the label each is shown by. Left and right click never become a
+ * shortcut, so they have no label.
+ */
+const MOUSE_BUTTON_LABELS: Record<string, { key: string; fallback: string }> = {
+  mousemiddle: { key: "shortcutEditor.mouse.middle", fallback: "Mouse Middle" },
+  mousex1: { key: "shortcutEditor.mouse.back", fallback: "Mouse Back" },
+  mousex2: { key: "shortcutEditor.mouse.forward", fallback: "Mouse Forward" },
+};
+
+/** Whether a key the engine reported is a mouse button. */
+export const isMouseButtonKey = (key: string | null | undefined): boolean =>
+  !!key && key.toLowerCase().startsWith("mouse");
+
+/** Whether a key the engine reported is the left or right button. */
+export const isClickKey = (key: string | null | undefined): boolean =>
+  key === "mouseleft" || key === "mouseright";
+
+/** Whether a stored binding includes a mouse button. */
+export const hasMouseButton = (binding: string | null | undefined): boolean =>
+  (binding ?? "").split("+").some((part) => isMouseButtonKey(part.trim()));
 
 /**
  * Extract a consistent key name from a KeyboardEvent
@@ -205,6 +230,13 @@ const formatKeyPart = (part: string, osType: OSType = "unknown"): string => {
   // shortcut engine still binds exactly the same key. Linux/macOS unchanged.
   if (osType === "windows" && META_KEY_ALIASES.has(name.toLowerCase())) {
     return `${side}Windows`;
+  }
+
+  // A mouse button is stored by its engine name (`mousex1`), which says
+  // nothing to anyone reading it.
+  const mouse = MOUSE_BUTTON_LABELS[name.toLowerCase()];
+  if (mouse) {
+    return i18next.isInitialized ? i18next.t(mouse.key) : mouse.fallback;
   }
 
   return `${side}${capitalizeKey(name)}`;
