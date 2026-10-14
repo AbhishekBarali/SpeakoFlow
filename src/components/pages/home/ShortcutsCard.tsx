@@ -73,6 +73,11 @@ export const ShortcutsCard: React.FC = () => {
       info: t("home.shortcuts.call.what"),
       off: assistantOn ? undefined : "assistant",
     },
+    {
+      id: "paste_last_transcript",
+      title: t("home.shortcuts.pasteLast.title"),
+      info: t("home.shortcuts.pasteLast.what"),
+    },
   ];
   // Cancel is not a global shortcut on Linux (see the Settings dialog).
   if (os !== "linux") {
