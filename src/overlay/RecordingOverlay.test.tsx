@@ -759,3 +759,54 @@ test("hands-free ends with its recording and never reaches the next one", async 
   });
   expect(hasClass("hands-free")).toBe(false);
 });
+
+/** The hands-free key's keycap on the pill, if it is showing. */
+const hintKeys = () =>
+  renderer.root.findAll(
+    (node) =>
+      typeof node.type === "string" &&
+      String(node.props.className ?? "") === "pill-hint-key",
+  );
+const sleep = (ms: number) =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  });
+
+test("a held dictation shows its hands-free key after a moment, then the waveform again", async () => {
+  await fire("show-overlay", {
+    state: "recording",
+    streamingWindow: false,
+    handsFreeKey: "space",
+    finishKeys: "ctrl_left+super",
+    epoch: 40,
+  });
+  expect(hintKeys()).toHaveLength(0);
+  await sleep(1000);
+  expect(hintKeys()).toHaveLength(1);
+  expect(textOf(hintKeys()[0])).toBe("Space");
+
+  // Going hands-free is the hint taken: the pill wears its ring instead.
+  await fire("recording-hands-free", { interactive: true });
+  expect(hintKeys()).toHaveLength(0);
+  expect(hasClass("hands-free")).toBe(true);
+});
+
+test("no hint where there is no hands-free key, and none once hands-free", async () => {
+  await fire("show-overlay", { state: "recording", streamingWindow: false });
+  await fire("show-overlay", { ...handsFreePill, handsFreeKey: "space" });
+  await sleep(1000);
+  expect(hintKeys()).toHaveLength(0);
+});
+
+test("the hands-free card names the keys that finish it", async () => {
+  await fire("show-overlay", {
+    ...handsFreePill,
+    streamingWindow: true,
+    finishKeys: "ctrl_left+super",
+  });
+  await fire("mic-level", [0.4, 0.6, 0.5, 0.7]);
+  expect(textOf(renderer.root.findByProps({ className: "card-label" }))).toBe(
+    "overlay.handsFreeFinish",
+  );
+  expect(surface().props["aria-label"]).toBe("overlay.lockedKeys");
+});

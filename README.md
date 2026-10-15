@@ -225,21 +225,22 @@ Each feature has its own page in the [documentation](https://www.speakoflow.com/
 
 <sup>1</sup> Press Space while you hold the dictation keys, or all together.
 It keeps listening after you let go, until you press the dictation keys again.
-Pick another key, or turn it off, under **Hands-free mode** in Settings →
-Shortcuts.
+The first few times you hold the dictation keys, the pill shows the Space key
+as a reminder. Pick another key, or turn it off, under **Hands-free** in
+Settings → Shortcuts.
 
-<sup>2</sup> Space is already part of `Ctrl + Space`, so set dictation to
-**Tap** instead, which makes every dictation hands-free.
+<sup>2</sup> Space is already part of `Ctrl + Space`, so turn off **Hold to
+talk** for dictation instead, which makes every dictation hands-free.
 
 <sup>3</sup> Only while AI cleanup is on and has its own shortcut.
 
 The pattern is the same on every platform. Add Shift to the dictation keys to
 dictate and clean up, and add C to the ask keys to start a conversation.
 Recording shortcuts work while you hold them. Dictation and the assistant each
-have their own **Hold** or **Tap** on the Home page: with Tap, one press starts
-and the next one stops. A dictation that keeps listening without the keys is
-hands-free: the pill gets a ring, and hovering it shows ✕ to cancel and ✓ to
-finish.
+have their own **Hold to talk** switch in Settings → Shortcuts (**Manage** on
+the Home page): turned off, one press starts and the next one stops. A
+dictation that keeps listening without the keys is hands-free: the pill gets a
+ring, and hovering it shows ✕ to cancel and ✓ to finish.
 
 Esc only cancels while something is running, like a recording or a reply being
 read aloud, so other apps keep their Esc the rest of the time. To change a
