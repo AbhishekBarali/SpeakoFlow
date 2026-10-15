@@ -916,20 +916,22 @@ pub enum ConversationSensitivity {
 }
 
 /// How thorough a web search should be. This is the single dial that replaces
-/// the old raw "max results" number: it controls how many queries run, how many
-/// pages get scraped, and how much source text the model receives. All three
-/// tiers are tuned to stay fast (one retrieval pass, heavy parallelism, tight
-/// timeouts) — this is "answer-with-search like ChatGPT/Gemini do in seconds",
-/// not minutes-long deep research.
+/// the old raw "max results" number. It reaches the provider request (Tavily
+/// `fast` / `basic` / `advanced`, Exa's search type, result count), the timeout
+/// and the text kept per source, and the model's prompt, which tells it how many
+/// searches to make (`web_search::depth_guidance`). All three tiers stay fast
+/// enough to sit through: this is "answer-with-search like ChatGPT/Gemini do in
+/// seconds", not minutes-long deep research.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum AssistantSearchDepth {
-    /// Fastest. One query, snippets + a couple of scraped pages. Quick facts.
+    /// Fastest. One search, shorter passages. Quick facts.
     Low,
-    /// Balanced default. A few queries, rerank, scrape the top handful.
+    /// Balanced default. One search, a second when the first misses something.
     #[default]
     Medium,
-    /// Broadest single pass. More queries/sources, scrape more winners.
+    /// Most thorough. The provider's best mode, the longest passages, and two
+    /// or three searches from different angles.
     High,
 }
 
