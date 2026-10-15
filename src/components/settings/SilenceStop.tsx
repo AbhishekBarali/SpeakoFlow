@@ -65,6 +65,7 @@ export const SilenceStop: React.FC<SilenceStopProps> = React.memo(
         grouped={grouped}
       >
         <Dropdown
+          size="sm"
           options={options}
           selectedValue={holdToTalk ? "0" : String(current)}
           onSelect={(value) =>
