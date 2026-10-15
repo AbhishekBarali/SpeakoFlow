@@ -1264,10 +1264,14 @@ pub(crate) fn reasoning_options_for(
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 enum StreamReasoningSupport {
     #[default]
     Requested,
+    /// An explicit `"none"`. Distinct from [`Self::Unsupported`], which omits
+    /// the parameter: some endpoints treat an omitted effort as their default
+    /// (a non-zero one) and refuse it exactly like the effort that was asked for.
+    NoEffort,
     Low,
     Unsupported,
 }
@@ -1275,24 +1279,60 @@ enum StreamReasoningSupport {
 static STREAM_REASONING_SUPPORT: Lazy<Mutex<HashMap<String, StreamReasoningSupport>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+fn set_stream_effort(body: &mut ChatCompletionRequest, value: &str) {
+    if let Some(effort) = &mut body.reasoning_effort {
+        *effort = value.into();
+    }
+    if let Some(reasoning) = &mut body.reasoning {
+        reasoning.effort = Some(value.into());
+    }
+}
+
 fn apply_stream_reasoning_support(
     body: &mut ChatCompletionRequest,
     support: StreamReasoningSupport,
 ) {
     match support {
         StreamReasoningSupport::Requested => {}
-        StreamReasoningSupport::Low => {
-            if let Some(effort) = &mut body.reasoning_effort {
-                *effort = "low".into();
-            }
-            if let Some(reasoning) = &mut body.reasoning {
-                reasoning.effort = Some("low".into());
-            }
-        }
+        StreamReasoningSupport::NoEffort => set_stream_effort(body, "none"),
+        StreamReasoningSupport::Low => set_stream_effort(body, "low"),
         StreamReasoningSupport::Unsupported => {
             body.reasoning_effort = None;
             body.reasoning = None;
         }
+    }
+}
+
+/// Whether a rejection tells us to send an effort of `"none"`.
+///
+/// Azure's GPT-6 deployments refuse function tools together with *any*
+/// reasoning effort on `/chat/completions`, including an omitted one:
+/// "Function tools with reasoning_effort are not supported for gpt-6-luna in
+/// /v1/chat/completions. To use function tools, use /v1/responses or set
+/// reasoning_effort to 'none'." The old ladder (requested → low → omitted)
+/// never tried `"none"`, so every tool turn failed twice and the assistant then
+/// fell back to answering with no tools at all — no web search, no reminders,
+/// no clock. This reads the provider's own instruction instead of guessing.
+///
+/// Matches "to 'none'", not just "'none'": Bedrock's "reasoning_effort 'none'
+/// is not one of low, medium, high" quotes the same word to refuse it.
+fn rejection_asks_for_no_effort(error: &str) -> bool {
+    let error = error.to_ascii_lowercase();
+    ["to 'none'", "to \"none\"", "to \\\"none\\\"", "to none"]
+        .iter()
+        .any(|hint| error.contains(hint))
+}
+
+/// The next reasoning setting to try after `effort` was refused with `error`,
+/// or `None` when the ladder has nothing left. The caller also stops on a
+/// setting it has already tried, so the ladder can never cycle.
+fn next_stream_reasoning_support(effort: &str, error: &str) -> Option<StreamReasoningSupport> {
+    if effort != "none" && rejection_asks_for_no_effort(error) {
+        return Some(StreamReasoningSupport::NoEffort);
+    }
+    match effort {
+        "low" => Some(StreamReasoningSupport::Unsupported),
+        _ => Some(StreamReasoningSupport::Low),
     }
 }
 
@@ -1333,7 +1373,16 @@ async fn send_stream_request(
         .clone()
         .or_else(|| body.reasoning.as_ref().and_then(|r| r.effort.clone()))
         .unwrap_or_default();
-    let key = format!("{url}|{}|{requested}", body.model);
+    // And by whether tools ride along: a model can accept an effort on a plain
+    // request and refuse the same effort next to `tools` (Azure GPT-6), so what
+    // a tool turn learns must not strip reasoning from cleanup or a summary.
+    let with_tools = if body.tools.is_some() {
+        "tools"
+    } else {
+        "plain"
+    };
+    let key = format!("{url}|{}|{requested}|{with_tools}", body.model);
+    let mut tried: Vec<StreamReasoningSupport> = Vec::new();
     if tuned {
         let support = STREAM_REASONING_SUPPORT
             .lock()
@@ -1341,6 +1390,7 @@ async fn send_stream_request(
             .and_then(|cache| cache.get(&key).copied())
             .unwrap_or_default();
         apply_stream_reasoning_support(&mut body, support);
+        tried.push(support);
     }
     loop {
         let response = client
@@ -1376,23 +1426,35 @@ async fn send_stream_request(
             .reasoning_effort
             .as_deref()
             .or_else(|| body.reasoning.as_ref().and_then(|r| r.effort.as_deref()));
-        if emitted || !can_negotiate || effort.is_none() || !reasoning_rejection(error) {
+        let Some(effort) = effort else {
+            return result;
+        };
+        if emitted || !can_negotiate || !reasoning_rejection(error) {
             return result;
         }
-        // At most two retries: none -> low -> provider default. Retain tools,
-        // images and history, and remember the supported level for later turns.
-        let support = if effort == Some("low") {
-            StreamReasoningSupport::Unsupported
-        } else {
-            StreamReasoningSupport::Low
+        // Retain tools, images and history, and remember the supported level
+        // for later turns. Bounded: every step is a setting not tried before,
+        // and there are only four.
+        let Some(support) = next_stream_reasoning_support(effort, error) else {
+            return result;
         };
+        if tried.contains(&support) {
+            return result;
+        }
+        tried.push(support);
         warn!(
-            "Model '{}' rejected interactive reasoning control; retrying with {}",
+            "Model '{}' rejected reasoning effort '{}'{}; retrying with {}",
             body.model,
-            if matches!(support, StreamReasoningSupport::Low) {
-                "low effort"
+            effort,
+            if body.tools.is_some() {
+                " on a tool request"
             } else {
-                "provider defaults"
+                ""
+            },
+            match support {
+                StreamReasoningSupport::NoEffort => "effort 'none'",
+                StreamReasoningSupport::Low => "low effort",
+                _ => "provider defaults",
             }
         );
         apply_stream_reasoning_support(&mut body, support);
@@ -1810,18 +1872,21 @@ mod tests {
         .unwrap();
         assert_eq!(reply.text, "Hello");
         assert_eq!(tokens, "Hello");
-        let reply = send_chat_stream(
+        // The next tool turn starts from what the first one learned.
+        let reply = send_chat_stream_with_tools(
             &provider,
             String::new(),
             "test-model",
             messages.clone(),
+            tools.clone(),
+            json!("auto"),
             None,
             None,
             |_| {},
         )
         .await
         .unwrap();
-        assert_eq!(reply, "Hello");
+        assert_eq!(reply.text, "Hello");
         server.join().unwrap();
         let requests: Vec<Value> = rx.into_iter().collect();
         assert_eq!(requests.len(), rejections.len() + 2);
@@ -1838,7 +1903,7 @@ mod tests {
             None
         };
         assert_eq!(effort(requests.last().unwrap()), last_effort);
-        for request in &requests[..requests.len() - 1] {
+        for request in &requests {
             assert_eq!(request["tools"], tools);
             assert_eq!(request["messages"], json!(messages));
         }
@@ -1865,6 +1930,121 @@ mod tests {
             ],
         )
         .await;
+    }
+
+    /// Verbatim from Azure's `gpt-6-luna` deployment when a tool request carries
+    /// any reasoning effort other than "none" — including an omitted one.
+    const AZURE_TOOLS_WITH_EFFORT_400: &str = r#"{"error":{"message":"Function tools with reasoning_effort are not supported for gpt-6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.","type":"invalid_request_error","param":"reasoning_effort","code":null}}"#;
+
+    #[test]
+    fn the_reasoning_ladder_follows_a_set_to_none_hint() {
+        let azure = format!(
+            "API request failed with status 400 Bad Request: {AZURE_TOOLS_WITH_EFFORT_400}"
+        );
+        assert!(reasoning_rejection(&azure));
+        assert!(rejection_asks_for_no_effort(&azure));
+        for effort in ["low", "medium", "high", "xhigh"] {
+            assert_eq!(
+                next_stream_reasoning_support(effort, &azure),
+                Some(StreamReasoningSupport::NoEffort),
+                "{effort} should step straight to 'none'"
+            );
+        }
+        // Quoting 'none' to refuse it is not a hint to send it.
+        let bedrock = "reasoning_effort 'none' is not one of low, medium, high";
+        assert!(!rejection_asks_for_no_effort(bedrock));
+        assert_eq!(
+            next_stream_reasoning_support("none", bedrock),
+            Some(StreamReasoningSupport::Low)
+        );
+        assert_eq!(
+            next_stream_reasoning_support("low", "reasoning is not supported"),
+            Some(StreamReasoningSupport::Unsupported)
+        );
+        // Asking for "none" again when "none" was refused cannot loop.
+        assert_eq!(
+            next_stream_reasoning_support("none", &azure),
+            Some(StreamReasoningSupport::Low)
+        );
+    }
+
+    /// The bug behind "web search does nothing" on Azure GPT-6 with Thinking on:
+    /// the tool request was refused, the ladder never tried "none", and the turn
+    /// fell back to no tools at all. Now the tool turn is retried at "none" and
+    /// remembered, while a plain request keeps the user's effort.
+    #[tokio::test]
+    async fn azure_tool_turns_drop_to_no_effort_and_plain_requests_keep_theirs() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/v1", listener.local_addr().unwrap());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let answer = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n";
+        let replies: Vec<(u16, String)> = vec![
+            (400, AZURE_TOOLS_WITH_EFFORT_400.to_string()),
+            (200, answer.to_string()),
+            (200, answer.to_string()),
+            (200, answer.to_string()),
+        ];
+        let server = std::thread::spawn(move || {
+            for (status, body) in replies {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request_body(&mut stream);
+                tx.send(serde_json::from_str::<Value>(&request).unwrap())
+                    .unwrap();
+                write!(stream, "HTTP/1.1 {status} Response\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let provider = provider("azure_openai", &base);
+        let model = "gpt-6-luna";
+        let messages = vec![json!({"role":"user", "content":"Latest news?"})];
+        let tools = json!([{ "type":"function", "function":{"name":"web_search", "parameters":{"type":"object"}}}]);
+        let (effort, reasoning) =
+            reasoning_options_for(&provider.id, model, crate::settings::ThinkingLevel::Low);
+        assert_eq!(effort.as_deref(), Some("low"));
+
+        for _ in 0..2 {
+            let round = send_chat_stream_with_tools(
+                &provider,
+                String::new(),
+                model,
+                messages.clone(),
+                tools.clone(),
+                json!("auto"),
+                effort.clone(),
+                reasoning.clone(),
+                |_| {},
+            )
+            .await
+            .unwrap();
+            assert_eq!(round.text, "Hi");
+        }
+        let plain = send_chat_stream(
+            &provider,
+            String::new(),
+            model,
+            messages.clone(),
+            effort.clone(),
+            reasoning.clone(),
+            |_| {},
+        )
+        .await
+        .unwrap();
+        assert_eq!(plain, "Hi");
+        server.join().unwrap();
+
+        let requests: Vec<Value> = rx.into_iter().collect();
+        let sent: Vec<(Option<&str>, bool)> = requests
+            .iter()
+            .map(|r| (r["reasoning_effort"].as_str(), r.get("tools").is_some()))
+            .collect();
+        assert_eq!(
+            sent,
+            vec![
+                (Some("low"), true),  // refused
+                (Some("none"), true), // the provider's own instruction
+                (Some("none"), true), // remembered: one request, not three
+                (Some("low"), false), // a plain request keeps the user's effort
+            ]
+        );
     }
 
     #[test]
