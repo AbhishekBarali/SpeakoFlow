@@ -1387,7 +1387,20 @@
       },
       "appendTrailingSpace": {
         "label": "끝에 공백 추가",
-        "description": ""
+        "description": "받아쓰기마다 끝에 공백을 추가합니다. 스마트 띄어쓰기가 켜져 있으면 입력란을 읽을 수 없을 때만 적용됩니다."
+      },
+      "smartSpacing": {
+        "label": "스마트 띄어쓰기",
+        "description": "입력란에 이미 있는 글에 맞춰 받아쓰기를 넣어, 멈췄다가 이어서 말해도 단어가 붙지 않게 합니다.",
+        "info": "붙여넣기 전에 SpeakoFlow는 커서 주변의 몇 글자를 확인하고 필요한 곳에만 공백을 넣습니다. 앱이 텍스트를 숨기면 대신 직전 받아쓰기를 참고합니다. 아무것도 저장하거나 전송하지 않습니다. macOS에서는 SpeakoFlow에 이미 허용된 손쉬운 사용 권한을 사용합니다. Linux에서는 Chrome, Electron, Qt 앱이 데스크톱 접근성 설정이 켜져 있을 때만 텍스트를 공유합니다."
+      },
+      "smartSpacingFixCase": {
+        "label": "대소문자 맞추기",
+        "description": "문장을 이어 말할 때 받아쓰기 첫 글자를 소문자로 시작합니다. 이름, 약어, \"I\"는 대문자를 유지합니다."
+      },
+      "smartSpacingJoin": {
+        "label": "멈춘 문장 이어 붙이기",
+        "description": "문장 중간에 멈췄을 때 SpeakoFlow가 붙인 마침표를 지웁니다. 예: \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "키보드 구현",

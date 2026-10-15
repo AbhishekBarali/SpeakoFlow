@@ -1405,7 +1405,20 @@
       },
       "appendTrailingSpace": {
         "label": "Ajouter une espace finale",
-        "description": ""
+        "description": "Ajoute une espace après chaque dictée. Avec l'espacement intelligent, cela ne s'applique que là où le champ ne peut pas être lu."
+      },
+      "smartSpacing": {
+        "label": "Espacement intelligent",
+        "description": "Adapte chaque dictée au texte déjà présent dans le champ, pour s'arrêter et reprendre sans que les mots se collent.",
+        "info": "Avant de coller, SpeakoFlow regarde les quelques caractères autour du curseur et n'ajoute une espace que là où il en faut une. Si une app masque son texte, il se sert plutôt de sa propre dernière dictée. Rien n'est enregistré ni envoyé nulle part. Sur macOS, il utilise l'autorisation d'accessibilité que SpeakoFlow a déjà. Sous Linux, les apps Chrome, Electron et Qt ne partagent leur texte que si l'accessibilité du bureau est activée."
+      },
+      "smartSpacingFixCase": {
+        "label": "Corriger les majuscules",
+        "description": "Commence la dictée en minuscule quand elle poursuit une phrase. Les noms, les sigles et « I » gardent leurs majuscules."
+      },
+      "smartSpacingJoin": {
+        "label": "Relier les phrases interrompues",
+        "description": "Supprime le point ajouté par SpeakoFlow quand vous vous êtes arrêté au milieu d'une phrase, comme dans « Je suis allé au. »"
       },
       "keyboardImplementation": {
         "title": "Gestion du clavier",

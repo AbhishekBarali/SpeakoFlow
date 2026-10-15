@@ -2545,6 +2545,11 @@ impl ShortcutAction for TranscribeAction {
         // ever reaches whatever holds keyboard focus at the moment it is sent.
         crate::input::remember_paste_target();
 
+        // Smart spacing: read the field this dictation is aimed at, now, while
+        // the caret is where the user left it and before any window of ours is
+        // in front. Runs in the background; a no-op when the setting is off.
+        crate::smart_spacing::begin(app);
+
         // Abandon any correction watch still running from the previous dictation. The
         // field it was reading is no longer the one that matters, and watching two at
         // once would attribute one field's edit to the other's transcript.
@@ -2784,6 +2789,10 @@ impl ShortcutAction for TranscribeAction {
         debug!("TranscribeAction::stop called for binding: {}", binding_id);
         // Let go before the press settled: it was this shortcut after all.
         shortcut::chord::reveal_now(app);
+
+        // Smart spacing: read the field again in case the caret moved while
+        // the user spoke. Runs alongside the transcription.
+        crate::smart_spacing::refresh(app);
 
         let ah = app.clone();
         let rm = Arc::clone(&app.state::<Arc<AudioRecordingManager>>());
@@ -3302,6 +3311,15 @@ fn paste_final(
     {
         utils::seal_working_overlay(&app);
     }
+    // Smart spacing: fit the dictation onto the field it is going into, from
+    // the reads made while the user spoke. Done here, before the main thread is
+    // taken for the paste, because it may wait briefly for a read in flight.
+    let fitted = if pending.flow {
+        None
+    } else {
+        let can_erase = crate::clipboard::paste_method_can_erase(get_settings(&app).paste_method);
+        crate::smart_spacing::prepare(&app, &pending.text, can_erase)
+    };
     app.run_on_main_thread(move || {
         // A cancel can arrive after the text was ready but before this
         // main-thread closure runs.
@@ -3342,6 +3360,19 @@ fn paste_final(
                 crate::clipboard::PasteBehavior {
                     allow_trailing_space: false,
                     allow_auto_submit: false,
+                    smart_spacing: None,
+                },
+            )
+        } else if let Some(fitted) = fitted {
+            utils::paste_with_behavior(
+                fitted.text,
+                ah.clone(),
+                crate::clipboard::PasteBehavior {
+                    smart_spacing: Some(crate::clipboard::SmartSpacingPaste {
+                        known: fitted.known,
+                        erase_before: fitted.erase_before,
+                    }),
+                    ..Default::default()
                 },
             )
         } else {

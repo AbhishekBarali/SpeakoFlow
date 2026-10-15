@@ -33,6 +33,7 @@ mod settings;
 mod settings_file;
 mod shortcut;
 mod signal_handle;
+mod smart_spacing;
 mod speech_readiness;
 mod speech_stream;
 mod stt_cloud;
@@ -1023,6 +1024,9 @@ pub fn run(cli_args: CliArgs) {
             shortcut::resume_binding,
             shortcut::change_mute_while_recording_setting,
             shortcut::change_append_trailing_space_setting,
+            shortcut::change_smart_spacing_setting,
+            shortcut::change_smart_spacing_fix_case_setting,
+            shortcut::change_smart_spacing_join_sentences_setting,
             shortcut::change_lazy_stream_close_setting,
             shortcut::change_live_transcription_enabled_setting,
             shortcut::change_live_transcription_window_enabled_setting,

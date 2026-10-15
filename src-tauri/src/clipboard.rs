@@ -773,6 +773,19 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
 pub struct PasteBehavior {
     pub allow_trailing_space: bool,
     pub allow_auto_submit: bool,
+    /// Set when Smart spacing shaped this dictation (see `smart_spacing`).
+    pub smart_spacing: Option<SmartSpacingPaste>,
+}
+
+/// What Smart spacing decided for one paste, beyond the text itself.
+#[derive(Debug, Clone, Copy)]
+pub struct SmartSpacingPaste {
+    /// Whether anything was known about the field. When not, the text is the
+    /// transcript as it was, and the trailing-space setting applies as usual.
+    pub known: bool,
+    /// Characters to remove before the caret first: SpeakoFlow's own stray
+    /// period from the previous dictation. Only ever 0 or 1.
+    pub erase_before: usize,
 }
 
 impl Default for PasteBehavior {
@@ -780,8 +793,76 @@ impl Default for PasteBehavior {
         Self {
             allow_trailing_space: true,
             allow_auto_submit: true,
+            smart_spacing: None,
         }
     }
+}
+
+/// Whether a paste method delivers keystrokes to the focused app, and so can
+/// also send the Backspace that removes SpeakoFlow's own stray period.
+pub fn paste_method_can_erase(paste_method: PasteMethod) -> bool {
+    matches!(
+        paste_method,
+        PasteMethod::Direct
+            | PasteMethod::CtrlV
+            | PasteMethod::CtrlShiftV
+            | PasteMethod::ShiftInsert
+    )
+}
+
+/// One Backspace into the focused app, through the same tools the paste uses.
+fn send_backspace(enigo: &mut Enigo) -> Result<(), String> {
+    let _injected = handy_keys::ignore_injected_input();
+    #[cfg(target_os = "linux")]
+    {
+        if try_send_backspace_linux()? {
+            return Ok(());
+        }
+    }
+    enigo
+        .key(Key::Backspace, Direction::Click)
+        .map_err(|e| format!("Failed to send Backspace: {}", e))
+}
+
+/// Backspace via the Linux-native tools, in the order the paste prefers them.
+/// `Ok(false)` falls back to enigo.
+#[cfg(target_os = "linux")]
+fn try_send_backspace_linux() -> Result<bool, String> {
+    let run = |program: &str, args: &[&str]| -> Result<bool, String> {
+        let output = Command::new(program)
+            .args(args)
+            .output()
+            .map_err(|e| format!("Failed to execute {}: {}", program, e))?;
+        if output.status.success() {
+            Ok(true)
+        } else {
+            Err(format!(
+                "{} failed: {}",
+                program,
+                String::from_utf8_lossy(&output.stderr)
+            ))
+        }
+    };
+    if is_wayland() {
+        if !is_kde_wayland() && !is_gnome_wayland() && is_wtype_available() {
+            return run("wtype", &["-k", "BackSpace"]);
+        }
+        if is_dotool_available() {
+            return run("sh", &["-c", "echo key backspace | dotool"]);
+        }
+        if is_ydotool_available() {
+            // Linux input keycode 14 is Backspace.
+            return run("ydotool", &["key", "14:1", "14:0"]);
+        }
+    } else {
+        if is_xdotool_available() {
+            return run("xdotool", &["key", "--clearmodifiers", "BackSpace"]);
+        }
+        if is_ydotool_available() {
+            return run("ydotool", &["key", "14:1", "14:0"]);
+        }
+    }
+    Ok(false)
 }
 
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
@@ -797,8 +878,14 @@ pub fn paste_with_behavior(
     let paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;
 
-    // Append trailing space if setting is enabled
-    let text = if behavior.allow_trailing_space && settings.append_trailing_space {
+    // Append trailing space if setting is enabled. A dictation Smart spacing
+    // already fitted to the field gets its spaces from the field instead; the
+    // setting still applies where the field could not be read.
+    let fitted_by_smart_spacing = behavior.smart_spacing.is_some_and(|smart| smart.known);
+    let text = if behavior.allow_trailing_space
+        && settings.append_trailing_space
+        && !fitted_by_smart_spacing
+    {
         format!("{} ", text)
     } else {
         text
@@ -828,6 +915,19 @@ pub fn paste_with_behavior(
         PasteMethod::None | PasteMethod::ExternalScript
     ) {
         input::restore_paste_target();
+    }
+
+    // Smart spacing removes its own stray period ("I went to the.") right
+    // before the continuation lands. The text was fitted assuming it is gone.
+    let erase_before = behavior.smart_spacing.map_or(0, |smart| smart.erase_before);
+    if erase_before > 0 && paste_method_can_erase(paste_method) {
+        for _ in 0..erase_before {
+            if let Err(e) = send_backspace(&mut enigo) {
+                log::warn!("Smart spacing: could not remove the stray period: {}", e);
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(15));
     }
 
     // Perform the paste operation. Capture the result instead of using `?` so we
@@ -884,15 +984,36 @@ pub fn paste_with_behavior(
         input::release_all_modifiers(&mut enigo);
     }
 
+    // Smart spacing remembers what it left in the field, for the next
+    // dictation into a field it cannot read. A failed paste, or one that was
+    // submitted with Enter, leaves nothing to continue.
+    if behavior.smart_spacing.is_some() {
+        let submitted = paste_result.is_ok()
+            && behavior.allow_auto_submit
+            && should_send_auto_submit(settings.auto_submit, paste_method);
+        if paste_result.is_ok() && paste_method != PasteMethod::None {
+            crate::smart_spacing::record_paste(&text, submitted);
+        } else {
+            crate::smart_spacing::forget_last_paste();
+        }
+    }
+
     // Surface the first error now that the cleanup has run.
     paste_result?;
     submit_result?;
 
-    // After pasting, optionally copy to clipboard based on settings
+    // After pasting, optionally copy to clipboard based on settings. The copy
+    // is the dictation itself, not the spaces Smart spacing fitted around it
+    // for this one field.
     if settings.clipboard_handling == ClipboardHandling::CopyToClipboard {
         let clipboard = app_handle.clipboard();
+        let copy = if fitted_by_smart_spacing {
+            text.trim()
+        } else {
+            text.as_str()
+        };
         clipboard
-            .write_text(&text)
+            .write_text(copy)
             .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
     }
 

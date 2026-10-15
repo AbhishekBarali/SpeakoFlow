@@ -1387,7 +1387,20 @@
       },
       "appendTrailingSpace": {
         "label": "追加尾部空格",
-        "description": ""
+        "description": "每次听写后添加一个空格。开启智能空格时，只在无法读取输入框时生效。"
+      },
+      "smartSpacing": {
+        "label": "智能空格",
+        "description": "让每次听写与输入框中已有的文字衔接，停下再继续时，单词不会粘在一起。",
+        "info": "粘贴前，SpeakoFlow 会查看光标附近的几个字符，只在需要的地方加空格。如果应用隐藏了文字，则改用自己上一次的听写来判断。不会保存或发送任何内容。在 macOS 上使用 SpeakoFlow 已获得的辅助功能权限。在 Linux 上，Chrome、Electron 和 Qt 应用只有在开启桌面辅助功能设置时才会提供文字。中文和日文之间不会加空格。"
+      },
+      "smartSpacingFixCase": {
+        "label": "调整大小写",
+        "description": "接着上一句继续听写时，首字母改为小写。人名、缩写和“I”保持大写。"
+      },
+      "smartSpacingJoin": {
+        "label": "连接中途停下的句子",
+        "description": "在句子中途停下时，删除 SpeakoFlow 添加的句点，例如“I went to the.”"
       },
       "keyboardImplementation": {
         "title": "键盘实现",
