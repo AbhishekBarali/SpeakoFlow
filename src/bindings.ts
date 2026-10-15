@@ -3798,9 +3798,11 @@ recording_retention_days?: number; paste_method?: PasteMethod; clipboard_handlin
 post_process_on_dictation?: boolean;
 /**
  * Paste a dictation with fewer than `post_process_min_words` words as
- * spoken, without AI cleanup. Off by default. Only cleanup that rides on
- * the dictation shortcut is skipped: the dedicated cleanup shortcut always
- * cleans. See `actions::skips_short_cleanup`.
+ * spoken, without AI cleanup. On by default: a search or a two-word reply
+ * rarely has anything to clean, and the wait for the model is the only
+ * delay left in it. Only cleanup that rides on the dictation shortcut is
+ * skipped: the dedicated cleanup shortcut always cleans. See
+ * `actions::skips_short_cleanup`.
  */
 post_process_skip_short?: boolean;
 /**
