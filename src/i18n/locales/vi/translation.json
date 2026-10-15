@@ -641,7 +641,7 @@
             "description": "Trò chuyện rảnh tay với trợ lý và nghe câu trả lời. Nhấn lần nữa để kết thúc."
           },
           "hands_free": {
-            "name": "Chế độ rảnh tay",
+            "name": "Rảnh tay",
             "description": "Nhấn phím này khi đang giữ các phím đọc chính tả để tiếp tục ghi âm sau khi thả tay. Nhấn lại các phím đọc chính tả để kết thúc."
           }
         },
@@ -663,19 +663,20 @@
         "auto": "Tự động"
       },
       "pushToTalk": {
-        "label": "Cách ghi âm",
-        "dictation": "Giữ: ghi âm trong khi bạn giữ các phím đọc chính tả. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng.",
-        "assistant": "Giữ: lắng nghe trong khi bạn giữ các phím đặt câu hỏi. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để gửi.",
-        "hold": "Giữ",
-        "tap": "Nhấn"
+        "dictation": "Bật: ghi âm trong khi bạn giữ các phím. Tắt: nhấn một lần để bắt đầu, nhấn lần nữa để dừng, nên mọi lần đọc chính tả đều rảnh tay.",
+        "assistant": "Bật: lắng nghe trong khi bạn giữ các phím. Tắt: nhấn một lần để bắt đầu, nhấn lần nữa để gửi.",
+        "dictationLabel": "Giữ để nói",
+        "assistantLabel": "Giữ để hỏi"
       },
       "handsFree": {
-        "description": "Khi đang giữ {{keys}}, nhấn phím này rồi thả ra: chế độ đọc chính tả tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}.",
-        "unavailableKeys": "Cần phím tắt đọc chính tả chỉ gồm các phím bổ trợ. Với {{keys}}, hãy dùng “Nhấn để bật/tắt” thay thế.",
-        "unavailableEngine": "Cần bộ xử lý bàn phím SpeakoFlow Keys, trong {{where}}.",
+        "unavailableKeys": "Hoạt động khi phím đọc chính tả chỉ gồm phím bổ trợ, như Ctrl + Win. Với {{keys}}, hãy tắt “Giữ để nói”: mỗi lần đọc chính tả sẽ tiếp tục cho đến khi bạn nhấn lại các phím.",
+        "unavailableEngine": "Cần bộ xử lý bàn phím SpeakoFlow Keys ({{where}}). Hoặc tắt “Giữ để nói”: mỗi lần đọc chính tả sẽ tiếp tục cho đến khi bạn nhấn lại các phím.",
         "taken": "{{name}} đã dùng {{keys}}, nên phím này không có tác dụng cho đến khi một trong hai thay đổi.",
         "needsKey": "Hãy chọn một phím, như phím cách hoặc Enter. Một phím bổ trợ riêng lẻ không thể là phím rảnh tay.",
-        "pressKey": "Nhấn một phím…"
+        "pressKey": "Nhấn một phím…",
+        "descriptionOff": "Đang tắt. Nhấp vào rồi nhấn một phím, như phím cách, để bật lại.",
+        "linux": "Trên Linux, hãy tắt “Giữ để nói”: mỗi lần đọc chính tả sẽ tiếp tục cho đến khi bạn nhấn lại các phím.",
+        "whileDictating": "Khi đang đọc chính tả, nhấn"
       }
     },
     "models": {
@@ -2213,7 +2214,11 @@
       "title": "Đang tải mô hình giọng nói…",
       "percent": "Đang tải mô hình giọng nói · {{percent}}%",
       "hint": "Đọc chính tả sẽ hoạt động khi tải xong"
-    }
+    },
+    "handsFreeHint": "Nhấn {{key}} để rảnh tay",
+    "handsFreeFinish": "Rảnh tay · {{keys}} để kết thúc",
+    "lockedKeys": "Đang ghi âm rảnh tay. Nhấn {{keys}} để kết thúc",
+    "finishKeys": "Hoàn tất ({{keys}})"
   },
   "reminders": {
     "title": "Lời nhắc",
@@ -2498,10 +2503,7 @@
       "dictation": "Đọc chính tả",
       "assistant": "Trợ lý",
       "cleanupOff": "Bật Dọn dẹp bằng AI để dùng phím tắt này.",
-      "cleanupOnDictation": "Phím tắt đọc chính tả của bạn đã dọn dẹp mọi lần đọc chính tả, nên không cần phím tắt này.",
-      "openCleanup": "Mở Dọn dẹp bằng AI",
-      "assistantOff": "Trợ lý đang tắt, nên các phím tắt của nó không có tác dụng.",
-      "openAssistant": "Mở Trợ lý"
+      "assistantOff": "Trợ lý đang tắt, nên các phím tắt của nó không có tác dụng."
     },
     "audio": {
       "microphone": "Micrô",
@@ -2581,7 +2583,8 @@
         "whatTap": "Nhấn, nói, nhấn lại. Lời bạn nói được gõ tại vị trí con trỏ."
       },
       "handsFree": {
-        "what": "Giữ {{keys}}, nhấn {{key}} rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}."
+        "what": "Giữ {{keys}}, nhấn {{key}} rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}.",
+        "linux": "Để đọc chính tả rảnh tay trên Linux, hãy tắt “Giữ để nói”. Khi đó nhấn một lần để bắt đầu, nhấn lần nữa để dừng."
       },
       "cleanup": {
         "title": "Đọc chính tả và dọn dẹp",

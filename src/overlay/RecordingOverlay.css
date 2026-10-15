@@ -141,6 +141,53 @@
 .pill-wave.compact {
   width: 40px;
 }
+/* The hands-free key's hint (`handsFreeHint.ts`) takes the waveform's slot for
+   a few seconds, so the pill neither grows nor moves: the bars fade down and
+   a keycap with a lock fades up in their place. */
+.pill-wave {
+  position: relative;
+}
+.pill-wave > :first-child {
+  transition: opacity 180ms ease-out;
+}
+.pill-wave.is-hinting > :first-child {
+  opacity: 0;
+}
+.pill-hint-key {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--ov-muted);
+  animation: ov-hint-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.pill-hint-key kbd {
+  max-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 13px;
+  color: var(--ov-text);
+}
+@keyframes ov-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .pill-label,
 .card-label {
   font-size: 11.5px;
@@ -305,8 +352,8 @@
 
 /* ── Hands-free ─────────────────────────────────────────────────────────────
  * A dictation that keeps listening after its keys are let go (`hands_free.rs`):
- * every one with Tap to toggle, and with Hold to talk one turned by the keys
- * plus Space, or by a quick tap. A held dictation is the plain pill; this one
+ * every one with Tap to toggle, and with Hold to talk one turned by the
+ * hands-free key. A held dictation is the plain pill; this one
  * says without a word that nothing has to be held: it is a little longer, and
  * it has a ring. The ring draws itself in from the top, down both sides, at
  * the moment the dictation turns, so the change is seen happening instead of
@@ -857,11 +904,13 @@
   .card-copied,
   .card-text.is-revealed,
   .pill-ring.is-waiting,
+  .pill-hint-key,
   .overlay-pill.hands-free::after,
   .overlay-card.hands-free::after {
     animation: none;
   }
   .overlay-pill.hands-free .pill-wave,
+  .pill-wave > :first-child,
   .hands-free-control,
   .card-controls {
     transition: none;

@@ -647,7 +647,7 @@
             "description": "Mluvte s asistentem bez použití rukou a poslouchejte jeho odpovědi. Dalším stisknutím ukončíte."
           },
           "hands_free": {
-            "name": "Režim bez držení",
+            "name": "Bez držení",
             "description": "Stiskněte při držení kláves diktování a nahrávání bude pokračovat i po jejich puštění. Dalším stiskem kláves diktování skončíte."
           }
         },
@@ -669,19 +669,20 @@
         "auto": "Automaticky"
       },
       "pushToTalk": {
-        "label": "Způsob nahrávání",
-        "dictation": "Podržení: nahrává se, dokud držíte klávesy diktování. Stisknutí: jeden stisk spustí, další zastaví.",
-        "assistant": "Podržení: poslouchá, dokud držíte klávesy pro dotaz. Stisknutí: jeden stisk spustí, další odešle.",
-        "hold": "Podržení",
-        "tap": "Stisknutí"
+        "dictation": "Zapnuto: nahrává se, dokud držíte klávesy. Vypnuto: jeden stisk spustí, další zastaví, takže každé diktování je bez držení.",
+        "assistant": "Zapnuto: poslouchá, dokud držíte klávesy. Vypnuto: jeden stisk spustí, další odešle.",
+        "dictationLabel": "Držet pro mluvení",
+        "assistantLabel": "Držet pro dotaz"
       },
       "handsFree": {
-        "description": "Při držení {{keys}} stiskněte tuto klávesu a pusťte: diktování poslouchá dál, dokud znovu nestisknete {{keys}}.",
-        "unavailableKeys": "Vyžaduje zkratku diktování jen z modifikačních kláves. S {{keys}} použijte místo toho „Stiskem zapnout/vypnout“.",
-        "unavailableEngine": "Vyžaduje klávesnicový modul SpeakoFlow Keys, v části {{where}}.",
+        "unavailableKeys": "Funguje, když je diktování jen z modifikačních kláves, třeba Ctrl + Win. S {{keys}} raději vypněte „Držet pro mluvení“: každé diktování pak běží, dokud znovu nestisknete klávesy.",
+        "unavailableEngine": "Vyžaduje klávesnicový modul SpeakoFlow Keys ({{where}}). Nebo vypněte „Držet pro mluvení“: každé diktování pak běží, dokud znovu nestisknete klávesy.",
         "taken": "{{name}} už používá {{keys}}, takže tato klávesa nic nedělá, dokud se jedno z nich nezmění.",
         "needsKey": "Vyberte jednu klávesu, například mezerník nebo Enter. Samotná modifikační klávesa nemůže být klávesou pro režim bez držení.",
-        "pressKey": "Stiskněte klávesu…"
+        "pressKey": "Stiskněte klávesu…",
+        "descriptionOff": "Vypnuto. Klikněte na něj a stiskněte klávesu, třeba mezerník, a znovu se zapne.",
+        "linux": "V Linuxu raději vypněte „Držet pro mluvení“: každé diktování pak běží, dokud znovu nestisknete klávesy.",
+        "whileDictating": "Během diktování stiskněte"
       }
     },
     "models": {
@@ -2249,7 +2250,11 @@
       "title": "Stahuje se model pro přepis…",
       "percent": "Stahuje se model pro přepis · {{percent}} %",
       "hint": "Diktování začne fungovat po dokončení"
-    }
+    },
+    "handsFreeHint": "Stiskněte {{key}} pro diktování bez držení",
+    "handsFreeFinish": "Bez držení · {{keys}} pro dokončení",
+    "lockedKeys": "Nahrávám bez držení. Stiskněte {{keys}} pro dokončení",
+    "finishKeys": "Dokončit ({{keys}})"
   },
   "reminders": {
     "title": "Připomínka",
@@ -2552,10 +2557,7 @@
       "dictation": "Diktování",
       "assistant": "Asistent",
       "cleanupOff": "Pro tuto zkratku zapněte čištění pomocí AI.",
-      "cleanupOnDictation": "Vaše zkratka pro diktování čistí každé diktování, takže tuto nepotřebujete.",
-      "openCleanup": "Otevřít čištění pomocí AI",
-      "assistantOff": "Asistent je vypnutý, takže jeho zkratky nic nedělají.",
-      "openAssistant": "Otevřít Asistenta"
+      "assistantOff": "Asistent je vypnutý, takže jeho zkratky nic nedělají."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2644,7 +2646,8 @@
         "whatTap": "Stiskněte, mluvte, stiskněte znovu. Slova se napíšou tam, kde je kurzor."
       },
       "handsFree": {
-        "what": "Podržte {{keys}}, stiskněte {{key}} a pusťte: poslouchá dál, dokud znovu nestisknete {{keys}}."
+        "what": "Podržte {{keys}}, stiskněte {{key}} a pusťte: poslouchá dál, dokud znovu nestisknete {{keys}}.",
+        "linux": "Pro diktování bez držení v Linuxu vypněte „Držet pro mluvení“. Jeden stisk pak spustí a další zastaví."
       },
       "cleanup": {
         "title": "Diktovat a vyčistit",

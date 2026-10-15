@@ -7,9 +7,20 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, RotateCcw, Undo2, X } from "lucide-react";
+import { Check, Copy, Lock, RotateCcw, Undo2, X } from "lucide-react";
+import { type } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import AudioWaveform from "../components/shared/AudioWaveform";
+import { shortKeyCombination } from "../components/ui/Keycaps";
+import type { OSType } from "@/lib/utils/keyboard";
+import {
+  HINT_DELAY_MS,
+  HINT_SHOW_MS,
+  hintDue,
+  markHintLearned,
+  markHintShown,
+  readHint,
+} from "./handsFreeHint";
 import {
   WORK_STAGES,
   browserTimingStore,
@@ -72,6 +83,12 @@ type ShowOverlayPayload = {
    * (`hands_free.rs`), so the surface wears its ring and, where it takes the
    * pointer, offers ✕ and ✓. */
   handsFree?: boolean;
+  /** For a dictation's `recording`: its own keys, raw (`ctrl_left+super`),
+   * which finish it once it is hands-free. */
+  finishKeys?: string;
+  /** For a held dictation's `recording`: the key that turns it hands-free
+   * (`space`), offered as a hint the first few times (`handsFreeHint.ts`). */
+  handsFreeKey?: string;
   /** Opaque fingerprints of what does the transcription and the cleanup, so
    * the fill learns each setup's timing separately (`workProgress.ts`). */
   sttSetup?: string;
@@ -88,6 +105,19 @@ type OverlayJustify = "left" | "center" | "right";
  *  before corners existed. */
 const parseJustify = (value: unknown): OverlayJustify =>
   value === "left" || value === "right" ? value : "center";
+
+/** Which keyboard to label keys for ("Win" or "⌘"). Outside the app (tests)
+ *  there is no OS plugin, and the keys are labelled plainly. */
+const overlayOs = (): OSType => {
+  try {
+    const os = type();
+    return os === "macos" || os === "windows" || os === "linux"
+      ? os
+      : "unknown";
+  } catch {
+    return "unknown";
+  }
+};
 
 const EMPTY_LEVELS: number[] = [];
 const EMPTY_TRANSCRIPT: Transcript = {
@@ -308,6 +338,14 @@ const RecordingOverlay: React.FC = () => {
   const downloadId = useRef<string | null>(null);
   /** The dictation keeps listening after its keys are let go. */
   const [handsFree, setHandsFree] = useState(false);
+  /** The recording's keys, raw: what finishes it, and what turns it
+   * hands-free while held (see `ShowOverlayPayload`). */
+  const [finishKeys, setFinishKeys] = useState<string | null>(null);
+  const [handsFreeKey, setHandsFreeKey] = useState<string | null>(null);
+  /** The hands-free key's hint is on the pill right now. */
+  const [hint, setHint] = useState(false);
+  /** Bumped by each recording's show, so the hint's timer starts over. */
+  const [recordingShow, setRecordingShow] = useState(0);
   /** ✕ or ✓ was clicked; the backend answers by replacing the recording. */
   const [ending, setEnding] = useState(false);
   const levelStore = useRef<LevelStore | null>(null);
@@ -548,6 +586,9 @@ const RecordingOverlay: React.FC = () => {
           follow.current = true;
           lastTop.current = 0;
           setHandsFree(!!payload.handsFree);
+          setFinishKeys(payload.finishKeys ?? null);
+          setHandsFreeKey(payload.handsFreeKey ?? null);
+          setRecordingShow((count) => count + 1);
           setMicLive(false);
           levels.set(EMPTY_LEVELS);
           replaceText(EMPTY_TRANSCRIPT, true);
@@ -578,6 +619,7 @@ const RecordingOverlay: React.FC = () => {
         setIsVisible(false);
         setInteractive(false);
         setHandsFree(false);
+        setHandsFreeKey(null);
         setEnding(false);
         setMicLive(false);
         levels.set(EMPTY_LEVELS);
@@ -627,13 +669,15 @@ const RecordingOverlay: React.FC = () => {
       listen<number>("restore-overlay", ({ payload }) => {
         if (completionEpoch.current === payload) setFading(false);
       }).then(register),
-      // A held dictation turned hands-free while on screen: the keys plus
-      // Space, or a quick tap. The window has taken the pointer if it can.
+      // A held dictation turned hands-free while on screen. The window has
+      // taken the pointer if it can, and the user has found the key, so its
+      // hint is never shown again.
       listen<{ interactive: boolean }>(
         "recording-hands-free",
         ({ payload }) => {
           if (!recording) return;
           setHandsFree(true);
+          markHintLearned();
           if (payload?.interactive) setInteractive(true);
         },
       ).then(register),
@@ -773,6 +817,33 @@ const RecordingOverlay: React.FC = () => {
   // button would pass the click straight to the app underneath.
   const handsFreeNow = isRecording && handsFree;
   const controls = handsFreeNow && interactive;
+  const hintable =
+    isVisible &&
+    isRecording &&
+    !handsFree &&
+    !!handsFreeKey &&
+    // The pill's ticker has no room for it; the card's header does.
+    (streamingWindow || !hasLiveText);
+  // The first few held dictations show the hands-free key once they have
+  // been held a moment (`handsFreeHint.ts`), then the waveform comes back.
+  useEffect(() => {
+    if (!hintable || !hintDue(readHint())) return;
+    let hide: ReturnType<typeof setTimeout> | undefined;
+    const show = setTimeout(() => {
+      markHintShown();
+      setHint(true);
+      hide = setTimeout(() => setHint(false), HINT_SHOW_MS);
+    }, HINT_DELAY_MS);
+    return () => {
+      clearTimeout(show);
+      if (hide) clearTimeout(hide);
+      setHint(false);
+    };
+  }, [hintable, recordingShow]);
+  const os = overlayOs();
+  const finishLabel = finishKeys ? shortKeyCombination(finishKeys, os) : "";
+  const hintKey = handsFreeKey ? shortKeyCombination(handsFreeKey, os) : "";
+  const showHint = hint && hintable;
   const recovery = RECOVERY.includes(state);
   const labeled = LABELED.includes(state);
   const downloading = state === "downloading";
@@ -816,12 +887,18 @@ const RecordingOverlay: React.FC = () => {
     : isRecording
       ? live
         ? handsFreeNow
-          ? t("overlay.handsFree")
-          : t("overlay.recording")
+          ? finishLabel
+            ? t("overlay.handsFreeFinish", { keys: finishLabel })
+            : t("overlay.handsFree")
+          : showHint
+            ? t("overlay.handsFreeHint", { key: hintKey })
+            : t("overlay.recording")
         : t("overlay.preparing")
       : busyLabel;
   const ariaLabel = handsFreeNow
-    ? t("overlay.locked")
+    ? finishLabel
+      ? t("overlay.lockedKeys", { keys: finishLabel })
+      : t("overlay.locked")
     : completed
       ? cardLabel
       : pillLabel;
@@ -886,7 +963,11 @@ const RecordingOverlay: React.FC = () => {
       type="button"
       className={`${className} is-finish`}
       aria-label={t("overlay.finish")}
-      title={t("overlay.finish")}
+      title={
+        finishLabel
+          ? t("overlay.finishKeys", { keys: finishLabel })
+          : t("overlay.finish")
+      }
       onClick={() => void endDictation("commit_recording")}
       disabled={ending}
     >
@@ -1139,8 +1220,25 @@ const RecordingOverlay: React.FC = () => {
               {transcriptLine}
             </div>
           ) : (
-            <div className="pill-wave" role="status" aria-label={pillLabel}>
+            <div
+              className={`pill-wave${showHint ? " is-hinting" : ""}`}
+              role="status"
+              aria-label={pillLabel}
+            >
               {indicator(PILL_WAVE)}
+              {/* In the waveform's own slot, so the pill keeps its size and
+                  the window never grows. Not announced: anything spoken now
+                  would be spoken into the microphone. */}
+              {showHint && (
+                <span
+                  className="pill-hint-key"
+                  aria-hidden="true"
+                  title={t("overlay.handsFreeHint", { key: hintKey })}
+                >
+                  <Lock size={9} strokeWidth={2.2} />
+                  <kbd>{hintKey}</kbd>
+                </span>
+              )}
             </div>
           )}
           {controls && finishButton("hands-free-control pill-control")}

@@ -647,7 +647,7 @@
             "description": "Rozmawiaj z asystentem bez użycia rąk i słuchaj jego odpowiedzi. Naciśnij ponownie, aby zakończyć."
           },
           "hands_free": {
-            "name": "Tryb bez trzymania",
+            "name": "Bez trzymania",
             "description": "Naciśnij go, trzymając klawisze dyktowania, a nagrywanie będzie trwać po ich puszczeniu. Naciśnij klawisze dyktowania ponownie, aby zakończyć."
           }
         },
@@ -669,19 +669,20 @@
         "auto": "Automatycznie"
       },
       "pushToTalk": {
-        "label": "Sposób nagrywania",
-        "dictation": "Przytrzymanie: nagrywanie trwa, dopóki trzymasz klawisze dyktowania. Naciśnięcie: jedno naciśnięcie zaczyna, następne kończy.",
-        "assistant": "Przytrzymanie: słucha, dopóki trzymasz klawisze pytania. Naciśnięcie: jedno naciśnięcie zaczyna, następne wysyła.",
-        "hold": "Przytrzymanie",
-        "tap": "Naciśnięcie"
+        "dictation": "Włączone: nagrywanie trwa, dopóki trzymasz klawisze. Wyłączone: jedno naciśnięcie zaczyna, następne kończy, więc każde dyktowanie jest bez trzymania.",
+        "assistant": "Włączone: słucha, dopóki trzymasz klawisze. Wyłączone: jedno naciśnięcie zaczyna, następne wysyła.",
+        "dictationLabel": "Przytrzymaj, aby mówić",
+        "assistantLabel": "Przytrzymaj, aby zapytać"
       },
       "handsFree": {
-        "description": "Trzymając {{keys}}, naciśnij ten klawisz i puść: dyktowanie słucha dalej, dopóki ponownie nie naciśniesz {{keys}}.",
-        "unavailableKeys": "Wymaga skrótu dyktowania złożonego wyłącznie z klawiszy modyfikujących. Przy {{keys}} użyj zamiast tego „Stuknij, aby przełączyć”.",
-        "unavailableEngine": "Wymaga silnika klawiatury SpeakoFlow Keys, w sekcji {{where}}.",
+        "unavailableKeys": "Działa, gdy dyktowanie składa się tylko z klawiszy modyfikujących, np. Ctrl + Win. Przy {{keys}} wyłącz zamiast tego „Przytrzymaj, aby mówić”: każde dyktowanie trwa wtedy, dopóki ponownie nie naciśniesz klawiszy.",
+        "unavailableEngine": "Wymaga silnika klawiatury SpeakoFlow Keys ({{where}}). Albo wyłącz „Przytrzymaj, aby mówić”: każde dyktowanie trwa wtedy, dopóki ponownie nie naciśniesz klawiszy.",
         "taken": "{{name}} już używa {{keys}}, więc ten klawisz nic nie robi, dopóki jedno z nich się nie zmieni.",
         "needsKey": "Wybierz jeden klawisz, na przykład spację lub Enter. Sam klawisz modyfikujący nie może być klawiszem trybu bez trzymania.",
-        "pressKey": "Naciśnij klawisz…"
+        "pressKey": "Naciśnij klawisz…",
+        "descriptionOff": "Wyłączone. Kliknij i naciśnij klawisz, np. spację, aby włączyć ponownie.",
+        "linux": "W Linuksie wyłącz zamiast tego „Przytrzymaj, aby mówić”: każde dyktowanie trwa wtedy, dopóki ponownie nie naciśniesz klawiszy.",
+        "whileDictating": "Podczas dyktowania naciśnij"
       }
     },
     "models": {
@@ -2249,7 +2250,11 @@
       "title": "Pobieranie modelu mowy…",
       "percent": "Pobieranie modelu mowy · {{percent}}%",
       "hint": "Dyktowanie zacznie działać po zakończeniu"
-    }
+    },
+    "handsFreeHint": "Naciśnij {{key}}, aby nie trzymać",
+    "handsFreeFinish": "Bez trzymania · {{keys}}, aby zakończyć",
+    "lockedKeys": "Nagrywanie bez trzymania. Naciśnij {{keys}}, aby zakończyć",
+    "finishKeys": "Zakończ ({{keys}})"
   },
   "reminders": {
     "title": "Przypomnienie",
@@ -2552,10 +2557,7 @@
       "dictation": "Dyktowanie",
       "assistant": "Asystent",
       "cleanupOff": "Włącz czyszczenie AI, aby korzystać z tego skrótu.",
-      "cleanupOnDictation": "Twój skrót dyktowania czyści każde dyktowanie, więc ten nie jest potrzebny.",
-      "openCleanup": "Otwórz czyszczenie AI",
-      "assistantOff": "Asystent jest wyłączony, więc jego skróty nic nie robią.",
-      "openAssistant": "Otwórz Asystenta"
+      "assistantOff": "Asystent jest wyłączony, więc jego skróty nic nie robią."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2644,7 +2646,8 @@
         "whatTap": "Stuknij, mów, stuknij ponownie. Słowa wpiszą się tam, gdzie jest kursor."
       },
       "handsFree": {
-        "what": "Przytrzymaj {{keys}}, naciśnij {{key}} i puść: nasłuchiwanie trwa, dopóki ponownie nie naciśniesz {{keys}}."
+        "what": "Przytrzymaj {{keys}}, naciśnij {{key}} i puść: nasłuchiwanie trwa, dopóki ponownie nie naciśniesz {{keys}}.",
+        "linux": "Aby dyktować bez trzymania w Linuksie, wyłącz „Przytrzymaj, aby mówić”. Wtedy jedno naciśnięcie zaczyna, a następne kończy."
       },
       "cleanup": {
         "title": "Dyktuj i oczyść",

@@ -92,6 +92,10 @@ pub struct HandyKeysState {
     /// shortcut is being changed are not yet the stored ones, and while it is
     /// being edited are none at all.
     registered: Mutex<HashMap<String, String>>,
+    /// The hands-free key (`space`) registered on top of each dictation
+    /// shortcut right now, by its binding id. The recording pill names it in
+    /// its hint, and only while it is really there.
+    hands_free_live: Mutex<HashMap<String, String>>,
 }
 
 /// Key event sent to frontend during recording mode
@@ -127,6 +131,7 @@ impl HandyKeysState {
             recording_binding_id: Mutex::new(None),
             recording_running: Arc::new(AtomicBool::new(false)),
             registered: Mutex::new(HashMap::new()),
+            hands_free_live: Mutex::new(HashMap::new()),
         })
     }
 
@@ -358,6 +363,9 @@ impl HandyKeysState {
         for binding_id in ["transcribe", settings::CLEANUP_BINDING_ID] {
             let _ = self.unregister_id(&hands_free::key_id(binding_id));
         }
+        if let Ok(mut live) = self.hands_free_live.lock() {
+            live.clear();
+        }
     }
 
     /// Bring both dictation shortcuts' hands-free hotkeys (`hands_free`) in
@@ -382,7 +390,16 @@ impl HandyKeysState {
             };
             let id = hands_free::key_id(binding_id);
             match self.register_continuation(&id, &extended) {
-                Ok(()) => debug!("Hands-free key for '{binding_id}': {extended}"),
+                Ok(()) => {
+                    debug!("Hands-free key for '{binding_id}': {extended}");
+                    let key = settings
+                        .bindings
+                        .get(settings::HANDS_FREE_BINDING_ID)
+                        .and_then(|b| hands_free::main_key(&b.current_binding));
+                    if let (Some(key), Ok(mut live)) = (key, self.hands_free_live.lock()) {
+                        live.insert(binding_id.to_string(), key);
+                    }
+                }
                 Err(e) => warn!("Could not register the hands-free key {extended}: {e}"),
             }
         }
@@ -610,6 +627,15 @@ pub fn sync_hands_free_keys(app: &AppHandle) {
     if let Some(state) = app.try_state::<HandyKeysState>() {
         state.sync_hands_free_keys(&get_settings(app));
     }
+}
+
+/// The hands-free key registered on top of dictation shortcut `binding_id`
+/// right now (`space`), or `None` when it has none: tapped, removed, taken by
+/// another shortcut, keys it cannot go on, or the other keyboard engine.
+pub fn hands_free_key(app: &AppHandle, binding_id: &str) -> Option<String> {
+    let state = app.try_state::<HandyKeysState>()?;
+    let live = state.hands_free_live.lock().ok()?;
+    live.get(binding_id).cloned()
 }
 
 /// Tell the hotkey engine whether each recording shortcut is held or tapped,

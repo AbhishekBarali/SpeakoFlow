@@ -200,6 +200,30 @@ pub fn set_recording_hands_free(hands_free: bool) {
     HANDS_FREE.store(hands_free, Ordering::SeqCst);
 }
 
+/// The keys of the dictation being recorded, for the pill to name them instead
+/// of saying "your shortcut". Raw binding strings; the webview labels them.
+#[derive(Clone, Default)]
+pub struct RecordingKeys {
+    /// The dictation's own keys, which finish it once it is hands-free.
+    pub finish: Option<String>,
+    /// The key that turns this held dictation hands-free, while one is
+    /// registered for it (`shortcut::handy_keys::hands_free_key`).
+    pub hands_free_key: Option<String>,
+}
+
+static RECORDING_KEYS: Mutex<RecordingKeys> = Mutex::new(RecordingKeys {
+    finish: None,
+    hands_free_key: None,
+});
+
+/// Set as each recording starts, beside [`set_recording_hands_free`]; read by
+/// that recording's show.
+pub fn set_recording_keys(keys: RecordingKeys) {
+    if let Ok(mut slot) = RECORDING_KEYS.lock() {
+        *slot = keys;
+    }
+}
+
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct HandsFreePayload {
@@ -344,6 +368,14 @@ struct ShowOverlayPayload {
     /// offers ✕ and ✓.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     hands_free: bool,
+    /// For a dictation's `recording`: its own keys (`ctrl_left+super`), which
+    /// the hands-free pill names as the way to finish.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    finish_keys: Option<String>,
+    /// For a held dictation's `recording`: the key that turns it hands-free
+    /// (`space`), which the pill offers as a hint the first few times.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hands_free_key: Option<String>,
     /// For `transcribing`: an opaque fingerprint of what does the speech to
     /// text (`work_fingerprint`). The working fill learns each setup's timing
     /// separately, on this computer, rather than one average across every model
@@ -1229,6 +1261,14 @@ fn show_overlay(
         // `finish_recording_overlay`. A recovery pill exists to be clicked, and
         // is only ever offered where that is safe (see `show_recovery_overlay`).
         let hands_free = state == "recording" && HANDS_FREE.load(Ordering::SeqCst);
+        let keys = if state == "recording" {
+            RECORDING_KEYS
+                .lock()
+                .map(|keys| keys.clone())
+                .unwrap_or_default()
+        } else {
+            RecordingKeys::default()
+        };
         let interactive = (streaming_window || recovery || hands_free) && live_card_takes_pointer();
         let _ = overlay_window.set_ignore_cursor_events(!interactive);
         let _ = overlay_window.show();
@@ -1266,6 +1306,9 @@ fn show_overlay(
                 download,
                 cleanup_next,
                 hands_free,
+                finish_keys: keys.finish,
+                // A dictation already hands-free has nothing to turn.
+                hands_free_key: keys.hands_free_key.filter(|_| !hands_free),
                 stt_setup: (state == "transcribing").then(|| stt_setup_fingerprint(&settings)),
                 cleanup_setup: if state == "processing" || (state == "transcribing" && cleanup_next)
                 {

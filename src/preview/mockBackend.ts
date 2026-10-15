@@ -56,15 +56,30 @@ if (readme && typeof caches !== "undefined") {
     .catch(() => {});
 }
 
-(window as unknown as Record<string, unknown>).__TAURI_OS_PLUGIN_INTERNALS__ = {
-  platform: "windows",
-  os_type: "windows",
-  family: "windows",
-  eol: "\r\n",
-  version: "10.0.26100",
-  arch: "x86_64",
-  exe_extension: "exe",
-};
+// `?os=linux` previews Linux: its default engine (Tauri's) and its dictation
+// keys, which have a main key and so no hands-free key.
+const previewOs = params.get("os") === "linux" ? "linux" : "windows";
+
+(window as unknown as Record<string, unknown>).__TAURI_OS_PLUGIN_INTERNALS__ =
+  previewOs === "linux"
+    ? {
+        platform: "linux",
+        os_type: "linux",
+        family: "unix",
+        eol: "\n",
+        version: "6.8.0",
+        arch: "x86_64",
+        exe_extension: "",
+      }
+    : {
+        platform: "windows",
+        os_type: "windows",
+        family: "windows",
+        eol: "\r\n",
+        version: "10.0.26100",
+        arch: "x86_64",
+        exe_extension: "exe",
+      };
 
 const now = Math.floor(Date.now() / 1000);
 
@@ -510,22 +525,31 @@ const binding = (id: string, current: string): Json => ({
 });
 
 const settings: Json = {
-  // The Windows defaults from `settings::get_default_settings`.
   bindings: {
-    transcribe: binding("transcribe", "ctrl_left+super"),
+    // The Windows defaults from `settings::get_default_settings`, or Linux's.
+    transcribe: binding(
+      "transcribe",
+      previewOs === "linux" ? "ctrl+space" : "ctrl_left+super",
+    ),
     transcribe_with_post_process: binding(
       "transcribe_with_post_process",
-      "ctrl_left+super+shift",
+      previewOs === "linux" ? "ctrl+shift+space" : "ctrl_left+super+shift",
     ),
-    assistant: binding("assistant", "ctrl_left+alt_left"),
-    assistant_call: binding("assistant_call", "ctrl_left+alt_left+c"),
+    assistant: binding(
+      "assistant",
+      previewOs === "linux" ? "ctrl+alt+space" : "ctrl_left+alt_left",
+    ),
+    assistant_call: binding(
+      "assistant_call",
+      previewOs === "linux" ? "ctrl+alt+c" : "ctrl_left+alt_left+c",
+    ),
     cancel: binding("cancel", "escape"),
     hands_free: binding("hands_free", "space"),
   },
   push_to_talk: true,
   assistant_push_to_talk: true,
-  // Windows' default engine, the one modifier-only keys need.
-  keyboard_implementation: "handy_keys",
+  // Each platform's default engine; modifier-only keys need SpeakoFlow Keys.
+  keyboard_implementation: previewOs === "linux" ? "tauri" : "handy_keys",
   audio_feedback: false,
   theme: params.get("theme") ?? "light",
   stt_engine_mode: params.get("stt") === "device" ? "local" : "cloud",

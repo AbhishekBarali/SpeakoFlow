@@ -645,7 +645,7 @@
             "description": "Habla con el asistente con manos libres y escucha sus respuestas. Pulsa de nuevo para terminar."
           },
           "hands_free": {
-            "name": "Modo manos libres",
+            "name": "Manos libres",
             "description": "Púlsala mientras mantienes las teclas de dictado para seguir grabando al soltarlas. Vuelve a pulsar las teclas de dictado para terminar."
           }
         },
@@ -667,19 +667,20 @@
         "auto": "Automático"
       },
       "pushToTalk": {
-        "label": "Modo de grabación",
-        "dictation": "Mantener: se graba mientras mantienes pulsadas las teclas de dictado. Tocar: una pulsación empieza y la siguiente detiene.",
-        "assistant": "Mantener: escucha mientras mantienes pulsadas las teclas de pregunta. Tocar: una pulsación empieza y la siguiente envía.",
-        "hold": "Mantener presionado",
-        "tap": "Tocar"
+        "dictation": "Activado: graba mientras mantienes pulsadas las teclas. Desactivado: una pulsación empieza y la siguiente detiene, así que cada dictado es manos libres.",
+        "assistant": "Activado: escucha mientras mantienes pulsadas las teclas. Desactivado: una pulsación empieza y la siguiente envía.",
+        "dictationLabel": "Mantener para hablar",
+        "assistantLabel": "Mantener para preguntar"
       },
       "handsFree": {
-        "description": "Mientras mantienes {{keys}}, pulsa esta tecla y suelta: el dictado sigue escuchando hasta que vuelvas a pulsar {{keys}}.",
-        "unavailableKeys": "Necesita un atajo de dictado solo con teclas modificadoras. Con {{keys}}, usa «Pulsa para activar o desactivar».",
-        "unavailableEngine": "Necesita el motor de teclado SpeakoFlow Keys, en {{where}}.",
+        "unavailableKeys": "Funciona cuando el dictado usa solo teclas modificadoras, como Ctrl + Win. Con {{keys}}, desactiva «Mantener para hablar»: cada dictado sigue hasta que vuelvas a pulsar las teclas.",
+        "unavailableEngine": "Necesita el motor de teclado SpeakoFlow Keys ({{where}}). O desactiva «Mantener para hablar»: cada dictado sigue hasta que vuelvas a pulsar las teclas.",
         "taken": "{{name}} ya usa {{keys}}, así que esta tecla no hace nada hasta que cambie uno de los dos.",
         "needsKey": "Elige una sola tecla, como Espacio o Intro. Una tecla modificadora sola no puede ser la tecla de manos libres.",
-        "pressKey": "Pulsa una tecla…"
+        "pressKey": "Pulsa una tecla…",
+        "descriptionOff": "Desactivado. Haz clic y pulsa una tecla, como Espacio, para volver a activarlo.",
+        "linux": "En Linux, desactiva «Mantener para hablar»: cada dictado sigue hasta que vuelvas a pulsar las teclas.",
+        "whileDictating": "Mientras dictas, pulsa"
       }
     },
     "models": {
@@ -2237,7 +2238,11 @@
       "title": "Descargando el modelo de voz…",
       "percent": "Descargando el modelo de voz · {{percent}} %",
       "hint": "El dictado funcionará cuando termine"
-    }
+    },
+    "handsFreeHint": "Pulsa {{key}} para manos libres",
+    "handsFreeFinish": "Manos libres · {{keys}} para terminar",
+    "lockedKeys": "Grabando con manos libres. Pulsa {{keys}} para terminar",
+    "finishKeys": "Terminar ({{keys}})"
   },
   "reminders": {
     "title": "Recordatorio",
@@ -2534,10 +2539,7 @@
       "dictation": "Dictado",
       "assistant": "Asistente",
       "cleanupOff": "Activa la limpieza con IA para usar este atajo.",
-      "cleanupOnDictation": "Tu atajo de dictado ya limpia todos los dictados, así que este no hace falta.",
-      "openCleanup": "Abrir Limpieza con IA",
-      "assistantOff": "El asistente está desactivado, así que sus atajos no hacen nada.",
-      "openAssistant": "Abrir Asistente"
+      "assistantOff": "El asistente está desactivado, así que sus atajos no hacen nada."
     },
     "audio": {
       "microphone": "Micrófono",
@@ -2623,7 +2625,8 @@
         "whatTap": "Pulsa, habla y vuelve a pulsar. Tus palabras se escriben donde está el cursor."
       },
       "handsFree": {
-        "what": "Mantén {{keys}}, pulsa {{key}} y suelta: sigue escuchando hasta que vuelvas a pulsar {{keys}}."
+        "what": "Mantén {{keys}}, pulsa {{key}} y suelta: sigue escuchando hasta que vuelvas a pulsar {{keys}}.",
+        "linux": "Para dictar con manos libres en Linux, desactiva «Mantener para hablar». Así una pulsación empieza y la siguiente detiene."
       },
       "cleanup": {
         "title": "Dictar y limpiar",

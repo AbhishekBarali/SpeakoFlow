@@ -643,7 +643,7 @@
             "description": "Sprich freihändig mit dem Assistenten und hör seine Antworten. Zum Beenden erneut drücken."
           },
           "hands_free": {
-            "name": "Freihändiger Modus",
+            "name": "Freihändig",
             "description": "Drücke sie, während du die Diktiertasten hältst, damit die Aufnahme nach dem Loslassen weiterläuft. Drücke die Diktiertasten erneut, um zu beenden."
           }
         },
@@ -665,19 +665,20 @@
         "auto": "Automatisch"
       },
       "pushToTalk": {
-        "label": "Aufnahmeverhalten",
-        "dictation": "Halten: Die Aufnahme läuft, solange du die Diktiertasten gedrückt hältst. Antippen: Ein Druck startet, der nächste stoppt.",
-        "assistant": "Halten: Hört zu, solange du die Fragetasten gedrückt hältst. Antippen: Ein Druck startet, der nächste sendet.",
-        "hold": "Halten",
-        "tap": "Antippen"
+        "dictation": "An: Die Aufnahme läuft, solange du die Tasten hältst. Aus: Ein Druck startet, der nächste stoppt, also ist jedes Diktat freihändig.",
+        "assistant": "An: Hört zu, solange du die Tasten hältst. Aus: Ein Druck startet, der nächste sendet.",
+        "dictationLabel": "Zum Sprechen halten",
+        "assistantLabel": "Zum Fragen halten"
       },
       "handsFree": {
-        "description": "Drücke diese Taste, während du {{keys}} hältst, und lass los: Das Diktat hört weiter zu, bis du {{keys}} erneut drückst.",
-        "unavailableKeys": "Braucht ein Diktierkürzel nur aus Sondertasten. Nutze mit {{keys}} stattdessen „Antippen zum Umschalten“.",
-        "unavailableEngine": "Braucht die Tastatur-Engine SpeakoFlow Keys, unter {{where}}.",
+        "unavailableKeys": "Geht, wenn Diktieren nur aus Sondertasten besteht, etwa Ctrl + Win. Schalte mit {{keys}} stattdessen „Zum Sprechen halten“ aus: Dann läuft jedes Diktat weiter, bis du die Tasten erneut drückst.",
+        "unavailableEngine": "Braucht die Tastatur-Engine SpeakoFlow Keys ({{where}}). Oder schalte „Zum Sprechen halten“ aus: Dann läuft jedes Diktat weiter, bis du die Tasten erneut drückst.",
         "taken": "{{name}} nutzt bereits {{keys}}, daher bewirkt diese Taste nichts, bis sich eins von beiden ändert.",
         "needsKey": "Wähle eine Taste, etwa Leertaste oder Eingabe. Eine Sondertaste allein kann nicht die Freihändig-Taste sein.",
-        "pressKey": "Taste drücken…"
+        "pressKey": "Taste drücken…",
+        "descriptionOff": "Aus. Klicke darauf und drück eine Taste, etwa die Leertaste, um es wieder einzuschalten.",
+        "linux": "Unter Linux schalte stattdessen „Zum Sprechen halten“ aus: Dann läuft jedes Diktat weiter, bis du die Tasten erneut drückst.",
+        "whileDictating": "Beim Diktieren drücken"
       }
     },
     "models": {
@@ -2225,7 +2226,11 @@
       "title": "Sprachmodell wird heruntergeladen…",
       "percent": "Sprachmodell wird heruntergeladen · {{percent}} %",
       "hint": "Das Diktieren funktioniert, sobald es fertig ist"
-    }
+    },
+    "handsFreeHint": "{{key}} drücken für freihändig",
+    "handsFreeFinish": "Freihändig · {{keys}} zum Beenden",
+    "lockedKeys": "Freihändige Aufnahme. Drücke {{keys}} zum Beenden",
+    "finishKeys": "Abschließen ({{keys}})"
   },
   "reminders": {
     "title": "Erinnerung",
@@ -2516,10 +2521,7 @@
       "dictation": "Diktat",
       "assistant": "Assistent",
       "cleanupOff": "Schalte die KI-Bereinigung ein, um dieses Tastenkürzel zu nutzen.",
-      "cleanupOnDictation": "Dein Diktat-Tastenkürzel bereinigt jedes Diktat, daher wird dieses nicht gebraucht.",
-      "openCleanup": "KI-Bereinigung öffnen",
-      "assistantOff": "Der Assistent ist ausgeschaltet, daher bewirken seine Tastenkürzel nichts.",
-      "openAssistant": "Assistent öffnen"
+      "assistantOff": "Der Assistent ist ausgeschaltet, daher bewirken seine Tastenkürzel nichts."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2602,7 +2604,8 @@
         "whatTap": "Antippen, sprechen, erneut antippen. Deine Worte erscheinen dort, wo dein Cursor ist."
       },
       "handsFree": {
-        "what": "Halte {{keys}}, drücke {{key}} und lass los: Es hört weiter zu, bis du {{keys}} erneut drückst."
+        "what": "Halte {{keys}}, drücke {{key}} und lass los: Es hört weiter zu, bis du {{keys}} erneut drückst.",
+        "linux": "Für freihändiges Diktieren unter Linux schalte „Zum Sprechen halten“ aus. Dann startet ein Druck und der nächste stoppt."
       },
       "cleanup": {
         "title": "Diktieren und bereinigen",
