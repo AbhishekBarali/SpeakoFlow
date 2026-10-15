@@ -1387,7 +1387,20 @@
       },
       "appendTrailingSpace": {
         "label": "Thêm dấu cách ở cuối",
-        "description": ""
+        "description": "Thêm dấu cách sau mỗi lần đọc chính tả. Khi bật khoảng cách thông minh, tùy chọn này chỉ áp dụng ở những ô không đọc được."
+      },
+      "smartSpacing": {
+        "label": "Khoảng cách thông minh",
+        "description": "Khớp mỗi lần đọc chính tả với văn bản đã có trong ô, để bạn có thể dừng rồi nói tiếp mà các từ không bị dính vào nhau.",
+        "info": "Trước khi dán, SpeakoFlow xem vài ký tự quanh con trỏ và chỉ thêm dấu cách ở chỗ cần. Khi ứng dụng ẩn văn bản của mình, nó dùng lần đọc chính tả gần nhất của chính nó. Không có gì được lưu hay gửi đi đâu. Trên macOS, tính năng này dùng quyền Trợ năng mà SpeakoFlow đã có. Trên Linux, ứng dụng Chrome, Electron và Qt chỉ chia sẻ văn bản khi cài đặt trợ năng của màn hình nền được bật."
+      },
+      "smartSpacingFixCase": {
+        "label": "Sửa chữ hoa",
+        "description": "Bắt đầu bằng chữ thường khi lần đọc nối tiếp một câu. Tên riêng, từ viết tắt và \"I\" vẫn giữ chữ hoa."
+      },
+      "smartSpacingJoin": {
+        "label": "Nối câu bị ngắt giữa chừng",
+        "description": "Xóa dấu chấm mà SpeakoFlow đã thêm khi bạn dừng giữa câu, như trong \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Cơ chế bàn phím",

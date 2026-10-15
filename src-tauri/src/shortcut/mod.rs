@@ -1672,6 +1672,35 @@ pub fn change_append_trailing_space_setting(app: AppHandle, enabled: bool) -> Re
     settings::write_settings(&app, settings);
     Ok(())
 }
+#[tauri::command]
+#[specta::specta]
+pub fn change_smart_spacing_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.smart_spacing = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_smart_spacing_fix_case_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.smart_spacing_fix_case = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_smart_spacing_join_sentences_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.smart_spacing_join_sentences = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
 
 #[tauri::command]
 #[specta::specta]

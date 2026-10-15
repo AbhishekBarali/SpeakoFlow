@@ -1396,7 +1396,20 @@
       },
       "appendTrailingSpace": {
         "label": "Leerzeichen anhängen",
-        "description": ""
+        "description": "Fügt nach jedem Diktat ein Leerzeichen ein. Mit intelligenten Leerzeichen gilt das nur, wo ein Feld nicht gelesen werden kann."
+      },
+      "smartSpacing": {
+        "label": "Intelligente Leerzeichen",
+        "description": "Passt jedes Diktat an den Text an, der schon im Feld steht, sodass man anhalten und weiterdiktieren kann, ohne dass Wörter zusammenkleben.",
+        "info": "Vor dem Einfügen prüft SpeakoFlow die wenigen Zeichen um den Cursor und fügt nur dort ein Leerzeichen ein, wo eines nötig ist. Wenn eine App ihren Text verbirgt, nutzt es stattdessen sein eigenes letztes Diktat. Nichts wird gespeichert oder irgendwohin gesendet. Unter macOS wird dafür die Bedienungshilfen-Berechtigung genutzt, die SpeakoFlow bereits hat. Unter Linux geben Chrome-, Electron- und Qt-Apps ihren Text nur frei, wenn die Barrierefreiheit der Desktopumgebung eingeschaltet ist."
+      },
+      "smartSpacingFixCase": {
+        "label": "Großschreibung anpassen",
+        "description": "Beginnt ein Diktat klein, wenn es einen Satz fortsetzt. Namen und Abkürzungen behalten ihre Großbuchstaben, deutscher Text bleibt unverändert."
+      },
+      "smartSpacingJoin": {
+        "label": "Unterbrochene Sätze verbinden",
+        "description": "Entfernt den Punkt, den SpeakoFlow gesetzt hat, als mitten im Satz angehalten wurde, etwa bei „Ich ging zu dem.“"
       },
       "keyboardImplementation": {
         "title": "Tastatur-Implementierung",
