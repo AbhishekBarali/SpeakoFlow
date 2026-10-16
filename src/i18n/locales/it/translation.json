@@ -1963,9 +1963,19 @@
       "hide": "Nascondi l'indicatore mobile",
       "show": "Mostra l'indicatore mobile"
     },
+    "notesPrefs": {
+      "autoTitle": "Scrivi le note alla fine di una chiamata",
+      "autoDescription": "Disattivalo se ti serve solo la trascrizione. Puoi comunque scrivere le note di una riunione dalla sua trascrizione.",
+      "languageTitle": "Lingua delle note",
+      "languageDescription": "Per impostazione predefinita le note sono nella lingua della riunione. Scegline una per riceverle sempre in quella lingua.",
+      "auto": "Quella della riunione",
+      "autoHint": "La lingua usata per gran parte della riunione"
+    },
     "pill": {
       "expand": "Apri la trascrizione in tempo reale",
       "collapse": "Torna alla pillola compatta",
+      "copy": "Copia trascrizione",
+      "copied": "Trascrizione copiata",
       "stop": "Ferma la registrazione",
       "listening": "In ascolto. Ciò che dicono le persone appare qui.",
       "micOnly": "Viene acquisito solo il tuo microfono: in questa trascrizione non ci sarà nulla di ciò che dicono gli altri partecipanti."
@@ -2045,6 +2055,7 @@
       "empty": "Questa riunione non ha una trascrizione.",
       "loadingMore": "Caricamento di altra trascrizione…",
       "renameSpeaker": "Rinomina questo interlocutore",
+      "copyTitle": "Copia l'intera trascrizione con i nomi di chi parla",
       "lowConfidence": "Incerto",
       "lowConfidenceHelp": "Questa etichetta dell'interlocutore è un'ipotesi. Le parole sono trascritte come sono state dette; è incerto solo chi le ha pronunciate."
     },
@@ -2069,6 +2080,7 @@
     },
     "summary": {
       "template": "Modello",
+      "languageAuto": "Lingua della riunione",
       "templates": {
         "general": "Generale",
         "standup": "Standup",

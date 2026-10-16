@@ -161,6 +161,23 @@ export const groupIntoTurns = (
 const isLowConfidence = (confidence: number | null): boolean =>
   confidence !== null && confidence < LOW_CONFIDENCE;
 
+/**
+ * The transcript as plain text for the clipboard: one `Name: what they said`
+ * paragraph per turn, a blank line between turns (feedback #14).
+ *
+ * Turns rather than raw items, so one person talking for two minutes is one
+ * paragraph and not six lines repeating their name. No timestamps: the text is
+ * pasted into documents and chats, where a clock on every line is noise, and
+ * the meeting page keeps them.
+ */
+export const transcriptToText = (
+  turns: readonly SpeakerTurn[],
+  nameFor: (speakerKey: string) => string,
+): string =>
+  turns
+    .map((turn) => `${nameFor(turn.speakerKey)}: ${turn.text.trim()}`)
+    .join("\n\n");
+
 const leastConfident = (a: number | null, b: number | null): number | null => {
   if (a === null) return b;
   if (b === null) return a;

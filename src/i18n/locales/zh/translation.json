@@ -1945,9 +1945,19 @@
       "hide": "隐藏浮动指示器",
       "show": "显示浮动指示器"
     },
+    "notesPrefs": {
+      "autoTitle": "通话结束时撰写笔记",
+      "autoDescription": "如果只需要转录，请关闭此项。关闭后，仍可从单个会议的转录中为它撰写笔记。",
+      "languageTitle": "笔记语言",
+      "languageDescription": "默认情况下，笔记使用会议所用的语言。选择一种语言，笔记将始终使用该语言。",
+      "auto": "与会议相同",
+      "autoHint": "会议大部分时间使用的语言"
+    },
     "pill": {
       "expand": "打开实时转录",
       "collapse": "返回小胶囊条",
+      "copy": "复制转录",
+      "copied": "已复制转录",
       "stop": "停止录制",
       "listening": "正在聆听。大家说的话会显示在这里。",
       "micOnly": "仅在录制您的麦克风——其他参会者说的话都不会出现在这份转录中。"
@@ -2023,6 +2033,7 @@
       "empty": "这场会议没有转录。",
       "loadingMore": "正在加载更多转录…",
       "renameSpeaker": "重命名此发言人",
+      "copyTitle": "复制完整转录，包含发言人名称",
       "lowConfidence": "不确定",
       "lowConfidenceHelp": "这个发言人标签是推测的。文字按原话转录，只是不确定是谁说的。"
     },
@@ -2047,6 +2058,7 @@
     },
     "summary": {
       "template": "模板",
+      "languageAuto": "会议语言",
       "templates": {
         "general": "通用",
         "standup": "站会",

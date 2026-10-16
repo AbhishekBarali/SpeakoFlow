@@ -1963,9 +1963,19 @@
       "hide": "Ocultar el indicador flotante",
       "show": "Mostrar el indicador flotante"
     },
+    "notesPrefs": {
+      "autoTitle": "Escribir notas al terminar una llamada",
+      "autoDescription": "Desactívalo si solo necesitas la transcripción. Aun así puedes escribir notas de una reunión desde su transcripción.",
+      "languageTitle": "Idioma de las notas",
+      "languageDescription": "Por defecto, las notas se escriben en el idioma de la reunión. Elige uno para recibirlas siempre en ese idioma.",
+      "auto": "El de la reunión",
+      "autoHint": "El idioma en que transcurrió casi toda la reunión"
+    },
     "pill": {
       "expand": "Abrir la transcripción en directo",
       "collapse": "Volver a la píldora pequeña",
+      "copy": "Copiar transcripción",
+      "copied": "Transcripción copiada",
       "stop": "Detener la grabación",
       "listening": "Escuchando. Lo que se diga aparecerá aquí.",
       "micOnly": "Solo se está capturando tu micrófono: nada de lo que digan los demás participantes estará en esta transcripción."
@@ -2045,6 +2055,7 @@
       "empty": "Esta reunión no tiene transcripción.",
       "loadingMore": "Cargando más transcripción…",
       "renameSpeaker": "Cambiar el nombre de este hablante",
+      "copyTitle": "Copiar toda la transcripción con los nombres de los participantes",
       "lowConfidence": "Dudoso",
       "lowConfidenceHelp": "Esta etiqueta de hablante es una suposición. Las palabras se transcriben tal como se dijeron; lo único dudoso es quién las dijo."
     },
@@ -2069,6 +2080,7 @@
     },
     "summary": {
       "template": "Plantilla",
+      "languageAuto": "Idioma de la reunión",
       "templates": {
         "general": "General",
         "standup": "Reunión diaria",
