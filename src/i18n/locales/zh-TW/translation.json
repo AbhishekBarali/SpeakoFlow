@@ -1945,9 +1945,19 @@
       "hide": "隱藏浮動指示器",
       "show": "顯示浮動指示器"
     },
+    "notesPrefs": {
+      "autoTitle": "通話結束時撰寫筆記",
+      "autoDescription": "如果只需要逐字稿，請關閉此項。關閉後，仍可從單一會議的逐字稿為它撰寫筆記。",
+      "languageTitle": "筆記語言",
+      "languageDescription": "預設情況下，筆記使用會議所用的語言。選擇一種語言，筆記就會一律使用該語言。",
+      "auto": "與會議相同",
+      "autoHint": "會議大部分時間使用的語言"
+    },
     "pill": {
       "expand": "開啟即時逐字稿",
       "collapse": "返回小膠囊",
+      "copy": "複製逐字稿",
+      "copied": "已複製逐字稿",
       "stop": "停止錄製",
       "listening": "聆聽中。與會者說的話會顯示在這裡。",
       "micOnly": "目前只錄製您的麥克風——其他與會者說的話都不會出現在這份逐字稿中。"
@@ -2023,6 +2033,7 @@
       "empty": "這場會議沒有逐字稿。",
       "loadingMore": "正在載入更多逐字稿…",
       "renameSpeaker": "重新命名這位說話者",
+      "copyTitle": "複製完整逐字稿，包含發言者名稱",
       "lowConfidence": "不確定",
       "lowConfidenceHelp": "這個說話者標籤是推測的。文字依照說出的內容轉錄，只是不確定是誰說的。"
     },
@@ -2047,6 +2058,7 @@
     },
     "summary": {
       "template": "範本",
+      "languageAuto": "會議語言",
       "templates": {
         "general": "一般",
         "standup": "站立會議",

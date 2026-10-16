@@ -15,8 +15,8 @@ import {
   Check,
   ChevronDown,
   Clock,
-  Copy,
   FileText,
+  Languages,
   Pencil,
   RefreshCw,
   Sparkles,
@@ -28,6 +28,7 @@ import { MenuButton, type MenuItem } from "@/components/ui/Menu";
 import { BackLink } from "@/components/ui/Page";
 import { Tabs } from "@/components/ui/Tabs";
 import {
+  AUTO_NOTES_LANGUAGE,
   DEFAULT_NOTES_TEMPLATE,
   generateMeetingNotes,
   getMeeting,
@@ -36,6 +37,7 @@ import {
   isMeetingNotesRunning,
   MEETING_NOTES_PROGRESS_EVENT,
   MEETING_SEGMENT_EVENT,
+  MEETING_SPEAKERS_LABELLED_EVENT,
   NOTES_TEMPLATES,
   renameMeeting,
   renameMeetingSpeaker,
@@ -56,6 +58,7 @@ import {
   ME_SPEAKER_KEY,
   type TranscriptItem,
 } from "./speakers";
+import { CopyAction, ICON_ACTION } from "./CopyAction";
 import { MeetingAskPanel } from "./MeetingAskPanel";
 import {
   DiscussButton,
@@ -63,6 +66,7 @@ import {
   useMeetingDiscuss,
 } from "./MeetingDiscuss";
 import { toggleTaskAt } from "./notesTasks";
+import { useMeetingNotesPrefs, useNotesLanguageOptions } from "./NotesPrefs";
 import { SpeakerIdentification } from "./SpeakerIdentification";
 import { TranscriptView } from "./TranscriptView";
 
@@ -89,6 +93,25 @@ const NOTES_DEBOUNCE_MS = 700;
  *  segments, far past any real meeting, and it means a bug in `has_more` cannot
  *  turn into an endless request loop. */
 const MAX_TRANSCRIPT_PAGES = 100;
+
+/** Every stored segment of a meeting, page by page. */
+const fetchTranscript = async (
+  meetingId: number,
+): Promise<TranscriptItem[]> => {
+  const all: TranscriptItem[] = [];
+  let offset = 0;
+  for (let page = 0; page < MAX_TRANSCRIPT_PAGES; page += 1) {
+    const result = await getMeetingSegments(
+      meetingId,
+      SEGMENT_PAGE_SIZE,
+      offset,
+    );
+    all.push(...result.segments.map(itemFromSegment));
+    offset += result.segments.length;
+    if (!result.has_more || result.segments.length === 0) break;
+  }
+  return all;
+};
 
 /**
  * Markdown for an answer in the Ask tab: the assistant's reply rules at the
@@ -137,9 +160,6 @@ const chatMarkdown: Components = {
     </blockquote>
   ),
 };
-
-/** How long the copy button says "Copied". */
-const COPIED_MS = 1600;
 
 const isTemplateId = (value: string | null): value is NotesTemplateId =>
   value !== null && NOTES_TEMPLATES.includes(value as NotesTemplateId);
@@ -261,9 +281,6 @@ const formatWhen = (seconds: number, locale: string): string => {
   }
 };
 
-const ICON_ACTION =
-  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[0.8125rem] font-medium text-muted transition-colors hover:bg-ink/6 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 aria-expanded:bg-ink/6 aria-expanded:text-ink";
-
 /**
  * One meeting: what the user thought, what was said, and what it added up to.
  *
@@ -309,6 +326,12 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
   const [skippedWindows, setSkippedWindows] = useState(0);
   /** Why the automatic notes job failed, so the retry says what to expect. */
   const [notesError, setNotesError] = useState<string | null>(null);
+  const notesPrefs = useMeetingNotesPrefs();
+  const languageOptions = useNotesLanguageOptions();
+  /** The language picked beside Regenerate; null follows the user's default. */
+  const [language, setLanguage] = useState<string | null>(null);
+  const notesLanguage =
+    language ?? notesPrefs.prefs?.language ?? AUTO_NOTES_LANGUAGE;
 
   const isLive = recordingMeetingId === meetingId;
 
@@ -317,6 +340,39 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
       .then(setSpeakers)
       .catch(() => {});
   }, [meetingId]);
+
+  /** Re-read everything speaker labels touch, after a diarization pass. Labels
+   *  changed every system-side row, so the transcript and the speaker list are
+   *  re-read rather than patched. */
+  const reloadLabelled = useCallback(() => {
+    void getMeeting(meetingId)
+      .then((fresh) => {
+        if (fresh) setMeeting(fresh);
+      })
+      .catch(() => {});
+    refreshSpeakers();
+    // Every page, not the first: re-reading only page one cut a long
+    // transcript, and anything copied from it, to its first 200 rows.
+    void fetchTranscript(meetingId)
+      .then(setItems)
+      .catch(() => {});
+    onChanged();
+  }, [meetingId, refreshSpeakers, onChanged]);
+
+  // The post-call pass labels the far side a minute or so after the call ends,
+  // usually while this page is already open on the transcript. Without this the
+  // page kept saying "Others" (and copied "Others") until it was reopened.
+  useEffect(() => {
+    const unlisten = listen<{ meeting_id: number }>(
+      MEETING_SPEAKERS_LABELLED_EVENT,
+      (event) => {
+        if (event.payload.meeting_id === meetingId) reloadLabelled();
+      },
+    );
+    return () => {
+      void unlisten.then((off) => off());
+    };
+  }, [meetingId, reloadLabelled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -549,7 +605,7 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
     // Progress and the refreshed title also arrive as events, since the backend
     // announces manual runs the same way as the automatic one. The promise is
     // still handled so this page updates even if the event raced its listener.
-    void generateMeetingNotes(meetingId, template)
+    void generateMeetingNotes(meetingId, template, notesLanguage)
       .then((result) => {
         setMeeting((current) =>
           current
@@ -612,23 +668,6 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
     () => summaryMarkdown(toggleTask, t("meetings.summary.toggleTask")),
     [toggleTask, t],
   );
-
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-
-  const copyNotes = () => {
-    if (!notesText) return;
-    void navigator.clipboard
-      .writeText(notesText)
-      .then(() => setCopied(true))
-      .catch((error: unknown) => {
-        toast.error(t("meetings.errors.copyFailed", { error: String(error) }));
-      });
-  };
 
   /* ── header numbers ── */
 
@@ -713,6 +752,55 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
       <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
     </MenuButton>
   );
+
+  // Like the template: a choice for the next Regenerate, starting from the
+  // default set on the Meetings page.
+  const languageItems: MenuItem[] = languageOptions.map((option) => ({
+    id: option.value,
+    label: option.label,
+    hint:
+      option.value === AUTO_NOTES_LANGUAGE
+        ? t("meetings.notesPrefs.autoHint")
+        : undefined,
+    checked: option.value === notesLanguage,
+    onSelect: () => setLanguage(option.value),
+  }));
+  const languageLabel =
+    notesLanguage === AUTO_NOTES_LANGUAGE
+      ? t("meetings.summary.languageAuto")
+      : (languageOptions.find((option) => option.value === notesLanguage)
+          ?.label ?? notesLanguage);
+
+  const languagePicker = (
+    <MenuButton
+      items={languageItems}
+      width={260}
+      maxHeight={340}
+      disabled={generating}
+      ariaLabel={t("meetings.notesPrefs.languageTitle")}
+      title={t("meetings.notesPrefs.languageTitle")}
+      className={ICON_ACTION}
+    >
+      <Languages className="h-3.5 w-3.5" aria-hidden="true" />
+      {languageLabel}
+      <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+    </MenuButton>
+  );
+
+  // With automatic notes off, a meeting that has none leads with its transcript
+  // and shows no Summary tab at all: an empty tab offering to do the thing the
+  // user switched off is clutter. Notes written on demand bring it back.
+  const autoNotes = notesPrefs.prefs?.auto_notes ?? true;
+  const hasNotes = Boolean(meeting.notes?.trim());
+  const showSummaryTab =
+    autoNotes || hasNotes || generating || notesError !== null;
+  const activeTab: DetailTab =
+    tab === "summary" && !showSummaryTab ? "transcript" : tab;
+
+  const writeNotesNow = () => {
+    generate();
+    setTab("summary");
+  };
 
   return (
     <div className="w-full">
@@ -825,10 +913,10 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
 
       <Tabs
         label={t("meetings.detail.tabsLabel")}
-        value={tab}
+        value={activeTab}
         onChange={(value) => {
           // Leaving the notes tab is a good moment to stop trusting a timer.
-          if (tab === "notes" && value !== "notes") flushNotes();
+          if (activeTab === "notes" && value !== "notes") flushNotes();
           setTab(value);
         }}
         items={(
@@ -838,11 +926,13 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
             ["transcript", "meetings.tabs.transcript"],
             ["notes", "meetings.tabs.myNotes"],
           ] as const
-        ).map(([id, labelKey]) => ({ id, label: t(labelKey) }))}
+        )
+          .filter(([id]) => id !== "summary" || showSummaryTab)
+          .map(([id, labelKey]) => ({ id, label: t(labelKey) }))}
       />
 
       <div className="mt-6">
-        {tab === "summary" && (
+        {activeTab === "summary" && (
           <div className="space-y-4">
             {skippedWindows > 0 && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-4 py-3 text-sm leading-relaxed text-ink">
@@ -895,6 +985,7 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
                     {items.length > 0 && (
                       <>
                         {templatePicker}
+                        {languagePicker}
                         <button
                           type="button"
                           onClick={generate}
@@ -913,23 +1004,7 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
                       </>
                     )}
                     {meeting.notes && (
-                      <button
-                        type="button"
-                        onClick={copyNotes}
-                        className={ICON_ACTION}
-                      >
-                        {copied ? (
-                          <Check
-                            className="h-3.5 w-3.5 text-success"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                        )}
-                        {copied
-                          ? t("meetings.summary.copied")
-                          : t("meetings.summary.copy")}
-                      </button>
+                      <CopyAction text={() => meeting.notes ?? ""} />
                     )}
                   </div>
                 </div>
@@ -981,6 +1056,7 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
                     <>
                       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                         {templatePicker}
+                        {languagePicker}
                         <Button
                           variant={live ? "secondary" : "primary"}
                           size="md"
@@ -1003,7 +1079,7 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
           </div>
         )}
 
-        {tab === "ask" && (
+        {activeTab === "ask" && (
           <>
             <MeetingAskPanel
               meetingId={meetingId}
@@ -1014,29 +1090,14 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
           </>
         )}
 
-        {tab === "transcript" && (
+        {activeTab === "transcript" && (
           <div className="space-y-4">
             <SpeakerIdentification
               meetingId={meetingId}
               diarized={meeting.diarized}
               hasSystemAudio={meeting.system_file !== null}
               isLive={isLive}
-              onLabelled={() => {
-                // Labels changed every system-side row, so both the transcript
-                // and the speaker list have to be re-read rather than patched.
-                void getMeeting(meetingId)
-                  .then((fresh) => {
-                    if (fresh) setMeeting(fresh);
-                  })
-                  .catch(() => {});
-                refreshSpeakers();
-                void getMeetingSegments(meetingId, SEGMENT_PAGE_SIZE, 0)
-                  .then((result) =>
-                    setItems(result.segments.map(itemFromSegment)),
-                  )
-                  .catch(() => {});
-                onChanged();
-              }}
+              onLabelled={reloadLabelled}
             />
             <div className="overflow-hidden rounded-2xl border border-hairline bg-surface elev-card">
               <TranscriptView
@@ -1051,6 +1112,21 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
                     : t("meetings.transcript.empty")
                 }
                 resetKey={meetingId}
+                copyable
+                actions={
+                  // Notes on demand, for someone who turned the automatic ones
+                  // off and wants them for this one meeting.
+                  !showSummaryTab && !live && items.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={writeNotesNow}
+                      className={ICON_ACTION}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t("meetings.summary.generate")}
+                    </button>
+                  ) : undefined
+                }
                 footer={
                   transcriptLoading && items.length > 0 ? (
                     <p className="pb-4 text-center text-xs text-muted-soft">
@@ -1063,7 +1139,7 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
           </div>
         )}
 
-        {tab === "notes" && (
+        {activeTab === "notes" && (
           <div className="overflow-hidden rounded-2xl border border-hairline bg-surface elev-card transition-colors focus-within:border-hairline-strong">
             <div className="flex items-center justify-between gap-3 border-b border-hairline px-5 py-3">
               <p className="min-w-0 text-[0.8125rem] leading-relaxed text-muted">

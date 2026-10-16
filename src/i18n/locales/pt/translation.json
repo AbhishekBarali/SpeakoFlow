@@ -1963,9 +1963,19 @@
       "hide": "Ocultar o indicador flutuante",
       "show": "Mostrar o indicador flutuante"
     },
+    "notesPrefs": {
+      "autoTitle": "Escrever notas quando uma chamada termina",
+      "autoDescription": "Desative se você só precisa da transcrição. Ainda é possível escrever as notas de uma reunião a partir da transcrição dela.",
+      "languageTitle": "Idioma das notas",
+      "languageDescription": "Por padrão, as notas ficam no idioma da reunião. Escolha um para recebê-las sempre nesse idioma.",
+      "auto": "O da reunião",
+      "autoHint": "O idioma usado na maior parte da reunião"
+    },
     "pill": {
       "expand": "Abrir a transcrição ao vivo",
       "collapse": "Voltar à pílula pequena",
+      "copy": "Copiar transcrição",
+      "copied": "Transcrição copiada",
       "stop": "Parar gravação",
       "listening": "Ouvindo. O que as pessoas dizem aparece aqui.",
       "micOnly": "Só o seu microfone está sendo capturado — nada do que os outros participantes disserem vai estar nesta transcrição."
@@ -2045,6 +2055,7 @@
       "empty": "Esta reunião não tem transcrição.",
       "loadingMore": "Carregando mais da transcrição…",
       "renameSpeaker": "Renomear este participante",
+      "copyTitle": "Copiar a transcrição inteira com os nomes de quem falou",
       "lowConfidence": "Incerto",
       "lowConfidenceHelp": "Este rótulo de participante é um palpite. As palavras foram transcritas como ditas; só quem as disse é incerto."
     },
@@ -2069,6 +2080,7 @@
     },
     "summary": {
       "template": "Modelo",
+      "languageAuto": "Idioma da reunião",
       "templates": {
         "general": "Geral",
         "standup": "Daily",

@@ -1972,9 +1972,19 @@
       "hide": "Ukryj pływający wskaźnik",
       "show": "Pokaż pływający wskaźnik"
     },
+    "notesPrefs": {
+      "autoTitle": "Pisz notatki po zakończeniu rozmowy",
+      "autoDescription": "Wyłącz, jeśli potrzebujesz tylko transkrypcji. Notatki z pojedynczego spotkania nadal możesz napisać z jego transkrypcji.",
+      "languageTitle": "Język notatek",
+      "languageDescription": "Domyślnie notatki są w języku, w którym odbyło się spotkanie. Wybierz język, aby zawsze dostawać je w nim.",
+      "auto": "Taki jak na spotkaniu",
+      "autoHint": "Język, w którym toczyła się większość spotkania"
+    },
     "pill": {
       "expand": "Otwórz transkrypcję na żywo",
       "collapse": "Wróć do małej pigułki",
+      "copy": "Kopiuj transkrypcję",
+      "copied": "Skopiowano transkrypcję",
       "stop": "Zatrzymaj nagrywanie",
       "listening": "Słucham. Tutaj pojawi się to, co mówią ludzie.",
       "micOnly": "Nagrywany jest tylko Twój mikrofon — w tej transkrypcji nie będzie niczego, co mówią pozostali uczestnicy."
@@ -2056,6 +2066,7 @@
       "empty": "To spotkanie nie ma transkrypcji.",
       "loadingMore": "Wczytywanie dalszej części transkrypcji…",
       "renameSpeaker": "Zmień nazwę tego mówcy",
+      "copyTitle": "Skopiuj całą transkrypcję z nazwami mówców",
       "lowConfidence": "Niepewne",
       "lowConfidenceHelp": "Ta etykieta mówcy to przypuszczenie. Słowa są przepisane tak, jak padły; niepewne jest tylko to, kto je wypowiedział."
     },
@@ -2080,6 +2091,7 @@
     },
     "summary": {
       "template": "Szablon",
+      "languageAuto": "Język spotkania",
       "templates": {
         "general": "Ogólny",
         "standup": "Stand-up",

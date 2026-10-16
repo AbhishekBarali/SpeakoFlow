@@ -1954,9 +1954,19 @@
       "hide": "Schwebende Anzeige ausblenden",
       "show": "Schwebende Anzeige einblenden"
     },
+    "notesPrefs": {
+      "autoTitle": "Notizen schreiben, wenn ein Anruf endet",
+      "autoDescription": "Schalte das aus, wenn du nur das Transkript brauchst. Notizen für ein einzelnes Meeting kannst du trotzdem über sein Transkript schreiben.",
+      "languageTitle": "Sprache der Notizen",
+      "languageDescription": "Standardmäßig sind die Notizen in der Sprache, in der das Meeting stattfand. Wähle eine Sprache, um sie immer in dieser zu bekommen.",
+      "auto": "Wie im Meeting",
+      "autoHint": "Die Sprache, in der das Meeting größtenteils war"
+    },
     "pill": {
       "expand": "Live-Transkript öffnen",
       "collapse": "Zurück zur kleinen Pille",
+      "copy": "Transkript kopieren",
+      "copied": "Transkript kopiert",
       "stop": "Aufnahme stoppen",
       "listening": "Hört zu. Was gesagt wird, erscheint hier.",
       "micOnly": "Nur dein Mikrofon wird aufgenommen – nichts, was die anderen Teilnehmenden sagen, landet in diesem Transkript."
@@ -2034,6 +2044,7 @@
       "empty": "Dieses Meeting hat kein Transkript.",
       "loadingMore": "Weitere Teile des Transkripts werden geladen…",
       "renameSpeaker": "Diesen Sprecher umbenennen",
+      "copyTitle": "Das ganze Transkript mit Sprechernamen kopieren",
       "lowConfidence": "Unsicher",
       "lowConfidenceHelp": "Diese Sprecherzuordnung ist eine Vermutung. Die Worte sind so transkribiert, wie sie gesagt wurden; unsicher ist nur, wer sie gesagt hat."
     },
@@ -2058,6 +2069,7 @@
     },
     "summary": {
       "template": "Vorlage",
+      "languageAuto": "Sprache des Meetings",
       "templates": {
         "general": "Allgemein",
         "standup": "Stand-up",

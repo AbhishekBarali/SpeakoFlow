@@ -198,12 +198,112 @@ pub const ASR_NOISE_RULE: &str = concat!(
     "\"Speaker 1\" come from automatic voice clustering, so one person may appear under several labels."
 );
 
-/// Which language the notes are written in. Separate from [`ASR_NOISE_RULE`]
-/// because Ask answers in the language of the question instead.
-const NOTES_LANGUAGE_RULE: &str = concat!(
-    "Write in English unless the user's own notes are written in another language, in which case use theirs. Translate ",
-    "what people meant; do not transliterate what they said."
-);
+/// Stored value of `meeting_notes_language` meaning "the language the meeting
+/// was held in".
+pub const AUTO_NOTES_LANGUAGE: &str = "auto";
+
+/// Languages the notes can be pinned to: the stored code and the English name
+/// the prompt uses. English names, because the instructions around them are in
+/// English and a model follows "Write in German" more reliably than a bare
+/// code. The frontend's `NOTES_LANGUAGES` lists the same codes.
+pub const NOTES_LANGUAGES: &[(&str, &str)] = &[
+    ("en", "English"),
+    ("ar", "Arabic"),
+    ("bn", "Bengali"),
+    ("bg", "Bulgarian"),
+    ("zh-Hans", "Simplified Chinese"),
+    ("zh-Hant", "Traditional Chinese"),
+    ("cs", "Czech"),
+    ("da", "Danish"),
+    ("nl", "Dutch"),
+    ("fi", "Finnish"),
+    ("fr", "French"),
+    ("de", "German"),
+    ("el", "Greek"),
+    ("he", "Hebrew"),
+    ("hi", "Hindi"),
+    ("hu", "Hungarian"),
+    ("id", "Indonesian"),
+    ("it", "Italian"),
+    ("ja", "Japanese"),
+    ("ko", "Korean"),
+    ("ms", "Malay"),
+    ("ne", "Nepali"),
+    ("no", "Norwegian"),
+    ("fa", "Persian"),
+    ("pl", "Polish"),
+    ("pt", "Portuguese"),
+    ("ro", "Romanian"),
+    ("ru", "Russian"),
+    ("sk", "Slovak"),
+    ("es", "Spanish"),
+    ("sv", "Swedish"),
+    ("ta", "Tamil"),
+    ("th", "Thai"),
+    ("tr", "Turkish"),
+    ("uk", "Ukrainian"),
+    ("ur", "Urdu"),
+    ("vi", "Vietnamese"),
+];
+
+/// Which language the notes are written in.
+///
+/// The default used to be English, full stop, unless the user's own notes were
+/// in another language. A German meeting therefore came back as English notes
+/// with no way to get German (feedback #15). Auto now means the meeting's own
+/// language, and a fixed language is one setting away.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum NotesLanguage {
+    /// The language the meeting was held in, judged by the model from the
+    /// transcript. A detector would have to guess on exactly the input that is
+    /// hardest for one: short, misheard, code-switched speech.
+    #[default]
+    Auto,
+    /// A fixed language, by its English name from [`NOTES_LANGUAGES`].
+    Named(&'static str),
+}
+
+impl NotesLanguage {
+    /// Resolve a stored code. Anything unknown, including an empty string, is
+    /// [`NotesLanguage::Auto`], so a setting written by a newer build degrades to
+    /// the default instead of failing the notes.
+    pub fn from_code(code: &str) -> Self {
+        let code = code.trim();
+        NOTES_LANGUAGES
+            .iter()
+            .find(|(known, _)| known.eq_ignore_ascii_case(code))
+            .map(|(_, name)| Self::Named(name))
+            .unwrap_or(Self::Auto)
+    }
+
+    /// The language rule sent with every prompt that writes notes or extracts
+    /// material for them. Separate from [`ASR_NOISE_RULE`] because Ask answers in
+    /// the language of the question instead.
+    ///
+    /// Auto follows the user's own notes first, so a document they started in
+    /// one language is not finished in another, and falls back to English only
+    /// when no single language leads — the code-switched Nepali/Hindi/English
+    /// case [`ASR_NOISE_RULE`] describes, where "the meeting's language" has no
+    /// single answer.
+    pub fn rule(self) -> String {
+        match self {
+            Self::Auto => concat!(
+                "LANGUAGE\n",
+                "Write in the language the meeting was held in, not in English by default: these instructions are in ",
+                "English, the notes should not be. If the user typed notes of their own, use the language of their notes ",
+                "so the document reads as one. Otherwise use the language most of the transcript is in; if people mixed ",
+                "languages, use the one they spoke most, and if none clearly leads, use English. Write the section headings ",
+                "in that language too. Translate what people meant; do not transliterate what they said."
+            )
+            .to_string(),
+            Self::Named(name) => format!(
+                "LANGUAGE\nWrite in {name}, including the section headings, whatever language the meeting or the user's \
+own notes were in. Keep people's names, product names and quoted titles as they were said. Translate what people \
+meant; do not transliterate what they said."
+            ),
+        }
+    }
+}
 
 /// How much of the user's own notes is echoed into each *map* prompt.
 ///
@@ -300,21 +400,30 @@ impl NotesTemplate {
     /// finished notes take. Everything else in the prompt (attribution, the
     /// user's notes, the output contract) is shared, exactly as dictation
     /// cleanup layers a writing style on top of one cleanup prompt.
+    ///
+    /// Headings are listed on their own, apart from what goes under them. They
+    /// used to share a line (`## Summary — two or three sentences: …`), and
+    /// Gemma 4 12B copied the whole line into its notes, description included,
+    /// so a user's summary opened with the heading "Summary — two or three
+    /// sentences: what this meeting was for…" (feedback #15's screenshot).
     pub fn instruction(self) -> &'static str {
         match self {
             Self::General => concat!(
-                "Write general meeting notes under these headings, in this order, ",
-                "omitting any heading the meeting genuinely had nothing for:\n",
-                "## Summary — two or three sentences: what this meeting was for and where it landed. Prose, not bullets.\n",
-                "## Key takeaways — three to five bullets, the outcomes and facts someone who missed the meeting needs first. ",
+                "Write general meeting notes with the sections below, in this order. Put each heading on a line of its ",
+                "own, worded exactly as listed (in the language of the notes), with nothing else on that line. Omit any ",
+                "section the meeting genuinely had nothing for.\n",
+                "## Summary\n## Key takeaways\n## Topics\n## Decisions\n## Next steps\n## Open questions\n",
+                "What goes under each heading:\n",
+                "- Summary: two or three sentences on what this meeting was for and where it landed. Prose, not bullets.\n",
+                "- Key takeaways: three to five bullets, the outcomes and facts someone who missed the meeting needs first. ",
                 "Each one specific: the number, the name, the date, not \"pricing was discussed\".\n",
-                "## Topics — one `### Short topic name` per subject that got real discussion, in the order it came up, ",
-                "with two to four terse bullets under each: what was said, who held which position, the specifics. ",
-                "Skip small talk and logistics.\n",
-                "## Decisions — what was actually settled, and by whom. Only decisions, not discussion.\n",
-                "## Next steps — every commitment, as a checklist: `- [ ] **Owner** — the task (by when)`. ",
+                "- Topics: one `###` subheading per subject that got real discussion, named after that subject, in the ",
+                "order it came up, with two to four terse bullets under each: what was said, who held which position, the ",
+                "specifics. Skip small talk and logistics.\n",
+                "- Decisions: what was actually settled, and by whom. Only decisions, not discussion.\n",
+                "- Next steps: every commitment, as a checklist: `- [ ] **Owner** — the task (by when)`. ",
                 "Add the deadline only if one was said. This is the only place action items appear.\n",
-                "## Open questions — what was raised and left unresolved."
+                "- Open questions: what was raised and left unresolved."
             ),
             Self::Standup => concat!(
                 "Write standup notes grouped by person, because a standup is per-person by construction. ",
@@ -325,21 +434,27 @@ impl NotesTemplate {
                 "appears in the next four standups."
             ),
             Self::OneOnOne => concat!(
-                "Write one-on-one notes under these headings:\n",
-                "## Topics — what the two of them actually talked about.\n",
-                "## Feedback — feedback given or received, saying who said it and to whom.\n",
-                "## Agreements — what each person committed to.\n",
-                "## For next time — what was deferred or promised for the next one.\n",
+                "Write one-on-one notes with the sections below, in this order. Put each heading on a line of its own, ",
+                "worded exactly as listed (in the language of the notes), with nothing else on that line.\n",
+                "## Topics\n## Feedback\n## Agreements\n## For next time\n",
+                "What goes under each heading:\n",
+                "- Topics: what the two of them actually talked about.\n",
+                "- Feedback: feedback given or received, saying who said it and to whom.\n",
+                "- Agreements: what each person committed to.\n",
+                "- For next time: what was deferred or promised for the next one.\n",
                 "A one-on-one is a private conversation. Keep the wording close to how the two people put it, ",
                 "and do not add judgements about anyone's performance, attitude or prospects — record what was said, not an assessment of it."
             ),
             Self::Interview => concat!(
-                "Write interview notes under these headings:\n",
-                "## Role and context — what the conversation was for, as stated.\n",
-                "## Background — what the candidate said about their own experience.\n",
-                "## Questions and answers — each question asked and the substance of the answer.\n",
-                "## Signals — concrete things observed, each tied to the moment or the quote it came from.\n",
-                "## To probe next — areas left thin or unexplored.\n",
+                "Write interview notes with the sections below, in this order. Put each heading on a line of its own, ",
+                "worded exactly as listed (in the language of the notes), with nothing else on that line.\n",
+                "## Role and context\n## Background\n## Questions and answers\n## Signals\n## To probe next\n",
+                "What goes under each heading:\n",
+                "- Role and context: what the conversation was for, as stated.\n",
+                "- Background: what the candidate said about their own experience.\n",
+                "- Questions and answers: each question asked and the substance of the answer.\n",
+                "- Signals: concrete things observed, each tied to the moment or the quote it came from.\n",
+                "- To probe next: areas left thin or unexplored.\n",
                 "Record evidence, not a verdict. Do not score the candidate, recommend hiring or rejecting them, ",
                 "or infer anything about them that the transcript does not support: these notes get read by people ",
                 "who were not in the room, and a guess written as a finding is indistinguishable from a fact."
@@ -664,6 +779,7 @@ pub fn build_window_prompt(
     window: &TranscriptWindow,
     template: NotesTemplate,
     my_notes: &str,
+    language: NotesLanguage,
 ) -> String {
     let mut prompt = String::new();
     prompt.push_str(&format!(
@@ -683,8 +799,8 @@ Do not write the final notes yet, and do not write a conclusion — this part ma
     prompt.push_str(ATTRIBUTION_RULE);
     prompt.push_str("\n\n");
     prompt.push_str(ASR_NOISE_RULE);
-    prompt.push('\n');
-    prompt.push_str(NOTES_LANGUAGE_RULE);
+    prompt.push_str("\n\n");
+    prompt.push_str(&language.rule());
     prompt.push_str("\n\n");
 
     let my_notes = my_notes.trim();
@@ -734,12 +850,15 @@ pub enum NotesSource {
 /// the template decides the shape, the user's notes decide the organising
 /// principle, the ownership rule and output contract are the app's own contract
 /// and go last so nothing the user or the template said can be read as
-/// overriding them.
+/// overriding them. The language rule sits right before the contract: it is
+/// the instruction a small model most often drops on a long transcript, and
+/// the last instructions before the material are the ones it keeps.
 pub fn build_notes_prompt(
     source: NotesSource,
     material: &str,
     template: NotesTemplate,
     my_notes: &str,
+    language: NotesLanguage,
 ) -> String {
     let mut prompt = String::from(
         "You are writing the notes for one meeting that has already finished. \
@@ -760,12 +879,12 @@ The material below is speaker-attributed: each line begins with the name of the 
     prompt.push_str(ATTRIBUTION_RULE);
     prompt.push_str("\n\n");
     prompt.push_str(ASR_NOISE_RULE);
-    prompt.push('\n');
-    prompt.push_str(NOTES_LANGUAGE_RULE);
     prompt.push_str("\n\n");
     prompt.push_str(NON_SUBSTANTIVE_RULE);
     prompt.push_str("\n\n");
     prompt.push_str(STYLE_RULE);
+    prompt.push_str("\n\n");
+    prompt.push_str(&language.rule());
     prompt.push_str("\n\n");
     prompt.push_str(OUTPUT_CONTRACT);
     prompt.push_str("\n\n");
@@ -955,12 +1074,13 @@ pub async fn generate_and_announce(
     store: &MeetingStore,
     meeting_id: i64,
     template: NotesTemplate,
+    language: NotesLanguage,
 ) -> Result<GeneratedNotes, String> {
     let Some(slot) = InFlight::claim(meeting_id) else {
         return Err("The notes for this meeting are already being written.".to_string());
     };
     let _ = app.emit(NOTES_PROGRESS_EVENT, NotesProgress::Started { meeting_id });
-    run_claimed(app, store, meeting_id, template, slot).await
+    run_claimed(app, store, meeting_id, template, language, slot).await
 }
 
 /// The body of an announced job, for a caller that already holds the slot and
@@ -970,9 +1090,10 @@ async fn run_claimed(
     store: &MeetingStore,
     meeting_id: i64,
     template: NotesTemplate,
+    language: NotesLanguage,
     _slot: InFlight,
 ) -> Result<GeneratedNotes, String> {
-    let result = generate_meeting_notes(app, store, meeting_id, template).await;
+    let result = generate_meeting_notes(app, store, meeting_id, template, language).await;
     match &result {
         Ok(generated) => {
             if let Err(e) = store.complete_meeting(meeting_id) {
@@ -1016,6 +1137,7 @@ pub async fn generate_meeting_notes(
     store: &MeetingStore,
     meeting_id: i64,
     template: NotesTemplate,
+    language: NotesLanguage,
 ) -> Result<GeneratedNotes, String> {
     let meeting = store
         .get_meeting(meeting_id)
@@ -1045,10 +1167,11 @@ pub async fn generate_meeting_notes(
     let budget = NotesBudget::for_provider(&provider.id, settings.local_llm_context_size);
     let windows = split_into_windows(&lines, budget.window_chars);
     info!(
-        "Generating notes for meeting {meeting_id}: {} window(s) of up to {} chars, template '{}', provider '{}' model '{}' ({:?})",
+        "Generating notes for meeting {meeting_id}: {} window(s) of up to {} chars, template '{}', language {:?}, provider '{}' model '{}' ({:?})",
         windows.len(),
         budget.window_chars,
         template.id(),
+        language,
         provider.id,
         model,
         source
@@ -1089,7 +1212,8 @@ pub async fn generate_meeting_notes(
         let window = windows.first().ok_or("no transcript window")?;
         (window.text.clone(), NotesSource::FullTranscript, 0)
     } else {
-        let (partials, skipped) = summarize_windows(&call, &windows, template, &my_notes).await;
+        let (partials, skipped) =
+            summarize_windows(&call, &windows, template, &my_notes, language).await;
         if partials.is_empty() {
             return Err(
                 "Every part of this meeting failed to summarize. Check the model configuration and try again."
@@ -1100,7 +1224,7 @@ pub async fn generate_meeting_notes(
         (merged, NotesSource::Partials, skipped)
     };
 
-    let prompt = build_notes_prompt(source_kind, &material, template, &my_notes);
+    let prompt = build_notes_prompt(source_kind, &material, template, &my_notes, language);
     let notes = call
         .complete(prompt)
         .await
@@ -1154,12 +1278,13 @@ async fn summarize_windows(
     windows: &[TranscriptWindow],
     template: NotesTemplate,
     my_notes: &str,
+    language: NotesLanguage,
 ) -> (Vec<String>, usize) {
     let mut partials = Vec::with_capacity(windows.len());
     let mut skipped = 0usize;
 
     for window in windows {
-        let prompt = build_window_prompt(window, template, my_notes);
+        let prompt = build_window_prompt(window, template, my_notes, language);
         match call.complete(prompt).await {
             Ok(text) => partials.push(format!(
                 "### Part {} of {}\n{}",
@@ -1368,23 +1493,37 @@ const TITLE_SOURCE_CHARS: usize = 1_200;
 /// scannable — which is the entire job of a title.
 const MAX_TITLE_CHARS: usize = 64;
 
-/// Generate notes for a meeting that has just ended, in the background.
+/// Event telling open views that the post-call pass relabelled a meeting's far
+/// side ("Others" became "Speaker 1", "Speaker 2"), so a transcript already on
+/// screen re-reads its rows instead of showing, and copying, the old labels.
+pub const SPEAKERS_LABELLED_EVENT: &str = "meeting-speakers-labelled";
+
+/// Finish a meeting that has just ended, in the background: identify the
+/// speakers, then write the notes unless the user turned that off.
 ///
-/// # Why this is automatic
+/// # Why notes are automatic
 ///
-/// It used to be a Summary tab, a template dropdown, and a Generate button. Three
-/// decisions to reach the thing every user wants every time — and a template
+/// They used to be a Summary tab, a template dropdown, and a Generate button. Three
+/// decisions to reach the thing most users want every time — and a template
 /// choice the user cannot make well, because they have not read the transcript
 /// yet. So the default template runs on its own the moment the call ends, and
 /// picking a different one becomes a *re-*generate: an override for the minority
 /// case, offered once there is something to compare it against.
+///
+/// # Why they can be turned off
+///
+/// Sometimes the transcript is the whole point (feedback #15), and then a notes
+/// job is a model call nobody asked for: minutes of GPU on a local model, money on
+/// a cloud one. With `meeting_auto_notes` off this still diarizes — speaker labels
+/// belong to the transcript, not to the notes — and writes nothing else. Notes
+/// for one meeting can still be written on demand.
 ///
 /// Fire-and-forget by construction. The notes are written to the store and
 /// announced on [`NOTES_PROGRESS_EVENT`]; nothing awaits this, and a failure costs
 /// the user a button press rather than an error dialog over a call they just
 /// finished. It also auto-titles the meeting, because "Meeting Sep 17, 6:01 PM" is
 /// unrecognisable in a list of nine of them.
-pub fn spawn_notes_job(app: &AppHandle, meeting_id: i64) {
+pub fn spawn_post_call_job(app: &AppHandle, meeting_id: i64) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let Some(store) = app.try_state::<std::sync::Arc<MeetingStore>>() else {
@@ -1392,28 +1531,42 @@ pub fn spawn_notes_job(app: &AppHandle, meeting_id: i64) {
         };
         let store = store.inner().clone();
 
-        // Nothing was said, so there is nothing to summarize and no reason to
-        // announce a job. A one-second recording is a misfire, not a meeting.
+        // Nothing was said, so there is nothing to label or summarize and no
+        // reason to announce a job. A one-second recording is a misfire, not a
+        // meeting.
         match store.get_meeting(meeting_id) {
             Ok(Some(meeting)) if meeting.segment_count == 0 => {
-                debug!("Meeting {meeting_id} has no transcript; skipping automatic notes");
+                debug!("Meeting {meeting_id} has no transcript; skipping the post-call job");
                 return;
             }
             Ok(Some(_)) => {}
             Ok(None) => return,
             Err(e) => {
-                warn!("Could not read meeting {meeting_id} before summarizing: {e}");
+                warn!("Could not read meeting {meeting_id} after the call: {e}");
                 return;
             }
         }
 
+        let settings = crate::settings::get_settings(&app);
+        let language = NotesLanguage::from_code(&settings.meeting_notes_language);
+
         // Held from here, across diarization, so a detail page opened in the
         // meantime shows "writing" instead of offering a second, racing job.
-        let Some(slot) = InFlight::claim(meeting_id) else {
-            debug!("Notes for meeting {meeting_id} are already being written");
-            return;
+        let slot = if settings.meeting_auto_notes {
+            match InFlight::claim(meeting_id) {
+                Some(slot) => {
+                    let _ = app.emit(NOTES_PROGRESS_EVENT, NotesProgress::Started { meeting_id });
+                    Some(slot)
+                }
+                None => {
+                    debug!("Notes for meeting {meeting_id} are already being written");
+                    return;
+                }
+            }
+        } else {
+            debug!("Automatic notes are off; meeting {meeting_id} gets speaker labels only");
+            None
         };
-        let _ = app.emit(NOTES_PROGRESS_EVENT, NotesProgress::Started { meeting_id });
 
         // Diarization first, deliberately. It renames "Others" into "Speaker 1" and
         // "Speaker 2", and the notes prompt is built from those labels — so running
@@ -1435,7 +1588,18 @@ pub fn spawn_notes_job(app: &AppHandle, meeting_id: i64) {
             })
             .await;
             match outcome {
-                Ok(Ok(result)) => debug!("Meeting {meeting_id} diarization: {result:?}"),
+                Ok(Ok(result)) => {
+                    debug!("Meeting {meeting_id} diarization: {result:?}");
+                    if !matches!(
+                        result,
+                        crate::meetings::diarize::DiarizationOutcome::Skipped { .. }
+                    ) {
+                        let _ = app.emit(
+                            SPEAKERS_LABELLED_EVENT,
+                            serde_json::json!({ "meeting_id": meeting_id }),
+                        );
+                    }
+                }
                 // Never fatal. The transcript is still correctly split into the
                 // user and the far side by `SpeakerSource`, which is a hardware
                 // fact rather than a guess — diarization only refines the far side.
@@ -1443,6 +1607,12 @@ pub fn spawn_notes_job(app: &AppHandle, meeting_id: i64) {
                 Err(error) => warn!("Meeting {meeting_id} diarization panicked: {error}"),
             }
         }
+
+        let Some(slot) = slot else {
+            // The list's speaker counts come from the labels just written.
+            let _ = app.emit(crate::commands::meetings::MEETINGS_UPDATED_EVENT, ());
+            return;
+        };
 
         // Failure is announced by `run_claimed` as a warning and a `Failed` event,
         // not an error dialog: the transcript and the audio are both safe, and
@@ -1452,6 +1622,7 @@ pub fn spawn_notes_job(app: &AppHandle, meeting_id: i64) {
             store.as_ref(),
             meeting_id,
             NotesTemplate::default(),
+            language,
             slot,
         )
         .await;
@@ -1633,17 +1804,123 @@ mod tests {
             text: "Speaker 2: Antina, voulez-vous venir avec?".to_string(),
         };
         for prompt in [
-            build_window_prompt(&window, NotesTemplate::General, ""),
+            build_window_prompt(&window, NotesTemplate::General, "", NotesLanguage::Auto),
             build_notes_prompt(
                 NotesSource::FullTranscript,
                 "Me: hi",
                 NotesTemplate::General,
                 "",
+                NotesLanguage::Auto,
             ),
         ] {
             assert!(prompt.contains(ASR_NOISE_RULE));
-            assert!(prompt.contains(NOTES_LANGUAGE_RULE));
+            assert!(prompt.contains(&NotesLanguage::Auto.rule()));
         }
+    }
+
+    /* ───────────────────────────── language ───────────────────────────── */
+
+    #[test]
+    fn a_known_language_code_pins_the_notes_language() {
+        assert_eq!(
+            NotesLanguage::from_code("de"),
+            NotesLanguage::Named("German")
+        );
+        assert_eq!(
+            NotesLanguage::from_code(" zh-hans "),
+            NotesLanguage::Named("Simplified Chinese")
+        );
+    }
+
+    /// A setting written by a newer build, or hand-edited, must not fail the
+    /// notes: it reads as the default.
+    #[test]
+    fn auto_and_unknown_codes_mean_the_meeting_language() {
+        for code in [AUTO_NOTES_LANGUAGE, "", "klingon", "xx-YY"] {
+            assert_eq!(NotesLanguage::from_code(code), NotesLanguage::Auto);
+        }
+    }
+
+    #[test]
+    fn every_listed_language_resolves_to_its_name() {
+        for (code, name) in NOTES_LANGUAGES {
+            assert_eq!(NotesLanguage::from_code(code), NotesLanguage::Named(name));
+        }
+    }
+
+    /// Feedback #15: a German meeting came back as English notes because the
+    /// rule said English unless the user's notes were in another language.
+    #[test]
+    fn auto_follows_the_meeting_instead_of_defaulting_to_english() {
+        let rule = NotesLanguage::Auto.rule();
+        assert!(rule.contains("not in English by default"));
+        assert!(rule.contains("most of the transcript is in"));
+        assert!(rule.contains("section headings"));
+        assert!(!rule.contains("Write in English unless"));
+    }
+
+    #[test]
+    fn a_pinned_language_reaches_both_prompts_by_name() {
+        let german = NotesLanguage::Named("German");
+        let window = TranscriptWindow {
+            index: 1,
+            total: 2,
+            text: "Speaker 1: Ich erinnere mich".to_string(),
+        };
+        for prompt in [
+            build_window_prompt(&window, NotesTemplate::General, "", german),
+            build_notes_prompt(
+                NotesSource::FullTranscript,
+                "Speaker 1: Ich erinnere mich",
+                NotesTemplate::General,
+                "",
+                german,
+            ),
+        ] {
+            assert!(prompt.contains("Write in German, including the section headings"));
+            assert!(!prompt.contains(&NotesLanguage::Auto.rule()));
+        }
+    }
+
+    /// The language rule is the last instruction before the output contract, so
+    /// a long transcript does not push it out of a small model's attention.
+    #[test]
+    fn the_language_rule_comes_right_before_the_output_contract() {
+        let prompt = build_notes_prompt(
+            NotesSource::FullTranscript,
+            "Me: hi",
+            NotesTemplate::General,
+            "",
+            NotesLanguage::Named("French"),
+        );
+        let language = prompt.find("LANGUAGE\n").expect("language rule");
+        let contract = prompt.find(OUTPUT_CONTRACT).expect("contract");
+        assert!(language < contract);
+        assert!(prompt.find(STYLE_RULE).unwrap() < language);
+    }
+
+    /// Feedback #15's screenshot: with the description on the heading line, the
+    /// model wrote "Summary — two or three sentences: what this meeting was
+    /// for…" as the heading. Headings now stand alone.
+    #[test]
+    fn template_headings_stand_on_their_own_lines() {
+        for template in NotesTemplate::all() {
+            for line in template.instruction().lines() {
+                if line.starts_with("## ") {
+                    assert!(
+                        !line.contains(" — ") && !line.contains(':'),
+                        "template '{}' puts a description on its heading line: {line:?}",
+                        template.id()
+                    );
+                }
+            }
+        }
+        assert!(NotesTemplate::General
+            .instruction()
+            .contains("\n## Summary\n## Key takeaways\n"));
+        assert!(!NotesTemplate::General
+            .instruction()
+            .contains("Short topic name"));
     }
 
     #[test]
@@ -1673,6 +1950,7 @@ mod tests {
             "Me: can you hear me",
             NotesTemplate::General,
             "",
+            NotesLanguage::Auto,
         );
         assert!(prompt.contains(NON_SUBSTANTIVE_RULE));
         assert!(
@@ -1690,7 +1968,7 @@ mod tests {
             total: 9,
             text: "Me: hello".to_string(),
         };
-        let prompt = build_window_prompt(&window, NotesTemplate::General, "");
+        let prompt = build_window_prompt(&window, NotesTemplate::General, "", NotesLanguage::Auto);
         assert!(!prompt.contains(NON_SUBSTANTIVE_RULE));
     }
 
@@ -2122,6 +2400,7 @@ We reviewed the quarterly pricing model together.";
             "Me: hello",
             NotesTemplate::Standup,
             "",
+            NotesLanguage::Auto,
         );
         assert!(
             prompt.contains(NotesTemplate::Standup.instruction()),
@@ -2140,6 +2419,7 @@ We reviewed the quarterly pricing model together.";
             "Abhishek: we ship on Friday",
             NotesTemplate::General,
             "",
+            NotesLanguage::Auto,
         );
         assert!(prompt.contains("Abhishek: we ship on Friday"));
         assert!(
@@ -2158,18 +2438,20 @@ We reviewed the quarterly pricing model together.";
             text: "Me: I will send it".to_string(),
         };
         let prompts = vec![
-            build_window_prompt(&window, NotesTemplate::General, ""),
+            build_window_prompt(&window, NotesTemplate::General, "", NotesLanguage::Auto),
             build_notes_prompt(
                 NotesSource::Partials,
                 "part one",
                 NotesTemplate::General,
                 "",
+                NotesLanguage::Auto,
             ),
             build_notes_prompt(
                 NotesSource::FullTranscript,
                 "Me: hi",
                 NotesTemplate::ActionItems,
                 "notes",
+                NotesLanguage::Auto,
             ),
             build_condense_prompt("part one"),
         ];
@@ -2196,6 +2478,7 @@ We reviewed the quarterly pricing model together.";
             "Me: hi",
             NotesTemplate::General,
             "",
+            NotesLanguage::Auto,
         );
         assert!(prompt.contains(STYLE_RULE));
         let window = TranscriptWindow {
@@ -2203,7 +2486,10 @@ We reviewed the quarterly pricing model together.";
             total: 2,
             text: "Me: hi".to_string(),
         };
-        assert!(!build_window_prompt(&window, NotesTemplate::General, "").contains(STYLE_RULE));
+        assert!(
+            !build_window_prompt(&window, NotesTemplate::General, "", NotesLanguage::Auto)
+                .contains(STYLE_RULE)
+        );
     }
 
     /// Next steps are a checklist the Summary tab can tick off, and they are the
@@ -2221,7 +2507,13 @@ We reviewed the quarterly pricing model together.";
 
     #[test]
     fn the_output_contract_is_appended_to_the_final_prompt() {
-        let prompt = build_notes_prompt(NotesSource::Partials, "part", NotesTemplate::General, "");
+        let prompt = build_notes_prompt(
+            NotesSource::Partials,
+            "part",
+            NotesTemplate::General,
+            "",
+            NotesLanguage::Auto,
+        );
         assert!(prompt.contains(OUTPUT_CONTRACT));
         assert!(
             prompt.contains("do not wrap the whole answer in a code fence"),
@@ -2233,7 +2525,13 @@ We reviewed the quarterly pricing model together.";
     /// later word wins, or a revisited decision gets reported twice.
     #[test]
     fn the_reduce_prompt_explains_that_the_parts_are_ordered() {
-        let prompt = build_notes_prompt(NotesSource::Partials, "part", NotesTemplate::General, "");
+        let prompt = build_notes_prompt(
+            NotesSource::Partials,
+            "part",
+            NotesTemplate::General,
+            "",
+            NotesLanguage::Auto,
+        );
         assert!(prompt.contains("<transcript_parts>"));
         assert!(prompt.contains("prefer the later one"));
         assert!(
@@ -2253,6 +2551,7 @@ We reviewed the quarterly pricing model together.";
             "Me: we agreed on Thursday",
             NotesTemplate::General,
             "- ask about the deadline\n- pricing?",
+            NotesLanguage::Auto,
         );
 
         assert!(
@@ -2286,6 +2585,7 @@ We reviewed the quarterly pricing model together.";
             "Me: hi",
             NotesTemplate::General,
             "decision: we go with plan A",
+            NotesLanguage::Auto,
         );
         assert!(prompt.contains("Correct them where the transcript disagrees"));
         assert!(prompt.contains("finish what they left half-written"));
@@ -2302,6 +2602,7 @@ We reviewed the quarterly pricing model together.";
             "Me: hi",
             NotesTemplate::General,
             "",
+            NotesLanguage::Auto,
         );
         assert!(prompt.contains(NO_NOTES_RULE));
         assert!(!prompt.contains(MY_NOTES_RULE));
@@ -2320,6 +2621,7 @@ We reviewed the quarterly pricing model together.";
             "Me: hi",
             NotesTemplate::General,
             "   \n\t\n ",
+            NotesLanguage::Auto,
         );
         assert!(prompt.contains(NO_NOTES_RULE));
         assert!(!prompt.contains("<my_notes>"));
@@ -2335,6 +2637,7 @@ We reviewed the quarterly pricing model together.";
             "Me: hi",
             NotesTemplate::General,
             &huge,
+            NotesLanguage::Auto,
         );
         assert!(prompt.contains("[…truncated]"));
         assert!(prompt.chars().count() < huge.chars().count());
@@ -2350,7 +2653,8 @@ We reviewed the quarterly pricing model together.";
             total: 3,
             text: "Me: hi".to_string(),
         };
-        let prompt = build_window_prompt(&window, NotesTemplate::General, &notes);
+        let prompt =
+            build_window_prompt(&window, NotesTemplate::General, &notes, NotesLanguage::Auto);
         assert!(prompt.contains("[…truncated]"));
         assert!(
             prompt.contains("<my_notes>"),
@@ -2369,7 +2673,7 @@ We reviewed the quarterly pricing model together.";
             total: 7,
             text: "Them: and then we decided".to_string(),
         };
-        let prompt = build_window_prompt(&window, NotesTemplate::General, "");
+        let prompt = build_window_prompt(&window, NotesTemplate::General, "", NotesLanguage::Auto);
 
         assert!(
             prompt.contains("part 3 of 7"),
@@ -2393,7 +2697,7 @@ We reviewed the quarterly pricing model together.";
             total: 4,
             text: "Me: hi".to_string(),
         };
-        let prompt = build_window_prompt(&window, NotesTemplate::Standup, "");
+        let prompt = build_window_prompt(&window, NotesTemplate::Standup, "", NotesLanguage::Auto);
         assert!(prompt.contains("\"standup\""));
         assert!(
             !prompt.contains(NotesTemplate::Standup.instruction()),
