@@ -18,7 +18,7 @@ export const SmartSpacing: React.FC<SmartSpacingProps> = React.memo(
     const { t } = useTranslation();
     const { getSetting, updateSetting, isUpdating } = useSettings();
 
-    const enabled = getSetting("smart_spacing") ?? false;
+    const enabled = getSetting("smart_spacing") ?? true;
     const fixCase = getSetting("smart_spacing_fix_case") ?? true;
     const joinSentences = getSetting("smart_spacing_join_sentences") ?? true;
 

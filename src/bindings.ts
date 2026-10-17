@@ -4049,9 +4049,10 @@ flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_sp
 /**
  * Smart spacing: fit each dictation onto the text already in the field
  * (a space where one is needed, the right case, no stray period from the
- * previous dictation), so dictations do not run together. Off by default:
- * it reads the few characters around the caret of the field being pasted
- * into. See `smart_spacing`.
+ * previous dictation), so dictations do not run together. On by default,
+ * for a new install and an update alike: it reads only the few characters
+ * around the caret of the field being pasted into, and keeps none of
+ * them. See `smart_spacing`.
  */
 smart_spacing?: boolean; 
 /**
