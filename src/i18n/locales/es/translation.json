@@ -891,6 +891,10 @@
         "label": "Mostrar icono en la bandeja",
         "description": "Mantén SpeakoFlow en la bandeja del sistema."
       },
+      "trayIconColor": {
+        "label": "Icono de bandeja en color",
+        "description": "Muestra el logotipo en color en lugar del icono blanco. Actívalo si tu panel es claro y el icono blanco apenas se ve."
+      },
       "closeBehavior": {
         "label": "Salir al cerrar la ventana",
         "description": "Si está desactivado, al cerrar la ventana SpeakoFlow sigue en la bandeja del sistema y tus atajos continúan funcionando. Si está activado, cerrar la ventana cierra la aplicación por completo."

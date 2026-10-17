@@ -2066,6 +2066,20 @@ pub fn change_show_tray_icon_setting(app: AppHandle, enabled: bool) -> Result<()
     Ok(())
 }
 
+/// Linux only: draw the tray icon in colour instead of as a white glyph. The
+/// other platforms ignore the setting, so redrawing there changes nothing.
+#[tauri::command]
+#[specta::specta]
+pub fn change_tray_icon_color_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.tray_icon_color = enabled;
+    settings::write_settings(&app, settings);
+
+    tray::refresh_tray_icon(&app);
+
+    Ok(())
+}
+
 /// Set what closing the main window does: minimize to the tray (default) or
 /// fully quit the app. The `Quit` branch reuses the same `app.exit(0)` path as
 /// the tray "Quit" item (see the `CloseRequested` handler in `lib.rs`). See

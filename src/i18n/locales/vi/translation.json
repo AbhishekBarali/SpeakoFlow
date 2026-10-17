@@ -879,6 +879,10 @@
         "label": "Hiện biểu tượng khay",
         "description": "Giữ SpeakoFlow trong khay hệ thống."
       },
+      "trayIconColor": {
+        "label": "Biểu tượng khay có màu",
+        "description": "Hiện logo có màu thay cho biểu tượng trắng. Bật nếu thanh tác vụ của bạn sáng màu và khó thấy biểu tượng trắng."
+      },
       "closeBehavior": {
         "label": "Thoát khi tôi đóng cửa sổ",
         "description": "Khi tắt, đóng cửa sổ vẫn giữ SpeakoFlow chạy trong khay hệ thống để phím tắt của bạn tiếp tục hoạt động. Khi bật, đóng cửa sổ sẽ thoát hẳn ứng dụng."

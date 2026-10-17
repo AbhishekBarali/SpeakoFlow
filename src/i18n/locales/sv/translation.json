@@ -885,6 +885,10 @@
         "label": "Visa ikon i systemfältet",
         "description": "Behåll SpeakoFlow i systemfältet."
       },
+      "trayIconColor": {
+        "label": "Färgad ikon i systemfältet",
+        "description": "Visar den färgade logotypen i stället för den vita ikonen. Slå på om panelen är ljus och den vita ikonen syns dåligt."
+      },
       "closeBehavior": {
         "label": "Avsluta när jag stänger fönstret",
         "description": "När det är av fortsätter SpeakoFlow att köras i systemfältet när du stänger fönstret, så att dina kortkommandon fortfarande fungerar. När det är på avslutas appen helt när du stänger fönstret."

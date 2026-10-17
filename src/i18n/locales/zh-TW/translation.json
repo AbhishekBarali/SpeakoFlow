@@ -879,6 +879,10 @@
         "label": "顯示系統匣圖示",
         "description": "將 SpeakoFlow 保留在系統匣中。"
       },
+      "trayIconColor": {
+        "label": "彩色系統匣圖示",
+        "description": "顯示彩色標誌，而非白色圖示。如果面板是淺色、白色圖示看不清楚，請開啟此選項。"
+      },
       "closeBehavior": {
         "label": "關閉視窗時結束程式",
         "description": "關閉此選項時，關閉視窗後 SpeakoFlow 會繼續在系統匣中執行，快捷鍵仍可使用。開啟時，關閉視窗會完全結束應用程式。"

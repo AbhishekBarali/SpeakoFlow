@@ -782,6 +782,18 @@ async changeShowTrayIconSetting(enabled: boolean) : Promise<Result<null, string>
 }
 },
 /**
+ * Linux only: draw the tray icon in colour instead of as a white glyph. The
+ * other platforms ignore the setting, so redrawing there changes nothing.
+ */
+async changeTrayIconColorSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_tray_icon_color_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Set what closing the main window does: minimize to the tray (default) or
  * fully quit the app. The `Quit` branch reuses the same `app.exit(0)` path as
  * the tray "Quit" item (see the `CloseRequested` handler in `lib.rs`). See
@@ -4040,7 +4052,14 @@ flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_sp
  * and the shortcut editor ignores the mouse. Only the SpeakoFlow Keys
  * engine can see mouse buttons at all.
  */
-mouse_button_shortcuts?: boolean; show_tray_icon?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
+mouse_button_shortcuts?: boolean; show_tray_icon?: boolean; 
+/**
+ * Linux only: draw the tray icon in colour instead of as a white glyph.
+ * For a light panel, where the white glyph cannot be seen; the app has no
+ * reliable way to find out what colour the panel is (see
+ * `tray::linux_tray_theme`).
+ */
+tray_icon_color?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
 /**
  * Master switch for the assistant experience: the floating panel window,
  * its two hotkeys, spoken replies, profiles and personal memory.

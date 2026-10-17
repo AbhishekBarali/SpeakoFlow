@@ -891,6 +891,10 @@
         "label": "Mostra icona nella barra di sistema",
         "description": "Tieni SpeakoFlow nella barra di sistema."
       },
+      "trayIconColor": {
+        "label": "Icona a colori nella barra di sistema",
+        "description": "Mostra il logo a colori invece dell'icona bianca. Attivalo se il pannello è chiaro e l'icona bianca si vede poco."
+      },
       "closeBehavior": {
         "label": "Esci quando chiudo la finestra",
         "description": "Se disattivata, chiudendo la finestra SpeakoFlow resta attivo nella barra di sistema e le tue scorciatoie continuano a funzionare. Se attivata, chiudendo la finestra l'app viene chiusa del tutto."
