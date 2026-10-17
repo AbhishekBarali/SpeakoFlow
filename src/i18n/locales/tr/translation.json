@@ -2802,6 +2802,14 @@
       "separate": "Kendi kısayolu",
       "dictation": "Dikteyle aynı"
     },
+    "skipShort": {
+      "title": "Kısa diktelerde temizlemeyi atla",
+      "info": "Arama ya da kısa bir yanıt gibi kısa dikteler, model beklenmeden söylediğiniz gibi yazılır. Daha uzun olanlar yine temizlenir.",
+      "limit": "Kısa sayılma sınırı",
+      "limitInfo": "Kelime olarak sayılır. Çince, Japonca ya da Tayca gibi boşluksuz yazılan dillerde kelime sayısı karakter sayısından tahmin edilir.",
+      "words_one": "kelimeden az",
+      "words_other": "kelimeden az"
+    },
     "shortcutRow": "Kısayol"
   },
   "dictionary": {

@@ -230,6 +230,31 @@ async changePostProcessOnDictationSetting(enabled: boolean) : Promise<Result<nul
 }
 },
 /**
+ * Paste a dictation shorter than the word threshold as spoken, without AI
+ * cleanup. Only cleanup that rides on the dictation shortcut is skipped.
+ */
+async changePostProcessSkipShortSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_skip_short_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How many words a dictation needs for cleanup to run while short ones are
+ * skipped. Clamped like the cleanup timeout, so an out-of-range value from a
+ * script still lands somewhere sensible.
+ */
+async changePostProcessMinWordsSetting(words: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_min_words_setting", { words }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Make an on-device model the AI-cleanup engine, keeping the prompt layer
  * coherent with it.
  * 
@@ -3800,7 +3825,21 @@ recording_retention_days?: number; paste_method?: PasteMethod; clipboard_handlin
  * Only matters while `post_process_enabled` is on; see
  * [`cleanup_on_dictation`] and [`cleanup_binding_active`].
  */
-post_process_on_dictation?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
+post_process_on_dictation?: boolean;
+/**
+ * Paste a dictation with fewer than `post_process_min_words` words as
+ * spoken, without AI cleanup. On by default: a search or a two-word reply
+ * rarely has anything to clean, and the wait for the model is the only
+ * delay left in it. Only cleanup that rides on the dictation shortcut is
+ * skipped: the dedicated cleanup shortcut always cleans. See
+ * `actions::skips_short_cleanup`.
+ */
+post_process_skip_short?: boolean;
+/**
+ * How many words a dictation needs for cleanup to run while
+ * `post_process_skip_short` is on.
+ */
+post_process_min_words?: number; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
 /**
  * User-created writing styles. Built-ins remain code-defined/localized and
  * are selected by their stable IDs.

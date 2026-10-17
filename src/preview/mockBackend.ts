@@ -544,6 +544,8 @@ const settings: Json = {
     : ["Abhishek Barali", "SpeakoFlow", "firecrawl", "Gintama", "Tauri"],
   post_process_enabled: true,
   post_process_on_dictation: params.get("cleanupShortcut") === "dictation",
+  post_process_skip_short: true,
+  post_process_min_words: 15,
   post_process_provider_id:
     params.get("cleanup") === "device" ? "builtin" : "bedrock_mantle",
   post_process_last_cloud_provider_id: "bedrock_mantle",
@@ -1628,6 +1630,14 @@ const handlers: Record<string, (args: Json) => unknown> = {
   },
   change_post_process_on_dictation_setting: ({ enabled }) => {
     settings.post_process_on_dictation = enabled;
+    return null;
+  },
+  change_post_process_skip_short_setting: ({ enabled }) => {
+    settings.post_process_skip_short = enabled;
+    return null;
+  },
+  change_post_process_min_words_setting: ({ words }) => {
+    settings.post_process_min_words = words;
     return null;
   },
   set_assistant_enabled: ({ enabled }) => {

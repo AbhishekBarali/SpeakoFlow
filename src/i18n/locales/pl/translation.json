@@ -2848,6 +2848,16 @@
       "separate": "Osobny skrót",
       "dictation": "Ten sam co dyktowanie"
     },
+    "skipShort": {
+      "title": "Pomijaj czyszczenie krótkich dyktowań",
+      "info": "Krótkie dyktowania, takie jak wyszukiwanie czy szybka odpowiedź, są wpisywane tak, jak je wypowiedziałeś, bez czekania na model. Dłuższe są nadal czyszczone.",
+      "limit": "Krótsze niż",
+      "limitInfo": "Liczone w słowach. W językach pisanych bez spacji, takich jak chiński, japoński czy tajski, liczba słów jest szacowana na podstawie liczby znaków.",
+      "words_one": "słowo",
+      "words_few": "słowa",
+      "words_many": "słów",
+      "words_other": "słowa"
+    },
     "shortcutRow": "Skrót"
   },
   "dictionary": {

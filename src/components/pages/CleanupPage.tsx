@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
 import { Page, PageHeader, SectionTitle } from "@/components/ui/Page";
 import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Callout } from "@/components/ui/Callout";
 import { Dialog } from "@/components/ui/Dialog";
 import { Segmented } from "@/components/ui/Segmented";
@@ -134,6 +135,97 @@ const CleanupKeysRow: React.FC = () => {
   );
 };
 
+/** Must match `MIN_POST_PROCESS_WORDS` / `MAX_POST_PROCESS_WORDS` in
+ *  `src-tauri/src/settings.rs`. */
+const MIN_WORDS = 2;
+const MAX_WORDS = 50;
+const DEFAULT_WORDS = 15;
+
+/**
+ * Skip cleanup for short dictations. A search or a quick reply rarely has
+ * anything to clean, and waiting on the model is the only delay left in it.
+ * Only offered while cleanup rides on the dictation shortcut: the separate
+ * cleanup shortcut is a request for cleanup, so it always cleans.
+ */
+const SkipShortRows: React.FC = () => {
+  const { t } = useTranslation();
+  const { getSetting, updateSetting, isUpdating } = useSettings();
+  const onDictation = getSetting("post_process_on_dictation") ?? false;
+  const skip = getSetting("post_process_skip_short") ?? true;
+  const stored = getSetting("post_process_min_words") ?? DEFAULT_WORDS;
+  const [draft, setDraft] = useState(String(stored));
+
+  useEffect(() => setDraft(String(stored)), [stored]);
+
+  if (!onDictation) return null;
+
+  const commit = () => {
+    const parsed = Number.parseInt(draft, 10);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(stored));
+      return;
+    }
+    const next = Math.min(MAX_WORDS, Math.max(MIN_WORDS, parsed));
+    setDraft(String(next));
+    if (next !== stored) void updateSetting("post_process_min_words", next);
+  };
+
+  // The unit follows the number being typed, so a language that inflects it
+  // ("2 слова", "5 слов") reads right before the value is saved.
+  const typed = Number.parseInt(draft, 10);
+  const count = Number.isFinite(typed) ? typed : stored;
+
+  return (
+    <>
+      <SettingContainer
+        title={t("cleanup.skipShort.title")}
+        description={t("cleanup.skipShort.info")}
+        grouped={true}
+      >
+        <Switch
+          checked={skip}
+          onChange={(value) =>
+            void updateSetting("post_process_skip_short", value)
+          }
+          disabled={isUpdating("post_process_skip_short")}
+          label={t("cleanup.skipShort.title")}
+        />
+      </SettingContainer>
+      {skip && (
+        <SettingContainer
+          title={t("cleanup.skipShort.limit")}
+          description={t("cleanup.skipShort.limitInfo")}
+          grouped={true}
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={String(MIN_WORDS)}
+              max={String(MAX_WORDS)}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={commit}
+              onKeyDown={(event) => {
+                // Enter saves, so a typed number needs no click elsewhere.
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }
+              }}
+              disabled={isUpdating("post_process_min_words")}
+              className="w-20"
+              aria-label={t("cleanup.skipShort.limit")}
+            />
+            <span className="text-sm text-ink">
+              {t("cleanup.skipShort.words", { count })}
+            </span>
+          </div>
+        </SettingContainer>
+      )}
+    </>
+  );
+};
+
 /**
  * AI cleanup: a switch, the shortcut that uses it (click the keys to change
  * them), the model, and the writing styles — all of them visible, with the one
@@ -188,6 +280,7 @@ export const CleanupPage: React.FC = () => {
       <SettingsGroup>
         <ShortcutModeRow />
         <CleanupKeysRow />
+        <SkipShortRows />
         <SettingContainer
           title={t("cleanup.model.title")}
           description={t("cleanup.model.info")}

@@ -2825,6 +2825,15 @@
       "separate": "Scorciatoia propria",
       "dictation": "Uguale alla dettatura"
     },
+    "skipShort": {
+      "title": "Salta la pulizia per le dettature brevi",
+      "info": "Le dettature brevi, come una ricerca o una risposta veloce, vengono scritte così come le hai dette, senza aspettare il modello. Quelle più lunghe vengono comunque ripulite.",
+      "limit": "Meno di",
+      "limitInfo": "Il conteggio è in parole. Per le lingue scritte senza spazi, come cinese, giapponese o thailandese, le parole sono stimate dal numero di caratteri.",
+      "words_one": "parola",
+      "words_many": "parole",
+      "words_other": "parole"
+    },
     "shortcutRow": "Scorciatoia"
   },
   "dictionary": {
