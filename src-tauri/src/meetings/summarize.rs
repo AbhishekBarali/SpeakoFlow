@@ -1609,6 +1609,12 @@ pub fn spawn_post_call_job(app: &AppHandle, meeting_id: i64) {
         }
 
         let Some(slot) = slot else {
+            // No notes job will mark this meeting complete, and the transcript
+            // is all the user asked for, so it is finished now. Left alone it
+            // read "Processing" until someone wrote notes by hand.
+            if let Err(e) = store.complete_meeting(meeting_id) {
+                warn!("Meeting {meeting_id} could not be marked complete: {e}");
+            }
             // The list's speaker counts come from the labels just written.
             let _ = app.emit(crate::commands::meetings::MEETINGS_UPDATED_EVENT, ());
             return;
