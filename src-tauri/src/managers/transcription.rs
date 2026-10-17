@@ -132,9 +132,26 @@ enum StreamCmd {
 /// the complete audio) rather than let the queue grow without bound.
 const MAX_QUEUED_FEED_FRAMES: usize = 1000;
 
+/// How long the end of a dictation waits for the live stream before asking it
+/// to stop. A stream that keeps up answers within about half a second even on a
+/// busy machine; one still working after this is behind, and on a GPU the whole
+/// recording is transcribed again in one pass faster than the backlog drains.
+const STREAM_FINALIZE_PATIENCE: Duration = Duration::from_secs(2);
+
+/// Silence fed to a buffered (chunked attention with right context) stream
+/// before it finalizes. That stream decodes its last chunk with no audio after
+/// it, and Parakeet Unified, trained to look about a second ahead, then drops
+/// the last word ("extra inform", "going"). 560 ms brought the word back on
+/// every cut-off recording tried, and changed nothing on the complete ones.
+const BUFFERED_STREAM_TAIL_PAD_SAMPLES: usize = 16_000 * 560 / 1000;
+
 pub struct StreamRouter {
     open: Arc<AtomicBool>,
     tx: Mutex<Option<mpsc::Sender<StreamCmd>>>,
+    /// Raised by [`TranscriptionManager::finalize_stream`] when the worker has
+    /// not answered within [`STREAM_FINALIZE_PATIENCE`]. Fresh for every
+    /// session, so a late raise can never reach the next recording's worker.
+    give_up: Mutex<Arc<AtomicBool>>,
     /// Monotonic stream session identity. Opening starts a fresh generation;
     /// finalize/cancel invalidates it immediately so queued old audio cannot
     /// affect a later recording's Flow prewarm watcher.
@@ -154,6 +171,7 @@ impl StreamRouter {
         Self {
             open: Arc::new(AtomicBool::new(false)),
             tx: Mutex::new(None),
+            give_up: Mutex::new(Arc::new(AtomicBool::new(false))),
             generation: AtomicU64::new(0),
             queued: AtomicUsize::new(0),
             dropped: AtomicU64::new(0),
@@ -227,26 +245,30 @@ impl StreamRouter {
     }
 
     /// Install a fresh FIFO command channel and mark the router open, returning
-    /// the receiver and generation token for the worker thread. Resets the
-    /// backlog/drop counters so each session starts clean.
-    fn open(&self) -> (mpsc::Receiver<StreamCmd>, u64) {
+    /// the receiver, generation token and give-up flag for the worker thread.
+    /// Resets the backlog/drop counters so each session starts clean.
+    fn open(&self) -> (mpsc::Receiver<StreamCmd>, u64, Arc<AtomicBool>) {
         let (tx, rx) = mpsc::channel();
         self.queued.store(0, Ordering::Relaxed);
         self.dropped.store(0, Ordering::Relaxed);
+        let give_up = Arc::new(AtomicBool::new(false));
+        *self.give_up.lock().unwrap() = give_up.clone();
         *self.tx.lock().unwrap() = Some(tx);
         let generation = self.generation.fetch_add(1, Ordering::AcqRel) + 1;
         self.open.store(true, Ordering::Release);
-        (rx, generation)
+        (rx, generation, give_up)
     }
 
     /// Stop accepting new frames and take the sender so the caller can push a
     /// terminal Finalize/Cancel through the same channel (after all buffered
-    /// frames have been enqueued). Invalidates the worker immediately so stale
-    /// queued transcript events cannot affect the next recording.
-    fn take(&self) -> Option<mpsc::Sender<StreamCmd>> {
+    /// frames have been enqueued), along with that session's give-up flag.
+    /// Invalidates the worker immediately so stale queued transcript events
+    /// cannot affect the next recording.
+    fn take(&self) -> Option<(mpsc::Sender<StreamCmd>, Arc<AtomicBool>)> {
         self.open.store(false, Ordering::Release);
         self.generation.fetch_add(1, Ordering::AcqRel);
-        self.tx.lock().unwrap().take()
+        let give_up = self.give_up.lock().unwrap().clone();
+        self.tx.lock().unwrap().take().map(|tx| (tx, give_up))
     }
 
     fn is_generation_current(&self, generation: u64) -> bool {
@@ -715,22 +737,34 @@ impl TranscriptionManager {
                         emit_loading_failed(&error_msg);
                         anyhow::anyhow!(error_msg)
                     })?;
-                let session = model.session().map_err(|e| {
-                    let error_msg = format!(
-                        "Failed to open transcribe.cpp session for {}: {}",
-                        model_id, e
-                    );
-                    emit_loading_failed(&error_msg);
-                    anyhow::anyhow!(error_msg)
-                })?;
+                let n_threads =
+                    transcribe_cpp_session_threads(&model.arch(), transcribe_cpp_on_gpu(&model));
+                let session = model
+                    .session_with(&transcribe_cpp::SessionOptions {
+                        n_threads,
+                        ..Default::default()
+                    })
+                    .map_err(|e| {
+                        let error_msg = format!(
+                            "Failed to open transcribe.cpp session for {}: {}",
+                            model_id, e
+                        );
+                        emit_loading_failed(&error_msg);
+                        anyhow::anyhow!(error_msg)
+                    })?;
                 // Log the resolved runtime backend so a silent CPU fallback (a
                 // requested GPU that wasn't available) is visible in the logs.
                 info!(
-                    "Loaded transcribe.cpp model {} (arch={}, variant={}, backend={})",
+                    "Loaded transcribe.cpp model {} (arch={}, variant={}, backend={}, cpu_threads={})",
                     model_id,
                     model.arch(),
                     model.variant(),
-                    model.backend()
+                    model.backend(),
+                    if n_threads == 0 {
+                        "all".to_string()
+                    } else {
+                        n_threads.to_string()
+                    }
                 );
                 // Post-load reconcile (Session 3): the loaded model's
                 // capabilities are ground truth — transcribe.cpp reads them from
@@ -1438,23 +1472,22 @@ impl TranscriptionManager {
             warn!("Live transcription stream already open; ignoring start_stream()");
             return;
         }
-        let (rx, stream_generation) = self.stream_router.open();
+        let (rx, stream_generation, give_up) = self.stream_router.open();
         let this = self.clone();
         thread::spawn(move || {
             // Cloud realtime streaming never touches the local engine, so it
             // gets its own worker rather than a branch inside the engine-leasing
             // one. Resolved here (on the worker thread) so a settings read never
-            // happens on the caller's path.
+            // happens on the caller's path. It ignores `give_up`: its finish is
+            // bounded by its own timeouts, not by a backlog.
             let settings = get_settings(&this.app_handle);
-            if settings.cloud_stt_streaming {
-                if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
-                    if crate::stt_cloud_stream::supports_streaming(&cfg) {
-                        this.run_cloud_stream_worker(rx, cfg, stream_generation);
-                        return;
-                    }
+            if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
+                if crate::stt_cloud::streams_live(&settings, &cfg) {
+                    this.run_cloud_stream_worker(rx, cfg, stream_generation);
+                    return;
                 }
             }
-            this.run_stream_worker(rx, stream_generation);
+            this.run_stream_worker(rx, stream_generation, give_up);
         });
     }
 
@@ -1560,7 +1593,18 @@ impl TranscriptionManager {
     ///   `finalize_stream()` routes to the batch `transcribe()` path.
     ///
     /// Always returns the leased engine to the mutex before replying.
-    fn run_stream_worker(&self, rx: mpsc::Receiver<StreamCmd>, stream_generation: u64) {
+    ///
+    /// `give_up` is raised when the dictation has ended and this worker is still
+    /// behind. Only the native path on a GPU honours it, by skipping the rest of
+    /// its backlog and answering `None`: there one batch pass over the whole
+    /// recording is cheap. Elsewhere starting over could cost more than
+    /// finishing, so the worker carries on.
+    fn run_stream_worker(
+        &self,
+        rx: mpsc::Receiver<StreamCmd>,
+        stream_generation: u64,
+        give_up: Arc<AtomicBool>,
+    ) {
         // Wait for any in-progress model load to finish (mirrors transcribe()).
         {
             let mut is_loading = self.is_loading.lock().unwrap();
@@ -1654,6 +1698,11 @@ impl TranscriptionManager {
                 // mutable stream borrow so no borrow conflict arises.
                 let caps = session.model().capabilities();
                 let arch = session.model().arch();
+                let may_give_up = transcribe_cpp_on_gpu(&session.model());
+                let pads_tail = session.model().accepts_ext(
+                    transcribe_cpp::ExtSlot::Stream,
+                    transcribe_cpp::sys::TRANSCRIBE_EXT_KIND_PARAKEET_BUFFERED_STREAM,
+                );
                 let run_opts = transcribe_cpp_run_plan(&settings, &caps, &arch);
                 // Live-display correction: whisper-family already biases its
                 // decoding via the initial prompt, so only non-whisper models
@@ -1686,6 +1735,11 @@ impl TranscriptionManager {
                             match cmd {
                                 StreamCmd::Feed(pcm) => {
                                     self.stream_router.note_feed_consumed();
+                                    if may_give_up && give_up.load(Ordering::Acquire) {
+                                        // The recording is being transcribed in
+                                        // one pass; the backlog would be wasted.
+                                        continue;
+                                    }
                                     acc.extend_from_slice(&pcm);
                                     while acc.len() >= FEED_SAMPLES {
                                         let chunk: Vec<f32> = acc.drain(..FEED_SAMPLES).collect();
@@ -1727,8 +1781,26 @@ impl TranscriptionManager {
                                     }
                                 }
                                 StreamCmd::Finalize(reply) => {
-                                    // Flush the sub-80 ms tail so the last words
-                                    // are included before finalizing.
+                                    if may_give_up && give_up.load(Ordering::Acquire) {
+                                        debug!(
+                                            "Live transcription: dropped the backlog; the \
+                                             recording is transcribed in one pass"
+                                        );
+                                        // `final_text` stays None, which sends the
+                                        // caller to the batch path.
+                                        stream.reset();
+                                        finalize_reply = Some(reply);
+                                        break;
+                                    }
+                                    if pads_tail {
+                                        acc.resize(
+                                            acc.len() + BUFFERED_STREAM_TAIL_PAD_SAMPLES,
+                                            0.0,
+                                        );
+                                    }
+                                    // Flush the sub-80 ms tail (and any pad) so
+                                    // the last words are included before
+                                    // finalizing.
                                     if !acc.is_empty() {
                                         let tail = std::mem::take(&mut acc);
                                         if let Err(e) = stream.feed(&tail) {
@@ -2031,8 +2103,8 @@ impl TranscriptionManager {
     /// timeout. Applies the SAME post-processing as batch (custom words for
     /// non-whisper models + the filler/hallucination filter).
     pub fn finalize_stream(&self) -> Result<Option<String>> {
-        let tx = match self.stream_router.take() {
-            Some(tx) => tx,
+        let (tx, give_up) = match self.stream_router.take() {
+            Some(taken) => taken,
             None => return Ok(None),
         };
         // How many frames the live path had to discard because inference
@@ -2049,20 +2121,39 @@ impl TranscriptionManager {
         drop(tx); // no further commands for this session
 
         // The worker answers Finalize only after it has worked through every frame
-        // queued ahead of it, and it keeps the model leased until then — so if it
-        // is behind, the batch fallback cannot run either: `transcribe()` finds no
-        // engine and the whole recording is lost. Giving up at the first deadline
-        // is therefore never better than waiting. The first dictation after launch
-        // is the usual way to get here (every frame queues while the model loads),
-        // and so is a slow CPU. A disconnect, by contrast, means the worker is gone
-        // and waiting is pointless.
-        let raw = match reply_rx.recv_timeout(Duration::from_secs(30)) {
+        // queued ahead of it, and it keeps the model leased until then, so the
+        // batch fallback cannot run while it is busy: `transcribe()` would find no
+        // engine and the whole recording would be lost. Simply giving up on it is
+        // therefore never an option. The first dictation after launch is one way
+        // to fall behind (every frame queues while the model loads), a busy
+        // machine is another: a full build in the background once held dictations
+        // here for 15 to 17 seconds.
+        //
+        // So past `STREAM_FINALIZE_PATIENCE` the worker is asked to stop instead.
+        // On a GPU it drops what is left, hands the engine back and answers None,
+        // and the recording is transcribed in one pass, which there takes well
+        // under a second where draining the backlog took many. A worker that
+        // cannot redo the recording cheaply ignores the request, and is waited
+        // for as before. A disconnect means the worker is gone and waiting is
+        // pointless.
+        let raw = match reply_rx.recv_timeout(STREAM_FINALIZE_PATIENCE) {
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                warn!(
-                    "Live transcription is still working through its backlog after 30s; \
-                     waiting for it rather than losing the recording"
+                give_up.store(true, Ordering::Release);
+                info!(
+                    "Live transcription is still behind {:?} after the recording ended; \
+                     asking it to stop so the recording can be transcribed in one pass",
+                    STREAM_FINALIZE_PATIENCE
                 );
-                reply_rx.recv_timeout(Duration::from_secs(120))
+                match reply_rx.recv_timeout(Duration::from_secs(30)) {
+                    Err(mpsc::RecvTimeoutError::Timeout) => {
+                        warn!(
+                            "Live transcription is still working through its backlog after \
+                             30s; waiting for it rather than losing the recording"
+                        );
+                        reply_rx.recv_timeout(Duration::from_secs(120))
+                    }
+                    other => other,
+                }
             }
             other => other,
         };
@@ -2156,7 +2247,7 @@ impl TranscriptionManager {
     /// Cancel any active live-transcription session, releasing the worker (which
     /// returns the leased engine). No-op when no stream is active.
     pub fn cancel_stream(&self) {
-        if let Some(tx) = self.stream_router.take() {
+        if let Some((tx, _)) = self.stream_router.take() {
             let _ = tx.send(StreamCmd::Cancel);
         }
     }
@@ -2212,6 +2303,41 @@ fn transcribe_cpp_backend_options(
     ModelOptions {
         backend,
         gpu_device,
+    }
+}
+
+/// Whether a loaded transcribe.cpp model computes on a GPU, dedicated or
+/// integrated, rather than having fallen back to the CPU.
+fn transcribe_cpp_on_gpu(model: &transcribe_cpp::Model) -> bool {
+    matches!(
+        model.device().map(|d| d.device_type),
+        Ok(transcribe_cpp::DeviceType::Gpu | transcribe_cpp::DeviceType::Igpu)
+    )
+}
+
+/// CPU threads for a transcribe.cpp session; 0 lets the library use every
+/// logical CPU.
+///
+/// The Parakeet family (Parakeet, Nemotron) decodes on the CPU even when its
+/// encoder runs on a GPU, one small step per frame and token, each spread
+/// across that many threads that wait for one another. On an idle machine that
+/// is harmless; with every core busy (a build, a game) each step waits for all
+/// of them to be scheduled, and dictations sat on "Transcribing…" for 15 to 17
+/// seconds. One thread measured the same as sixteen on an idle machine
+/// (Parakeet Unified streaming finished 64 ms after the audio against 105 ms),
+/// and under load turned a live stream that could not keep up into one at 0.2x
+/// real time, and a 37-second batch from 4–11 s into 0.4–0.6 s. Raising the
+/// thread priority instead made it worse, since the boosted thread then spins
+/// waiting for its own helpers.
+///
+/// Every other family, and any model on the CPU, keeps all threads: Canary
+/// decodes on the GPU and was slower with one thread under load, and a
+/// CPU-only encoder needs them all.
+fn transcribe_cpp_session_threads(arch: &str, on_gpu: bool) -> i32 {
+    if on_gpu && arch == "parakeet" {
+        1
+    } else {
+        0
     }
 }
 
@@ -3013,7 +3139,7 @@ mod tests {
 
         // Open a session and deliberately keep the receiver unread so the
         // "worker" never consumes — the worst case (a hung/overloaded engine).
-        let (_rx, generation) = router.open();
+        let (_rx, generation, _give_up) = router.open();
         assert!(router.is_open());
         assert!(router.is_generation_current(generation));
 
@@ -3054,6 +3180,35 @@ mod tests {
         let router2 = StreamRouter::new();
         router2.note_feed_consumed();
         assert_eq!(router2.queued.load(Ordering::Relaxed), 0);
+    }
+
+    /// Giving up on one recording's stream must never reach the next one's
+    /// worker: every session gets its own flag, and take() hands back the flag
+    /// of the session it closes.
+    #[test]
+    fn stream_give_up_belongs_to_one_session() {
+        let router = StreamRouter::new();
+        let (_rx, _, first) = router.open();
+        let (_tx, taken) = router.take().expect("an open session");
+        assert!(Arc::ptr_eq(&first, &taken));
+        taken.store(true, Ordering::Release);
+
+        let (_rx2, _, second) = router.open();
+        assert!(!second.load(Ordering::Acquire));
+        assert!(first.load(Ordering::Acquire));
+        assert!(router
+            .take()
+            .is_some_and(|(_, flag)| Arc::ptr_eq(&flag, &second)));
+    }
+
+    #[test]
+    fn only_the_parakeet_family_on_a_gpu_decodes_on_one_thread() {
+        assert_eq!(transcribe_cpp_session_threads("parakeet", true), 1);
+        // On the CPU the encoder needs every thread.
+        assert_eq!(transcribe_cpp_session_threads("parakeet", false), 0);
+        // These decode on the GPU, so the cap would only slow them down.
+        assert_eq!(transcribe_cpp_session_threads("canary", true), 0);
+        assert_eq!(transcribe_cpp_session_threads("whisper", true), 0);
     }
 
     /// Build a minimal `Capabilities` for run-plan tests.

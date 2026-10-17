@@ -58,7 +58,7 @@ function App() {
   const [skippedModels, setSkippedModels] = useState(false);
   const [shellNavigation, setShellNavigation] =
     useState<NavigationState>(INITIAL_NAVIGATION);
-  const { settings, updateSetting } = useSettings();
+  const { settings, updateSetting, refreshSettings } = useSettings();
   // A damaged or unreadable settings file, or saves that keep failing.
   useSettingsNotices();
   const direction = getLanguageDirection(i18n.language);
@@ -93,16 +93,25 @@ function App() {
   useEffect(() => {
     if (onboardingStep === "done" && !hasCompletedPostOnboardingInit.current) {
       hasCompletedPostOnboardingInit.current = true;
-      Promise.all([
-        commands.initializeEnigo(),
-        commands.initializeShortcuts(),
-      ]).catch((e) => {
-        console.warn("Failed to initialize:", e);
-      });
+      Promise.all([commands.initializeEnigo(), commands.initializeShortcuts()])
+        .catch((e) => {
+          console.warn("Failed to initialize:", e);
+        })
+        // Starting the shortcuts is also when the backend brings the stored
+        // settings up to date (`load_or_create_app_settings`): a shortcut an
+        // update added, a migrated default. They were read before that, so
+        // read them again, or the new shortcut has no keys on screen (the
+        // hands-free key's row was empty) until the next launch.
+        .finally(() => void refreshSettings());
       refreshAudioDevices();
       refreshOutputDevices();
     }
-  }, [onboardingStep, refreshAudioDevices, refreshOutputDevices]);
+  }, [
+    onboardingStep,
+    refreshAudioDevices,
+    refreshOutputDevices,
+    refreshSettings,
+  ]);
 
   // Handle keyboard shortcuts for debug mode toggle
   useEffect(() => {

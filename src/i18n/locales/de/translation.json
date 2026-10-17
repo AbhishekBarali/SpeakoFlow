@@ -641,12 +641,17 @@
           "assistant_call": {
             "name": "Gespräch starten",
             "description": "Sprich freihändig mit dem Assistenten und hör seine Antworten. Zum Beenden erneut drücken."
+          },
+          "hands_free": {
+            "name": "Freihändig",
+            "description": "Drücke sie, während du die Diktiertasten hältst, damit die Aufnahme nach dem Loslassen weiterläuft. Drücke die Diktiertasten erneut, um zu beenden."
           }
         },
         "errors": {
           "restore": "Das ursprüngliche Tastenkürzel konnte nicht wiederhergestellt werden.",
           "set": "Das Tastenkürzel konnte nicht festgelegt werden: {{error}}",
           "inUse": "„{{name}}“ verwendet bereits {{keys}}. Andere Tasten wählen oder zuerst jenes Tastenkürzel ändern.",
+          "sameAsOther": "{{keys}} ist für dieses Tastenkürzel bereits eingestellt.",
           "reset": "Tastenkürzel konnte nicht zurückgesetzt werden."
         },
         "clickToChange": "Zum Ändern klicken",
@@ -661,10 +666,24 @@
         "auto": "Automatisch"
       },
       "pushToTalk": {
-        "label": "Aufnahmeverhalten",
-        "description": "Halten: Die Aufnahme läuft, solange du ein Aufnahme-Tastenkürzel gedrückt hältst. Antippen: Ein Druck startet, der nächste stoppt. Gilt für alle Aufnahme-Tastenkürzel.",
-        "hold": "Halten",
-        "tap": "Antippen"
+        "dictation": "An: Die Aufnahme läuft, solange du die Tasten hältst. Aus: Ein Druck startet, der nächste stoppt, also ist jedes Diktat freihändig.",
+        "assistant": "An: Hört zu, solange du die Tasten hältst. Aus: Ein Druck startet, der nächste sendet.",
+        "dictationLabel": "Zum Sprechen halten",
+        "assistantLabel": "Zum Fragen halten"
+      },
+      "handsFree": {
+        "unavailableKeys": "Geht, wenn Diktieren nur aus Sondertasten besteht, etwa Ctrl + Win. Schalte mit {{keys}} stattdessen „Zum Sprechen halten“ aus: Dann läuft jedes Diktat weiter, bis du die Tasten erneut drückst.",
+        "unavailableEngine": "Braucht die Tastatur-Engine SpeakoFlow Keys ({{where}}). Oder schalte „Zum Sprechen halten“ aus: Dann läuft jedes Diktat weiter, bis du die Tasten erneut drückst.",
+        "taken": "{{name}} nutzt bereits {{keys}}, daher bewirkt diese Taste nichts, bis sich eins von beiden ändert.",
+        "needsKey": "Wähle eine Taste, etwa Leertaste oder Eingabe. Eine Sondertaste allein kann nicht die Freihändig-Taste sein.",
+        "pressKey": "Taste drücken…",
+        "descriptionOff": "Aus. Klicke darauf und drück eine Taste, etwa die Leertaste, um es wieder einzuschalten.",
+        "linux": "Unter Linux schalte stattdessen „Zum Sprechen halten“ aus: Dann läuft jedes Diktat weiter, bis du die Tasten erneut drückst.",
+        "whileDictating": "Beim Diktieren drücken"
+      },
+      "silenceStop": {
+        "label": "Nach Stille beenden",
+        "description": "Ein freihändiges Diktat, in dem so lange keine Sprache zu hören ist, endet von selbst und wird eingefügt, als hättest du das Tastenkürzel erneut gedrückt. Kurz vorher läuft eine Linie auf der Pille ab; sprichst du weiter, läuft die Aufnahme weiter."
       }
     },
     "models": {
@@ -824,6 +843,13 @@
         "label": "Mikrofon zwischen Transkriptionen offen halten",
         "description": "Schnelleres Diktieren in Folge. Kann die Bluetooth-Audioqualität beeinträchtigen."
       },
+      "mouseButtonShortcuts": {
+        "label": "Maustasten als Tastenkürzel",
+        "description": "Nutze die mittlere Maustaste oder die Tasten Zurück und Vor als Tastenkürzel: Klicke auf die Tasten eines Kürzels und drücke dann die Maustaste. Solange sie ein Kürzel ist, tut die Taste sonst nichts.",
+        "linux": "Unter Linux funktioniert nur die mittlere Maustaste.",
+        "needsEngine": "Erfordert die Tastatur-Implementierung SpeakoFlow Keys.",
+        "reset": "Tastenkürzel mit einer Maustaste verwenden wieder ihre Standardtasten."
+      },
       "liveTranscription": {
         "label": "Live-Transkription",
         "description": "Sprache schon beim Sprechen transkribieren, statt erst alles auf einmal beim Stoppen. Experimentell."
@@ -858,6 +884,10 @@
       "showTrayIcon": {
         "label": "Taskleistensymbol anzeigen",
         "description": "SpeakoFlow in der Taskleiste behalten."
+      },
+      "trayIconColor": {
+        "label": "Farbiges Taskleistensymbol",
+        "description": "Zeigt das farbige Logo statt des weißen Symbols. Schalte das ein, wenn deine Leiste hell ist und das weiße Symbol schlecht zu sehen ist."
       },
       "closeBehavior": {
         "label": "Beenden, wenn ich das Fenster schließe",
@@ -1186,6 +1216,24 @@
           "azureDescription": "Der Endpunkt deiner Azure-Ressource, zu finden unter „Schlüssel und Endpunkt“ im Azure-Portal. MAI-Transcribe braucht eine Ressource in Central India, Southeast Asia, East US, West US, West US 2 oder North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS-Zugriffsschlüssel",
+            "missing": "Noch kein Schlüssel gespeichert. Verwende einen Zugriffsschlüssel für einen IAM-Benutzer oder eine IAM-Rolle mit der Berechtigung transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Zugriffsschlüssel-ID",
+            "secret": "Geheimer Zugriffsschlüssel",
+            "sessionToken": "Sitzungstoken (nur bei temporären Anmeldedaten)",
+            "invalid": "Das sieht nicht nach einem AWS-Schlüssel aus. Die Zugriffsschlüssel-ID besteht aus Buchstaben und Ziffern, und kein Feld darf Leerzeichen oder Doppelpunkte enthalten.",
+            "permission": "Benötigte Berechtigung"
+          },
+          "region": {
+            "title": "AWS-Region",
+            "description": "Wo Amazon Transcribe läuft. Die Region, die dir am nächsten liegt, antwortet am schnellsten."
+          },
+          "streaming": "Immer an: Amazon Transcribe transkribiert nur live. Bricht die Verbindung während der Aufnahme ab, wird die Aufnahme in Sprechgeschwindigkeit erneut gesendet – das Fertigstellen dauert dann so lange wie die Aufnahme selbst.",
+          "language": "Amazon Transcribe muss die Sprache kennen. „Automatisch“ wählt zwischen Englisch, deiner App-Sprache und einigen weiteren verbreiteten Sprachen – wähle deine Sprache aus, wenn du etwas anderes sprichst.",
+          "unsupportedLanguage": "Amazon Transcribe kann diese Sprache in {{region}} nicht live transkribieren. Wähle eine andere Sprache oder Region. Bis dahin nutzt das Diktieren Amazon Transcribe nicht."
+        },
         "model": {
           "title": "Modell",
           "info": "Gib ein beliebiges Modell des Anbieters ein oder lade die Liste. Bei ElevenLabs wählst du scribe_v2_realtime für die Transkription beim Sprechen und scribe_v2 für die Transkription nach dem Stoppen.",
@@ -1198,7 +1246,8 @@
         },
         "keyterms": {
           "label": "Meine benutzerdefinierten Wörter senden",
-          "description": "Übergibt deinen eigenen Wortschatz an den Anbieter, damit er diese Schreibweisen bevorzugt."
+          "description": "Übergibt deinen eigenen Wortschatz an den Anbieter, damit er diese Schreibweisen bevorzugt.",
+          "unsupported": "{{provider}} kann keine Wortliste entgegennehmen, deshalb werden deine eigenen Wörter stattdessen auf diesem Computer korrigiert."
         },
         "noVerbatim": {
           "label": "Füllwörter entfernen",
@@ -1396,7 +1445,20 @@
       },
       "appendTrailingSpace": {
         "label": "Leerzeichen anhängen",
-        "description": ""
+        "description": "Fügt nach jedem Diktat ein Leerzeichen ein. Mit intelligenten Leerzeichen gilt das nur, wo ein Feld nicht gelesen werden kann."
+      },
+      "smartSpacing": {
+        "label": "Intelligente Leerzeichen",
+        "description": "Passt jedes Diktat an den Text an, der schon im Feld steht, sodass man anhalten und weiterdiktieren kann, ohne dass Wörter zusammenkleben.",
+        "info": "Vor dem Einfügen prüft SpeakoFlow die wenigen Zeichen um den Cursor und fügt nur dort ein Leerzeichen ein, wo eines nötig ist. Wenn eine App ihren Text verbirgt, nutzt es stattdessen sein eigenes letztes Diktat. Nichts wird gespeichert oder irgendwohin gesendet. Unter macOS wird dafür die Bedienungshilfen-Berechtigung genutzt, die SpeakoFlow bereits hat. Unter Linux geben Chrome-, Electron- und Qt-Apps ihren Text nur frei, wenn die Barrierefreiheit der Desktopumgebung eingeschaltet ist."
+      },
+      "smartSpacingFixCase": {
+        "label": "Großschreibung anpassen",
+        "description": "Beginnt ein Diktat klein, wenn es einen Satz fortsetzt. Namen und Abkürzungen behalten ihre Großbuchstaben, deutscher Text bleibt unverändert."
+      },
+      "smartSpacingJoin": {
+        "label": "Unterbrochene Sätze verbinden",
+        "description": "Entfernt den Punkt, den SpeakoFlow gesetzt hat, als mitten im Satz angehalten wurde, etwa bei „Ich ging zu dem.“"
       },
       "keyboardImplementation": {
         "title": "Tastatur-Implementierung",
@@ -1954,9 +2016,19 @@
       "hide": "Schwebende Anzeige ausblenden",
       "show": "Schwebende Anzeige einblenden"
     },
+    "notesPrefs": {
+      "autoTitle": "Notizen schreiben, wenn ein Anruf endet",
+      "autoDescription": "Schalte das aus, wenn du nur das Transkript brauchst. Notizen für ein einzelnes Meeting kannst du trotzdem über sein Transkript schreiben.",
+      "languageTitle": "Sprache der Notizen",
+      "languageDescription": "Standardmäßig sind die Notizen in der Sprache, in der das Meeting stattfand. Wähle eine Sprache, um sie immer in dieser zu bekommen.",
+      "auto": "Wie im Meeting",
+      "autoHint": "Die Sprache, in der das Meeting größtenteils war"
+    },
     "pill": {
       "expand": "Live-Transkript öffnen",
       "collapse": "Zurück zur kleinen Pille",
+      "copy": "Transkript kopieren",
+      "copied": "Transkript kopiert",
       "stop": "Aufnahme stoppen",
       "listening": "Hört zu. Was gesagt wird, erscheint hier.",
       "micOnly": "Nur dein Mikrofon wird aufgenommen – nichts, was die anderen Teilnehmenden sagen, landet in diesem Transkript."
@@ -2034,6 +2106,7 @@
       "empty": "Dieses Meeting hat kein Transkript.",
       "loadingMore": "Weitere Teile des Transkripts werden geladen…",
       "renameSpeaker": "Diesen Sprecher umbenennen",
+      "copyTitle": "Das ganze Transkript mit Sprechernamen kopieren",
       "lowConfidence": "Unsicher",
       "lowConfidenceHelp": "Diese Sprecherzuordnung ist eine Vermutung. Die Worte sind so transkribiert, wie sie gesagt wurden; unsicher ist nur, wer sie gesagt hat."
     },
@@ -2058,6 +2131,7 @@
     },
     "summary": {
       "template": "Vorlage",
+      "languageAuto": "Sprache des Meetings",
       "templates": {
         "general": "Allgemein",
         "standup": "Stand-up",
@@ -2199,6 +2273,7 @@
     "copied": "Kopiert",
     "copyFailed": "Kopieren fehlgeschlagen – versuche es erneut",
     "done": "Fertig",
+    "finish": "Abschließen",
     "askAssistant": "Den Assistenten fragen, statt das zu tippen",
     "recovery": {
       "dismissed": "Verworfen",
@@ -2210,7 +2285,10 @@
       "title": "Sprachmodell wird heruntergeladen…",
       "percent": "Sprachmodell wird heruntergeladen · {{percent}} %",
       "hint": "Das Diktieren funktioniert, sobald es fertig ist"
-    }
+    },
+    "handsFreeHint": "{{key}} drücken für freihändig",
+    "lockedKeys": "Freihändige Aufnahme. Drücke {{keys}} zum Beenden",
+    "finishKeys": "Abschließen ({{keys}})"
   },
   "reminders": {
     "title": "Erinnerung",
@@ -2501,10 +2579,7 @@
       "dictation": "Diktat",
       "assistant": "Assistent",
       "cleanupOff": "Schalte die KI-Bereinigung ein, um dieses Tastenkürzel zu nutzen.",
-      "cleanupOnDictation": "Dein Diktat-Tastenkürzel bereinigt jedes Diktat, daher wird dieses nicht gebraucht.",
-      "openCleanup": "KI-Bereinigung öffnen",
-      "assistantOff": "Der Assistent ist ausgeschaltet, daher bewirken seine Tastenkürzel nichts.",
-      "openAssistant": "Assistent öffnen"
+      "assistantOff": "Der Assistent ist ausgeschaltet, daher bewirken seine Tastenkürzel nichts."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2586,6 +2661,10 @@
         "whatHold": "Halten, sprechen, loslassen. Deine Worte erscheinen dort, wo dein Cursor ist.",
         "whatTap": "Antippen, sprechen, erneut antippen. Deine Worte erscheinen dort, wo dein Cursor ist."
       },
+      "handsFree": {
+        "what": "Halte {{keys}}, drücke {{key}} und lass los: Es hört weiter zu, bis du {{keys}} erneut drückst.",
+        "linux": "Für freihändiges Diktieren unter Linux schalte „Zum Sprechen halten“ aus. Dann startet ein Druck und der nächste stoppt."
+      },
       "cleanup": {
         "title": "Diktieren und bereinigen",
         "description": "Wie „Diktieren“, danach korrigiert die KI Zeichensetzung, Füllwörter und Stil.",
@@ -2594,7 +2673,8 @@
       "ask": {
         "title": "Assistenten fragen",
         "description": "Stell eine Frage laut und erhalte die Antwort in einem schwebenden Panel.",
-        "what": "Frag laut. Die Antwort erscheint in einem schwebenden Panel."
+        "whatHold": "Halten, fragen, loslassen. Die Antwort erscheint in einem schwebenden Panel.",
+        "whatTap": "Antippen, fragen, erneut antippen. Die Antwort erscheint in einem schwebenden Panel."
       },
       "call": {
         "title": "Gespräch starten",
@@ -2603,10 +2683,6 @@
       },
       "info": "Drück sie in einer beliebigen App. Klicke auf die Tasten, um sie zu ändern.",
       "offHint": "Ausgeschaltet",
-      "mode": {
-        "hold": "Zum Sprechen halten",
-        "tap": "Antippen zum Umschalten"
-      },
       "cancel": {
         "title": "Abbrechen",
         "what": "Beendet eine Aufnahme oder eine Antwort, die vorgelesen wird."
@@ -2801,6 +2877,14 @@
       "info": "Gib der Bereinigung ein eigenes Tastenkürzel, oder lass dein Diktier-Tastenkürzel jedes Diktat bereinigen, damit du dir nur eine Tastenkombination merken musst.",
       "separate": "Eigenes Tastenkürzel",
       "dictation": "Wie beim Diktat"
+    },
+    "skipShort": {
+      "title": "Kurze Diktate nicht bereinigen",
+      "info": "Kurze Diktate wie eine Suche oder eine schnelle Antwort werden so geschrieben, wie du sie gesagt hast, ohne auf das Modell zu warten. Längere werden weiterhin bereinigt.",
+      "limit": "Kürzer als",
+      "limitInfo": "Gezählt wird in Wörtern. Bei Sprachen, die ohne Leerzeichen geschrieben werden, wie Chinesisch, Japanisch oder Thai, wird die Wortzahl aus der Zeichenzahl geschätzt.",
+      "words_one": "Wort",
+      "words_other": "Wörter"
     },
     "shortcutRow": "Tastenkürzel"
   },
@@ -3184,7 +3268,19 @@
     "useDefault": "Standard verwenden",
     "turnOff": "Ausschalten",
     "turnedOff": "Tastenkürzel für {{name}} ausgeschaltet",
-    "undo": "Rückgängig"
+    "undo": "Rückgängig",
+    "addAnother": "Weitere hinzufügen",
+    "addAnotherHint": "Diesem Tastenkürzel eine zweite Tastenkombination geben, etwa eine Maustaste",
+    "remove": "Entfernen",
+    "or": "oder",
+    "changeOther": "Weitere Tasten für {{name}} ändern",
+    "pressKeysOrButton": "Tasten oder eine Maustaste drücken…",
+    "mouseNeedsKeysEngine": "Maustasten brauchen die Tastatur-Implementierung SpeakoFlow Keys (Einstellungen → Erweitert → Experimentell).",
+    "mouse": {
+      "middle": "Mittlere Maustaste",
+      "back": "Maustaste Zurück",
+      "forward": "Maustaste Vor"
+    }
   },
   "memoryManager": {
     "status": {

@@ -146,6 +146,16 @@ pub enum Key {
     MouseX2,
 }
 
+impl Key {
+    /// Whether this is a mouse button rather than a key on the keyboard.
+    pub fn is_mouse_button(self) -> bool {
+        matches!(
+            self,
+            Key::MouseLeft | Key::MouseRight | Key::MouseMiddle | Key::MouseX1 | Key::MouseX2
+        )
+    }
+}
+
 impl fmt::Display for Key {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -509,5 +519,27 @@ mod tests {
             let parsed: Key = displayed.parse().unwrap();
             assert_eq!(parsed, key, "Roundtrip failed for {:?}", key);
         }
+    }
+
+    /// The host stores a recorded mouse button by its lower-cased name
+    /// (`mousex1`), so that name has to parse back to the same button.
+    #[test]
+    fn mouse_buttons_roundtrip_and_are_told_apart_from_keys() {
+        for key in [
+            Key::MouseLeft,
+            Key::MouseRight,
+            Key::MouseMiddle,
+            Key::MouseX1,
+            Key::MouseX2,
+        ] {
+            assert!(key.is_mouse_button(), "{key:?}");
+            let stored = key.to_string().to_lowercase();
+            assert_eq!(stored.parse::<Key>().unwrap(), key);
+        }
+        for key in [Key::A, Key::Space, Key::Escape, Key::F13] {
+            assert!(!key.is_mouse_button(), "{key:?}");
+        }
+        assert_eq!("back".parse::<Key>().unwrap(), Key::MouseX1);
+        assert_eq!("mouse5".parse::<Key>().unwrap(), Key::MouseX2);
     }
 }

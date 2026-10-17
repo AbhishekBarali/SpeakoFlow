@@ -60,8 +60,14 @@ impl OfferKind {
 /// What a dictation needs to be finished the way it would have been.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DictationContext {
-    /// AI cleanup runs on it.
+    /// AI cleanup was asked for, by its own shortcut or by the dictation
+    /// shortcut it rides on. A short dictation may still skip it; see
+    /// `explicit_cleanup`.
     pub post_process: bool,
+    /// The dedicated "dictate and clean up" shortcut asked for that cleanup,
+    /// so it runs however short the dictation is. Only cleanup that rides on
+    /// the dictation shortcut skips a short one (`post_process_skip_short`).
+    pub explicit_cleanup: bool,
     /// It came from the dictation shortcut, so "Hey Flow" applies.
     pub flow_eligible: bool,
 }
@@ -285,6 +291,7 @@ mod tests {
             remaining: Remaining::Deliver("hello".to_string()),
             context: DictationContext {
                 post_process: false,
+                explicit_cleanup: false,
                 flow_eligible: true,
             },
             row,

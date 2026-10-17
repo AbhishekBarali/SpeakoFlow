@@ -12,7 +12,7 @@
 說話，它就替你打字，任何應用程式都行。提問，它就回答。開啟對話，和它把問題聊清楚。<br />
 它也能幫你整理會議紀錄。免費、開源，預設在本機執行。
 
-[![Latest release](https://img.shields.io/badge/release-v2.0.1-0A7A70)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
+[![Latest release](https://img.shields.io/badge/release-v2.1.0-0A7A70)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-informational)](#安裝)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
@@ -86,12 +86,12 @@ SpeakoFlow 內建繁體中文與簡體中文介面，也支援中文語音轉文
 
 ### 語音輸入
 
-按住按鍵，說話，放開。文字會出現在游標所在的位置，錄音浮層也能在你說話時即時顯示文字。轉錄透過本機模型在顯示卡或處理器上完成：英語預設使用 Parakeet，Nemotron 支援 28 種語言並能自動偵測，Whisper 支援 99 種語言，模型目錄中共有 65 個語音模型。如果你偏好雲端，ElevenLabs 與 Deepgram 可以邊說邊出字，OpenAI、Groq、Mistral、Azure AI Speech 與 OpenRouter 也都能使用。
+按住按鍵，說話，放開。文字會出現在游標所在的位置，錄音浮層也能在你說話時即時顯示文字。轉錄透過本機模型在顯示卡或處理器上完成：英語預設使用 Parakeet，Nemotron 支援 28 種語言並能自動偵測，Whisper 支援 99 種語言，模型目錄中共有 65 個語音模型。如果你偏好雲端，ElevenLabs、Deepgram 與 Amazon Transcribe 可以邊說邊出字，OpenAI、Groq、Mistral、Azure AI Speech 與 OpenRouter 也都能使用。
 
 - **復原。** 不小心取消了錄音？浮層會在幾秒內提供「復原」，歷史紀錄也會保留這段錄音，之後仍可復原。轉錄失敗時則會提供「重試」。
 - **照你的方式拼寫。** 把人名與專業術語加入字典，或設定文字取代規則。在 Windows 上，它也能學習你修正過的字詞。
 - **翻譯成英文。** Whisper、Canary、Granite Speech 與 Voxtral 模型，以及雲端的 OpenAI 或 Groq，可以把其他語言的語音直接轉成英文文字。
-- **按住或按一下。** 可以按住按鍵說話，也可以切換成按一下模式：按一次開始，再按一次停止。
+- **按住、點按或免持。** 可以按住按鍵說話，也可以切換成點按：按一次開始，再按一次停止；語音輸入和助理各自設定。按住語音輸入時想說久一點？再按一下空白鍵，放開後繼續說。
 
 ### 提問
 
@@ -167,16 +167,21 @@ AI 整理預設關閉。啟用後，它可以有自己的快速鍵（語音輸�
 | 操作                        | Windows                        | macOS           | Linux                  |
 | --------------------------- | ------------------------------ | --------------- | ---------------------- |
 | 語音輸入                    | `Left Ctrl + Left Win`         | `Fn` (🌐)       | `Ctrl + Space`         |
+| 免持語音輸入 <sup>1</sup>   | `Left Ctrl + Left Win + Space` | `Fn + Space`    | 輕按 <sup>2</sup>      |
 | 詢問助理                    | `Left Ctrl + Left Alt`         | `Fn + Ctrl`     | `Ctrl + Alt + Space`   |
 | 開始或結束對話              | `Left Ctrl + Left Alt + C`     | `Fn + Ctrl + C` | `Ctrl + Alt + C`       |
-| 語音輸入並整理 <sup>1</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`    | `Ctrl + Shift + Space` |
+| 語音輸入並整理 <sup>3</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`    | `Ctrl + Shift + Space` |
 | 取消                        | `Esc`                          | `Esc`           | 尚未支援               |
 
-<sup>1</sup> 僅在 AI 整理已啟用並設有專屬快速鍵時可用。
+<sup>1</sup> 按住語音輸入的按鍵時再按空白鍵，或三個鍵一起按。放開後會持續聆聽，直到你再次按下語音輸入的按鍵。最初幾次按住語音輸入的按鍵時，小藥丸會顯示空白鍵作為提示。可在「設定 → 快捷鍵」的「免持」中換成別的鍵，或將其關閉。
 
-各平台的規則相同：語音輸入的按鍵加上 Shift 就是語音輸入並整理，提問的按鍵加上 C 就是開始對話。錄音快速鍵預設需要按住使用；在首頁把「按住說話」切換成「按一下切換」後，按一次開始，再按一次停止。
+<sup>2</sup> `Ctrl + Space` 本身已包含空白鍵，請為語音輸入關閉「按住說話」，這樣每次語音輸入都是免持的。
 
-Esc 只在有工作進行時（例如正在錄音，或正在朗讀回答）才會取消，其他時候其他應用程式仍可照常使用 Esc。若要更改快速鍵，點選它的按鍵即可。取消與對話這兩組快速鍵也可以在那裡關閉。
+<sup>3</sup> 僅在 AI 整理已啟用並設有專屬快速鍵時可用。
+
+各平台的規則相同：語音輸入的按鍵加上 Shift 就是語音輸入並整理，提問的按鍵加上 C 就是開始對話。錄音快速鍵預設需要按住使用。語音輸入和助理在「設定 → 快捷鍵」中各有自己的「按住說話」開關（首頁上點「管理」即可開啟）：關閉後，按一下開始，再按一下停止。放開按鍵後仍在聆聽的語音輸入就是免持狀態：小藥丸會出現一圈外框，滑鼠停在上面時會顯示 ✕（取消）和 ✓（完成）。
+
+Esc 只在有工作進行時（例如正在錄音，或正在朗讀回答）才會取消，其他時候其他應用程式仍可照常使用 Esc。若要更改快速鍵，點選它的按鍵即可。取消、對話快速鍵和免持按鍵也可以在那裡關閉。
 
 在 Mac 上，請把「系統設定 → 鍵盤 → 按下 🌐 鍵來」設為「不執行任何動作」，否則按下地球鍵時還會開啟表情符號選擇器。原本使用舊版 Option + Space 預設快速鍵的 Mac，更新後會保留原來的設定。
 
@@ -188,7 +193,7 @@ Esc 只在有工作進行時（例如正在錄音，或正在朗讀回答）才�
 
 | 工作             | 在你的電腦上                                                                                                                                   | 在雲端（使用你的金鑰）                                                                                                                                                                         |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 語音轉文字       | Parakeet、Nemotron、Canary、Cohere Transcribe、Whisper、Moonshine、Voxtral、Qwen3-ASR、GigaAM、Granite Speech、SenseVoice 等（目錄中共 65 個） | ElevenLabs、Deepgram、OpenAI、Groq、Mistral (Voxtral)、Azure AI Speech、OpenRouter，或任何 OpenAI 相容伺服器                                                                                   |
+| 語音轉文字       | Parakeet、Nemotron、Canary、Cohere Transcribe、Whisper、Moonshine、Voxtral、Qwen3-ASR、GigaAM、Granite Speech、SenseVoice 等（目錄中共 65 個） | ElevenLabs、Deepgram、OpenAI、Groq、Mistral (Voxtral)、Azure AI Speech、Amazon Transcribe、OpenRouter，或任何 OpenAI 相容伺服器                                                                |
 | 助理與整理       | 內建引擎（llama.cpp，完全離線）、Ollama、LM Studio、用於整理的 SpeakoFlow Mini、Apple 晶片上用於整理的 Apple Intelligence                      | OpenAI、Anthropic、Google Gemini、Azure OpenAI、AWS Bedrock、OpenRouter、Groq、Cerebras、xAI、DeepSeek、Mistral、Moonshot、Together AI、Fireworks AI、Perplexity、Z.AI，或任何 OpenAI 相容端點 |
 | 語音回答         | Kokoro、Kitten、Pocket TTS、Supertonic                                                                                                         | OpenAI、ElevenLabs、OpenRouter、Deepgram、Cartesia、Google Cloud、Azure AI Speech、Groq、xAI、Mistral、Inworld，或你自己的伺服器                                                               |
 | 網路搜尋（選用） |                                                                                                                                                | Serper、Brave、Tavily、Exa、SerpAPI、TinyFish                                                                                                                                                  |

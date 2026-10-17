@@ -645,12 +645,17 @@
           "assistant_call": {
             "name": "Rozpocznij rozmowę",
             "description": "Rozmawiaj z asystentem bez użycia rąk i słuchaj jego odpowiedzi. Naciśnij ponownie, aby zakończyć."
+          },
+          "hands_free": {
+            "name": "Bez trzymania",
+            "description": "Naciśnij go, trzymając klawisze dyktowania, a nagrywanie będzie trwać po ich puszczeniu. Naciśnij klawisze dyktowania ponownie, aby zakończyć."
           }
         },
         "errors": {
           "restore": "Nie udało się przywrócić oryginalnego skrótu.",
           "set": "Nie udało się ustawić skrótu: {{error}}",
           "inUse": "„{{name}}” już używa {{keys}}. Wybierz inne klawisze albo najpierw zmień tamten skrót.",
+          "sameAsOther": "{{keys}} jest już ustawione dla tego skrótu.",
           "reset": "Nie udało się zresetować skrótu."
         },
         "clickToChange": "Kliknij, aby zmienić",
@@ -665,10 +670,24 @@
         "auto": "Automatycznie"
       },
       "pushToTalk": {
-        "label": "Sposób nagrywania",
-        "description": "Przytrzymanie: nagrywanie trwa, dopóki trzymasz skrót nagrywania. Naciśnięcie: jedno naciśnięcie zaczyna, następne kończy. Dotyczy wszystkich skrótów nagrywania.",
-        "hold": "Przytrzymanie",
-        "tap": "Naciśnięcie"
+        "dictation": "Włączone: nagrywanie trwa, dopóki trzymasz klawisze. Wyłączone: jedno naciśnięcie zaczyna, następne kończy, więc każde dyktowanie jest bez trzymania.",
+        "assistant": "Włączone: słucha, dopóki trzymasz klawisze. Wyłączone: jedno naciśnięcie zaczyna, następne wysyła.",
+        "dictationLabel": "Przytrzymaj, aby mówić",
+        "assistantLabel": "Przytrzymaj, aby zapytać"
+      },
+      "handsFree": {
+        "unavailableKeys": "Działa, gdy dyktowanie składa się tylko z klawiszy modyfikujących, np. Ctrl + Win. Przy {{keys}} wyłącz zamiast tego „Przytrzymaj, aby mówić”: każde dyktowanie trwa wtedy, dopóki ponownie nie naciśniesz klawiszy.",
+        "unavailableEngine": "Wymaga silnika klawiatury SpeakoFlow Keys ({{where}}). Albo wyłącz „Przytrzymaj, aby mówić”: każde dyktowanie trwa wtedy, dopóki ponownie nie naciśniesz klawiszy.",
+        "taken": "{{name}} już używa {{keys}}, więc ten klawisz nic nie robi, dopóki jedno z nich się nie zmieni.",
+        "needsKey": "Wybierz jeden klawisz, na przykład spację lub Enter. Sam klawisz modyfikujący nie może być klawiszem trybu bez trzymania.",
+        "pressKey": "Naciśnij klawisz…",
+        "descriptionOff": "Wyłączone. Kliknij i naciśnij klawisz, np. spację, aby włączyć ponownie.",
+        "linux": "W Linuksie wyłącz zamiast tego „Przytrzymaj, aby mówić”: każde dyktowanie trwa wtedy, dopóki ponownie nie naciśniesz klawiszy.",
+        "whileDictating": "Podczas dyktowania naciśnij"
+      },
+      "silenceStop": {
+        "label": "Zatrzymaj po ciszy",
+        "description": "Dyktowanie bez trzymania, w którym przez tyle czasu nie słychać mowy, samo się zatrzymuje i wkleja tekst, jakby skrót został naciśnięty ponownie. Tuż przed zatrzymaniem kreska na pigułce się skraca; gdy znów zaczniesz mówić, nagrywanie trwa dalej."
       }
     },
     "models": {
@@ -836,6 +855,13 @@
         "label": "Nie zamykaj mikrofonu między transkrypcjami",
         "description": "Szybsze dyktowanie jedno po drugim. Może wpłynąć na jakość dźwięku Bluetooth."
       },
+      "mouseButtonShortcuts": {
+        "label": "Przyciski myszy jako skróty",
+        "description": "Używaj środkowego przycisku myszy albo przycisków Wstecz i Dalej jako skrótu: kliknij klawisze skrótu, a potem naciśnij przycisk. Dopóki jest skrótem, przycisk nie robi nic innego.",
+        "linux": "W systemie Linux działa tylko środkowy przycisk.",
+        "needsEngine": "Wymaga implementacji klawiatury SpeakoFlow Keys.",
+        "reset": "Skróty, które używały przycisku myszy, wróciły do domyślnych klawiszy."
+      },
       "liveTranscription": {
         "label": "Transkrypcja na bieżąco",
         "description": "Transkrybuj mowę w trakcie mówienia, a nie całość po zatrzymaniu. Eksperymentalne."
@@ -870,6 +896,10 @@
       "showTrayIcon": {
         "label": "Pokaż ikonę w zasobniku",
         "description": "Trzymaj SpeakoFlow w zasobniku systemowym."
+      },
+      "trayIconColor": {
+        "label": "Kolorowa ikona w zasobniku",
+        "description": "Pokazuje kolorowe logo zamiast białej ikony. Włącz, jeśli panel jest jasny i biała ikona jest słabo widoczna."
       },
       "closeBehavior": {
         "label": "Zamykaj aplikację razem z oknem",
@@ -1198,6 +1228,24 @@
           "azureDescription": "Punkt końcowy Twojego zasobu Azure, z sekcji Keys and Endpoint w portalu Azure. MAI-Transcribe wymaga zasobu w regionie Central India, Southeast Asia, East US, West US, West US 2 lub North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Klucz dostępu AWS",
+            "missing": "Nie zapisano jeszcze klucza. Użyj klucza dostępu użytkownika lub roli IAM z uprawnieniem do wywołania transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Identyfikator klucza dostępu",
+            "secret": "Tajny klucz dostępu",
+            "sessionToken": "Token sesji (tylko dla tymczasowych poświadczeń)",
+            "invalid": "To nie wygląda na klucz AWS. Identyfikator klucza dostępu składa się z liter i cyfr, a żadne pole nie może zawierać spacji ani dwukropków.",
+            "permission": "Wymagane uprawnienie"
+          },
+          "region": {
+            "title": "Region AWS",
+            "description": "Gdzie działa Amazon Transcribe. Region najbliżej Ciebie odpowiada najszybciej."
+          },
+          "streaming": "Zawsze włączone: Amazon Transcribe transkrybuje tylko na żywo. Jeśli połączenie zerwie się w trakcie nagrania, nagranie zostanie wysłane ponownie w tempie mowy, więc dokończenie trwa tyle, ile trwało nagranie.",
+          "language": "Amazon Transcribe musi znać język. Tryb automatyczny wybiera spośród angielskiego, języka aplikacji i kilku innych popularnych języków, więc wybierz swój, jeśli mówisz w innym.",
+          "unsupportedLanguage": "Amazon Transcribe nie może transkrybować tego języka na żywo w regionie {{region}}. Wybierz inny język lub region. Do tego czasu dyktowanie nie będzie korzystać z Amazon Transcribe."
+        },
         "model": {
           "title": "Model",
           "info": "Wpisz dowolny model oferowany przez dostawcę albo wczytaj listę. W ElevenLabs wybierz scribe_v2_realtime, aby transkrybować w trakcie mówienia, lub scribe_v2, aby transkrybować po zakończeniu.",
@@ -1210,7 +1258,8 @@
         },
         "keyterms": {
           "label": "Wysyłaj moje własne słowa",
-          "description": "Przekazuje Twoje własne słownictwo dostawcy, aby preferował taką pisownię."
+          "description": "Przekazuje Twoje własne słownictwo dostawcy, aby preferował taką pisownię.",
+          "unsupported": "{{provider}} nie przyjmuje listy słów, więc Twoje własne słowa są poprawiane na tym komputerze."
         },
         "noVerbatim": {
           "label": "Usuwaj słowa wypełniające",
@@ -1414,7 +1463,20 @@
       },
       "appendTrailingSpace": {
         "label": "Dodaj spację na końcu",
-        "description": ""
+        "description": "Dodaje spację po każdym dyktowaniu. Przy włączonych inteligentnych odstępach działa to tylko tam, gdzie nie da się odczytać pola."
+      },
+      "smartSpacing": {
+        "label": "Inteligentne odstępy",
+        "description": "Dopasowuje każde dyktowanie do tekstu, który już jest w polu, aby można było przerwać i kontynuować bez sklejania słów.",
+        "info": "Przed wklejeniem SpeakoFlow sprawdza kilka znaków wokół kursora i dodaje spację tylko tam, gdzie jest potrzebna. Gdy aplikacja ukrywa swój tekst, korzysta zamiast tego z własnego ostatniego dyktowania. Nic nie jest zapisywane ani nigdzie wysyłane. W macOS używa uprawnienia Dostępności, które SpeakoFlow już ma. W Linuksie aplikacje Chrome, Electron i Qt udostępniają tekst tylko wtedy, gdy ułatwienia dostępu pulpitu są włączone."
+      },
+      "smartSpacingFixCase": {
+        "label": "Poprawiaj wielkie litery",
+        "description": "Zaczyna dyktowanie małą literą, gdy kontynuuje zdanie. Imiona, skróty i „I” zachowują wielkie litery."
+      },
+      "smartSpacingJoin": {
+        "label": "Łącz przerwane zdania",
+        "description": "Usuwa kropkę dodaną przez SpeakoFlow, gdy przerwano w połowie zdania, np. „I went to the.”"
       },
       "keyboardImplementation": {
         "title": "Implementacja klawiatury",
@@ -1972,9 +2034,19 @@
       "hide": "Ukryj pływający wskaźnik",
       "show": "Pokaż pływający wskaźnik"
     },
+    "notesPrefs": {
+      "autoTitle": "Pisz notatki po zakończeniu rozmowy",
+      "autoDescription": "Wyłącz, jeśli potrzebujesz tylko transkrypcji. Notatki z pojedynczego spotkania nadal możesz napisać z jego transkrypcji.",
+      "languageTitle": "Język notatek",
+      "languageDescription": "Domyślnie notatki są w języku, w którym odbyło się spotkanie. Wybierz język, aby zawsze dostawać je w nim.",
+      "auto": "Taki jak na spotkaniu",
+      "autoHint": "Język, w którym toczyła się większość spotkania"
+    },
     "pill": {
       "expand": "Otwórz transkrypcję na żywo",
       "collapse": "Wróć do małej pigułki",
+      "copy": "Kopiuj transkrypcję",
+      "copied": "Skopiowano transkrypcję",
       "stop": "Zatrzymaj nagrywanie",
       "listening": "Słucham. Tutaj pojawi się to, co mówią ludzie.",
       "micOnly": "Nagrywany jest tylko Twój mikrofon — w tej transkrypcji nie będzie niczego, co mówią pozostali uczestnicy."
@@ -2056,6 +2128,7 @@
       "empty": "To spotkanie nie ma transkrypcji.",
       "loadingMore": "Wczytywanie dalszej części transkrypcji…",
       "renameSpeaker": "Zmień nazwę tego mówcy",
+      "copyTitle": "Skopiuj całą transkrypcję z nazwami mówców",
       "lowConfidence": "Niepewne",
       "lowConfidenceHelp": "Ta etykieta mówcy to przypuszczenie. Słowa są przepisane tak, jak padły; niepewne jest tylko to, kto je wypowiedział."
     },
@@ -2080,6 +2153,7 @@
     },
     "summary": {
       "template": "Szablon",
+      "languageAuto": "Język spotkania",
       "templates": {
         "general": "Ogólny",
         "standup": "Stand-up",
@@ -2223,6 +2297,7 @@
     "copied": "Skopiowano",
     "copyFailed": "Nie udało się skopiować — spróbuj ponownie",
     "done": "Gotowe",
+    "finish": "Zakończ",
     "askAssistant": "Zapytaj asystenta, zamiast to wpisywać",
     "recovery": {
       "dismissed": "Odrzucono",
@@ -2234,7 +2309,10 @@
       "title": "Pobieranie modelu mowy…",
       "percent": "Pobieranie modelu mowy · {{percent}}%",
       "hint": "Dyktowanie zacznie działać po zakończeniu"
-    }
+    },
+    "handsFreeHint": "Naciśnij {{key}}, aby nie trzymać",
+    "lockedKeys": "Nagrywanie bez trzymania. Naciśnij {{keys}}, aby zakończyć",
+    "finishKeys": "Zakończ ({{keys}})"
   },
   "reminders": {
     "title": "Przypomnienie",
@@ -2537,10 +2615,7 @@
       "dictation": "Dyktowanie",
       "assistant": "Asystent",
       "cleanupOff": "Włącz czyszczenie AI, aby korzystać z tego skrótu.",
-      "cleanupOnDictation": "Twój skrót dyktowania czyści każde dyktowanie, więc ten nie jest potrzebny.",
-      "openCleanup": "Otwórz czyszczenie AI",
-      "assistantOff": "Asystent jest wyłączony, więc jego skróty nic nie robią.",
-      "openAssistant": "Otwórz Asystenta"
+      "assistantOff": "Asystent jest wyłączony, więc jego skróty nic nie robią."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2628,6 +2703,10 @@
         "whatHold": "Przytrzymaj, mów, puść. Słowa wpiszą się tam, gdzie jest kursor.",
         "whatTap": "Stuknij, mów, stuknij ponownie. Słowa wpiszą się tam, gdzie jest kursor."
       },
+      "handsFree": {
+        "what": "Przytrzymaj {{keys}}, naciśnij {{key}} i puść: nasłuchiwanie trwa, dopóki ponownie nie naciśniesz {{keys}}.",
+        "linux": "Aby dyktować bez trzymania w Linuksie, wyłącz „Przytrzymaj, aby mówić”. Wtedy jedno naciśnięcie zaczyna, a następne kończy."
+      },
       "cleanup": {
         "title": "Dyktuj i oczyść",
         "description": "Jak dyktowanie, a potem AI poprawia interpunkcję, słowa wypełniające i styl.",
@@ -2636,7 +2715,8 @@
       "ask": {
         "title": "Zapytaj asystenta",
         "description": "Zadaj pytanie na głos i zobacz odpowiedź w pływającym panelu.",
-        "what": "Zapytaj na głos. Odpowiedź pojawi się w pływającym panelu."
+        "whatHold": "Przytrzymaj, zapytaj, puść. Odpowiedź pojawi się w pływającym panelu.",
+        "whatTap": "Stuknij, zapytaj, stuknij ponownie. Odpowiedź pojawi się w pływającym panelu."
       },
       "call": {
         "title": "Rozpocznij rozmowę",
@@ -2645,10 +2725,6 @@
       },
       "info": "Używaj ich w dowolnej aplikacji. Kliknij klawisze, aby je zmienić.",
       "offHint": "Wyłączony",
-      "mode": {
-        "hold": "Przytrzymaj, aby mówić",
-        "tap": "Stuknij, aby przełączyć"
-      },
       "cancel": {
         "title": "Anuluj",
         "what": "Zatrzymaj nagrywanie albo czytaną na głos odpowiedź."
@@ -2847,6 +2923,16 @@
       "info": "Daj czyszczeniu osobny skrót albo pozwól, by skrót dyktowania czyścił każde dyktowanie – wtedy masz do zapamiętania jeden zestaw klawiszy.",
       "separate": "Osobny skrót",
       "dictation": "Ten sam co dyktowanie"
+    },
+    "skipShort": {
+      "title": "Pomijaj czyszczenie krótkich dyktowań",
+      "info": "Krótkie dyktowania, takie jak wyszukiwanie czy szybka odpowiedź, są wpisywane tak, jak je wypowiedziałeś, bez czekania na model. Dłuższe są nadal czyszczone.",
+      "limit": "Krótsze niż",
+      "limitInfo": "Liczone w słowach. W językach pisanych bez spacji, takich jak chiński, japoński czy tajski, liczba słów jest szacowana na podstawie liczby znaków.",
+      "words_one": "słowo",
+      "words_few": "słowa",
+      "words_many": "słów",
+      "words_other": "słowa"
     },
     "shortcutRow": "Skrót"
   },
@@ -3240,7 +3326,19 @@
     "useDefault": "Domyślny",
     "turnOff": "Wyłącz",
     "turnedOff": "Skrót {{name}} wyłączony",
-    "undo": "Cofnij"
+    "undo": "Cofnij",
+    "addAnother": "Dodaj kolejny",
+    "addAnotherHint": "Przypisz temu skrótowi drugi zestaw klawiszy, np. przycisk myszy",
+    "remove": "Usuń",
+    "or": "lub",
+    "changeOther": "Zmień dodatkowe klawisze skrótu: {{name}}",
+    "pressKeysOrButton": "Naciśnij klawisze lub przycisk myszy…",
+    "mouseNeedsKeysEngine": "Przyciski myszy wymagają implementacji klawiatury SpeakoFlow Keys (Ustawienia → Zaawansowane → Eksperymentalne).",
+    "mouse": {
+      "middle": "Środkowy przycisk myszy",
+      "back": "Przycisk myszy Wstecz",
+      "forward": "Przycisk myszy Dalej"
+    }
   },
   "memoryManager": {
     "status": {

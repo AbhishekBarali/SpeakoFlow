@@ -90,6 +90,32 @@ pub struct ShortcutBinding {
     pub description: String,
     pub default_binding: String,
     pub current_binding: String,
+    /// A second set of keys that does exactly what `current_binding` does, or
+    /// empty for none: a mouse button, or a combo a mouse's own software can
+    /// send. Both are registered under this binding's id, so everything that
+    /// acts on a shortcut by id (the coordinator, Cancel, the chord hold-back)
+    /// takes one for the other, and a recording started with either stops
+    /// with either. Only armed while `current_binding` is set: a shortcut that
+    /// is turned off is off by both.
+    #[serde(default)]
+    pub alternate_binding: String,
+}
+
+impl ShortcutBinding {
+    /// Every set of keys this shortcut answers to, its own first. Empty when
+    /// the shortcut is turned off.
+    pub fn combos(&self) -> Vec<&str> {
+        let primary = self.current_binding.trim();
+        if primary.is_empty() {
+            return Vec::new();
+        }
+        let alternate = self.alternate_binding.trim();
+        if alternate.is_empty() {
+            vec![primary]
+        } else {
+            vec![primary, alternate]
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
@@ -416,6 +442,10 @@ pub enum SttEngineMode {
 ///   `Ocp-Apim-Subscription-Key` header and a multipart body of `audio` plus a
 ///   JSON `definition`. The model is not a form field: MAI-Transcribe is chosen
 ///   by `definition.enhancedMode.model`.
+/// - [`AmazonTranscribe`](Self::AmazonTranscribe): Amazon Transcribe's
+///   streaming WebSocket, with a SigV4-presigned URL instead of an auth header
+///   and binary event-stream frames instead of JSON. Streaming only: its batch
+///   API needs an S3 upload and a polled job (see `crate::stt_aws`).
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum CloudSttKind {
@@ -423,6 +453,7 @@ pub enum CloudSttKind {
     OpenAiCompatible,
     Deepgram,
     AzureSpeech,
+    AmazonTranscribe,
 }
 
 /// A configurable cloud speech-to-text endpoint. Seeded from
@@ -512,6 +543,11 @@ pub enum CloudSttUnavailableReason {
     NoModelConfigured,
     /// The provider's endpoint is the user's own resource and none is set.
     MissingEndpoint,
+    /// The provider cannot transcribe the selected language. Amazon Transcribe
+    /// streams a fixed list of languages, and a few of them not in every region;
+    /// sending the audio to another language's model instead would paste a
+    /// confident transcript in the wrong language.
+    UnsupportedLanguage,
 }
 
 /// Whether cloud transcription is ready, for display in Settings.
@@ -534,7 +570,9 @@ pub enum CloudSttReadiness {
 
 /// Fully resolved cloud transcription configuration. Deliberately has no
 /// `Serialize`/`Type`/`Debug` derive because it carries the hydrated API key —
-/// same reasoning as [`ResolvedPostProcessConfig`].
+/// same reasoning as [`ResolvedPostProcessConfig`]. `Clone` is safe, and is
+/// what lets a request move to its own thread.
+#[derive(Clone)]
 pub(crate) struct ResolvedCloudStt {
     pub provider: CloudSttProvider,
     pub model: String,
@@ -561,6 +599,10 @@ pub(crate) struct ResolvedCloudStt {
     /// Ask the provider to drop filler words and false starts server-side.
     pub no_verbatim: bool,
     pub timeout_secs: u64,
+    /// Amazon Transcribe only: the region, the credentials split out of the
+    /// stored key, and the language in the form AWS needs. `None` for every
+    /// other provider.
+    pub amazon: Option<crate::stt_aws::AmazonTranscribeConfig>,
 }
 
 #[derive(Debug)]
@@ -916,20 +958,22 @@ pub enum ConversationSensitivity {
 }
 
 /// How thorough a web search should be. This is the single dial that replaces
-/// the old raw "max results" number: it controls how many queries run, how many
-/// pages get scraped, and how much source text the model receives. All three
-/// tiers are tuned to stay fast (one retrieval pass, heavy parallelism, tight
-/// timeouts) — this is "answer-with-search like ChatGPT/Gemini do in seconds",
-/// not minutes-long deep research.
+/// the old raw "max results" number. It reaches the provider request (Tavily
+/// `fast` / `basic` / `advanced`, Exa's search type, result count), the timeout
+/// and the text kept per source, and the model's prompt, which tells it how many
+/// searches to make (`web_search::depth_guidance`). All three tiers stay fast
+/// enough to sit through: this is "answer-with-search like ChatGPT/Gemini do in
+/// seconds", not minutes-long deep research.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum AssistantSearchDepth {
-    /// Fastest. One query, snippets + a couple of scraped pages. Quick facts.
+    /// Fastest. One search, shorter passages. Quick facts.
     Low,
-    /// Balanced default. A few queries, rerank, scrape the top handful.
+    /// Balanced default. One search, a second when the first misses something.
     #[default]
     Medium,
-    /// Broadest single pass. More queries/sources, scrape more winners.
+    /// Most thorough. The provider's best mode, the longest passages, and two
+    /// or three searches from different angles.
     High,
 }
 
@@ -1289,7 +1333,24 @@ impl fmt::Debug for SecretString {
 #[serde(default)]
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
+    /// Hold to talk (true) or Tap to toggle (false) for the dictation
+    /// shortcuts: dictation and the separate cleanup shortcut. With Hold, the
+    /// hands-free key makes a dictation keep listening (`hands_free`). See
+    /// [`holds_to_record`].
     pub push_to_talk: bool,
+    /// Hold to talk or Tap to toggle for the ask. It used to share
+    /// `push_to_talk`, so holding to dictate meant holding to ask too. A store
+    /// from before the split gets the shared value (`normalize_settings_json`).
+    #[serde(default = "default_true")]
+    pub assistant_push_to_talk: bool,
+    /// Seconds without speech after which a hands-free dictation (tapped, or
+    /// held and then made hands-free) ends by itself, exactly as if its
+    /// shortcut had been pressed again. 0 (the default) never does: the
+    /// recording runs until the next press or the 30-minute cap. Which
+    /// recordings it covers is decided in one place,
+    /// `transcription_coordinator::silence_timeout_for`.
+    #[serde(default = "default_dictation_silence_stop_secs")]
+    pub dictation_silence_stop_secs: u32,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -1423,6 +1484,20 @@ pub struct AppSettings {
     /// then never touches them again, so a later opt-in sticks.
     #[serde(default)]
     pub meeting_opt_in_defaults_applied: bool,
+    /// Write notes automatically when a meeting ends.
+    ///
+    /// **On by default**, because notes are what most people record a call for.
+    /// Off is for people who only want the transcript: the post-call job then
+    /// still identifies the speakers but makes no model call, and the meeting
+    /// page leads with the transcript. Notes for one meeting can still be
+    /// written on demand from its transcript.
+    #[serde(default = "default_true")]
+    pub meeting_auto_notes: bool,
+    /// Language the meeting notes are written in: `"auto"` for the language the
+    /// meeting was held in, or a code from
+    /// `meetings::summarize::NOTES_LANGUAGES`. An unknown code reads as auto.
+    #[serde(default = "default_meeting_notes_language")]
+    pub meeting_notes_language: String,
     /// Learn a spelling when the user corrects a dictated word.
     ///
     /// **Off by default, and it must stay that way.** Unlike every other setting
@@ -1515,6 +1590,18 @@ pub struct AppSettings {
     /// [`cleanup_on_dictation`] and [`cleanup_binding_active`].
     #[serde(default)]
     pub post_process_on_dictation: bool,
+    /// Paste a dictation with fewer than `post_process_min_words` words as
+    /// spoken, without AI cleanup. On by default: a search or a two-word reply
+    /// rarely has anything to clean, and the wait for the model is the only
+    /// delay left in it. Only cleanup that rides on the dictation shortcut is
+    /// skipped: the dedicated cleanup shortcut always cleans. See
+    /// `actions::skips_short_cleanup`.
+    #[serde(default = "default_true")]
+    pub post_process_skip_short: bool,
+    /// How many words a dictation needs for cleanup to run while
+    /// `post_process_skip_short` is on.
+    #[serde(default = "default_post_process_min_words")]
+    pub post_process_min_words: u32,
     #[serde(default = "default_post_process_provider_id")]
     pub post_process_provider_id: String,
     #[serde(default = "default_post_process_providers")]
@@ -1572,6 +1659,23 @@ pub struct AppSettings {
     pub mute_while_recording: bool,
     #[serde(default)]
     pub append_trailing_space: bool,
+    /// Smart spacing: fit each dictation onto the text already in the field
+    /// (a space where one is needed, the right case, no stray period from the
+    /// previous dictation), so dictations do not run together. On by default,
+    /// for a new install and an update alike: it reads only the few characters
+    /// around the caret of the field being pasted into, and keeps none of
+    /// them. See `smart_spacing`.
+    #[serde(default = "default_true")]
+    pub smart_spacing: bool,
+    /// Smart spacing: lowercase a dictation's first word when it continues a
+    /// sentence, and match the case of a replaced selection.
+    #[serde(default = "default_true")]
+    pub smart_spacing_fix_case: bool,
+    /// Smart spacing: remove the period SpeakoFlow itself pasted at the end of
+    /// an unfinished sentence ("I went to the.") when the next dictation
+    /// continues it.
+    #[serde(default = "default_true")]
+    pub smart_spacing_join_sentences: bool,
     #[serde(default = "default_app_language")]
     pub app_language: String,
     #[serde(default)]
@@ -1580,8 +1684,20 @@ pub struct AppSettings {
     pub lazy_stream_close: bool,
     #[serde(default)]
     pub keyboard_implementation: KeyboardImplementation,
+    /// Experimental: let the middle, Back and Forward mouse buttons be a
+    /// shortcut's keys. Off, a stored mouse button is kept but not registered,
+    /// and the shortcut editor ignores the mouse. Only the SpeakoFlow Keys
+    /// engine can see mouse buttons at all.
+    #[serde(default)]
+    pub mouse_button_shortcuts: bool,
     #[serde(default = "default_show_tray_icon")]
     pub show_tray_icon: bool,
+    /// Linux only: draw the tray icon in colour instead of as a white glyph.
+    /// For a light panel, where the white glyph cannot be seen; the app has no
+    /// reliable way to find out what colour the panel is (see
+    /// `tray::linux_tray_theme`).
+    #[serde(default)]
+    pub tray_icon_color: bool,
     #[serde(default)]
     pub close_behavior: CloseBehavior,
     #[serde(default = "default_paste_delay_ms")]
@@ -1874,6 +1990,10 @@ fn default_model() -> String {
     crate::managers::model::RECOMMENDED_MODEL_ID.to_string()
 }
 
+fn default_dictation_silence_stop_secs() -> u32 {
+    0
+}
+
 fn default_always_on_microphone() -> bool {
     false
 }
@@ -2010,15 +2130,43 @@ pub fn cleanup_binding_active(settings: &AppSettings) -> bool {
     settings.post_process_enabled && !settings.post_process_on_dictation
 }
 
+/// Bounds for `post_process_min_words`. Below two words, "short" could only
+/// mean an empty dictation, which is never cleaned up anyway; past fifty it
+/// is a paragraph, which nobody means by short.
+pub const MIN_POST_PROCESS_WORDS: u32 = 2;
+pub const MAX_POST_PROCESS_WORDS: u32 = 50;
+
+fn default_post_process_min_words() -> u32 {
+    15
+}
+
 /// Binding id of the separate cleanup shortcut.
 pub const CLEANUP_BINDING_ID: &str = "transcribe_with_post_process";
+
+/// Binding id of the hands-free key: one key, pressed while the dictation keys
+/// are held (`hands_free`). Never registered on its own.
+pub const HANDS_FREE_BINDING_ID: &str = "hands_free";
 
 /// Shortcuts the user may remove entirely, leaving them unbound. Dictation and
 /// the quick ask are the app's two front doors and always keep a key; the
 /// cleanup shortcut is turned off with its own switch on the cleanup page.
 /// Cancel is here because a global Esc, even one only registered while
-/// something is running, is one some people would rather not have at all.
-pub const OPTIONAL_BINDINGS: [&str; 2] = ["cancel", "assistant_call"];
+/// something is running, is one some people would rather not have at all. The
+/// hands-free key, because removing it is how hands-free mode is turned off.
+pub const OPTIONAL_BINDINGS: [&str; 3] = ["cancel", "assistant_call", HANDS_FREE_BINDING_ID];
+
+/// Whether the recording shortcut `binding_id` records while its keys are held
+/// (Hold to talk) instead of from one press to the next (Tap to toggle).
+/// Dictation and the cleanup shortcut follow `push_to_talk`, the ask follows
+/// `assistant_push_to_talk`. Any other shortcut acts on a press and has nothing
+/// to hold: the call starts on one press and hangs up on the next.
+pub fn holds_to_record(settings: &AppSettings, binding_id: &str) -> bool {
+    match binding_id {
+        "transcribe" | CLEANUP_BINDING_ID => settings.push_to_talk,
+        "assistant" => settings.assistant_push_to_talk,
+        _ => false,
+    }
+}
 
 /// Whether a shortcut may be left without a key.
 pub fn is_optional_binding(id: &str) -> bool {
@@ -2348,6 +2496,9 @@ pub const CLOUD_STT_ELEVENLABS: &str = "elevenlabs";
 /// Provider id of Azure AI Speech (MAI-Transcribe), called directly.
 pub const CLOUD_STT_AZURE: &str = "azure";
 
+/// Provider id of Amazon Transcribe (streaming).
+pub const CLOUD_STT_AMAZON: &str = "amazon_transcribe";
+
 pub fn default_cloud_stt_provider_id() -> String {
     CLOUD_STT_ELEVENLABS.to_string()
 }
@@ -2550,6 +2701,39 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
                 "https://learn.microsoft.com/azure/ai-services/speech-service/mai-transcribe"
                     .to_string(),
         },
+        // Amazon Transcribe, through its streaming WebSocket only (`stt_aws`):
+        // the batch API wants the audio in an S3 bucket and a polled job, which
+        // is exactly the delay people built middleware to get around.
+        //
+        // Two of the generic slots carry AWS's own shape. The key slot holds
+        // `KEY_ID:SECRET[:SESSION_TOKEN]`, composed by the Settings card from
+        // separate fields, and the editable endpoint slot holds the region,
+        // which ships as us-east-1 so a fresh setup needs only the key. There is
+        // no model to choose; "standard" names the one AWS runs.
+        CloudSttProvider {
+            id: CLOUD_STT_AMAZON.to_string(),
+            label: "Amazon Transcribe".to_string(),
+            base_url: "us-east-1".to_string(),
+            allow_base_url_edit: true,
+            kind: CloudSttKind::AmazonTranscribe,
+            default_model: "standard".to_string(),
+            models: vec!["standard".to_string()],
+            models_endpoint: None,
+            // Biasing at AWS means a custom vocabulary created in the AWS
+            // console beforehand and named in the request; it cannot take a
+            // list of words inline. False keeps the app's own word pass.
+            honors_keyterms: false,
+            supports_streaming: true,
+            // Transcribes in the language spoken; translation is a separate
+            // AWS service.
+            supports_translation: false,
+            key_optional: false,
+            // The page with the IAM permission the key needs, which is the part
+            // that goes wrong: an access key without it fails every request.
+            api_key_url:
+                "https://docs.aws.amazon.com/transcribe/latest/dg/streaming-setting-up.html#streaming-websocket"
+                    .to_string(),
+        },
         // Custom always comes last, mirroring the post-processing provider list.
         CloudSttProvider {
             id: "custom".to_string(),
@@ -2730,6 +2914,10 @@ fn default_post_process_models() -> HashMap<String, String> {
 /// Default value helper for `#[serde(default = "default_true")]` fields.
 fn default_true() -> bool {
     true
+}
+
+fn default_meeting_notes_language() -> String {
+    crate::meetings::summarize::AUTO_NOTES_LANGUAGE.to_string()
 }
 
 /// Default text-replacement rules. Empty by default — users add their own.
@@ -3910,6 +4098,7 @@ pub fn get_default_settings() -> AppSettings {
                 .to_string(),
             default_binding: default_shortcut.to_string(),
             current_binding: default_shortcut.to_string(),
+            alternate_binding: String::new(),
         },
     );
     // The dictation keys plus Shift. Only registered while cleanup is on and
@@ -3932,6 +4121,7 @@ pub fn get_default_settings() -> AppSettings {
                 .to_string(),
             default_binding: default_post_process_shortcut.to_string(),
             current_binding: default_post_process_shortcut.to_string(),
+            alternate_binding: String::new(),
         },
     );
     bindings.insert(
@@ -3946,6 +4136,7 @@ pub fn get_default_settings() -> AppSettings {
             // rather never lose an Esc to it (`OPTIONAL_BINDINGS`).
             default_binding: "escape".to_string(),
             current_binding: "escape".to_string(),
+            alternate_binding: String::new(),
         },
     );
 
@@ -3988,6 +4179,7 @@ pub fn get_default_settings() -> AppSettings {
                     .to_string(),
             default_binding: default_assistant_shortcut.to_string(),
             current_binding: default_assistant_shortcut.to_string(),
+            alternate_binding: String::new(),
         },
     );
 
@@ -4009,12 +4201,36 @@ pub fn get_default_settings() -> AppSettings {
             // which is not a discoverable way to find a feature.
             default_binding: default_assistant_call_shortcut.to_string(),
             current_binding: default_assistant_call_shortcut.to_string(),
+            alternate_binding: String::new(),
+        },
+    );
+
+    // Hands-free mode: a key pressed while the dictation keys are held, so the
+    // dictation keeps listening after they are let go (`hands_free`). Space on
+    // every platform, as in Wispr Flow (Ctrl+Win+Space, Fn+Space). It is not a
+    // shortcut of its own: only ever registered on top of the dictation keys,
+    // and only while dictation is held to talk.
+    bindings.insert(
+        HANDS_FREE_BINDING_ID.to_string(),
+        ShortcutBinding {
+            id: HANDS_FREE_BINDING_ID.to_string(),
+            name: "Hands-free mode".to_string(),
+            description: "Press while holding the dictation keys to keep recording after \
+                 you let go."
+                .to_string(),
+            default_binding: "space".to_string(),
+            current_binding: "space".to_string(),
+            // One key on top of the dictation keys; other keys for it would
+            // be listened for by nothing (`change_alternate_binding` refuses).
+            alternate_binding: String::new(),
         },
     );
 
     AppSettings {
         bindings,
         push_to_talk: true,
+        assistant_push_to_talk: true,
+        dictation_silence_stop_secs: default_dictation_silence_stop_secs(),
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),
@@ -4050,6 +4266,8 @@ pub fn get_default_settings() -> AppSettings {
         meeting_auto_detect: false,
         meeting_show_indicator: false,
         meeting_opt_in_defaults_applied: true,
+        meeting_auto_notes: true,
+        meeting_notes_language: default_meeting_notes_language(),
         auto_learn_corrections: false,
         learned_words: Vec::new(),
         model_folders: Vec::new(),
@@ -4069,6 +4287,8 @@ pub fn get_default_settings() -> AppSettings {
         auto_submit_key: AutoSubmitKey::default(),
         post_process_enabled: default_post_process_enabled(),
         post_process_on_dictation: false,
+        post_process_skip_short: true,
+        post_process_min_words: default_post_process_min_words(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
         post_process_api_keys: default_post_process_api_keys(),
@@ -4089,11 +4309,16 @@ pub fn get_default_settings() -> AppSettings {
         flow_screen_access: false,
         mute_while_recording: false,
         append_trailing_space: false,
+        smart_spacing: true,
+        smart_spacing_fix_case: true,
+        smart_spacing_join_sentences: true,
         app_language: default_app_language(),
         experimental_enabled: false,
         lazy_stream_close: false,
         keyboard_implementation: KeyboardImplementation::default(),
+        mouse_button_shortcuts: false,
         show_tray_icon: default_show_tray_icon(),
+        tray_icon_color: false,
         close_behavior: CloseBehavior::default(),
         paste_delay_ms: default_paste_delay_ms(),
         typing_tool: default_typing_tool(),
@@ -4996,10 +5221,19 @@ fn hydrate_secrets(settings: &mut AppSettings) {
 /// press the camera button") turns them off, because switching it on would
 /// start sending screenshots to a provider the user never agreed to send them
 /// to. Idempotent: once either new key exists, nothing is rewritten.
+///
+/// Hold or Tap was one setting for every recording shortcut too; see
+/// [`split_recording_modes`].
 fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bool) {
     let Some(settings) = raw.as_object_mut() else {
         return (raw, false);
     };
+    let screen = migrate_screen_access(settings);
+    let modes = split_recording_modes(settings);
+    (raw, screen || modes)
+}
+
+fn migrate_screen_access(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
     const LEGACY_KEYS: [&str; 2] = [
         "assistant_screen_access_mode",
         "assistant_screenshot_enabled",
@@ -5008,7 +5242,7 @@ fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bo
         || settings.contains_key("assistant_call_screen_access");
     let has_legacy = LEGACY_KEYS.iter().any(|key| settings.contains_key(*key));
     if migrated || !has_legacy {
-        return (raw, false);
+        return false;
     }
 
     let agent_decided = settings
@@ -5024,7 +5258,28 @@ fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bo
     ] {
         settings.insert(key.to_string(), serde_json::Value::Bool(agent_decided));
     }
-    (raw, true)
+    true
+}
+
+/// `push_to_talk` used to be Hold or Tap for every recording shortcut. The ask
+/// has its own now (`assistant_push_to_talk`), and a store from before the
+/// split gives it the shared value, so nobody's ask changes on update.
+/// Idempotent: a store that has the key is left alone.
+fn split_recording_modes(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
+    if settings.contains_key("assistant_push_to_talk") {
+        return false;
+    }
+    let Some(shared) = settings
+        .get("push_to_talk")
+        .and_then(serde_json::Value::as_bool)
+    else {
+        return false;
+    };
+    settings.insert(
+        "assistant_push_to_talk".to_string(),
+        serde_json::Value::Bool(shared),
+    );
+    true
 }
 
 /// One-time switch of the two meeting settings to their opt-in defaults.
@@ -5466,6 +5721,7 @@ mod tests {
             description: String::new(),
             default_binding: default.to_string(),
             current_binding: current.to_string(),
+            alternate_binding: String::new(),
         }
     }
 
@@ -5509,10 +5765,57 @@ mod tests {
         assert_eq!(stored["cancel"].current_binding, "");
     }
 
+    /// Moving a default onto new keys is about the shortcut's own keys. The
+    /// other keys someone added never came from a default, so no migration
+    /// may touch them.
     #[test]
-    fn only_cancel_and_the_call_can_be_left_unbound() {
+    fn a_default_migration_leaves_the_other_keys_alone() {
+        let defaults = get_default_settings().bindings;
+        let mut untouched = binding("assistant_call", "an+old+default", "an+old+default");
+        untouched.alternate_binding = "mousex2".to_string();
+        let mut customised = binding("assistant", "an+old+default", "ctrl+f9");
+        customised.alternate_binding = "f13".to_string();
+        let mut stored = HashMap::from([
+            ("assistant_call".to_string(), untouched),
+            ("assistant".to_string(), customised),
+        ]);
+        assert!(migrate_binding_defaults(&mut stored, &defaults));
+        assert_eq!(stored["assistant_call"].alternate_binding, "mousex2");
+        assert_eq!(stored["assistant"].alternate_binding, "f13");
+    }
+
+    /// Every store written before shortcuts had other keys must still parse,
+    /// with none.
+    #[test]
+    fn a_binding_stored_before_other_keys_existed_has_none() {
+        let stored = serde_json::json!({
+            "id": "transcribe",
+            "name": "Transcribe",
+            "description": "",
+            "default_binding": "ctrl_left+super",
+            "current_binding": "f13"
+        });
+        let parsed: ShortcutBinding = serde_json::from_value(stored).unwrap();
+        assert_eq!(parsed.alternate_binding, "");
+        assert_eq!(parsed.combos(), vec!["f13"]);
+    }
+
+    #[test]
+    fn a_shortcut_answers_to_its_own_keys_first_and_nothing_when_off() {
+        let mut dictate = binding("transcribe", "ctrl_left+super", "ctrl_left+super");
+        assert_eq!(dictate.combos(), vec!["ctrl_left+super"]);
+        dictate.alternate_binding = " mousex1 ".to_string();
+        assert_eq!(dictate.combos(), vec!["ctrl_left+super", "mousex1"]);
+        // Turned off, it is off by both.
+        dictate.current_binding = String::new();
+        assert!(dictate.combos().is_empty());
+    }
+
+    #[test]
+    fn only_cancel_the_call_and_the_hands_free_key_can_be_left_unbound() {
         assert!(is_optional_binding("cancel"));
         assert!(is_optional_binding("assistant_call"));
+        assert!(is_optional_binding(HANDS_FREE_BINDING_ID));
         assert!(!is_optional_binding("transcribe"));
         assert!(!is_optional_binding("assistant"));
         assert!(!is_optional_binding(CLEANUP_BINDING_ID));
@@ -5932,6 +6235,42 @@ mod tests {
         assert!(salvaged.assistant_call_screen_access);
         assert_eq!(salvaged.selected_model, "keep-this-model");
         assert_eq!(salvaged.sound_theme, default_sound_theme());
+    }
+
+    #[test]
+    fn the_ask_keeps_the_recording_mode_it_shared_before_the_split() {
+        for shared in [true, false] {
+            let (normalized, changed) =
+                normalize_settings_json(serde_json::json!({ "push_to_talk": shared }));
+            assert!(changed);
+            let settings: AppSettings = serde_json::from_value(normalized).unwrap();
+            assert_eq!(settings.push_to_talk, shared);
+            assert_eq!(settings.assistant_push_to_talk, shared);
+        }
+
+        // Once apart, they stay apart.
+        let split = serde_json::json!({
+            "push_to_talk": true,
+            "assistant_push_to_talk": false
+        });
+        let (normalized, changed) = normalize_settings_json(split.clone());
+        assert!(!changed);
+        assert_eq!(normalized, split);
+    }
+
+    #[test]
+    fn dictation_and_the_ask_are_held_or_tapped_on_their_own() {
+        let mut settings = get_default_settings();
+        settings.push_to_talk = true;
+        settings.assistant_push_to_talk = false;
+        assert!(holds_to_record(&settings, "transcribe"));
+        assert!(holds_to_record(&settings, CLEANUP_BINDING_ID));
+        assert!(!holds_to_record(&settings, "assistant"));
+        // The call is a press, whatever either mode is.
+        assert!(!holds_to_record(&settings, "assistant_call"));
+        settings.assistant_push_to_talk = true;
+        assert!(!holds_to_record(&settings, "assistant_call"));
+        assert!(!holds_to_record(&settings, "cancel"));
     }
 
     #[test]
@@ -7137,5 +7476,146 @@ mod tests {
         let out = format!("{:?}", map);
         assert!(!out.contains("secret"));
         assert!(out.contains("[REDACTED]"));
+    }
+
+    /* ── Upgrading from 2.0.1 ───────────────────────────────────────────────
+     *
+     * `testdata/settings-2.0.1.json` is exactly what a fresh 2.0.1 install
+     * saves, dumped from the v2.0.1 tag. The tests change it the way a user
+     * would, run it through what a launch does to a stored file, and check
+     * that every choice comes back. A field renamed or retyped, an enum value
+     * removed, or a migration that overwrites a choice fails here rather than
+     * on someone's machine. When a release ships, add its file beside this
+     * one. */
+
+    const SETTINGS_2_0_1: &str = include_str!("testdata/settings-2.0.1.json");
+
+    /// What `load_or_create_app_settings` does to a stored file, minus the
+    /// keychain steps, which move secrets but change no stored choice.
+    fn launch_with(stored: serde_json::Value) -> AppSettings {
+        let (mut settings, _) = deserialize_settings_value(stored);
+        let defaults = get_default_settings();
+        migrate_binding_defaults(&mut settings.bindings, &defaults.bindings);
+        apply_meeting_opt_in_defaults(&mut settings);
+        apply_ask_anchor_top_default(&mut settings);
+        for (key, value) in defaults.bindings {
+            settings.bindings.entry(key).or_insert(value);
+        }
+        for obsolete in [
+            "transcribe_toggle",
+            "assistant_vision",
+            "assistant_panel_toggle",
+        ] {
+            settings.bindings.remove(obsolete);
+        }
+        let _ = ensure_post_process_defaults(&mut settings)
+            | ensure_assistant_defaults(&mut settings)
+            | ensure_cloud_stt_defaults(&mut settings);
+        settings
+    }
+
+    /// A 2.0.1 store someone has used: every switch flipped from its default,
+    /// every whole number moved, and their own shortcuts, words and language.
+    fn used_2_0_1_store() -> serde_json::Value {
+        let mut stored: serde_json::Value = serde_json::from_str(SETTINGS_2_0_1).unwrap();
+        let map = stored.as_object_mut().unwrap();
+        for (key, value) in map.iter_mut() {
+            // A one-time marker is set in every 2.0.1 store. Flipping it would
+            // re-run its migration rather than stand for a choice. The retired
+            // incognito switch is always `false` on disk (2.0.1 already folds
+            // a `true` into memory off at launch), so it is no choice either.
+            if key.ends_with("_applied") || key == "assistant_memory_incognito" {
+                continue;
+            }
+            match value {
+                serde_json::Value::Bool(on) => *on = !*on,
+                serde_json::Value::Number(n) if n.is_u64() => {
+                    *value = serde_json::json!(n.as_u64().unwrap() + 1);
+                }
+                _ => {}
+            }
+        }
+        map.insert("selected_language".into(), serde_json::json!("de"));
+        map.insert("app_language".into(), serde_json::json!("de"));
+        map.insert(
+            "custom_words".into(),
+            serde_json::json!(["Kubernetes", "SpeakoFlow"]),
+        );
+        let bindings = map["bindings"].as_object_mut().unwrap();
+        for (i, binding) in bindings.values_mut().enumerate() {
+            binding["current_binding"] = serde_json::json!(format!("ctrl+alt+f{}", i + 1));
+        }
+        stored
+    }
+
+    /// Whether everything in `before` is still in `after`. New keys and new
+    /// list entries are fine (that is what an update adds); a value changed
+    /// or gone is not. Lists of objects with an `id` are matched by id, since
+    /// a launch may put providers in the shipped order.
+    fn kept(
+        before: &serde_json::Value,
+        after: &serde_json::Value,
+        path: &str,
+        lost: &mut Vec<String>,
+    ) {
+        use serde_json::Value;
+        match (before, after) {
+            (Value::Object(b), Value::Object(a)) => {
+                for (key, value) in b {
+                    match a.get(key) {
+                        Some(now) => kept(value, now, &format!("{path}.{key}"), lost),
+                        None => lost.push(format!("{path}.{key} (gone)")),
+                    }
+                }
+            }
+            (Value::Array(b), Value::Array(a)) if b.iter().all(|v| v.get("id").is_some()) => {
+                for item in b {
+                    let id = &item["id"];
+                    match a.iter().find(|now| &now["id"] == id) {
+                        Some(now) => kept(item, now, &format!("{path}[{id}]"), lost),
+                        None => lost.push(format!("{path}[{id}] (gone)")),
+                    }
+                }
+            }
+            _ if before == after => {}
+            _ => lost.push(path.to_string()),
+        }
+    }
+
+    #[test]
+    fn a_2_0_1_store_still_parses_as_a_whole() {
+        // Salvage would keep the rest, but only by dropping what no longer
+        // parses, so a 2.0.1 store must never need it.
+        let (normalized, _) = normalize_settings_json(used_2_0_1_store());
+        if let Err(error) = serde_json::from_value::<AppSettings>(normalized) {
+            panic!("a 2.0.1 store no longer parses as a whole: {error}");
+        }
+    }
+
+    #[test]
+    fn upgrading_from_2_0_1_keeps_every_choice() {
+        let before = used_2_0_1_store();
+        let after = serde_json::to_value(launch_with(before.clone())).unwrap();
+        let mut lost = Vec::new();
+        kept(&before, &after, "settings", &mut lost);
+        assert!(lost.is_empty(), "changed by the upgrade: {lost:#?}");
+    }
+
+    #[test]
+    fn upgrading_from_2_0_1_carries_hold_or_tap_over_to_the_ask() {
+        let before = used_2_0_1_store();
+        let shared = before["push_to_talk"].as_bool().unwrap();
+        let after = launch_with(before);
+        assert_eq!(after.push_to_talk, shared);
+        assert_eq!(after.assistant_push_to_talk, shared);
+        // The one new shortcut arrives; the user's own keys are untouched.
+        assert!(after.bindings.contains_key(HANDS_FREE_BINDING_ID));
+    }
+
+    #[test]
+    fn a_second_launch_after_upgrading_changes_nothing() {
+        let first = serde_json::to_value(launch_with(used_2_0_1_store())).unwrap();
+        let second = serde_json::to_value(launch_with(first.clone())).unwrap();
+        assert_eq!(first, second);
     }
 }

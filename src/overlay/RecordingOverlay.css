@@ -20,10 +20,18 @@
   inherits: false;
   initial-value: 0px;
 }
+/* How much of the hands-free ring is drawn, from the top centre down each
+   side: 180deg is all of it. */
+@property --ov-ring-sweep {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 180deg;
+}
 
 .overlay-root {
   --ov-surface: rgba(28, 28, 30, 0.97);
   --ov-edge: rgba(255, 255, 255, 0.08);
+  --ov-ring: rgba(255, 255, 255, 0.34);
   --ov-text: #d4d4d8;
   --ov-muted: #8e8e93;
   --ov-faint: #6e6e73;
@@ -117,6 +125,12 @@
   max-width: 100%;
   padding: 0 10px;
   border-radius: 999px;
+  /* The shared surface's, plus the width a hands-free pill gains and gives
+     back (below). Width only ever moves through padding, which can ease. */
+  transition:
+    opacity 240ms ease-out,
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    padding 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .pill-wave {
   display: flex;
@@ -126,6 +140,53 @@
 }
 .pill-wave.compact {
   width: 40px;
+}
+/* The hands-free key's hint (`handsFreeHint.ts`) takes the waveform's slot for
+   a few seconds, so the pill neither grows nor moves: the bars fade down and
+   a keycap with a lock fades up in their place. */
+.pill-wave {
+  position: relative;
+}
+.pill-wave > :first-child {
+  transition: opacity 180ms ease-out;
+}
+.pill-wave.is-hinting > :first-child {
+  opacity: 0;
+}
+.pill-hint-key {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--ov-muted);
+  animation: ov-hint-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.pill-hint-key kbd {
+  max-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 13px;
+  color: var(--ov-text);
+}
+@keyframes ov-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .pill-label,
 .card-label {
@@ -289,6 +350,164 @@
   opacity: 0.55;
 }
 
+/* ── Hands-free ─────────────────────────────────────────────────────────────
+ * A dictation that keeps listening after its keys are let go (`hands_free.rs`):
+ * every one with Tap to toggle, and with Hold to talk one turned by the
+ * hands-free key. A held dictation is the plain pill; this one
+ * says without a word that nothing has to be held: it is a little longer, and
+ * it has a ring. The ring draws itself in from the top, down both sides, at
+ * the moment the dictation turns, so the change is seen happening instead of
+ * discovered later — while the keys are still down, which is what tells the
+ * user they can let go.
+ *
+ * Nothing on it is clickable until the pointer is over it. Then the bars close
+ * up and ✕ and ✓ come in at the ends, in room the longer pill already had, so
+ * nothing moves under the pointer and the window never resizes (the stretch
+ * stays inside the compact frame). Monochrome like the rest: ✓ is the one
+ * filled thing, ✕ a quiet disc. */
+.overlay-pill.hands-free:not(.has-text) {
+  padding-inline: 17px;
+}
+.overlay-pill.hands-free::after,
+.overlay-card.hands-free::after {
+  content: "";
+  position: absolute;
+  /* Over the surface's own hairline edge, which the ring replaces. */
+  inset: -1px;
+  border: 1.5px solid var(--ov-ring);
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-mask-image: conic-gradient(
+    #000 var(--ov-ring-sweep),
+    transparent var(--ov-ring-sweep) calc(360deg - var(--ov-ring-sweep)),
+    #000 calc(360deg - var(--ov-ring-sweep))
+  );
+  mask-image: conic-gradient(
+    #000 var(--ov-ring-sweep),
+    transparent var(--ov-ring-sweep) calc(360deg - var(--ov-ring-sweep)),
+    #000 calc(360deg - var(--ov-ring-sweep))
+  );
+  animation: ov-ring-draw 340ms cubic-bezier(0.33, 0, 0.2, 1) both;
+}
+.overlay-card.hands-free::after {
+  border-width: 1px;
+}
+@keyframes ov-ring-draw {
+  from {
+    --ov-ring-sweep: 0deg;
+  }
+  to {
+    --ov-ring-sweep: 180deg;
+  }
+}
+
+/* The waveform keeps its natural size and the window onto it narrows, rather
+   than the bars being squeezed: squeezed, fourteen bars ran into one blob. The
+   padding grows by exactly what the window loses, so the pill's width holds. */
+.overlay-pill.hands-free .pill-wave {
+  overflow: hidden;
+  transition: width 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.overlay-pill.hands-free .pill-wave .overlay-wave {
+  flex: 0 0 54px;
+}
+.overlay-pill.has-controls:hover {
+  padding-inline: 27px;
+}
+.overlay-pill.has-controls:hover .pill-wave {
+  width: 34px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 5px,
+    #000 calc(100% - 5px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 5px,
+    #000 calc(100% - 5px),
+    transparent
+  );
+}
+.pill-control {
+  position: absolute;
+  top: 50%;
+  margin-top: -10px;
+}
+.pill-control.is-cancel {
+  inset-inline-start: 5px;
+}
+.pill-control.is-finish {
+  inset-inline-end: 5px;
+}
+.hands-free-control {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 140ms ease-out,
+    transform 200ms cubic-bezier(0.34, 1.45, 0.64, 1),
+    background-color 140ms,
+    color 140ms;
+}
+.hands-free-control.is-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ov-text);
+}
+.hands-free-control.is-finish {
+  background: var(--ov-text);
+  color: #1c1c1e;
+}
+/* A short wait, so a cursor passing over on its way somewhere else does not
+   set them off. Leaving is immediate. */
+.overlay-pill.has-controls:hover .hands-free-control,
+.overlay-card.hands-free:hover .hands-free-control {
+  opacity: 1;
+  transform: scale(1);
+  transition-delay: 70ms;
+}
+.overlay-root .hands-free-control.is-cancel:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #f5f5f7;
+}
+.overlay-root .hands-free-control.is-finish:hover {
+  background: #f5f5f7;
+}
+.overlay-root .hands-free-control:active {
+  transform: scale(0.9);
+}
+.hands-free-control:disabled {
+  cursor: default;
+}
+/* In the card the two sit with Copy, top right, and take no room until the
+   pointer is on the card. */
+.card-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 0;
+  overflow: hidden;
+  transition: max-width 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.overlay-card.hands-free:hover .card-controls {
+  max-width: 48px;
+}
+.card-controls .hands-free-control {
+  width: 22px;
+  height: 22px;
+}
+
 /* ── Live transcript, compact pill ──────────────────────────────────────────
  * A ticker: pinned to the newest words, older ones scrolling out of the far
  * edge. `text-align: end` cannot do this — alignment stops mattering once a
@@ -346,6 +565,7 @@
  * Vertical budget inside the 1px border (112px): 8 top + 24 header + 2 + 66
  * body (three 22px lines) + 12 below. */
 .overlay-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -505,6 +725,35 @@
   transition:
     opacity 60ms ease-in,
     transform 60ms ease-in;
+}
+
+/* ── About to stop on silence ──────────────────────────────────────────────
+ * A tap-started dictation that has gone quiet ends by itself
+ * (`dictation_silence_stop_secs`), and for its last moments a hairline along
+ * the bottom edge runs out with the time left. Absolutely placed, so the pill
+ * neither moves nor resizes; speaking again simply takes it away. It shrinks
+ * toward the middle, so it reads the same in a right-to-left language. */
+.silence-countdown {
+  position: absolute;
+  inset-inline: 14px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+  animation: silence-countdown var(--ov-countdown, 2000ms) linear forwards;
+}
+.overlay-card .silence-countdown {
+  inset-inline: 15px;
+  bottom: 4px;
+}
+@keyframes silence-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 .overlay-sr-only {
   position: absolute;
@@ -683,8 +932,21 @@
   .card-label,
   .card-copied,
   .card-text.is-revealed,
-  .pill-ring.is-waiting {
+  .pill-ring.is-waiting,
+  .pill-hint-key,
+  .overlay-pill.hands-free::after,
+  .overlay-card.hands-free::after {
     animation: none;
+  }
+  /* Still there, just not running out: its appearing is the warning. */
+  .silence-countdown {
+    animation: none;
+  }
+  .overlay-pill.hands-free .pill-wave,
+  .pill-wave > :first-child,
+  .hands-free-control,
+  .card-controls {
+    transition: none;
   }
   .pill-ring-fill {
     transition: none;

@@ -26,10 +26,16 @@
 //!
 //! Providers (all snippet-first, all benefit from the local rerank, all use a
 //! single API key): **Serper** (fast, cheap Google SERP — the default),
-//! **Brave** (independent index), **Tavily** (LLM-optimized search + answer),
-//! **Exa** (neural/semantic search), **SerpAPI** (Google SERP), and
-//! **TinyFish** (own index, agent-oriented, free tier with no card). Any unknown
-//! or legacy provider value routes to Serper.
+//! **Brave** (independent index), **Tavily** (LLM-oriented search returning
+//! relevant passages per result), **Exa** (neural/semantic search), **SerpAPI**
+//! (Google SERP), and **TinyFish** (own index, agent-oriented, free tier with
+//! no card). Any unknown or legacy provider value routes to Serper.
+//!
+//! The Quick / Standard / Deep dial (`AssistantSearchDepth`) reaches three
+//! places: the provider request (Tavily `fast`/`basic`/`advanced`, Exa's search
+//! type, how many results), the timeout and text kept per source
+//! (`TierParams`), and the model's own prompt (`depth_guidance`), since only the
+//! model decides how many searches a turn gets.
 
 use crate::settings::{AppSettings, AssistantSearchDepth};
 use log::{debug, warn};
@@ -42,18 +48,20 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
-/// Timeout for a snippet search HTTP call (Serper, Brave, Tavily, Exa, SerpAPI,
-/// TinyFish).
+/// Default timeout for a snippet search HTTP call (Serper, Brave, Tavily, Exa,
+/// SerpAPI, TinyFish). Each depth tier sets its own (see `TierParams::timeout`);
+/// this is the Standard one.
 ///
 /// A search happens inside a wait the user is sitting through in silence, so the
 /// ceiling is a UX number, not just a safety net. Sized against measured
-/// provider latency: Serper averages ~0.8s (p99 ~2.1s) and the slowest supported
-/// providers average ~5s, so 6s still lets a slow provider finish while cutting
-/// the worst case a hung request can impose on a turn.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(6);
+/// provider latency: Serper averages ~0.8s (p99 ~2.1s) and Tavily `basic` came
+/// in at 0.6–2.2s warm and ~4.5s cold from Nepal, so 8s lets a slow provider
+/// finish while cutting the worst case a hung request can impose on a turn.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
-/// Per-snippet character cap.
-const SNIPPET_MAX_CHARS: usize = 500;
+/// Hard cap on the text kept per candidate while parsing. Each tier then trims
+/// to its own `snippet_chars` when the candidate becomes a result.
+const SNIPPET_HARD_CAP: usize = 2_000;
 
 /// Title character cap (defensive against pathological titles).
 const TITLE_MAX_CHARS: usize = 160;
@@ -162,8 +170,14 @@ pub struct SearchPlan {
 // Search depth tiers
 // ---------------------------------------------------------------------------
 
-/// Concrete retrieval knobs for a depth tier. All tiers are one snippet-only
-/// pass; they differ only in breadth and how much text reaches the model.
+/// Concrete retrieval knobs for a depth tier. Every tier is one snippet pass
+/// per query; they differ in how thorough the provider is asked to be, how
+/// long it may take, and how much text reaches the model.
+///
+/// Until this was reworked the dial did almost nothing: the model only ever
+/// sends one query per tool call, so `max_queries` never applied, and every
+/// snippet was cut to 500 characters, so the larger budgets of Standard and
+/// Deep could never be filled. Tavily was also always asked for `basic`.
 #[derive(Clone, Copy, Debug)]
 struct TierParams {
     /// Max queries to actually run from the plan.
@@ -174,27 +188,39 @@ struct TierParams {
     sources_out: usize,
     /// Total web-context cap across all sources (chars).
     total_budget_chars: usize,
+    /// Text kept per source (chars). Providers that return passages (Tavily,
+    /// Exa) fill this; Google-style snippets are shorter than any tier's cap.
+    snippet_chars: usize,
+    /// Per-request timeout. Deep pays for Tavily's `advanced` mode, measured at
+    /// 5.2–8.3s, which a single shared timeout would have cut off.
+    timeout: Duration,
 }
 
 fn tier_params(depth: AssistantSearchDepth) -> TierParams {
     match depth {
         AssistantSearchDepth::Low => TierParams {
             max_queries: 1,
-            snippet_limit: 8,
+            snippet_limit: 6,
             sources_out: 5,
-            total_budget_chars: 7_000,
+            total_budget_chars: 4_000,
+            snippet_chars: 600,
+            timeout: Duration::from_secs(6),
         },
         AssistantSearchDepth::Medium => TierParams {
             max_queries: 3,
-            snippet_limit: 10,
+            snippet_limit: 8,
             sources_out: 8,
-            total_budget_chars: 14_000,
+            total_budget_chars: 10_000,
+            snippet_chars: 1_000,
+            timeout: REQUEST_TIMEOUT,
         },
         AssistantSearchDepth::High => TierParams {
             max_queries: 4,
             snippet_limit: 10,
             sources_out: 10,
-            total_budget_chars: 24_000,
+            total_budget_chars: 20_000,
+            snippet_chars: 1_800,
+            timeout: Duration::from_secs(12),
         },
     }
 }
@@ -203,6 +229,25 @@ fn tier_params(depth: AssistantSearchDepth) -> TierParams {
 /// formatting results for the prompt.
 pub fn context_budget_for(depth: AssistantSearchDepth) -> usize {
     tier_params(depth).total_budget_chars
+}
+
+/// One line for the system prompt saying how hard to search at this depth.
+///
+/// The model decides how many searches a turn gets, so the dial has to reach it
+/// too; provider settings alone cannot make Deep look at a question from more
+/// than one angle. Fixed text per tier, so the prompt stays cache-stable.
+pub fn depth_guidance(depth: AssistantSearchDepth) -> &'static str {
+    match depth {
+        AssistantSearchDepth::Low => {
+            "  Search depth is Quick: make one focused search and answer from it. Search again only if the results are empty or clearly about something else."
+        }
+        AssistantSearchDepth::Medium => {
+            "  Search depth is Standard: one well-phrased search is usually enough. Make a second, differently worded search only when the first misses part of the question."
+        }
+        AssistantSearchDepth::High => {
+            "  Search depth is Deep: for anything beyond a single quick fact, make two or three searches from different angles (for example the question itself, the latest news on it, and an official or primary source). Each search takes several seconds, so send them together as several web_search calls in one reply instead of one after another, then combine what they found. Search again afterwards only if something important is still missing."
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -220,31 +265,39 @@ struct Candidate {
 }
 
 /// Run a single web search using the configured provider and return snippet
-/// results. Used by the settings "Test search" button; surfaces provider errors
-/// (missing key, rate limit, budget) to the caller.
+/// results. Used by the settings "Test search" button, so it runs the same
+/// pipeline as the assistant at the selected depth (a Deep test exercises
+/// Tavily's `advanced` mode, not `basic`), and surfaces provider errors
+/// (missing key, rate limit, plan limit) to the caller.
 pub async fn search(settings: &AppSettings, query: &str) -> Result<Vec<SearchResult>, String> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let cands = snippet_search(settings, query, 5, None, false).await?;
-    Ok(cands.into_iter().take(5).map(candidate_to_result).collect())
+    let plan = SearchPlan {
+        queries: vec![truncate_chars(query, 480)],
+        freshness: "none".to_string(),
+        news: false,
+    };
+    search_with_plan(settings, &plan).await
 }
 
 /// Run a single web search requested by the model's `web_search` tool call.
 /// Reuses the full plan pipeline (parallel snippet search + local rerank) with
-/// a one-query plan built from the tool arguments, so tool-calling turns get
-/// the same retrieval quality as the planner path. Never errors: a failure
-/// returns an empty list so the model can answer without web context.
+/// a one-query plan built from the tool arguments.
+///
+/// A provider failure is returned rather than flattened into "no results": the
+/// caller tells the model the search failed, so the user hears "the search
+/// didn't work" instead of a confident "there's nothing on that".
 pub async fn run_tool_search(
     settings: &AppSettings,
     query: &str,
     freshness: Option<&str>,
     news: bool,
-) -> Vec<SearchResult> {
+) -> Result<Vec<SearchResult>, String> {
     let query = query.trim();
     if query.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let freshness = match freshness.map(|f| f.trim().to_ascii_lowercase()) {
         Some(ref f) if matches!(f.as_str(), "day" | "week" | "month" | "year") => f.clone(),
@@ -259,10 +312,15 @@ pub async fn run_tool_search(
 }
 
 /// Execute a full search plan: snippet-search every query in parallel, then
-/// merge + rerank locally and hand the top sources to the model. Per-query
-/// errors are swallowed (logged) so one bad query never sinks the whole turn.
-pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<SearchResult> {
-    let tp = tier_params(settings.assistant_search_depth);
+/// merge + rerank locally and hand the top sources to the model. One failing
+/// query never sinks the others; an error is only returned when every query
+/// failed, since then there is nothing to answer from.
+pub async fn search_with_plan(
+    settings: &AppSettings,
+    plan: &SearchPlan,
+) -> Result<Vec<SearchResult>, String> {
+    let depth = settings.assistant_search_depth;
+    let tp = tier_params(depth);
 
     let queries: Vec<&String> = plan
         .queries
@@ -271,7 +329,7 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
         .take(tp.max_queries)
         .collect();
     if queries.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
 
     // Recency-sensitive topics get news results and a date-restricted window.
@@ -289,10 +347,12 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
             tp.snippet_limit,
             tbs_ref,
             include_news,
+            depth,
         )
     });
     let per_query = futures_util::future::join_all(snippet_futs).await;
 
+    let mut first_error: Option<String> = None;
     let lists: Vec<Vec<Candidate>> = per_query
         .into_iter()
         .enumerate()
@@ -304,6 +364,7 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
                     crate::utils::redact_text(queries[i]),
                     e
                 );
+                first_error.get_or_insert(e);
                 Vec::new()
             }
         })
@@ -311,19 +372,23 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
 
     let mut merged = round_robin_merge(lists);
     if merged.is_empty() {
-        return Vec::new();
+        return match first_error {
+            Some(e) => Err(e),
+            None => Ok(Vec::new()),
+        };
     }
 
     // Stage 2 — local rerank (lexical + recency). No network, no LLM.
     let primary = queries.first().map(|q| q.as_str()).unwrap_or("");
     rerank(primary, &mut merged, recency_sensitive);
 
-    // Stage 3 — hand the top reranked snippets to the model.
-    merged
+    // Stage 3 — hand the top reranked snippets to the model, at this tier's
+    // per-source size.
+    Ok(merged
         .into_iter()
         .take(tp.sources_out)
-        .map(candidate_to_result)
-        .collect()
+        .map(|c| candidate_to_result(c, tp.snippet_chars))
+        .collect())
 }
 
 /// Round-robin merge across per-query candidate lists, de-duping by URL (or
@@ -378,10 +443,46 @@ fn rerank(query: &str, candidates: &mut Vec<Candidate>, recency_sensitive: bool)
 }
 
 /// Tokenize a query into meaningful lowercase terms (drop short words / stopwords).
+///
+/// Recency words ("latest", "news", "today") are stopwords here: they say
+/// *when*, not *what*, and the freshness window and the news boost already
+/// handle when. Scored as topic words they ranked "Immigration News: Latest on
+/// ICE raids" above Nepal's own headlines for "Nepal latest news".
 fn query_terms(query: &str) -> Vec<String> {
-    const STOP: [&str; 22] = [
-        "the", "a", "an", "of", "to", "in", "is", "are", "was", "were", "what", "who", "when",
-        "how", "and", "for", "on", "with", "about", "whats", "does", "did",
+    const STOP: [&str; 33] = [
+        "the",
+        "a",
+        "an",
+        "of",
+        "to",
+        "in",
+        "is",
+        "are",
+        "was",
+        "were",
+        "what",
+        "who",
+        "when",
+        "how",
+        "and",
+        "for",
+        "on",
+        "with",
+        "about",
+        "whats",
+        "does",
+        "did",
+        "latest",
+        "news",
+        "today",
+        "current",
+        "currently",
+        "recent",
+        "recently",
+        "now",
+        "new",
+        "update",
+        "updates",
     ];
     query
         .to_lowercase()
@@ -439,12 +540,14 @@ async fn snippet_search(
     limit: usize,
     tbs: Option<&str>,
     include_news: bool,
+    depth: AssistantSearchDepth,
 ) -> Result<Vec<Candidate>, String> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(Vec::new());
     }
     let limit = limit.clamp(1, MAX_RESULTS_HARD);
+    let timeout = tier_params(depth).timeout;
     let provider = settings.assistant_web_search_provider.as_str();
     let key = |id: &str| {
         settings
@@ -454,27 +557,30 @@ async fn snippet_search(
             .unwrap_or_default()
     };
     debug!(
-        "Snippet search via '{}' for {:?} (limit {}, news {}, tbs {:?})",
+        "Snippet search via '{}' for {:?} (limit {}, news {}, tbs {:?}, depth {:?})",
         provider,
         crate::utils::redact_text(query),
         limit,
         include_news,
-        tbs
+        tbs,
+        depth
     );
 
     match provider {
         "brave" => {
-            let results = search_brave(&key("brave"), query, limit, tbs).await?;
+            let results = search_brave(&key("brave"), query, limit, tbs, timeout).await?;
             Ok(results.into_iter().map(result_to_candidate).collect())
         }
-        "tavily" => search_tavily(&key("tavily"), query, limit, tbs, include_news).await,
-        "exa" => search_exa(&key("exa"), query, limit, tbs).await,
-        "serpapi" => search_serpapi(&key("serpapi"), query, limit, tbs, include_news).await,
-        "tinyfish" => search_tinyfish(&key("tinyfish"), query, limit, tbs).await,
+        "tavily" => search_tavily(&key("tavily"), query, limit, tbs, include_news, depth).await,
+        "exa" => search_exa(&key("exa"), query, limit, tbs, depth).await,
+        "serpapi" => {
+            search_serpapi(&key("serpapi"), query, limit, tbs, include_news, timeout).await
+        }
+        "tinyfish" => search_tinyfish(&key("tinyfish"), query, limit, tbs, timeout).await,
         // "serper" is the default. Any unknown or legacy value (including the
         // removed "firecrawl"/"duckduckgo") also routes here so old settings
         // keep working.
-        _ => search_serper(&key("serper"), query, limit, tbs, include_news).await,
+        _ => search_serper(&key("serper"), query, limit, tbs, include_news, timeout).await,
     }
 }
 
@@ -540,16 +646,108 @@ fn http_client(timeout: Duration) -> Result<reqwest::Client, String> {
     Ok(client)
 }
 
-/// Tavily Search (`POST /search`) — an LLM-optimized search API returning clean
-/// per-result snippets (`content`) plus an optional synthesized `answer`. Auth
-/// is a Bearer token. Freshness maps to Tavily's `time_range`; a news topic
-/// switches `topic` to "news".
+/// Tavily's `search_depth` and `chunks_per_source` for a tier.
+///
+/// Measured against the live API (Nepal, 2026-10-15): `fast` answers in ~0.5s
+/// server-side and is on-topic for general queries, but with `topic: "news"` it
+/// returned unrelated world headlines (CNN, CBS) for "Nepal latest news", so a
+/// Quick *news* search stays on `basic`. `advanced` returns the longest, most
+/// relevant passages (~2,000 chars per source) and costs 2 credits and 5–8s,
+/// which is what Deep is for.
+fn tavily_depth_params(depth: AssistantSearchDepth, news: bool) -> (&'static str, u8) {
+    match depth {
+        AssistantSearchDepth::Low if news => ("basic", 2),
+        AssistantSearchDepth::Low => ("fast", 2),
+        AssistantSearchDepth::Medium => ("basic", 3),
+        AssistantSearchDepth::High => ("advanced", 3),
+    }
+}
+
+/// The JSON body for one Tavily `/search` call. Pure, so the request shape is a
+/// test rather than something read off the wire.
+///
+/// `include_answer` is deliberately off. Tavily's answer is an LLM summary of
+/// the same results, which the assistant's own model then summarises again; it
+/// cost 2–3s per search (measured: 3.4–4.2s with it, 0.6–2.2s without) for no
+/// information the results do not already carry.
+fn tavily_request_body(
+    query: &str,
+    max_results: usize,
+    time_range: Option<&str>,
+    include_news: bool,
+    depth: AssistantSearchDepth,
+) -> serde_json::Value {
+    let (search_depth, chunks) = tavily_depth_params(depth, include_news);
+    let mut body = json!({
+        "query": query,
+        "max_results": max_results.clamp(1, 20),
+        "search_depth": search_depth,
+        "chunks_per_source": chunks,
+        "topic": if include_news { "news" } else { "general" },
+        "include_answer": false,
+        // A date on every result that has one, not only news: the model sees
+        // how old a source is, and the rerank can trust it.
+        "include_published_date": true,
+    });
+    if let Some(tr) = time_range {
+        body["time_range"] = json!(tr);
+    }
+    body
+}
+
+/// Parse a Tavily `/search` payload into candidates, with each result's
+/// published date in front of its text ("2026-10-15: ...") the way the Google
+/// providers' dated snippets read.
+fn parse_tavily_results(value: &serde_json::Value, from_news: bool) -> Vec<Candidate> {
+    let mut candidates = Vec::new();
+    let Some(items) = value.get("results").and_then(|v| v.as_array()) else {
+        return candidates;
+    };
+    for item in items {
+        let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        let text = item.get("content").and_then(|v| v.as_str()).unwrap_or("");
+        let date = item
+            .get("published_date")
+            .and_then(|v| v.as_str())
+            .and_then(short_date);
+        let snippet = match date {
+            Some(date) if !text.trim().is_empty() => format!("{date}: {text}"),
+            Some(date) => date,
+            None => text.to_string(),
+        };
+        push_candidate(&mut candidates, title, url, &snippet, from_news);
+    }
+    candidates
+}
+
+/// The readable part of a Tavily error body (`{"detail":{"error":"..."}}`),
+/// so a plan limit reads as "This request exceeds your plan's set usage
+/// limit" rather than as a JSON fragment.
+fn tavily_error_detail(body: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| {
+            v.get("detail")
+                .and_then(|d| d.get("error").or(Some(d)))
+                .and_then(|e| e.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| truncate_chars(body, 200))
+}
+
+/// Tavily Search (`POST /search`) — an LLM-oriented search API returning
+/// relevant passages per result (`content`, up to `chunks_per_source` chunks).
+/// Auth is a Bearer token. The depth tier picks `fast` / `basic` / `advanced`
+/// and the timeout; freshness maps to `time_range`; a news turn sets
+/// `topic: "news"`.
 async fn search_tavily(
     api_key: &str,
     query: &str,
     max_results: usize,
     tbs: Option<&str>,
     include_news: bool,
+    depth: AssistantSearchDepth,
 ) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
         return Err(
@@ -557,69 +755,73 @@ async fn search_tavily(
         );
     }
 
-    let client = http_client(REQUEST_TIMEOUT)?;
-    let max = max_results.clamp(1, 20);
-    let mut body = json!({
-        "query": query,
-        "max_results": max,
-        "search_depth": "basic",
-        "topic": if include_news { "news" } else { "general" },
-        "include_answer": true,
-    });
-    if let Some(tr) = tavily_time_range_from_tbs(tbs) {
-        body["time_range"] = json!(tr);
-    }
-
-    let resp = client
-        .post("https://api.tavily.com/search")
-        .bearer_auth(api_key)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Tavily request failed: {}", e))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!(
-            "Tavily search failed ({}): {}",
-            status,
-            truncate_chars(&text, 200)
-        ));
-    }
-
-    let value: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse Tavily response: {}", e))?;
-
-    let mut candidates = Vec::new();
-    // Tavily's synthesized answer — highest value for quick facts; added first.
-    if let Some(answer) = value.get("answer").and_then(|v| v.as_str()) {
-        if !answer.trim().is_empty() {
-            push_candidate(&mut candidates, "Answer", "", answer, false);
+    let client = http_client(tier_params(depth).timeout)?;
+    let time_range = tavily_time_range_from_tbs(tbs);
+    let request = |time_range: Option<&str>| {
+        let body = tavily_request_body(query, max_results, time_range, include_news, depth);
+        let client = client.clone();
+        async move {
+            let resp = client
+                .post("https://api.tavily.com/search")
+                .bearer_auth(api_key.trim())
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| {
+                    if e.is_timeout() {
+                        format!("Tavily did not answer in time ({})", e)
+                    } else {
+                        format!("Tavily request failed: {}", e)
+                    }
+                })?;
+            let status = resp.status();
+            if !status.is_success() {
+                let text = resp.text().await.unwrap_or_default();
+                return Err(format!(
+                    "Tavily search failed ({}): {}",
+                    status,
+                    tavily_error_detail(&text)
+                ));
+            }
+            let value: serde_json::Value = resp
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse Tavily response: {}", e))?;
+            Ok::<_, String>(parse_tavily_results(&value, include_news))
         }
+    };
+
+    let candidates = request(time_range).await?;
+    // A time window filters by publish date, and a niche or slow-moving topic
+    // can have nothing inside it. An answer from slightly older sources beats
+    // no answer, so ask once more without the window.
+    if candidates.is_empty() && time_range.is_some() {
+        debug!(
+            "Tavily returned nothing for {:?} within {:?}; retrying without the time range",
+            crate::utils::redact_text(query),
+            time_range
+        );
+        return request(None).await;
     }
-    if let Some(items) = value.get("results").and_then(|v| v.as_array()) {
-        for item in items {
-            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-            let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
-            let snippet = item.get("content").and_then(|v| v.as_str()).unwrap_or("");
-            push_candidate(&mut candidates, title, url, snippet, include_news);
-        }
-    }
+    debug!(
+        "Tavily returned {} candidate(s) for {:?}",
+        candidates.len(),
+        crate::utils::redact_text(query)
+    );
     Ok(candidates)
 }
 
 /// Exa Search (`POST /search`) — neural/semantic search. Auth is the `x-api-key`
-/// header. We request `highlights` (with a short `text` fallback) as the snippet
-/// and use the `fast` search type for low latency. Freshness maps to a
-/// `startPublishedDate` lower bound.
+/// header. We request `highlights` (with a short `text` fallback) as the snippet.
+/// Quick and Standard use the `fast` search type for latency; Deep uses Exa's
+/// default `auto`, and each tier asks for as much text as it will keep.
+/// Freshness maps to a `startPublishedDate` lower bound.
 async fn search_exa(
     api_key: &str,
     query: &str,
     max_results: usize,
     tbs: Option<&str>,
+    depth: AssistantSearchDepth,
 ) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
         return Err(
@@ -627,15 +829,21 @@ async fn search_exa(
         );
     }
 
-    let client = http_client(REQUEST_TIMEOUT)?;
+    let tp = tier_params(depth);
+    let client = http_client(tp.timeout)?;
     let num = max_results.clamp(1, 20);
+    let search_type = if depth == AssistantSearchDepth::High {
+        "auto"
+    } else {
+        "fast"
+    };
     let mut body = json!({
         "query": query,
         "numResults": num,
-        "type": "fast",
+        "type": search_type,
         "contents": {
             "highlights": true,
-            "text": { "maxCharacters": 800 }
+            "text": { "maxCharacters": tp.snippet_chars }
         }
     });
     if let Some(start) = exa_start_date_from_tbs(tbs) {
@@ -709,6 +917,7 @@ async fn search_serpapi(
     max_results: usize,
     tbs: Option<&str>,
     include_news: bool,
+    timeout: Duration,
 ) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
         return Err(
@@ -716,7 +925,7 @@ async fn search_serpapi(
         );
     }
 
-    let client = http_client(REQUEST_TIMEOUT)?;
+    let client = http_client(timeout)?;
     let num = max_results.clamp(1, 20).to_string();
     let mut params: Vec<(&str, String)> = vec![
         ("engine", "google".to_string()),
@@ -818,6 +1027,7 @@ async fn search_brave(
     query: &str,
     max_results: usize,
     tbs: Option<&str>,
+    timeout: Duration,
 ) -> Result<Vec<SearchResult>, String> {
     if api_key.trim().is_empty() {
         return Err(
@@ -826,7 +1036,7 @@ async fn search_brave(
         );
     }
 
-    let client = http_client(REQUEST_TIMEOUT)?;
+    let client = http_client(timeout)?;
     let count = max_results.clamp(1, 20).to_string();
 
     let mut query_params: Vec<(&str, String)> = vec![("q", query.to_string()), ("count", count)];
@@ -892,6 +1102,7 @@ async fn search_serper(
     max_results: usize,
     tbs: Option<&str>,
     include_news: bool,
+    timeout: Duration,
 ) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
         return Err(
@@ -899,7 +1110,7 @@ async fn search_serper(
         );
     }
 
-    let client = http_client(REQUEST_TIMEOUT)?;
+    let client = http_client(timeout)?;
     let num = max_results.clamp(1, 20);
 
     // Serper proxies live Google, and a 200 response intermittently comes back
@@ -1094,6 +1305,7 @@ async fn search_tinyfish(
     query: &str,
     max_results: usize,
     tbs: Option<&str>,
+    timeout: Duration,
 ) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
         return Err(
@@ -1101,7 +1313,7 @@ async fn search_tinyfish(
         );
     }
 
-    let client = http_client(REQUEST_TIMEOUT)?;
+    let client = http_client(timeout)?;
     let mut query_params: Vec<(&str, String)> = vec![("query", query.to_string())];
     if let Some(minutes) = tinyfish_recency_minutes_from_tbs(tbs) {
         query_params.push(("recency_minutes", minutes.to_string()));
@@ -1280,6 +1492,26 @@ fn truncate_chars(s: &str, max: usize) -> String {
     out
 }
 
+/// A provider date as `YYYY-MM-DD`, or `None` when it cannot be read. Tavily
+/// sends RFC 2822 ("Thu, 15 Oct 2026 05:10:21 GMT"); RFC 3339 and a bare date
+/// are accepted too. An unreadable date is dropped rather than passed through,
+/// since a garbled date in front of a snippet is worse than none.
+fn short_date(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(raw) {
+        return Some(dt.format("%Y-%m-%d").to_string());
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(raw) {
+        return Some(dt.format("%Y-%m-%d").to_string());
+    }
+    chrono::NaiveDate::parse_from_str(raw.get(..10).unwrap_or(raw), "%Y-%m-%d")
+        .ok()
+        .map(|d| d.format("%Y-%m-%d").to_string())
+}
+
 /// Push a cleaned, bounded candidate, skipping entries with neither title nor URL.
 fn push_candidate(
     candidates: &mut Vec<Candidate>,
@@ -1290,7 +1522,7 @@ fn push_candidate(
 ) {
     let title = truncate_chars(title.trim(), TITLE_MAX_CHARS);
     let url = url.trim().to_string();
-    let snippet = truncate_chars(&clean_html_text(snippet), SNIPPET_MAX_CHARS);
+    let snippet = truncate_chars(&clean_html_text(snippet), SNIPPET_HARD_CAP);
     if title.is_empty() && url.is_empty() {
         return;
     }
@@ -1312,7 +1544,7 @@ fn push_result(
 ) {
     let title = truncate_chars(title.trim(), TITLE_MAX_CHARS);
     let url = url.trim().to_string();
-    let snippet = truncate_chars(snippet.trim(), SNIPPET_MAX_CHARS);
+    let snippet = truncate_chars(snippet.trim(), SNIPPET_HARD_CAP);
     let content = cap_content(content, CONTENT_HARD_CAP);
     if title.is_empty() && url.is_empty() {
         return;
@@ -1325,12 +1557,13 @@ fn push_result(
     });
 }
 
-/// Convert a snippet-only candidate into a result (no scraped content).
-fn candidate_to_result(c: Candidate) -> SearchResult {
+/// Convert a snippet-only candidate into a result (no scraped content), with
+/// the snippet trimmed to the tier's per-source size.
+fn candidate_to_result(c: Candidate, snippet_chars: usize) -> SearchResult {
     SearchResult {
         title: truncate_chars(c.title.trim(), TITLE_MAX_CHARS),
         url: c.url,
-        snippet: truncate_chars(c.snippet.trim(), SNIPPET_MAX_CHARS),
+        snippet: truncate_chars(c.snippet.trim(), snippet_chars),
         content: String::new(),
     }
 }
@@ -1479,6 +1712,30 @@ mod tests {
         assert_eq!(cands[0].url, "https://b.com"); // relevant + news wins
     }
 
+    /// Live Tavily, "Nepal latest news": an unrelated "Immigration News: Latest
+    /// on ICE Raids" outranked Nepal's own headlines because "latest" and
+    /// "news" were scored as topic words.
+    #[test]
+    fn recency_words_do_not_outrank_the_topic() {
+        let mut cands = vec![
+            Candidate {
+                title: "Immigration News: Latest on ICE Raids".to_string(),
+                url: "https://a.com".to_string(),
+                snippet: "The latest news on immigration policy.".to_string(),
+                from_news: true,
+            },
+            Candidate {
+                title: "Monsoon withdraws from Nepal".to_string(),
+                url: "https://b.com".to_string(),
+                snippet: "Fog is likely in parts of Nepal's Terai.".to_string(),
+                from_news: true,
+            },
+        ];
+        rerank("Nepal latest news", &mut cands, true);
+        assert_eq!(cands[0].url, "https://b.com");
+        assert_eq!(query_terms("Nepal latest news today"), vec!["nepal"]);
+    }
+
     #[test]
     fn rerank_news_boost_only_when_recency_sensitive() {
         let news = Candidate {
@@ -1535,5 +1792,204 @@ mod tests {
         // Only 3 chars of the body should appear.
         assert!(block.contains("abc"));
         assert!(!block.contains("abcd"));
+    }
+
+    /* ─────────────────────────── depth tiers ─────────────────────────── */
+
+    use crate::settings::AssistantSearchDepth::{High, Low, Medium};
+
+    /// Each step up the dial has to be a real step: more time allowed, more
+    /// text per source, more sources, and a budget that can actually be filled.
+    #[test]
+    fn deeper_tiers_are_strictly_more_thorough() {
+        let tiers = [tier_params(Low), tier_params(Medium), tier_params(High)];
+        for pair in tiers.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            assert!(b.timeout > a.timeout);
+            assert!(b.snippet_chars > a.snippet_chars);
+            assert!(b.sources_out >= a.sources_out);
+            assert!(b.total_budget_chars > a.total_budget_chars);
+        }
+        for t in tiers {
+            // The old tiers could never fill their budgets: 500-char snippets
+            // times the source count stayed far below them.
+            assert!(t.snippet_chars * t.sources_out >= t.total_budget_chars * 3 / 4);
+            assert!(t.snippet_chars <= SNIPPET_HARD_CAP);
+        }
+        // Tavily `advanced` was measured at 5.2–8.3s; Deep must outlast it.
+        assert!(tier_params(High).timeout >= Duration::from_secs(10));
+    }
+
+    #[test]
+    fn tavily_requests_follow_the_depth_dial() {
+        let quick = tavily_request_body("q", 6, None, false, Low);
+        let quick_news = tavily_request_body("q", 6, Some("day"), true, Low);
+        let standard = tavily_request_body("q", 8, None, false, Medium);
+        let deep = tavily_request_body("q", 10, Some("week"), true, High);
+
+        assert_eq!(quick["search_depth"], "fast");
+        // `fast` with the news topic returned unrelated world headlines.
+        assert_eq!(quick_news["search_depth"], "basic");
+        assert_eq!(standard["search_depth"], "basic");
+        assert_eq!(deep["search_depth"], "advanced");
+        assert_eq!(deep["chunks_per_source"], 3);
+
+        for body in [&quick, &quick_news, &standard, &deep] {
+            // The synthesized answer cost 2–3s and duplicated the results.
+            assert_eq!(body["include_answer"], false);
+            assert_eq!(body["include_published_date"], true);
+            let chunks = body["chunks_per_source"].as_u64().unwrap();
+            assert!((1..=3).contains(&chunks), "Tavily allows 1..=3");
+        }
+        assert_eq!(quick["topic"], "general");
+        assert_eq!(quick_news["topic"], "news");
+        assert_eq!(quick_news["time_range"], "day");
+        assert!(quick.get("time_range").is_none());
+        assert_eq!(deep["max_results"], 10);
+    }
+
+    #[test]
+    fn tavily_results_carry_their_dates_and_full_passages() {
+        let long = "word ".repeat(400);
+        let payload = json!({
+            "query": "nepal latest news",
+            "results": [
+                {
+                    "title": "Flood in Gorkha",
+                    "url": "https://example.com/flood",
+                    "content": "Houses and five bridges were swept away.",
+                    "published_date": "Thu, 15 Oct 2026 05:10:21 GMT"
+                },
+                { "title": "Long", "url": "https://example.com/long", "content": long },
+                { "title": "No date", "url": "https://example.com/plain", "content": "Text.", "published_date": null }
+            ]
+        });
+        let candidates = parse_tavily_results(&payload, true);
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(
+            candidates[0].snippet,
+            "2026-10-15: Houses and five bridges were swept away."
+        );
+        assert!(candidates[0].from_news);
+        assert_eq!(candidates[2].snippet, "Text.");
+        // Parsing keeps the passage; the tier decides how much the model gets.
+        let long_snippet = candidates[1].snippet.clone();
+        assert!(long_snippet.chars().count() > 1_500);
+        let quick = candidate_to_result(candidates[1].clone(), tier_params(Low).snippet_chars);
+        let deep = candidate_to_result(candidates[1].clone(), tier_params(High).snippet_chars);
+        assert!(quick.snippet.chars().count() <= tier_params(Low).snippet_chars + 1);
+        assert!(deep.snippet.chars().count() > quick.snippet.chars().count());
+        // No synthesized "Answer" pseudo-source.
+        assert!(candidates.iter().all(|c| c.title != "Answer"));
+    }
+
+    #[test]
+    fn tavily_errors_read_as_sentences() {
+        assert_eq!(
+            tavily_error_detail(
+                r#"{"detail":{"error":"This request exceeds your plan's set usage limit."}}"#
+            ),
+            "This request exceeds your plan's set usage limit."
+        );
+        assert_eq!(
+            tavily_error_detail(r#"{"detail":"Unauthorized"}"#),
+            "Unauthorized"
+        );
+        assert_eq!(tavily_error_detail("Bad gateway"), "Bad gateway");
+    }
+
+    #[test]
+    fn short_dates_from_each_provider_shape() {
+        assert_eq!(
+            short_date("Thu, 15 Oct 2026 05:10:21 GMT").as_deref(),
+            Some("2026-10-15")
+        );
+        assert_eq!(
+            short_date("2026-10-11T04:01:39Z").as_deref(),
+            Some("2026-10-11")
+        );
+        assert_eq!(short_date("2026-07-30").as_deref(), Some("2026-07-30"));
+        assert_eq!(short_date("yesterday"), None);
+        assert_eq!(short_date("  "), None);
+    }
+
+    #[test]
+    fn only_deep_asks_the_model_for_several_searches() {
+        assert!(depth_guidance(High).contains("two or three"));
+        assert!(!depth_guidance(Low).contains("two or three"));
+        assert!(!depth_guidance(Medium).contains("two or three"));
+        for depth in [Low, Medium, High] {
+            assert!(!depth_guidance(depth).contains('\u{2014}'));
+        }
+    }
+
+    /// Live: the configured provider at every depth, through the same
+    /// `search_with_plan` the assistant uses. Ignored, so `cargo test` stays
+    /// offline and free; costs a handful of search credits when run.
+    ///
+    /// ```text
+    /// cargo test --lib web_search::tests::live_search_at_every_depth -- --ignored --nocapture
+    /// ```
+    ///
+    /// Provider from `SPEAKOFLOW_SEARCH_PROVIDER` (default `tavily`); the key
+    /// from `SPEAKOFLOW_SEARCH_KEY` or the app's own keychain slot.
+    #[tokio::test]
+    #[ignore]
+    async fn live_search_at_every_depth() {
+        let provider =
+            std::env::var("SPEAKOFLOW_SEARCH_PROVIDER").unwrap_or_else(|_| "tavily".to_string());
+        let key = std::env::var("SPEAKOFLOW_SEARCH_KEY")
+            .ok()
+            .or_else(|| {
+                crate::secret_store::get(&crate::secret_store::account_web_search(&provider))
+            })
+            .filter(|k| !k.trim().is_empty())
+            .expect("no key for the search provider");
+        let mut settings = crate::settings::get_default_settings();
+        settings.assistant_web_search_provider = provider.clone();
+        settings.web_search_api_keys.insert(provider.clone(), key);
+
+        let plans = [
+            ("news", "Nepal latest news", "day", true),
+            (
+                "general",
+                "best isekai manga without an anime adaptation",
+                "none",
+                false,
+            ),
+        ];
+        let mut text_by_depth = Vec::new();
+        for depth in [Low, Medium, High] {
+            settings.assistant_search_depth = depth;
+            let mut total = 0;
+            for (label, query, freshness, news) in plans {
+                let started = std::time::Instant::now();
+                let results = run_tool_search(&settings, query, Some(freshness), news)
+                    .await
+                    .unwrap_or_else(|e| panic!("{depth:?} {label}: {e}"));
+                let elapsed = started.elapsed();
+                let chars: usize = results.iter().map(|r| r.snippet.chars().count()).sum();
+                total += chars;
+                println!(
+                    "{provider} {depth:?} {label}: {} results, {chars} chars, {} ms",
+                    results.len(),
+                    elapsed.as_millis()
+                );
+                for r in results.iter().take(3) {
+                    println!(
+                        "    {} | {}",
+                        truncate_chars(&r.title, 70),
+                        truncate_chars(&r.snippet, 110)
+                    );
+                }
+                assert!(!results.is_empty(), "{depth:?} {label} found nothing");
+                assert!(elapsed < tier_params(depth).timeout * 2 + Duration::from_secs(1));
+            }
+            text_by_depth.push(total);
+        }
+        assert!(
+            text_by_depth[2] > text_by_depth[0],
+            "Deep should hand the model more text than Quick: {text_by_depth:?}"
+        );
     }
 }

@@ -12,7 +12,7 @@
 Talk and it types, in any app. Ask and it answers. Start a conversation and talk it through.<br />
 It also writes up your meetings. Free, open source, and local by default.
 
-[![Latest release](https://img.shields.io/badge/release-v2.0.1-0A7A70)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
+[![Latest release](https://img.shields.io/badge/release-v2.1.0-0A7A70)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-informational)](#install)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
@@ -87,8 +87,8 @@ the recording pill can show them as you speak. Transcription runs on your
 graphics card or processor with a local model: Parakeet by default for English,
 Nemotron for 28 languages with automatic detection, Whisper for 99, and 65
 speech models in the catalog altogether. If you'd rather use the cloud,
-ElevenLabs and Deepgram stream text while you talk, and OpenAI, Groq, Mistral,
-Azure AI Speech, and OpenRouter work too.
+ElevenLabs, Deepgram, and Amazon Transcribe stream text while you talk, and
+OpenAI, Groq, Mistral, Azure AI Speech, and OpenRouter work too.
 
 - **Undo.** Cancelled a recording by accident? The pill offers Undo for a few
   seconds, and History keeps the recording so you can recover it later. A
@@ -98,8 +98,10 @@ Azure AI Speech, and OpenRouter work too.
 - **Translate to English.** Whisper, Canary, Granite Speech, and Voxtral
   models, and OpenAI or Groq in the cloud, can turn speech in another language
   into English text.
-- **Hold or tap.** Hold the keys while you talk, or switch to tap so one press
-  starts and the next one stops.
+- **Hold, tap, or go hands-free.** Hold the keys while you talk, or switch to
+  tap so one press starts and the next one stops, separately for dictation and
+  the assistant. Holding to dictate and need longer? Press Space too, let go,
+  and keep talking.
 
 ### Ask
 
@@ -215,22 +217,35 @@ Each feature has its own page in the [documentation](https://www.speakoflow.com/
 | Action                            | Windows                        | macOS           | Linux                  |
 | --------------------------------- | ------------------------------ | --------------- | ---------------------- |
 | Dictate                           | `Left Ctrl + Left Win`         | `Fn` (🌐)       | `Ctrl + Space`         |
+| Dictate hands-free <sup>1</sup>   | `Left Ctrl + Left Win + Space` | `Fn + Space`    | Tap <sup>2</sup>       |
 | Ask the assistant                 | `Left Ctrl + Left Alt`         | `Fn + Ctrl`     | `Ctrl + Alt + Space`   |
 | Start or end a conversation       | `Left Ctrl + Left Alt + C`     | `Fn + Ctrl + C` | `Ctrl + Alt + C`       |
-| Dictate and clean up <sup>1</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`    | `Ctrl + Shift + Space` |
+| Dictate and clean up <sup>3</sup> | `Left Ctrl + Left Win + Shift` | `Fn + Shift`    | `Ctrl + Shift + Space` |
 | Cancel                            | `Esc`                          | `Esc`           | Not available yet      |
 
-<sup>1</sup> Only while AI cleanup is on and has its own shortcut.
+<sup>1</sup> Press Space while you hold the dictation keys, or all together.
+It keeps listening after you let go, until you press the dictation keys again.
+The first few times you hold the dictation keys, the pill shows the Space key
+as a reminder. Pick another key, or turn it off, under **Hands-free** in
+Settings → Shortcuts.
+
+<sup>2</sup> Space is already part of `Ctrl + Space`, so turn off **Hold to
+talk** for dictation instead, which makes every dictation hands-free.
+
+<sup>3</sup> Only while AI cleanup is on and has its own shortcut.
 
 The pattern is the same on every platform. Add Shift to the dictation keys to
 dictate and clean up, and add C to the ask keys to start a conversation.
-Recording shortcuts work while you hold them; switch the Home page from **Hold
-to talk** to **Tap to toggle** and one press starts, the next one stops.
+Recording shortcuts work while you hold them. Dictation and the assistant each
+have their own **Hold to talk** switch in Settings → Shortcuts (**Manage** on
+the Home page): turned off, one press starts and the next one stops. A
+dictation that keeps listening without the keys is hands-free: the pill gets a
+ring, and hovering it shows ✕ to cancel and ✓ to finish.
 
 Esc only cancels while something is running, like a recording or a reply being
 read aloud, so other apps keep their Esc the rest of the time. To change a
-shortcut, click its keys. Cancel and the conversation shortcut can also be
-turned off from there.
+shortcut, click its keys. Cancel, the conversation shortcut and the
+hands-free key can also be turned off from there.
 
 On a Mac, set **System Settings → Keyboard → Press 🌐 key to** to **Do
 Nothing**, or the globe key opens the emoji picker as well. Macs that were on
@@ -247,7 +262,7 @@ providers use your own API key, stored in your system keychain.
 
 | Job                   | On your computer                                                                                                                                        | In the cloud, with your key                                                                                                                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Speech to text        | Parakeet, Nemotron, Canary, Cohere Transcribe, Whisper, Moonshine, Voxtral, Qwen3-ASR, GigaAM, Granite Speech, SenseVoice, and more (65 in the catalog) | ElevenLabs, Deepgram, OpenAI, Groq, Mistral (Voxtral), Azure AI Speech, OpenRouter, or any OpenAI-compatible server                                                                                       |
+| Speech to text        | Parakeet, Nemotron, Canary, Cohere Transcribe, Whisper, Moonshine, Voxtral, Qwen3-ASR, GigaAM, Granite Speech, SenseVoice, and more (65 in the catalog) | ElevenLabs, Deepgram, OpenAI, Groq, Mistral (Voxtral), Azure AI Speech, Amazon Transcribe, OpenRouter, or any OpenAI-compatible server                                                                    |
 | Assistant and cleanup | Built-in engine (llama.cpp, fully offline), Ollama, LM Studio, SpeakoFlow Mini for cleanup, Apple Intelligence for cleanup on Apple silicon             | OpenAI, Anthropic, Google Gemini, Azure OpenAI, AWS Bedrock, OpenRouter, Groq, Cerebras, xAI, DeepSeek, Mistral, Moonshot, Together AI, Fireworks AI, Perplexity, Z.AI, or any OpenAI-compatible endpoint |
 | Spoken replies        | Kokoro, Kitten, Pocket TTS, Supertonic                                                                                                                  | OpenAI, ElevenLabs, OpenRouter, Deepgram, Cartesia, Google Cloud, Azure AI Speech, Groq, xAI, Mistral, Inworld, or your own server                                                                        |
 | Web search (optional) |                                                                                                                                                         | Serper, Brave, Tavily, Exa, SerpAPI, TinyFish                                                                                                                                                             |

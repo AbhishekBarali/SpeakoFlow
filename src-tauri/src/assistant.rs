@@ -3145,15 +3145,22 @@ fn strip_visuals_for_retry(messages: &[Value], user_content: &str) -> Vec<Value>
 /// and `capture_screen` when the asking surface's screen switch is on — explains
 /// when to reach for each, and (reusing the shared, TTS-aware directive) how
 /// to present web findings. Fixed text per flag combination → cache-safe.
-fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
+fn tools_system_section(
+    web: bool,
+    screen: bool,
+    tts_enabled: bool,
+    depth: crate::settings::AssistantSearchDepth,
+) -> String {
     let mut s = String::from(
         "## Tools\n\
          You can call tools before answering; use one only when it genuinely helps, then reply normally.\n",
     );
     if web {
         s.push_str(
-            "• web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts (news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events), because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n",
+            "• web_search(query, freshness, news): live web results (titles + snippets). Call it BEFORE answering any question about current, recent, or changeable facts (news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events), because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. When a search is needed, call the tool in this same reply: never say you will look something up, or ask the user to wait, without calling it, because nothing happens after your reply ends. Never claim you cannot access the internet.\n",
         );
+        s.push_str(web_search::depth_guidance(depth));
+        s.push('\n');
     }
     s.push_str(
         "• get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment: to say what day or time it is, to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, or before setting a reminder for a named clock time.\n\
@@ -3169,6 +3176,18 @@ fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
     }
     s
 }
+
+/// What replaces the Tools section when a turn is retried with no tools
+/// because the provider refused function calling (see `tools_fallback`).
+///
+/// The retry used to resend the original system prompt, which still described
+/// web_search and said "never claim you cannot access the internet". A model
+/// told it has a tool it cannot call does the only thing left: it announces the
+/// search ("I'll check the latest headlines now") and then, on the next turn,
+/// admits it never saw any results. Telling it the truth gives the user an
+/// honest answer and a reason instead.
+const TOOLS_UNAVAILABLE_SECTION: &str = "## Tools\n\
+No tools are available for this reply: the selected model or provider refused function calling, so you cannot search the web, check the clock, look at the screen, or set reminders right now. Do not say you will look something up or set a reminder. Answer from what you know. If the question needs live or current information, say in one short sentence that live search is not working with the current model, then give your best answer and note that it may be out of date.";
 
 /// When to look at the screen, for the system prompt.
 ///
@@ -3697,7 +3716,21 @@ async fn run_text_tool(
                 return "No query was provided to web_search.".to_string();
             }
             let results =
-                web_search::run_tool_search(settings, &query, freshness.as_deref(), news).await;
+                match web_search::run_tool_search(settings, &query, freshness.as_deref(), news)
+                    .await
+                {
+                    Ok(results) => results,
+                    // Said to the model, not swallowed: "No results found" for a
+                    // search that never ran (a bad key, an exhausted plan) made
+                    // the model tell the user the web had nothing on the topic.
+                    Err(e) => {
+                        return format!(
+                            "The web search failed and returned nothing: {e}. Tell the user in one \
+                             short sentence that the search did not work and why, then answer from \
+                             what you know if you can, noting it may be out of date."
+                        )
+                    }
+                };
             if results.is_empty() {
                 return "No results found for that query.".to_string();
             }
@@ -4120,6 +4153,13 @@ async fn run_assistant_turn_inner(
         (settings.assistant_max_history_messages as usize, usize::MAX)
     };
     let mut messages: Vec<Value> = Vec::new();
+    // Built outside the prompt so a no-tools retry can swap exactly this part.
+    let tools_section = tools_system_section(
+        web_via_tools,
+        agent_screen,
+        settings.assistant_tts_enabled,
+        settings.assistant_search_depth,
+    );
     let system_content = {
         // Assemble the system prompt as clearly-separated sections, including a
         // section ONLY when it does work this turn. On a plain chat turn that's
@@ -4210,17 +4250,16 @@ async fn run_assistant_turn_inner(
         //    `else` was harmless. It stopped being harmless the moment the tool
         //    list became unconditional, at which point an `else` would have
         //    silently dropped the note for every `:online` user.
-        sections.push(tools_system_section(
-            web_via_tools,
-            agent_screen,
-            settings.assistant_tts_enabled,
-        ));
+        sections.push(tools_section.clone());
         if web_via_online {
             sections.push(web_search::WEB_SEARCH_CAPABILITY_NOTE.to_string());
         }
 
         sections.join("\n\n")
     };
+    // The same prompt for a retry that goes out with no tools attached.
+    let system_content_without_tools =
+        system_content.replacen(&tools_section, TOOLS_UNAVAILABLE_SECTION, 1);
     messages.push(json!({
         "role": "system",
         "content": system_content,
@@ -4338,8 +4377,16 @@ async fn run_assistant_turn_inner(
     // And the same turn with the tool list removed, for a provider that refuses
     // function calling outright (see the retry further down). One clone of the
     // message list per turn, which is the same cost `vision_fallback` above
-    // already pays and negligible beside the request it is insuring.
-    let mut tools_fallback = tool_capabilities.as_ref().map(|_| messages.clone());
+    // already pays and negligible beside the request it is insuring. Its system
+    // prompt says the tools are gone, so the model cannot promise a search it
+    // has no way to run.
+    let mut tools_fallback = tool_capabilities.as_ref().map(|_| {
+        let mut fallback = messages.clone();
+        if let Some(system) = fallback.first_mut() {
+            system["content"] = json!(system_content_without_tools);
+        }
+        fallback
+    });
 
     emit_state(&app, "thinking");
 
@@ -5417,13 +5464,20 @@ mod tests {
         for web in [false, true] {
             for screen in [false, true] {
                 for tts in [false, true] {
-                    texts.push((
-                        format!("tools web={web} screen={screen} tts={tts}"),
-                        tools_system_section(web, screen, tts),
-                    ));
+                    for depth in [
+                        crate::settings::AssistantSearchDepth::Low,
+                        crate::settings::AssistantSearchDepth::Medium,
+                        crate::settings::AssistantSearchDepth::High,
+                    ] {
+                        texts.push((
+                            format!("tools web={web} screen={screen} tts={tts} depth={depth:?}"),
+                            tools_system_section(web, screen, tts, depth),
+                        ));
+                    }
                 }
             }
         }
+        texts.push(("tools unavailable".into(), TOOLS_UNAVAILABLE_SECTION.into()));
         for (name, text) in texts {
             assert!(!text.contains('\u{2014}'), "em dash in {name}: {text}");
         }
@@ -5814,7 +5868,12 @@ mod tests {
     #[test]
     fn the_tools_prompt_section_always_documents_reminders() {
         for (web, screen) in [(false, false), (true, false), (false, true), (true, true)] {
-            let section = tools_system_section(web, screen, false);
+            let section = tools_system_section(
+                web,
+                screen,
+                false,
+                crate::settings::AssistantSearchDepth::Medium,
+            );
             assert!(
                 section.contains("set_reminder"),
                 "web={web} screen={screen}"
@@ -5823,6 +5882,200 @@ mod tests {
             assert_eq!(section.contains("web_search"), web);
             assert_eq!(section.contains("capture_screen"), screen);
         }
+    }
+
+    /// The depth dial has to reach the model, not only the search provider:
+    /// Deep is the only setting that asks for more than one search, and none of
+    /// it appears when web search is off.
+    #[test]
+    fn the_tools_prompt_follows_the_search_depth() {
+        use crate::settings::AssistantSearchDepth::{High, Low, Medium};
+        let quick = tools_system_section(true, false, false, Low);
+        let standard = tools_system_section(true, false, false, Medium);
+        let deep = tools_system_section(true, false, false, High);
+        assert!(quick.contains(web_search::depth_guidance(Low)));
+        assert!(standard.contains(web_search::depth_guidance(Medium)));
+        assert!(deep.contains(web_search::depth_guidance(High)));
+        assert_ne!(quick, deep);
+        assert!(deep.contains("two or three"));
+        assert!(!tools_system_section(false, false, false, High)
+            .contains(web_search::depth_guidance(High)));
+    }
+
+    /// Live, end to end through this app's own code: the user's configured
+    /// assistant provider, model and Thinking level, offered the real tool
+    /// list, has to call `web_search` for a news question, get results from the
+    /// configured search provider, and answer from them. This is the turn that
+    /// used to end in "I'll check the headlines" and then "I can't see search
+    /// results" on Azure GPT-6 with Thinking set to Low. Ignored: it spends
+    /// provider and search credits.
+    ///
+    /// ```text
+    /// cargo test --lib assistant::tests::live_tool_loop_searches_and_answers -- --ignored --nocapture
+    /// ```
+    #[tokio::test]
+    #[ignore]
+    async fn live_tool_loop_searches_and_answers() {
+        let store = crate::stt_cloud_live_tests::recordings_dir()
+            .and_then(|dir| dir.parent().map(|p| p.join("settings_store.json")))
+            .expect("the app's data directory (run the app once first)");
+        let raw: Value =
+            serde_json::from_str(&std::fs::read_to_string(store).expect("settings file"))
+                .expect("settings json");
+        let saved = &raw["settings"];
+        let provider_id = saved["assistant_provider_id"].as_str().unwrap().to_string();
+        let provider: crate::settings::PostProcessProvider = serde_json::from_value(
+            saved["post_process_providers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|p| p["id"] == provider_id.as_str())
+                .cloned()
+                .expect("provider"),
+        )
+        .unwrap();
+        let model = saved["assistant_models"][&provider_id]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let thinking: crate::settings::ThinkingLevel =
+            serde_json::from_value(saved["assistant_thinking"].clone()).unwrap_or_default();
+        let depth: crate::settings::AssistantSearchDepth =
+            match std::env::var("SPEAKOFLOW_SEARCH_DEPTH") {
+                Ok(d) => serde_json::from_value(json!(d)).expect("low, medium or high"),
+                Err(_) => serde_json::from_value(saved["assistant_search_depth"].clone())
+                    .unwrap_or_default(),
+            };
+        let search_provider = saved["assistant_web_search_provider"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let api_key =
+            crate::secret_store::get(&crate::secret_store::account_post_process(&provider_id))
+                .unwrap_or_default();
+        let search_key =
+            crate::secret_store::get(&crate::secret_store::account_web_search(&search_provider))
+                .expect("search key");
+        let mut settings = crate::settings::get_default_settings();
+        settings.assistant_web_search_provider = search_provider.clone();
+        settings
+            .web_search_api_keys
+            .insert(search_provider.clone(), search_key);
+        settings.assistant_search_depth = depth;
+        println!("{provider_id} / {model}, thinking {thinking:?}, {search_provider} at {depth:?}");
+
+        let tools = build_assistant_tool_capabilities(true, false).unwrap();
+        let (effort, reasoning) = llm_client::reasoning_options_for(&provider.id, &model, thinking);
+        let mut msgs = vec![
+            json!({"role": "system", "content": tools_system_section(true, false, false, depth)}),
+            json!({"role": "user", "content": "Who is the current Prime Minister of Nepal?"}),
+            json!({"role": "assistant", "content": "Nepal's current Prime Minister is Balendra Shah."}),
+            json!({"role": "user", "content": "All right, what is the latest news in Nepal?"}),
+        ];
+        let started = Instant::now();
+        let mut searches = 0;
+        let mut answer = String::new();
+        for round_index in 0..MAX_ASSISTANT_TOOL_ROUNDS {
+            let round = llm_client::send_chat_stream_with_tools(
+                &provider,
+                api_key.clone(),
+                &model,
+                msgs.clone(),
+                tools.clone(),
+                json!("auto"),
+                effort.clone(),
+                reasoning.clone(),
+                |_| {},
+            )
+            .await
+            .unwrap_or_else(|e| panic!("round {round_index} failed: {e}"));
+            println!(
+                "round {round_index} at {} ms: {} tool call(s), text {:?}",
+                started.elapsed().as_millis(),
+                round.tool_calls.len(),
+                round.text.chars().take(80).collect::<String>()
+            );
+            if round.tool_calls.is_empty() {
+                answer = round.text;
+                break;
+            }
+            msgs.push(json!({
+                "role": "assistant",
+                "content": round.text,
+                "tool_calls": round.tool_calls.iter().map(|tc| json!({
+                    "id": tc.id, "type": "function",
+                    "function": {"name": tc.name, "arguments": tc.arguments}
+                })).collect::<Vec<_>>()
+            }));
+            for tc in &round.tool_calls {
+                if tc.name == "web_search" {
+                    searches += 1;
+                }
+            }
+            // Concurrently, the way the app's own tool loop runs them.
+            let contents = futures_util::future::join_all(round.tool_calls.iter().map(|tc| {
+                let settings = &settings;
+                async move {
+                    if tc.name != "web_search" {
+                        return current_datetime_line();
+                    }
+                    let (query, freshness, news) = parse_web_search_args(&tc.arguments);
+                    let t = Instant::now();
+                    let results =
+                        web_search::run_tool_search(settings, &query, freshness.as_deref(), news)
+                            .await
+                            .unwrap_or_else(|e| panic!("search failed: {e}"));
+                    println!(
+                        "  web_search {:?} (freshness {:?}, news {}) -> {} results in {} ms",
+                        query,
+                        freshness,
+                        news,
+                        results.len(),
+                        t.elapsed().as_millis()
+                    );
+                    web_search::format_results_for_prompt(
+                        &results,
+                        web_search::context_budget_for(depth),
+                    )
+                }
+            }))
+            .await;
+            for (tc, content) in round.tool_calls.iter().zip(contents) {
+                msgs.push(json!({"role": "tool", "tool_call_id": tc.id, "content": content}));
+            }
+        }
+        println!(
+            "answer after {} ms:\n{answer}",
+            started.elapsed().as_millis()
+        );
+        assert!(searches >= 1, "the model never searched");
+        assert!(!answer.trim().is_empty(), "no answer after searching");
+        let lower = answer.to_lowercase();
+        for refusal in [
+            "can't see",
+            "cannot see",
+            "can't access",
+            "unable to search",
+        ] {
+            assert!(!lower.contains(refusal), "answer still refuses: {answer}");
+        }
+    }
+
+    /// The no-tools retry must not keep telling the model it can search.
+    #[test]
+    fn the_no_tools_retry_prompt_does_not_promise_tools() {
+        let section = tools_system_section(
+            true,
+            true,
+            false,
+            crate::settings::AssistantSearchDepth::High,
+        );
+        let prompt = format!("Persona.\n\n{section}");
+        let retry = prompt.replacen(&section, TOOLS_UNAVAILABLE_SECTION, 1);
+        assert!(retry.starts_with("Persona."));
+        assert!(!retry.contains("web_search("));
+        assert!(!retry.contains("Never claim you cannot access the internet"));
+        assert!(retry.contains("No tools are available"));
     }
 
     /// The rejections this has to recognise, in the wording each provider
