@@ -87,6 +87,7 @@ interface SettingsStore {
   refreshAudioDevices: () => Promise<void>;
   refreshOutputDevices: () => Promise<void>;
   updateBinding: (id: string, binding: string) => Promise<void>;
+  updateAlternateBinding: (id: string, binding: string) => Promise<void>;
   resetBinding: (id: string) => Promise<void>;
   getSetting: <K extends keyof Settings>(key: K) => Settings[K] | undefined;
   isUpdatingKey: (key: string) => boolean;
@@ -258,6 +259,8 @@ const settingUpdaters: {
     commands.changeExperimentalEnabledSetting(value as boolean),
   lazy_stream_close: (value) =>
     commands.changeLazyStreamCloseSetting(value as boolean),
+  mouse_button_shortcuts: (value) =>
+    commands.changeMouseButtonShortcutsSetting(value as boolean),
   live_transcription_enabled: (value) =>
     commands.changeLiveTranscriptionEnabledSetting(value as boolean),
   live_transcription_window_enabled: (value) =>
@@ -563,6 +566,47 @@ export const useSettingsStore = create<SettingsStore>()(
         }
 
         // Re-throw to let the caller know it failed
+        throw error;
+      } finally {
+        setUpdating(updateKey, false);
+      }
+    },
+
+    // A shortcut's other keys: the same round trip as its own, on their own
+    // field, so a failure puts back only what this call changed.
+    updateAlternateBinding: async (id, binding) => {
+      const { settings, setUpdating } = get();
+      const updateKey = `binding_${id}`;
+      const original = settings?.bindings?.[id]?.alternate_binding ?? "";
+      const apply = (value: string) =>
+        set((state) => ({
+          settings: state.settings
+            ? {
+                ...state.settings,
+                bindings: {
+                  ...state.settings.bindings,
+                  [id]: {
+                    ...state.settings.bindings[id]!,
+                    alternate_binding: value,
+                  },
+                },
+              }
+            : null,
+        }));
+
+      setUpdating(updateKey, true);
+      try {
+        apply(binding);
+        const result = await commands.changeAlternateBinding(id, binding);
+        if (result.status === "error") {
+          throw new Error(result.error);
+        }
+        if (!result.data.success) {
+          throw new Error(result.data.error || "Failed to update binding");
+        }
+      } catch (error) {
+        console.error(`Failed to update the other keys of ${id}:`, error);
+        if (get().settings) apply(original);
         throw error;
       } finally {
         setUpdating(updateKey, false);

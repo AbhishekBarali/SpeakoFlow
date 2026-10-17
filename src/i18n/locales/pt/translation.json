@@ -649,6 +649,7 @@
           "restore": "Não foi possível restaurar o atalho original.",
           "set": "Não foi possível definir o atalho: {{error}}",
           "inUse": "“{{name}}” já usa {{keys}}. Escolha outras teclas ou altere primeiro esse atalho.",
+          "sameAsOther": "{{keys}} já está definido para este atalho.",
           "reset": "Não foi possível redefinir o atalho."
         },
         "clickToChange": "Clique para alterar",
@@ -834,6 +835,13 @@
       "lazyStreamClose": {
         "label": "Manter o microfone aberto entre transcrições",
         "description": "Ditados consecutivos mais rápidos. Pode afetar a qualidade do áudio Bluetooth."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Botões do mouse como atalhos",
+        "description": "Use o botão do meio, Voltar ou Avançar do mouse como atalho: clique nas teclas de um atalho e pressione o botão. Enquanto for um atalho, o botão não faz mais nada.",
+        "linux": "No Linux, só o botão do meio funciona.",
+        "needsEngine": "Requer a implementação do teclado SpeakoFlow Keys.",
+        "reset": "Os atalhos que usavam um botão do mouse voltaram às teclas padrão."
       },
       "liveTranscription": {
         "label": "Transcrição ao vivo",
@@ -3245,7 +3253,19 @@
     "useDefault": "Usar padrão",
     "turnOff": "Desativar",
     "turnedOff": "Atalho de {{name}} desativado",
-    "undo": "Desfazer"
+    "undo": "Desfazer",
+    "addAnother": "Adicionar outro",
+    "addAnotherHint": "Dê a este atalho uma segunda combinação de teclas, como um botão do mouse",
+    "remove": "Remover",
+    "or": "ou",
+    "changeOther": "Alterar as outras teclas do atalho {{name}}",
+    "pressKeysOrButton": "Pressione as teclas ou um botão do mouse…",
+    "mouseNeedsKeysEngine": "Os botões do mouse precisam da implementação do teclado SpeakoFlow Keys (Configurações → Avançado → Experimental).",
+    "mouse": {
+      "middle": "Botão do meio",
+      "back": "Botão Voltar",
+      "forward": "Botão Avançar"
+    }
   },
   "memoryManager": {
     "status": {

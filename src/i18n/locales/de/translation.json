@@ -647,6 +647,7 @@
           "restore": "Das ursprüngliche Tastenkürzel konnte nicht wiederhergestellt werden.",
           "set": "Das Tastenkürzel konnte nicht festgelegt werden: {{error}}",
           "inUse": "„{{name}}“ verwendet bereits {{keys}}. Andere Tasten wählen oder zuerst jenes Tastenkürzel ändern.",
+          "sameAsOther": "{{keys}} ist für dieses Tastenkürzel bereits eingestellt.",
           "reset": "Tastenkürzel konnte nicht zurückgesetzt werden."
         },
         "clickToChange": "Zum Ändern klicken",
@@ -828,6 +829,13 @@
       "lazyStreamClose": {
         "label": "Mikrofon zwischen Transkriptionen offen halten",
         "description": "Schnelleres Diktieren in Folge. Kann die Bluetooth-Audioqualität beeinträchtigen."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Maustasten als Tastenkürzel",
+        "description": "Nutze die mittlere Maustaste oder die Tasten Zurück und Vor als Tastenkürzel: Klicke auf die Tasten eines Kürzels und drücke dann die Maustaste. Solange sie ein Kürzel ist, tut die Taste sonst nichts.",
+        "linux": "Unter Linux funktioniert nur die mittlere Maustaste.",
+        "needsEngine": "Erfordert die Tastatur-Implementierung SpeakoFlow Keys.",
+        "reset": "Tastenkürzel mit einer Maustaste verwenden wieder ihre Standardtasten."
       },
       "liveTranscription": {
         "label": "Live-Transkription",
@@ -3216,7 +3224,19 @@
     "useDefault": "Standard verwenden",
     "turnOff": "Ausschalten",
     "turnedOff": "Tastenkürzel für {{name}} ausgeschaltet",
-    "undo": "Rückgängig"
+    "undo": "Rückgängig",
+    "addAnother": "Weitere hinzufügen",
+    "addAnotherHint": "Diesem Tastenkürzel eine zweite Tastenkombination geben, etwa eine Maustaste",
+    "remove": "Entfernen",
+    "or": "oder",
+    "changeOther": "Weitere Tasten für {{name}} ändern",
+    "pressKeysOrButton": "Tasten oder eine Maustaste drücken…",
+    "mouseNeedsKeysEngine": "Maustasten brauchen die Tastatur-Implementierung SpeakoFlow Keys (Einstellungen → Erweitert → Experimentell).",
+    "mouse": {
+      "middle": "Mittlere Maustaste",
+      "back": "Maustaste Zurück",
+      "forward": "Maustaste Vor"
+    }
   },
   "memoryManager": {
     "status": {

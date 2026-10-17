@@ -25,10 +25,7 @@ pub const CHORD_CANCEL_WINDOW: Duration = Duration::from_millis(400);
 /// modifier-only hotkey to talk is ordinary use, not the start of another
 /// shortcut.
 fn is_keyboard_key(key: Key) -> bool {
-    !matches!(
-        key,
-        Key::MouseLeft | Key::MouseRight | Key::MouseMiddle | Key::MouseX1 | Key::MouseX2
-    )
+    !key.is_mouse_button()
 }
 
 /// Internal state shared between the manager and the processing thread
@@ -97,6 +94,14 @@ impl ManagerState {
             .is_some_and(|&at| now.saturating_duration_since(at) < CHORD_CANCEL_WINDOW)
     }
 
+    /// Whether a mouse button, with these modifiers held, is itself a
+    /// registered hotkey.
+    fn is_bound_button(&self, key: Key, modifiers: Modifiers) -> bool {
+        self.hotkeys
+            .values()
+            .any(|h| h.key == Some(key) && h.modifiers.matches(modifiers))
+    }
+
     /// Process a key event and return any matching hotkey events
     fn process_event(&mut self, event: &KeyEvent) -> Vec<HotkeyEvent> {
         self.process_event_at(event, Instant::now())
@@ -119,8 +124,14 @@ impl ManagerState {
                 Some(key) => {
                     // A click counts as "something else" only while waiting
                     // for a release. While a hotkey is being held to talk it
-                    // is ordinary use of the mouse.
-                    if is_keyboard_key(key) || self.fire_on_release {
+                    // is ordinary use of the mouse, unless the button is a
+                    // hotkey of its own: Ctrl+Alt+Back registered while
+                    // Ctrl+Alt asks is the rest of a longer shortcut, exactly
+                    // as a typed C is for Ctrl+Alt+C.
+                    if is_keyboard_key(key)
+                        || self.fire_on_release
+                        || self.is_bound_button(key, event.modifiers)
+                    {
                         self.yield_to_chord(now, &mut results);
                     }
                     let to_press: Vec<HotkeyId> = self
@@ -874,6 +885,71 @@ mod tests {
                 )
                 .is_empty());
             assert!(state.pressed_hotkeys.contains(&dictate));
+        }
+
+        /// A mouse button registered as a hotkey of its own (another
+        /// shortcut's other keys) is a chord like any typed key: Ctrl+Alt
+        /// fires the ask, Back on top within the window withdraws it for the
+        /// longer one. A button nobody registered stays ordinary use.
+        #[test]
+        fn a_bound_button_during_a_hold_is_a_chord() {
+            let (mut state, [_, _, ask, _]) = windows_defaults(false);
+            let back = HotkeyId(4);
+            state
+                .hotkeys
+                .insert(back, "ctrl_left+alt_left+mousex1".parse().unwrap());
+            let t0 = Instant::now();
+            state.process_event_at(
+                &make_modifier_event(CTRL_ALT, true, Modifiers::OPT_LEFT),
+                t0,
+            );
+            let click = state.process_event_at(
+                &make_key_event(CTRL_ALT, Some(Key::MouseX1), true),
+                at(t0, 120),
+            );
+            assert_eq!(
+                states(&click),
+                vec![(ask, HotkeyState::Cancelled), (back, HotkeyState::Pressed)]
+            );
+            let release = state.process_event_at(
+                &make_key_event(CTRL_ALT, Some(Key::MouseX1), false),
+                at(t0, 400),
+            );
+            assert_eq!(states(&release), vec![(back, HotkeyState::Released)]);
+
+            // The forward button is nobody's: holding the ask, it is a click.
+            let (mut state, [_, _, ask, _]) = windows_defaults(false);
+            state.process_event_at(
+                &make_modifier_event(CTRL_ALT, true, Modifiers::OPT_LEFT),
+                t0,
+            );
+            assert!(state
+                .process_event_at(
+                    &make_key_event(CTRL_ALT, Some(Key::MouseX2), true),
+                    at(t0, 120),
+                )
+                .is_empty());
+            assert!(state.pressed_hotkeys.contains(&ask));
+        }
+
+        /// A button on its own, bound with no modifiers, is pressed and
+        /// released like a key.
+        #[test]
+        fn a_bound_button_alone_is_pressed_and_released() {
+            let (mut state, _) = windows_defaults(false);
+            let back = HotkeyId(4);
+            state.hotkeys.insert(back, "mousex1".parse().unwrap());
+            let t0 = Instant::now();
+            let down = state.process_event_at(
+                &make_key_event(Modifiers::empty(), Some(Key::MouseX1), true),
+                t0,
+            );
+            assert_eq!(states(&down), vec![(back, HotkeyState::Pressed)]);
+            let up = state.process_event_at(
+                &make_key_event(Modifiers::empty(), Some(Key::MouseX1), false),
+                at(t0, 2000),
+            );
+            assert_eq!(states(&up), vec![(back, HotkeyState::Released)]);
         }
 
         #[test]

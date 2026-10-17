@@ -647,6 +647,7 @@
           "restore": "Orijinal kısayol geri yüklenemedi.",
           "set": "Kısayol ayarlanamadı: {{error}}",
           "inUse": "“{{name}}” zaten {{keys}} kullanıyor. Başka tuşlar seçin veya önce o kısayolu değiştirin.",
+          "sameAsOther": "{{keys}} bu kısayol için zaten ayarlı.",
           "reset": "Kısayol sıfırlanamadı."
         },
         "clickToChange": "Değiştirmek için tıklayın",
@@ -828,6 +829,13 @@
       "lazyStreamClose": {
         "label": "Transkripsiyonlar arasında mikrofonu açık tut",
         "description": "Ardışık diktelerde daha hızlı. Bluetooth ses kalitesini etkileyebilir."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Kısayol olarak fare düğmeleri",
+        "description": "Farenizin orta, Geri veya İleri düğmesini kısayol olarak kullanın: bir kısayolun tuşlarına tıklayın, ardından düğmeye basın. Kısayol olduğu sürece düğme başka bir şey yapmaz.",
+        "linux": "Linux'ta yalnızca orta düğme çalışır.",
+        "needsEngine": "SpeakoFlow Keys klavye altyapısını gerektirir.",
+        "reset": "Fare düğmesi kullanan kısayollar varsayılan tuşlarına döndü."
       },
       "liveTranscription": {
         "label": "Canlı transkripsiyon",
@@ -3216,7 +3224,19 @@
     "useDefault": "Varsayılanı kullan",
     "turnOff": "Kapat",
     "turnedOff": "{{name}} kısayolu kapatıldı",
-    "undo": "Geri al"
+    "undo": "Geri al",
+    "addAnother": "Başka ekle",
+    "addAnotherHint": "Bu kısayola ikinci bir tuş takımı verin, örneğin bir fare düğmesi",
+    "remove": "Kaldır",
+    "or": "veya",
+    "changeOther": "{{name}} kısayolunun diğer tuşlarını değiştir",
+    "pressKeysOrButton": "Tuşlara veya bir fare düğmesine basın…",
+    "mouseNeedsKeysEngine": "Fare düğmeleri SpeakoFlow Keys klavye altyapısını gerektirir (Ayarlar → Gelişmiş → Deneysel).",
+    "mouse": {
+      "middle": "Orta fare düğmesi",
+      "back": "Fare Geri düğmesi",
+      "forward": "Fare İleri düğmesi"
+    }
   },
   "memoryManager": {
     "status": {

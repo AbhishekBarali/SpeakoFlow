@@ -645,6 +645,7 @@
           "restore": "无法恢复原来的快捷键。",
           "set": "无法设置快捷键：{{error}}",
           "inUse": "“{{name}}”已在使用 {{keys}}。请选择其他按键，或先修改那个快捷键。",
+          "sameAsOther": "{{keys}} 已经是这个快捷键的按键。",
           "reset": "无法重置该快捷键。"
         },
         "clickToChange": "点击更改",
@@ -822,6 +823,13 @@
       "lazyStreamClose": {
         "label": "在两次转录之间保持麦克风开启",
         "description": "连续语音输入更快。可能影响蓝牙音频质量。"
+      },
+      "mouseButtonShortcuts": {
+        "label": "将鼠标按钮用作快捷键",
+        "description": "将鼠标中键、后退键或前进键用作快捷键：点击快捷键的按键，然后按下该鼠标按钮。作为快捷键期间，该按钮不再执行其他操作。",
+        "linux": "在 Linux 上只有鼠标中键可用。",
+        "needsEngine": "需要使用 SpeakoFlow Keys 键盘实现。",
+        "reset": "使用鼠标按钮的快捷键已恢复为默认按键。"
       },
       "liveTranscription": {
         "label": "实时转录",
@@ -3187,7 +3195,19 @@
     "useDefault": "使用默认值",
     "turnOff": "关闭",
     "turnedOff": "已关闭{{name}}快捷键",
-    "undo": "撤销"
+    "undo": "撤销",
+    "addAnother": "添加另一组",
+    "addAnotherHint": "为这个快捷键再设一组按键，例如鼠标按钮",
+    "remove": "移除",
+    "or": "或",
+    "changeOther": "更改“{{name}}”快捷键的另一组按键",
+    "pressKeysOrButton": "请按下按键或鼠标按钮…",
+    "mouseNeedsKeysEngine": "鼠标按钮需要使用 SpeakoFlow Keys 键盘实现（设置 → 高级 → 实验性）。",
+    "mouse": {
+      "middle": "鼠标中键",
+      "back": "鼠标后退键",
+      "forward": "鼠标前进键"
+    }
   },
   "memoryManager": {
     "status": {

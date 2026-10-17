@@ -647,6 +647,7 @@
           "restore": "Det gick inte att återställa det ursprungliga kortkommandot.",
           "set": "Det gick inte att ställa in kortkommandot: {{error}}",
           "inUse": "”{{name}}” använder redan {{keys}}. Välj andra tangenter eller ändra det kortkommandot först.",
+          "sameAsOther": "{{keys}} är redan inställt för det här kortkommandot.",
           "reset": "Kunde inte återställa kortkommandot."
         },
         "clickToChange": "Klicka för att ändra",
@@ -828,6 +829,13 @@
       "lazyStreamClose": {
         "label": "Håll mikrofonen öppen mellan transkriptioner",
         "description": "Snabbare diktering på raken. Kan påverka Bluetooth-ljudkvaliteten."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Musknappar som kortkommandon",
+        "description": "Använd musens mittenknapp, Bakåt eller Framåt som kortkommando: klicka på kortkommandots tangenter och tryck sedan på knappen. Så länge den är ett kortkommando gör knappen inget annat.",
+        "linux": "På Linux fungerar bara mittenknappen.",
+        "needsEngine": "Kräver tangentbordsimplementeringen SpeakoFlow Keys.",
+        "reset": "Kortkommandon som använde en musknapp har fått tillbaka sina standardtangenter."
       },
       "liveTranscription": {
         "label": "Live-transkribering",
@@ -3216,7 +3224,19 @@
     "useDefault": "Använd standard",
     "turnOff": "Stäng av",
     "turnedOff": "Kortkommandot för {{name}} är avstängt",
-    "undo": "Ångra"
+    "undo": "Ångra",
+    "addAnother": "Lägg till fler",
+    "addAnotherHint": "Ge kortkommandot en andra uppsättning tangenter, till exempel en musknapp",
+    "remove": "Ta bort",
+    "or": "eller",
+    "changeOther": "Ändra de andra tangenterna för {{name}}",
+    "pressKeysOrButton": "Tryck på tangenter eller en musknapp…",
+    "mouseNeedsKeysEngine": "Musknappar kräver tangentbordsimplementeringen SpeakoFlow Keys (Inställningar → Avancerat → Experimentellt).",
+    "mouse": {
+      "middle": "Mittenknapp på musen",
+      "back": "Musknapp Bakåt",
+      "forward": "Musknapp Framåt"
+    }
   },
   "memoryManager": {
     "status": {

@@ -651,6 +651,7 @@
           "restore": "Nepodařilo se obnovit původní zkratku.",
           "set": "Nepodařilo se nastavit zkratku: {{error}}",
           "inUse": "„{{name}}“ už používá {{keys}}. Vyberte jiné klávesy, nebo nejdřív změňte tu zkratku.",
+          "sameAsOther": "{{keys}} už je pro tuto zkratku nastaveno.",
           "reset": "Nepodařilo se resetovat zkratku."
         },
         "clickToChange": "Kliknutím změníte",
@@ -840,6 +841,13 @@
       "lazyStreamClose": {
         "label": "Ponechat mikrofon zapnutý mezi přepisy",
         "description": "Rychlejší diktování za sebou. Může ovlivnit kvalitu zvuku Bluetooth."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Tlačítka myši jako zkratky",
+        "description": "Použijte prostřední tlačítko myši nebo tlačítka Zpět a Vpřed jako zkratku: klikněte na klávesy zkratky a pak stiskněte tlačítko. Dokud je zkratkou, tlačítko nedělá nic jiného.",
+        "linux": "V Linuxu funguje jen prostřední tlačítko.",
+        "needsEngine": "Vyžaduje implementaci klávesnice SpeakoFlow Keys.",
+        "reset": "Zkratky, které používaly tlačítko myši, mají zase výchozí klávesy."
       },
       "liveTranscription": {
         "label": "Průběžný přepis",
@@ -3274,7 +3282,19 @@
     "useDefault": "Výchozí",
     "turnOff": "Vypnout",
     "turnedOff": "Zkratka {{name}} je vypnutá",
-    "undo": "Zpět"
+    "undo": "Zpět",
+    "addAnother": "Přidat další",
+    "addAnotherHint": "Přiřadit této zkratce druhou sadu kláves, třeba tlačítko myši",
+    "remove": "Odebrat",
+    "or": "nebo",
+    "changeOther": "Změnit další klávesy zkratky {{name}}",
+    "pressKeysOrButton": "Stiskněte klávesy nebo tlačítko myši…",
+    "mouseNeedsKeysEngine": "Tlačítka myši vyžadují implementaci klávesnice SpeakoFlow Keys (Nastavení → Pokročilé → Experimentální).",
+    "mouse": {
+      "middle": "Prostřední tlačítko myši",
+      "back": "Tlačítko myši Zpět",
+      "forward": "Tlačítko myši Vpřed"
+    }
   },
   "memoryManager": {
     "status": {

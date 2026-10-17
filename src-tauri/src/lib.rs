@@ -967,6 +967,7 @@ pub fn run(cli_args: CliArgs) {
         .commands(collect_commands![
             shortcut::change_binding,
             shortcut::reset_binding,
+            shortcut::change_alternate_binding,
             shortcut::change_ptt_setting,
             shortcut::change_dictation_silence_stop_setting,
             shortcut::change_audio_feedback_setting,
@@ -1037,6 +1038,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_update_checks_setting,
             shortcut::change_keyboard_implementation_setting,
             shortcut::get_keyboard_implementation,
+            shortcut::change_mouse_button_shortcuts_setting,
             shortcut::globe_key_has_own_action,
             shortcut::environment::get_shortcut_environment,
             shortcut::open_keyboard_settings,

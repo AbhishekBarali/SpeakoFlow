@@ -7,6 +7,7 @@ import { SectionTitle } from "@/components/ui/Page";
 import { Segmented } from "@/components/ui/Segmented";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
+import { shortcutCombos } from "@/lib/utils/shortcutConflict";
 import { useNavigation, type PageId } from "@/components/shell/navigation";
 import { LinuxShortcutHelp } from "./LinuxShortcutHelp";
 
@@ -96,13 +97,17 @@ export const ShortcutsCard: React.FC = () => {
   const bindings = getSetting("bindings") ?? {};
   const usesGlobe =
     os === "macos" &&
-    rows.some(
-      (row) =>
+    rows.some((row) => {
+      const binding = bindings[row.id];
+      return (
         !row.off &&
-        (bindings[row.id]?.current_binding ?? "")
-          .split("+")
-          .some((part) => part.trim().toLowerCase() === "fn"),
-    );
+        !!binding &&
+        // Its other keys press the globe key as much as its own do.
+        shortcutCombos(binding).some((keys) =>
+          keys.split("+").some((part) => part.trim().toLowerCase() === "fn"),
+        )
+      );
+    });
   const [globeBusy, setGlobeBusy] = useState(false);
   useEffect(() => {
     if (!usesGlobe) {
