@@ -19,7 +19,8 @@
 //
 // Deliberately untouched: src-tauri/resources/tray_recording*.png,
 // tray_transcribing*.png, recording.png, transcribing.png. Those are
-// recording/transcribing STATE glyphs, not the brand mark.
+// recording/transcribing STATE glyphs, not the brand mark. The Linux tray's
+// white idle glyph and its teal state glyphs come from tray-glyphs.mjs.
 //
 // Run from the Logo folder: node apply-icon-to-app.mjs
 
@@ -56,7 +57,7 @@ const TARGETS = [
   // macOS idle uses its own 36px file, written below.
   ["src-tauri/resources/tray_idle.png", 64, "tray idle (dark themes)"],
   ["src-tauri/resources/tray_idle_dark.png", 64, "tray idle (light themes)"],
-  ["src-tauri/resources/speakoflow.png", 64, "tray idle (Linux)"],
+  ["src-tauri/resources/speakoflow.png", 64, "tray idle (Linux colour)"],
   // Runtime window icons are single bitmaps, independent of the multi-size ICO.
   // Native DrawIconEx comparisons showed uneven stroke widths from 64 -> 24.
   // 48 -> 24 preserves the original mark more evenly, and also covers the

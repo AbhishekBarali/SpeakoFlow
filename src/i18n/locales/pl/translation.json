@@ -897,6 +897,10 @@
         "label": "Pokaż ikonę w zasobniku",
         "description": "Trzymaj SpeakoFlow w zasobniku systemowym."
       },
+      "trayIconColor": {
+        "label": "Kolorowa ikona w zasobniku",
+        "description": "Pokazuje kolorowe logo zamiast białej ikony. Włącz, jeśli panel jest jasny i biała ikona jest słabo widoczna."
+      },
       "closeBehavior": {
         "label": "Zamykaj aplikację razem z oknem",
         "description": "Gdy wyłączone, zamknięcie okna pozostawia SpeakoFlow w zasobniku systemowym, więc skróty nadal działają. Gdy włączone, zamknięcie okna całkowicie kończy działanie aplikacji."

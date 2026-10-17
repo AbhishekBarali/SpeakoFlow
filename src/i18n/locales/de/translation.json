@@ -885,6 +885,10 @@
         "label": "Taskleistensymbol anzeigen",
         "description": "SpeakoFlow in der Taskleiste behalten."
       },
+      "trayIconColor": {
+        "label": "Farbiges Taskleistensymbol",
+        "description": "Zeigt das farbige Logo statt des weißen Symbols. Schalte das ein, wenn deine Leiste hell ist und das weiße Symbol schlecht zu sehen ist."
+      },
       "closeBehavior": {
         "label": "Beenden, wenn ich das Fenster schließe",
         "description": "Wenn aus, läuft SpeakoFlow nach dem Schließen des Fensters in der Taskleiste weiter, damit deine Tastenkürzel weiter funktionieren. Wenn an, beendet das Schließen des Fensters die App vollständig."

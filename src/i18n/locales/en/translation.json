@@ -885,6 +885,10 @@
         "label": "Show tray icon",
         "description": "Keep SpeakoFlow in your system tray."
       },
+      "trayIconColor": {
+        "label": "Color tray icon",
+        "description": "Show the color logo instead of the white icon. Turn this on if your panel is light and the white icon is hard to see."
+      },
       "closeBehavior": {
         "label": "Quit when I close the window",
         "description": "When off, closing the window keeps SpeakoFlow running in the tray so your hotkeys still work. When on, closing the window quits the app completely."
