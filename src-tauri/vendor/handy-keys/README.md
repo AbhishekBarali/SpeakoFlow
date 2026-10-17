@@ -64,7 +64,7 @@ Uses low-level keyboard hooks. No special permissions required.
 
 ### Linux
 
-Uses [rdev](https://crates.io/crates/rdev). On Wayland, hotkey blocking may not work due to compositor restrictions.
+Reads the input devices through evdev, so it works the same under X11 and any Wayland compositor. Reading needs access to `/dev/input/event*` (the `input` group). Withholding a hotkey's key from the focused app takes the keyboard over and re-sends everything else through a uinput mirror, which needs write access to `/dev/uinput`; without it, hotkeys still fire but their key also reaches the app. A keyboard is only taken over while no key on it is held, and a device appearing or going away never stops capture.
 
 ## Modifiers
 

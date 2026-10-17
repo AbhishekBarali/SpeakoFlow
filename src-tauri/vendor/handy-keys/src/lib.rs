@@ -90,8 +90,11 @@
 //!
 //! ## Linux
 //!
-//! Uses [rdev](https://crates.io/crates/rdev). On Wayland, hotkey blocking may not
-//! work due to compositor restrictions.
+//! Reads the input devices through evdev, which needs read access to
+//! `/dev/input/event*` (the `input` group), and takes keyboards over so the key
+//! a hotkey ends in can be withheld, which needs write access to `/dev/uinput`.
+//! Without the latter, hotkeys still fire but their key also reaches the
+//! focused app. Works the same under X11 and any Wayland compositor.
 
 mod error;
 mod injected;
