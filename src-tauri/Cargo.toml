@@ -262,6 +262,9 @@ windows = { version = "0.61.3", features = [
   # text of the field just dictated into so a word the user fixes by hand can be
   # learned. Read-only, and only for the field the app itself pasted into.
   "Win32_UI_Accessibility",
+  # Smart spacing (see smart_spacing/windows.rs): the foreground process's
+  # executable name, so a terminal is recognised and never read.
+  "Win32_System_Threading",
 ] }
 winreg = "0.55"
 # Clipboard writes that opt out of Win+V history and cloud clipboard sync
@@ -309,6 +312,25 @@ tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.
 # Secure API-key storage via the macOS Keychain. `apple-native` uses the
 # system Security framework (no extra C/system build dependency).
 keyring = { version = "3", features = ["apple-native"] }
+# Smart spacing (see smart_spacing/macos.rs): reads the few characters around
+# the caret of the field a dictation is pasted into, through the Accessibility
+# API SpeakoFlow already has permission for. Same objc2 family and version as
+# the rest of the graph.
+objc2-application-services = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "libc",
+  "HIServices",
+  "AXUIElement",
+  "AXValue",
+  "AXError",
+] }
+objc2-core-foundation = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "CFBase",
+  "CFString",
+  "CFNumber",
+  "CFArray",
+] }
 
 # macOS aarch64 (Apple Silicon, M1+) — the shipping macOS target.
 # STATIC with the Metal GPU backend compiled in (Apple's default posture).
@@ -356,6 +378,15 @@ webkit2gtk = "=2.0.2"
 # Wayland app's selection. Already in the graph through arboard; pinned to the
 # version the lockfile resolves so both share one copy.
 wl-clipboard-rs = "=0.9.3"
+# Smart spacing (see smart_spacing/linux.rs): reads the few characters around
+# the caret of the focused field over AT-SPI, which works on X11 and Wayland
+# alike. Pure Rust over zbus, which is already in the graph.
+atspi = { version = "=0.30.0", default-features = false, features = [
+  "proxies",
+  "connection",
+  "wrappers",
+  "tokio",
+] }
 transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan"] }
 # transcribe.cpp Linux: dynamic (loadable) backend .so modules + Vulkan GPU
 # acceleration (the `dynamic-backends` posture, same as Windows x86_64). Ships a

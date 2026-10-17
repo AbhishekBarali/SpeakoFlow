@@ -1441,7 +1441,20 @@
       },
       "appendTrailingSpace": {
         "label": "Lägg till avslutande mellanslag",
-        "description": ""
+        "description": "Lägger till ett mellanslag efter varje diktering. Med smart mellanrum på gäller det bara där fältet inte kan läsas."
+      },
+      "smartSpacing": {
+        "label": "Smart mellanrum",
+        "description": "Anpassar varje diktering till texten som redan finns i fältet, så att du kan pausa och fortsätta utan att orden klistras ihop.",
+        "info": "Innan inklistring tittar SpeakoFlow på de få tecknen runt markören och lägger bara till ett mellanslag där det behövs. Om en app döljer sin text används i stället den egna senaste dikteringen. Inget sparas eller skickas någonstans. På macOS används behörigheten för hjälpmedel som SpeakoFlow redan har. På Linux delar Chrome-, Electron- och Qt-appar bara sin text när skrivbordets hjälpmedelsinställning är på."
+      },
+      "smartSpacingFixCase": {
+        "label": "Rätta versaler",
+        "description": "Börjar dikteringen med liten bokstav när den fortsätter en mening. Namn, förkortningar och \"I\" behåller sina versaler."
+      },
+      "smartSpacingJoin": {
+        "label": "Sätt ihop avbrutna meningar",
+        "description": "Tar bort punkten som SpeakoFlow lade till när du stannade mitt i en mening, som i \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Tangentbordsimplementering",

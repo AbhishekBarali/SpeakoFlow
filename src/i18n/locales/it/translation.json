@@ -1450,7 +1450,20 @@
       },
       "appendTrailingSpace": {
         "label": "Aggiungi uno spazio finale",
-        "description": ""
+        "description": "Aggiunge uno spazio dopo ogni dettatura. Con la spaziatura intelligente attiva, vale solo dove il campo non può essere letto."
+      },
+      "smartSpacing": {
+        "label": "Spaziatura intelligente",
+        "description": "Adatta ogni dettatura al testo già presente nel campo, per fermarsi e riprendere senza che le parole si attacchino.",
+        "info": "Prima di incollare, SpeakoFlow guarda i pochi caratteri intorno al cursore e aggiunge uno spazio solo dove serve. Se un'app nasconde il suo testo, usa invece la propria ultima dettatura. Nulla viene salvato né inviato altrove. Su macOS usa il permesso di Accessibilità che SpeakoFlow ha già. Su Linux, le app Chrome, Electron e Qt condividono il testo solo quando l'accessibilità del desktop è attiva."
+      },
+      "smartSpacingFixCase": {
+        "label": "Correggi le maiuscole",
+        "description": "Inizia la dettatura in minuscolo quando continua una frase. Nomi, sigle e «I» mantengono le maiuscole."
+      },
+      "smartSpacingJoin": {
+        "label": "Unisci le frasi interrotte",
+        "description": "Rimuove il punto aggiunto da SpeakoFlow quando ti sei fermato a metà frase, come in «Ho comprato un.»"
       },
       "keyboardImplementation": {
         "title": "Implementazione della tastiera",

@@ -1645,6 +1645,22 @@ pub struct AppSettings {
     pub mute_while_recording: bool,
     #[serde(default)]
     pub append_trailing_space: bool,
+    /// Smart spacing: fit each dictation onto the text already in the field
+    /// (a space where one is needed, the right case, no stray period from the
+    /// previous dictation), so dictations do not run together. Off by default:
+    /// it reads the few characters around the caret of the field being pasted
+    /// into. See `smart_spacing`.
+    #[serde(default)]
+    pub smart_spacing: bool,
+    /// Smart spacing: lowercase a dictation's first word when it continues a
+    /// sentence, and match the case of a replaced selection.
+    #[serde(default = "default_true")]
+    pub smart_spacing_fix_case: bool,
+    /// Smart spacing: remove the period SpeakoFlow itself pasted at the end of
+    /// an unfinished sentence ("I went to the.") when the next dictation
+    /// continues it.
+    #[serde(default = "default_true")]
+    pub smart_spacing_join_sentences: bool,
     #[serde(default = "default_app_language")]
     pub app_language: String,
     #[serde(default)]
@@ -4266,6 +4282,9 @@ pub fn get_default_settings() -> AppSettings {
         flow_screen_access: false,
         mute_while_recording: false,
         append_trailing_space: false,
+        smart_spacing: false,
+        smart_spacing_fix_case: true,
+        smart_spacing_join_sentences: true,
         app_language: default_app_language(),
         experimental_enabled: false,
         lazy_stream_close: false,

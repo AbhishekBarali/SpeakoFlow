@@ -597,6 +597,30 @@ async changeAppendTrailingSpaceSetting(enabled: boolean) : Promise<Result<null, 
     else return { status: "error", error: e  as any };
 }
 },
+async changeSmartSpacingSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_smart_spacing_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeSmartSpacingFixCaseSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_smart_spacing_fix_case_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeSmartSpacingJoinSentencesSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_smart_spacing_join_sentences_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeLazyStreamCloseSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_lazy_stream_close_setting", { enabled }) };
@@ -3961,7 +3985,7 @@ flow_phrase?: string;
  * clearly refers to the screen. Separate from the assistant's screen
  * access mode on purpose — the two features are permissioned independently.
  */
-flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; 
+flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; smart_spacing?: boolean; smart_spacing_fix_case?: boolean; smart_spacing_join_sentences?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; 
 /**
  * Experimental: let the middle, Back and Forward mouse buttons be a
  * shortcut's keys. Off, a stored mouse button is kept but not registered,

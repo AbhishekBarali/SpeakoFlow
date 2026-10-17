@@ -371,6 +371,7 @@ pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String>
         crate::clipboard::PasteBehavior {
             allow_trailing_space: false,
             allow_auto_submit: false,
+            smart_spacing: None,
         },
     );
 

@@ -1441,7 +1441,20 @@
       },
       "appendTrailingSpace": {
         "label": "Append trailing space",
-        "description": ""
+        "description": "Add a space after every dictation. With Smart spacing on, this only applies where a field can't be read."
+      },
+      "smartSpacing": {
+        "label": "Smart spacing",
+        "description": "Fit each dictation to the text already in the field, so you can stop and continue without words running together.",
+        "info": "Before pasting, SpeakoFlow looks at the few characters around the cursor and adds a space only where one is needed. Where an app hides its text, it uses its own last dictation instead. Nothing is stored or sent anywhere. On macOS this uses the Accessibility permission SpeakoFlow already has. On Linux, Chrome, Electron and Qt apps share their text only when the desktop accessibility setting is on."
+      },
+      "smartSpacingFixCase": {
+        "label": "Fix capital letters",
+        "description": "Start a dictation in lowercase when it continues a sentence. Names, acronyms and \"I\" keep their capitals."
+      },
+      "smartSpacingJoin": {
+        "label": "Join sentences you paused in",
+        "description": "Remove the period SpeakoFlow added when you stopped mid-sentence, as in \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Keyboard implementation",

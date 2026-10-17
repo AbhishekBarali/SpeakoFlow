@@ -1459,7 +1459,20 @@
       },
       "appendTrailingSpace": {
         "label": "Přidat koncovou mezeru",
-        "description": ""
+        "description": "Přidá mezeru za každý diktát. Se zapnutými chytrými mezerami platí jen tam, kde pole nelze přečíst."
+      },
+      "smartSpacing": {
+        "label": "Chytré mezery",
+        "description": "Přizpůsobí každý diktát textu, který už v poli je, takže můžete přestat a pokračovat, aniž by se slova slila.",
+        "info": "Před vložením se SpeakoFlow podívá na několik znaků kolem kurzoru a mezeru přidá jen tam, kde je potřeba. Když aplikace svůj text skrývá, použije místo toho svůj poslední diktát. Nic se neukládá ani nikam neodesílá. V macOS se používá oprávnění Zpřístupnění, které SpeakoFlow už má. V Linuxu sdílejí aplikace Chrome, Electron a Qt svůj text jen tehdy, když je v prostředí zapnuté zpřístupnění."
+      },
+      "smartSpacingFixCase": {
+        "label": "Opravovat velká písmena",
+        "description": "Začne diktát malým písmenem, když pokračuje ve větě. Jména, zkratky a „I“ si velká písmena ponechají."
+      },
+      "smartSpacingJoin": {
+        "label": "Spojovat přerušené věty",
+        "description": "Odstraní tečku, kterou SpeakoFlow přidal, když jste se zastavili uprostřed věty, například „I went to the.“"
       },
       "keyboardImplementation": {
         "title": "Implementace klávesnice",
