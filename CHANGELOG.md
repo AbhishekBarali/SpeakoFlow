@@ -4,6 +4,162 @@ What changed in each SpeakoFlow release. The release page on GitHub carries the
 highlights; this file has the full list. Versions before 2.0.0 are described on
 their [GitHub releases](https://github.com/AbhishekBarali/SpeakoFlow/releases).
 
+## 2.1.0
+
+Hands-free dictation, Hold or Tap set per shortcut, smart spacing between
+dictations, Amazon Transcribe, and optional meeting notes in the meeting's own
+language. Local dictation no longer stalls when the computer is busy, and
+updates from here on download several times faster.
+
+**On 2.0.0 or 2.0.1?** The app offers this update by itself. On 1.4 or
+earlier, download 2.1.0 once and install it over the old version.
+
+### New
+
+**Hands-free dictation.** While you hold the dictation keys, press Space and
+let go. The dictation keeps listening until you press the dictation keys again,
+click ✓ on the pill, or cancel with Esc or ✕.
+
+- The default is Left Ctrl + Left Win + Space on Windows and Fn + Space on a
+  Mac. Pick another key, or turn it off, under Hands-free in Settings →
+  Shortcuts.
+- A hands-free dictation has a ring around the pill and the live card. Hover
+  it for ✕ and ✓.
+- The first three times you hold the dictation keys, the pill shows the Space
+  key as a reminder.
+- It needs the SpeakoFlow Keys engine and dictation keys that are modifiers
+  only. Linux's default Ctrl + Space has a main key of its own, so on Linux
+  turn off Hold to talk instead, which makes every dictation hands-free.
+- Space no longer reaches Windows while you hold Ctrl + Win, so a dictation
+  can no longer switch your input language by accident.
+
+**Hold or Tap, set per shortcut.** Dictation and the assistant each have their
+own switch in Settings → Shortcuts: Hold to talk and Hold to ask. You can now
+hold to dictate and tap to ask. Existing installs keep what they had, because
+the ask starts with the old shared setting.
+
+**Smart spacing**, on by default. Two dictations into the same field no longer
+run together. SpeakoFlow reads the few characters around the cursor and adds a
+space only where one is needed.
+
+- It lowercases the first word when you continue a sentence (Fix capital
+  letters). "I", acronyms, names and dictionary words keep their capitals, and
+  so does German and Turkish text.
+- It removes the period SpeakoFlow added when you paused mid-sentence, but only
+  when the field still ends with exactly that paste, and only in the window it
+  was read from (Join sentences you paused in).
+- No spaces next to Chinese, Japanese, Thai and other scripts written without
+  them. Korean gets spaces.
+- Password fields and terminals are never read. Nothing that is read is logged
+  or kept, apart from the end of SpeakoFlow's own last paste.
+- Where a field can't be read, a dictation that continues your last one in the
+  same window still gets its space. Otherwise it pastes exactly as before.
+- Chrome's address bar trims pasted spaces, so there the space is typed.
+- With Smart spacing on, Append trailing space only applies where a field
+  can't be read. Turn Smart spacing off in Settings → Dictation → Typing and
+  pasting to get the old paste back.
+
+**Amazon Transcribe** for cloud speech-to-text, streaming as you speak.
+
+- Enter an access key ID and secret access key, plus a session token for
+  temporary credentials, and pick the region closest to you.
+- Auto language picks among five candidates, starting with the app's language.
+  A language Amazon can't stream in your region falls back to your local model
+  instead of going to another language's model.
+- Amazon has no batch endpoint, so History, calls and meetings send recordings
+  again at speaking speed. Finishing takes as long as the recording did.
+
+**More than one set of keys per shortcut.** Click a shortcut's keys, then Add
+another. Either set starts the shortcut, and a recording started with one
+stops with the other.
+
+**Mouse buttons as shortcuts** (experimental, Settings → Advanced →
+Experimental). The middle, Back and Forward buttons can be a shortcut, alone or
+with modifier keys. Left and right click are never accepted. A bound button
+stops doing its usual job. Works on the SpeakoFlow Keys engine only, and on
+Linux only the middle button can be used.
+
+**Stop after silence.** A tapped or hands-free dictation can end itself after
+3, 5, 10, 20 or 30 seconds without speech, exactly as a second press would.
+Off by default, in Settings → Shortcuts. A held recording, the assistant, a
+call and a meeting are never stopped this way. In the last two seconds a thin
+line on the pill counts down.
+
+**Skip cleanup for short dictations**, on by default at 15 words. A search or a
+two-word reply is pasted as transcribed without waiting for the cleanup model.
+
+- Only while cleanup runs on every dictation. The dictate-and-clean-up
+  shortcut always cleans, however short.
+- Change the threshold, or turn it off, on the AI cleanup page.
+- Words in Chinese, Japanese and Thai are estimated from the character count.
+
+**Meetings.**
+
+- Write notes when a call ends, on the Meetings page, can be turned off. The
+  transcript still gets its speaker labels, and notes for one meeting can still
+  be written from its transcript.
+- Notes language. Same as the meeting is the default, so a German meeting gets
+  German notes. You can also pick one of 37 languages, and regenerate an old
+  meeting's notes in another.
+- A Copy button for the transcript, on the meeting page, in the live recorder
+  and in the floating pill. Renamed speakers are copied under their new names.
+- Note headings no longer carry the template's descriptions.
+
+**Search depth that changes the search.** Quick, Standard and Deep now set how
+many searches the assistant runs, how much text it reads from each source, and
+how long it waits, and Tavily and Exa search deeper on Deep.
+
+**Faster updates.** The app downloads an update on 16 connections and checks
+its signature before installing it. From Kathmandu that took a 38 MB update
+from about three and a half minutes to 42 seconds. It only helps updates
+installed by 2.1.0 or later, so this update itself downloads at the old speed.
+
+- When the fast download can't be used, or what it fetched doesn't match the
+  signature, the update downloads the old way on one connection. A
+  connection that stops sending for a minute ends with an error you can retry
+  instead of a progress bar that never moves.
+- Download installer, in Settings → About, uses the same fast download.
+
+**Linux: a white tray icon** that matches the rest of the panel. A Color tray
+icon switch in Settings → General brings the colour logo back for a light
+panel, with teal recording and transcribing icons instead of pink.
+
+**Shortcut rows** on Home and in Settings show a name, an (i) that says how the
+shortcut is pressed, and the keys.
+
+### Fixed
+
+- **Local dictation could sit on "Transcribing…" for 15 seconds or more** while
+  the computer was busy, for example during a large build. Parakeet and
+  Nemotron on a graphics card now decode on one processor thread, and a
+  dictation that is still behind two seconds after you stop is transcribed in
+  one pass instead.
+- **Parakeet Unified dropped the last word** of a dictation.
+- **Web search stopped working on Azure GPT-6** with Thinking above Off. The
+  assistant now keeps its tools and turns reasoning off for those requests.
+- **Linux AppImage: built-in AI cleanup never started** (#68). Thanks to
+  @HananSolves for the fix.
+- **Meetings with notes off stayed on "Processing".**
+- **Meetings: a long transcript could show rows twice** right after the call,
+  with the old speaker labels.
+- **Meetings: the notes-language list closed** as soon as you scrolled it.
+- **After updating, the Hands-free row had no key** until the next launch.
+- **The update card showed a literal `<br />`** in the release notes.
+- **A debug log could contain cloud transcription credentials.** With
+  `--debug`, the WebSocket library logged every handshake in full.
+
+### Downloads
+
+| Platform             | File                                                                |
+| -------------------- | ------------------------------------------------------------------- |
+| Windows              | `SpeakoFlow_2.1.0_x64-setup.exe` (or the `.msi`)                    |
+| macOS, Apple silicon | `SpeakoFlow_2.1.0_aarch64.dmg`                                      |
+| macOS, Intel         | `SpeakoFlow_2.1.0_x64.dmg`                                          |
+| Linux x86_64         | `SpeakoFlow_2.1.0_amd64.deb` or `SpeakoFlow_2.1.0_amd64.AppImage`   |
+| Linux ARM64          | `SpeakoFlow_2.1.0_arm64.deb` or `SpeakoFlow_2.1.0_aarch64.AppImage` |
+
+Every commit: [v2.0.1...v2.1.0](https://github.com/AbhishekBarali/SpeakoFlow/compare/v2.0.1...v2.1.0)
+
 ## 2.0.1
 
 A smaller update to 2.0: a connection test for AI cleanup, a Thinking setting
