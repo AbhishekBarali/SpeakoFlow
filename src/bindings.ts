@@ -677,6 +677,18 @@ async changeShowTrayIconSetting(enabled: boolean) : Promise<Result<null, string>
 }
 },
 /**
+ * Linux only: draw the tray icon in colour instead of as a white glyph. The
+ * other platforms ignore the setting, so redrawing there changes nothing.
+ */
+async changeTrayIconColorSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_tray_icon_color_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Set what closing the main window does: minimize to the tray (default) or
  * fully quit the app. The `Quit` branch reuses the same `app.exit(0)` path as
  * the tray "Quit" item (see the `CloseRequested` handler in `lib.rs`). See
@@ -3814,7 +3826,14 @@ flow_phrase?: string;
  * clearly refers to the screen. Separate from the assistant's screen
  * access mode on purpose — the two features are permissioned independently.
  */
-flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
+flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; 
+/**
+ * Linux only: draw the tray icon in colour instead of as a white glyph.
+ * For a light panel, where the white glyph cannot be seen; the app has no
+ * reliable way to find out what colour the panel is (see
+ * `tray::linux_tray_theme`).
+ */
+tray_icon_color?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
 /**
  * Master switch for the assistant experience: the floating panel window,
  * its two hotkeys, spoken replies, profiles and personal memory.

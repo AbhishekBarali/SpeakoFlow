@@ -859,6 +859,10 @@
         "label": "Tepsi simgesini göster",
         "description": "SpeakoFlow'u sistem tepsisinde tutar."
       },
+      "trayIconColor": {
+        "label": "Renkli tepsi simgesi",
+        "description": "Beyaz simge yerine renkli logoyu gösterir. Paneliniz açık renkliyse ve beyaz simge zor görünüyorsa açın."
+      },
       "closeBehavior": {
         "label": "Pencereyi kapattığımda uygulamadan çık",
         "description": "Kapalıyken pencereyi kapatmak SpeakoFlow'u tepside çalışır durumda tutar, böylece kısayollarınız çalışmaya devam eder. Açıkken pencereyi kapatmak uygulamayı tamamen kapatır."

@@ -853,6 +853,10 @@
         "label": "显示托盘图标",
         "description": "在系统托盘中保留 SpeakoFlow。"
       },
+      "trayIconColor": {
+        "label": "彩色托盘图标",
+        "description": "显示彩色标志，而不是白色图标。如果面板是浅色、白色图标看不清，请打开此项。"
+      },
       "closeBehavior": {
         "label": "关闭窗口时退出应用",
         "description": "关闭此项时，关闭窗口只会让 SpeakoFlow 继续在托盘中运行，快捷键依然有效。开启后，关闭窗口会彻底退出应用。"

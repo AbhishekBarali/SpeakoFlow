@@ -871,6 +871,10 @@
         "label": "Zobrazit ikonu v systémové liště",
         "description": "Ponechat SpeakoFlow v systémové liště."
       },
+      "trayIconColor": {
+        "label": "Barevná ikona v systémové liště",
+        "description": "Zobrazí barevné logo místo bílé ikony. Zapněte, pokud máte světlý panel a bílá ikona je špatně vidět."
+      },
       "closeBehavior": {
         "label": "Ukončit aplikaci při zavření okna",
         "description": "Když je vypnuto, zavřením okna zůstane SpeakoFlow běžet v systémové liště a vaše zkratky dál fungují. Když je zapnuto, zavřením okna se aplikace úplně ukončí."

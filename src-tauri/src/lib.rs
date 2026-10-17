@@ -1037,6 +1037,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::environment::get_shortcut_environment,
             shortcut::open_keyboard_settings,
             shortcut::change_show_tray_icon_setting,
+            shortcut::change_tray_icon_color_setting,
             shortcut::change_close_behavior_setting,
             shortcut::change_whisper_accelerator_setting,
             shortcut::change_ort_accelerator_setting,
