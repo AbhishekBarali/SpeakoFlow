@@ -335,6 +335,12 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
 
   const isLive = recordingMeetingId === meetingId;
 
+  /** Bumped by every transcript load, the page's first and every relabel. A
+   *  load that has been overtaken drops its rows: the first load's later pages
+   *  appended onto a relabel's full list doubled them, and a relabel of the
+   *  meeting just left must not land on the one now open. */
+  const transcriptLoad = useRef(0);
+
   const refreshSpeakers = useCallback(() => {
     void getMeetingSpeakers(meetingId)
       .then(setSpeakers)
@@ -345,17 +351,24 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
    *  changed every system-side row, so the transcript and the speaker list are
    *  re-read rather than patched. */
   const reloadLabelled = useCallback(() => {
+    const load = ++transcriptLoad.current;
     void getMeeting(meetingId)
       .then((fresh) => {
-        if (fresh) setMeeting(fresh);
+        if (fresh && transcriptLoad.current === load) setMeeting(fresh);
       })
       .catch(() => {});
     refreshSpeakers();
     // Every page, not the first: re-reading only page one cut a long
     // transcript, and anything copied from it, to its first 200 rows.
     void fetchTranscript(meetingId)
-      .then(setItems)
-      .catch(() => {});
+      .then((all) => {
+        if (transcriptLoad.current !== load) return;
+        setItems(all);
+        setTranscriptLoading(false);
+      })
+      .catch(() => {
+        if (transcriptLoad.current === load) setTranscriptLoading(false);
+      });
     onChanged();
   }, [meetingId, refreshSpeakers, onChanged]);
 
@@ -413,6 +426,7 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
     // append-only and finished by the time it is read, so offsets are stable and
     // the whole thing is a handful of cheap queries. Windowing is what keeps the
     // DOM small; this only keeps the queries small.
+    const load = ++transcriptLoad.current;
     void (async () => {
       let offset = 0;
       for (let page = 0; page < MAX_TRANSCRIPT_PAGES; page += 1) {
@@ -422,7 +436,9 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
             SEGMENT_PAGE_SIZE,
             offset,
           );
-          if (cancelled) return;
+          // A relabel that started meanwhile reads the whole transcript and
+          // finishes the loading state itself.
+          if (cancelled || transcriptLoad.current !== load) return;
           const fetched = result.segments.map(itemFromSegment);
           setItems((current) => [...current, ...fetched]);
           offset += result.segments.length;
