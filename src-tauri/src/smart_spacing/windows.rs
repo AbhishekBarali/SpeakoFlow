@@ -171,6 +171,12 @@ fn window_key(hwnd: HWND) -> String {
     format!("hwnd:{}", hwnd.0 as isize)
 }
 
+/// The window in front now, keyed the way a reading's target is.
+pub fn current_target() -> Option<String> {
+    let foreground = unsafe { GetForegroundWindow() };
+    (!foreground.is_invalid()).then(|| window_key(foreground))
+}
+
 fn read_foreground(client: &IUIAutomation2, cooldown: &mut Option<(isize, Instant)>) -> Snapshot {
     let foreground = unsafe { GetForegroundWindow() };
     if foreground.is_invalid() {

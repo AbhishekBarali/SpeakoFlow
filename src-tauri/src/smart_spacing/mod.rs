@@ -329,6 +329,33 @@ pub fn prepare(app: &AppHandle, transcript: &str, can_erase: bool) -> Option<Fit
     Some(fitted)
 }
 
+/// Whether the window in front is still the one this dictation's field was
+/// read from. The Backspace that removes SpeakoFlow's own stray period goes
+/// wherever focus is now, and the paste respects a switch to another app made
+/// while the speech was transcribed (`input::restore_paste_target`), so after
+/// such a switch it would delete a character of the user's own text there.
+/// Where the window in front cannot be named, the reading is trusted as before.
+pub fn still_aimed_at_reading() -> bool {
+    let Some(read_from) = state().pasting_into.clone() else {
+        return false;
+    };
+    match current_target() {
+        Some(now) => now == read_from,
+        None => true,
+    }
+}
+
+fn current_target() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::current_target()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}
+
 /// The fitted dictation landed. Remember its tail for the next one.
 ///
 /// `submitted` is true when SpeakoFlow also pressed Enter after it: the field
