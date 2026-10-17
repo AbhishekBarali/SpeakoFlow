@@ -9,7 +9,11 @@ use crate::types::{Hotkey, Key, KeyEvent, Modifiers};
 /// Hotkeys that should be blocked when triggered
 pub type BlockingHotkeys = Arc<Mutex<HashSet<Hotkey>>>;
 
-/// Internal state shared with platform-specific event callbacks
+/// Internal state shared with platform-specific event callbacks.
+///
+/// Linux keeps its own (`platform::linux::tracker`): one engine reads every
+/// device for every listener.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 pub struct ListenerState {
     pub event_sender: Sender<KeyEvent>,
     /// Track which modifiers are currently held
@@ -18,6 +22,7 @@ pub struct ListenerState {
     pub blocking_hotkeys: Option<BlockingHotkeys>,
 }
 
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 impl ListenerState {
     pub fn new(event_sender: Sender<KeyEvent>, blocking_hotkeys: Option<BlockingHotkeys>) -> Self {
         Self {

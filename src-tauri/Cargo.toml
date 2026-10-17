@@ -377,7 +377,7 @@ keyring = { version = "3", features = [
 tauri-runtime = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-runtime-wry = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-utils = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
-# Vendored handy-keys with three Windows fixes.
+# Vendored handy-keys with three Windows fixes and a Linux engine of its own.
 #
 # 1. OS-level stuck keys: the low-level hook now blocks a key's UP (and
 #    auto-repeats) if-and-only-if it blocked that key's DOWN, instead of
@@ -396,6 +396,13 @@ tauri-utils = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.1
 #    as up, so the Settings recorder read a held Ctrl+Alt as released when C
 #    went down, and recording Ctrl+Alt+C saved Ctrl+Alt ("Hotkey already
 #    registered"). See vendor/handy-keys/src/platform/withheld.rs.
+# 4. Linux reads input devices through its own evdev engine instead of rdev's
+#    grab (vendor/handy-keys/src/platform/linux/engine.rs). rdev's ended for good
+#    whenever an input device appeared, so a keyboard reconnecting killed every
+#    shortcut until a restart; and it took every device over at once, so a key
+#    held at that instant (Super, when the app is opened with Super+S) stayed
+#    pressed in the compositor. Keyboards are now taken over one at a time and
+#    only while no key on them is held.
 handy-keys = { path = "vendor/handy-keys" }
 
 [dev-dependencies]
