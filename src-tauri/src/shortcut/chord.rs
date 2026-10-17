@@ -13,9 +13,9 @@
 //! So such a press records at once and only *shows* itself once the window has
 //! passed: [`reveal_when_settled`] holds back the visible part, releasing the
 //! keys reveals it at once ([`reveal_now`]), and a withdrawn press is dropped
-//! without ever having appeared ([`forget`]). With Tap to toggle none of this
-//! is needed: the engine fires those shortcuts when the keys are let go, by
-//! which point it already knows what was pressed.
+//! without ever having appeared ([`forget`]). A shortcut set to Tap to toggle
+//! needs none of this: the engine fires it when the keys are let go, by which
+//! point it already knows what was pressed.
 
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -25,6 +25,8 @@ use once_cell::sync::Lazy;
 use tauri::AppHandle;
 
 use crate::settings::{self, AppSettings, KeyboardImplementation};
+
+use super::combos;
 
 type Reveal = Box<dyn FnOnce(&AppHandle) + Send>;
 
@@ -42,14 +44,19 @@ fn keys(binding: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// Whether a shortcut that is live right now starts with every key of
-/// `binding_id`'s and adds more.
-fn extended_by_another(settings: &AppSettings, binding_id: &str) -> bool {
-    let Some(binding) = settings.bindings.get(binding_id) else {
-        return false;
-    };
-    let base = keys(&binding.current_binding);
-    if base.is_empty() {
+/// Whether a set of keys that is live right now starts with every key of
+/// `pressed` (one of `binding_id`'s) and adds more.
+///
+/// Every set of keys counts, a shortcut's other keys as much as its own, and
+/// that includes `binding_id`'s own other keys: with Ctrl+Win to dictate and
+/// Ctrl+Win+F12 as the same shortcut's other keys, the F12 withdraws the
+/// Ctrl+Win press like any longer shortcut would. A mouse button on top counts
+/// too while one is being listened for, since the engine takes a registered
+/// button for the rest of a chord. A press that is itself a button is never
+/// withdrawn (only modifier-only presses are), so it never waits.
+fn extended_by_another(settings: &AppSettings, binding_id: &str, pressed: &str) -> bool {
+    let base = keys(pressed);
+    if base.is_empty() || combos::has_mouse_button(pressed) {
         return false;
     }
     settings.bindings.iter().any(|(id, other)| {
@@ -58,27 +65,36 @@ fn extended_by_another(settings: &AppSettings, binding_id: &str) -> bool {
         } else if crate::assistant::is_assistant_binding(id) {
             settings.assistant_enabled
         } else {
-            id != "cancel"
+            // The hands-free key is never a shortcut of its own, and it does
+            // not withdraw the dictation it is pressed on (`hands_free`).
+            id != "cancel" && id != settings::HANDS_FREE_BINDING_ID
         };
-        let longer = keys(&other.current_binding);
-        id != binding_id && live && longer.len() > base.len() && base.is_subset(&longer)
+        live && other.combos().into_iter().any(|combo| {
+            let longer = keys(combo);
+            !(id == binding_id && longer == base)
+                && combos::refusal(settings, combo, KeyboardImplementation::HandyKeys).is_none()
+                && longer.len() > base.len()
+                && base.is_subset(&longer)
+        })
     })
 }
 
 /// Whether this press should keep quiet until the chord window has passed.
 ///
 /// Only a held press from the hotkey engine that can withdraw it, of a shortcut
-/// another live one extends. `shortcut_str` is how a programmatic start (the
-/// pill, the CLI) is told apart: it is the binding's own keys only when a
-/// hotkey fired it.
+/// another live one extends. Held is the shortcut's own setting: dictation can
+/// be held while the ask is tapped (`settings::holds_to_record`).
+/// `shortcut_str` is how a programmatic start (the pill, the CLI) is told
+/// apart: it is one of the binding's own sets of keys only when a hotkey fired
+/// it.
 pub fn holds_back(settings: &AppSettings, binding_id: &str, shortcut_str: &str) -> bool {
-    settings.push_to_talk
+    settings::holds_to_record(settings, binding_id)
         && settings.keyboard_implementation == KeyboardImplementation::HandyKeys
         && settings
             .bindings
             .get(binding_id)
-            .is_some_and(|b| b.current_binding == shortcut_str)
-        && extended_by_another(settings, binding_id)
+            .is_some_and(|b| b.combos().contains(&shortcut_str))
+        && extended_by_another(settings, binding_id, shortcut_str)
 }
 
 /// Run `reveal` now, or, when `hold_back`, once the chord window has passed
@@ -144,6 +160,7 @@ mod tests {
     fn with(bindings: &[(&str, &str)]) -> AppSettings {
         let mut settings = settings::get_default_settings();
         settings.push_to_talk = true;
+        settings.assistant_push_to_talk = true;
         settings.keyboard_implementation = KeyboardImplementation::HandyKeys;
         settings.assistant_enabled = true;
         for (id, keys) in bindings {
@@ -174,8 +191,34 @@ mod tests {
             ("assistant_call", "ctrl_left+alt_left+c"),
         ]);
         assert!(!holds_back(&settings, "assistant", "signal"));
-        settings.push_to_talk = false;
+        settings.assistant_push_to_talk = false;
         assert!(!holds_back(&settings, "assistant", "ctrl_left+alt_left"));
+    }
+
+    #[test]
+    fn each_shortcut_holds_back_by_its_own_mode() {
+        // Dictation held, the ask tapped: the ask still extends Fn, so a held
+        // dictation may yet be withdrawn for it and keeps quiet until it settles.
+        let mut settings = with(&[
+            ("transcribe", "fn"),
+            ("assistant", "fn+ctrl"),
+            ("assistant_call", "fn+ctrl+c"),
+        ]);
+        settings.assistant_push_to_talk = false;
+        assert!(holds_back(&settings, "transcribe", "fn"));
+        assert!(!holds_back(&settings, "assistant", "fn+ctrl"));
+
+        settings.push_to_talk = false;
+        settings.assistant_push_to_talk = true;
+        assert!(!holds_back(&settings, "transcribe", "fn"));
+        assert!(holds_back(&settings, "assistant", "fn+ctrl"));
+    }
+
+    #[test]
+    fn the_hands_free_key_extends_nothing() {
+        let mut settings = with(&[("transcribe", "ctrl_left+super"), ("assistant_call", "")]);
+        settings.post_process_enabled = false;
+        assert!(!holds_back(&settings, "transcribe", "ctrl_left+super"));
     }
 
     #[test]
@@ -187,6 +230,67 @@ mod tests {
         ]);
         assert!(holds_back(&settings, "transcribe", "fn"));
         assert!(holds_back(&settings, "assistant", "fn+ctrl"));
+    }
+
+    fn with_other_keys(settings: &mut AppSettings, id: &str, keys: &str) {
+        settings.bindings.get_mut(id).unwrap().alternate_binding = keys.to_string();
+    }
+
+    /// Other keys are a press the engine can fire, so they hold back the same
+    /// way, and they are a longer shortcut like any other.
+    #[test]
+    fn other_keys_hold_back_and_extend_like_own_keys() {
+        let mut settings = with(&[
+            ("transcribe", "f13"),
+            ("assistant", "fn+ctrl"),
+            ("assistant_call", ""),
+        ]);
+        with_other_keys(&mut settings, "transcribe", "ctrl_left+alt_left");
+        with_other_keys(&mut settings, "assistant", "ctrl_left+alt_left+d");
+        // Dictation's other keys are extended by the ask's other keys.
+        assert!(holds_back(&settings, "transcribe", "ctrl_left+alt_left"));
+        // Its own keys are not.
+        assert!(!holds_back(&settings, "transcribe", "f13"));
+    }
+
+    /// Ctrl+Win to dictate, and Ctrl+Win+F12 as the same shortcut's other keys
+    /// (sent by a mouse button's software): the F12 withdraws the Ctrl+Win
+    /// press, so its pill must not flash up on the way.
+    #[test]
+    fn a_shortcuts_own_other_keys_extend_its_keys() {
+        let mut settings = with(&[("transcribe", "ctrl_left+super"), ("assistant_call", "")]);
+        with_other_keys(&mut settings, "transcribe", "ctrl_left+super+f12");
+        assert!(holds_back(&settings, "transcribe", "ctrl_left+super"));
+        assert!(!holds_back(&settings, "transcribe", "ctrl_left+super+f12"));
+    }
+
+    /// A press that is a mouse button is never withdrawn, so it never waits.
+    /// A button added on top of a press is a longer shortcut, but only while
+    /// something listens for it.
+    #[test]
+    fn a_pressed_button_never_waits_and_a_button_on_top_extends_while_on() {
+        let mut settings = with(&[
+            ("transcribe", "ctrl_left+super"),
+            ("assistant", "ctrl_left+alt_left"),
+            ("assistant_call", ""),
+        ]);
+        settings.mouse_button_shortcuts = true;
+        with_other_keys(&mut settings, "transcribe", "mousex1");
+        with_other_keys(&mut settings, "assistant", "mousex1+ctrl_left+alt_left");
+        assert!(!holds_back(&settings, "transcribe", "mousex1"));
+        assert!(holds_back(&settings, "assistant", "ctrl_left+alt_left"));
+        settings.mouse_button_shortcuts = false;
+        assert!(!holds_back(&settings, "assistant", "ctrl_left+alt_left"));
+    }
+
+    /// Keys that are not one of the shortcut's own are a programmatic start.
+    #[test]
+    fn only_the_shortcuts_own_keys_count_as_its_press() {
+        let mut settings = with(&[("assistant", "fn+ctrl"), ("assistant_call", "fn+ctrl+c")]);
+        with_other_keys(&mut settings, "assistant", "f14");
+        assert!(holds_back(&settings, "assistant", "fn+ctrl"));
+        assert!(!holds_back(&settings, "assistant", "signal"));
+        assert!(!holds_back(&settings, "assistant", "f14"));
     }
 
     #[test]

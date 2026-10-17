@@ -34,6 +34,18 @@ pub fn handle_shortcut_event(
 ) {
     let base_id = binding_id;
 
+    // The hands-free key on top of the dictation keys (`hands_free`). Only
+    // the press means anything: the release of the dictation keys is what
+    // matters to a held dictation, and they are released after it either way.
+    if let Some(dictation) = crate::hands_free::dictation_of(base_id) {
+        if is_pressed {
+            if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
+                coordinator.send_hands_free(dictation);
+            }
+        }
+        return;
+    }
+
     // The assistant is switched off: its hotkeys do nothing. They are also
     // unregistered at the OS level when the setting changes, so this is the
     // belt-and-braces path for a shortcut that was already in flight.
@@ -50,11 +62,12 @@ pub fn handle_shortcut_event(
         // end a call at all: it holds the call's microphone while it records
         // (see `voice_conversation::DictationTracker`).
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
-            // Every recording shortcut — dictation, dictation + post-processing,
-            // and the assistant — follows the single Push-to-talk setting:
-            //   • Push-to-talk ON  → hold the shortcut to record, release to stop.
-            //   • Push-to-talk OFF → tap once to start, tap again to stop.
-            let mode = recording_mode(get_settings(app).push_to_talk);
+            // Dictation (with or without cleanup) and the ask are each held or
+            // tapped on their own setting (`settings::holds_to_record`):
+            //   • Hold → hold the shortcut to record, release to stop.
+            //   • Tap  → tap once to start, tap again to stop.
+            let holds = crate::settings::holds_to_record(&get_settings(app), base_id);
+            let mode = recording_mode(holds);
             coordinator.send_input(base_id, hotkey_string, is_pressed, mode);
         } else {
             warn!("TranscriptionCoordinator is not initialized");

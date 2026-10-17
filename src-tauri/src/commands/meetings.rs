@@ -215,17 +215,17 @@ pub async fn stop_meeting(
 
     let _ = app.emit(MEETINGS_UPDATED_EVENT, ());
 
-    // The call is over, so summarize it. Not awaited: this is a sequence of model
-    // calls that can take minutes on a long meeting, and the user has finished
-    // their call and wants their transcript now. Progress arrives on
-    // `meeting-notes-progress`.
+    // The call is over, so label the speakers and summarize it (unless notes are
+    // switched off). Not awaited: this is a sequence of model calls that can take
+    // minutes on a long meeting, and the user has finished their call and wants
+    // their transcript now. Progress arrives on `meeting-notes-progress`.
     //
     // This is the whole difference between the old Summary tab and this one. It
     // used to require three decisions — open the tab, pick a template, press
     // Generate — to reach the thing every user wants every time, and the template
     // choice had to be made before reading the transcript it applies to. Now the
     // default runs on its own and choosing a template becomes a re-generate.
-    crate::meetings::summarize::spawn_notes_job(&app, meeting_id);
+    crate::meetings::summarize::spawn_post_call_job(&app, meeting_id);
 
     Ok(meeting_id)
 }
@@ -494,8 +494,14 @@ pub async fn generate_meeting_notes(
     store: State<'_, Arc<MeetingStore>>,
     meeting_id: i64,
     template: Option<NotesTemplate>,
+    language: Option<String>,
 ) -> Result<GeneratedNotes, String> {
     let store = Arc::clone(&store);
+    // The Summary tab passes the language picked beside Regenerate; anything
+    // else gets the user's default.
+    let language =
+        language.unwrap_or_else(|| crate::settings::get_settings(&app).meeting_notes_language);
+    let language = crate::meetings::summarize::NotesLanguage::from_code(&language);
     // Announced like the automatic job, so the list, the pill and any other open
     // view of this meeting learn about the run, and so a click during the
     // post-call job is refused instead of racing it. Completion and the
@@ -505,6 +511,7 @@ pub async fn generate_meeting_notes(
         store.as_ref(),
         meeting_id,
         template.unwrap_or_default(),
+        language,
     )
     .await
 }
@@ -518,6 +525,56 @@ pub async fn generate_meeting_notes(
 #[specta::specta]
 pub fn is_meeting_notes_running(meeting_id: i64) -> bool {
     crate::meetings::summarize::notes_job_running(meeting_id)
+}
+
+/// The two notes preferences, read together because the Meetings page and a
+/// meeting's own page both need both.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct MeetingNotesPrefs {
+    /// Write notes automatically when a call ends.
+    pub auto_notes: bool,
+    /// `"auto"` or a code from `summarize::NOTES_LANGUAGES`.
+    pub language: String,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_meeting_notes_prefs(app: AppHandle) -> Result<MeetingNotesPrefs, String> {
+    let settings = crate::settings::get_settings(&app);
+    Ok(MeetingNotesPrefs {
+        auto_notes: settings.meeting_auto_notes,
+        language: settings.meeting_notes_language,
+    })
+}
+
+/// Whether notes are written automatically when a call ends. Takes effect from
+/// the next call; a job already running for one that just ended is left alone.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_meeting_auto_notes(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = crate::settings::get_settings(&app);
+    settings.meeting_auto_notes = enabled;
+    crate::settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// The default language for meeting notes. Refuses a code this build does not
+/// know rather than storing something that would silently read as auto.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_meeting_notes_language(app: AppHandle, language: String) -> Result<(), String> {
+    let language = language.trim().to_string();
+    let known = language == crate::meetings::summarize::AUTO_NOTES_LANGUAGE
+        || crate::meetings::summarize::NOTES_LANGUAGES
+            .iter()
+            .any(|(code, _)| *code == language);
+    if !known {
+        return Err(format!("'{language}' is not a supported notes language."));
+    }
+    let mut settings = crate::settings::get_settings(&app);
+    settings.meeting_notes_language = language;
+    crate::settings::write_settings(&app, settings);
+    Ok(())
 }
 
 /* ─────────────────────────── the call offer ─────────────────────────── */

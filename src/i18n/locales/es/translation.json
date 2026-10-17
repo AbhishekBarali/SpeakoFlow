@@ -643,12 +643,17 @@
           "assistant_call": {
             "name": "Iniciar una conversación",
             "description": "Habla con el asistente con manos libres y escucha sus respuestas. Pulsa de nuevo para terminar."
+          },
+          "hands_free": {
+            "name": "Manos libres",
+            "description": "Púlsala mientras mantienes las teclas de dictado para seguir grabando al soltarlas. Vuelve a pulsar las teclas de dictado para terminar."
           }
         },
         "errors": {
           "restore": "No se pudo restaurar el atajo original.",
           "set": "No se pudo configurar el atajo: {{error}}",
           "inUse": "«{{name}}» ya usa {{keys}}. Elige otras teclas o cambia primero ese atajo.",
+          "sameAsOther": "{{keys}} ya está asignado a este atajo.",
           "reset": "No se pudo restablecer el atajo."
         },
         "clickToChange": "Haz clic para cambiarlo",
@@ -663,10 +668,24 @@
         "auto": "Automático"
       },
       "pushToTalk": {
-        "label": "Modo de grabación",
-        "description": "Mantener: se graba mientras mantienes pulsado un atajo de grabación. Tocar: una pulsación empieza y la siguiente detiene. Se aplica a todos los atajos de grabación.",
-        "hold": "Mantener presionado",
-        "tap": "Tocar"
+        "dictation": "Activado: graba mientras mantienes pulsadas las teclas. Desactivado: una pulsación empieza y la siguiente detiene, así que cada dictado es manos libres.",
+        "assistant": "Activado: escucha mientras mantienes pulsadas las teclas. Desactivado: una pulsación empieza y la siguiente envía.",
+        "dictationLabel": "Mantener para hablar",
+        "assistantLabel": "Mantener para preguntar"
+      },
+      "handsFree": {
+        "unavailableKeys": "Funciona cuando el dictado usa solo teclas modificadoras, como Ctrl + Win. Con {{keys}}, desactiva «Mantener para hablar»: cada dictado sigue hasta que vuelvas a pulsar las teclas.",
+        "unavailableEngine": "Necesita el motor de teclado SpeakoFlow Keys ({{where}}). O desactiva «Mantener para hablar»: cada dictado sigue hasta que vuelvas a pulsar las teclas.",
+        "taken": "{{name}} ya usa {{keys}}, así que esta tecla no hace nada hasta que cambie uno de los dos.",
+        "needsKey": "Elige una sola tecla, como Espacio o Intro. Una tecla modificadora sola no puede ser la tecla de manos libres.",
+        "pressKey": "Pulsa una tecla…",
+        "descriptionOff": "Desactivado. Haz clic y pulsa una tecla, como Espacio, para volver a activarlo.",
+        "linux": "En Linux, desactiva «Mantener para hablar»: cada dictado sigue hasta que vuelvas a pulsar las teclas.",
+        "whileDictating": "Mientras dictas, pulsa"
+      },
+      "silenceStop": {
+        "label": "Detener tras un silencio",
+        "description": "Un dictado manos libres que no oye voz durante este tiempo se detiene y se pega solo, como si hubieras pulsado el atajo otra vez. Justo antes, una línea de la píldora se agota; si vuelves a hablar, la grabación sigue."
       }
     },
     "models": {
@@ -830,6 +849,13 @@
         "label": "Mantener micrófono abierto entre transcripciones",
         "description": "Dictados consecutivos más rápidos. Puede afectar a la calidad del audio Bluetooth."
       },
+      "mouseButtonShortcuts": {
+        "label": "Botones del ratón como atajos",
+        "description": "Usa el botón central, Atrás o Adelante del ratón como atajo: haz clic en las teclas de un atajo y luego pulsa el botón. Mientras sea un atajo, el botón no hace nada más.",
+        "linux": "En Linux solo funciona el botón central.",
+        "needsEngine": "Requiere la implementación de teclado SpeakoFlow Keys.",
+        "reset": "Los atajos que usaban un botón del ratón volvieron a sus teclas predeterminadas."
+      },
       "liveTranscription": {
         "label": "Transcripción en directo",
         "description": "Transcribe mientras hablas, en lugar de todo de golpe al terminar. Experimental."
@@ -864,6 +890,10 @@
       "showTrayIcon": {
         "label": "Mostrar icono en la bandeja",
         "description": "Mantén SpeakoFlow en la bandeja del sistema."
+      },
+      "trayIconColor": {
+        "label": "Icono de bandeja en color",
+        "description": "Muestra el logotipo en color en lugar del icono blanco. Actívalo si tu panel es claro y el icono blanco apenas se ve."
       },
       "closeBehavior": {
         "label": "Salir al cerrar la ventana",
@@ -1192,6 +1222,24 @@
           "azureDescription": "El endpoint de tu recurso de Azure, que encontrarás en Claves y punto de conexión en Azure Portal. MAI-Transcribe necesita un recurso en Central India, Southeast Asia, East US, West US, West US 2 o North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Clave de acceso de AWS",
+            "missing": "Aún no hay ninguna clave guardada. Usa una clave de acceso de un usuario o rol de IAM con permiso para llamar a transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID de clave de acceso",
+            "secret": "Clave de acceso secreta",
+            "sessionToken": "Token de sesión (solo credenciales temporales)",
+            "invalid": "Esto no parece una clave de AWS. El ID de clave de acceso tiene solo letras y números, y ningún campo puede contener espacios ni dos puntos.",
+            "permission": "Permiso que necesita"
+          },
+          "region": {
+            "title": "Región",
+            "description": "Dónde se ejecuta Amazon Transcribe. La más cercana a ti responde más rápido."
+          },
+          "streaming": "Siempre activado: Amazon Transcribe solo transcribe en directo. Si la conexión se corta durante la grabación, se vuelve a enviar a la velocidad del habla, así que terminar tarda lo mismo que duró la grabación.",
+          "language": "Amazon Transcribe necesita saber el idioma. Automático elige entre el inglés, el idioma de la app y algunos otros idiomas comunes, así que elige el tuyo si hablas otro.",
+          "unsupportedLanguage": "Amazon Transcribe no puede transcribir este idioma en directo en {{region}}. Elige otro idioma u otra región. Hasta entonces, el dictado no usará Amazon Transcribe."
+        },
         "model": {
           "title": "Modelo",
           "info": "Escribe cualquier modelo que ofrezca el proveedor, o carga la lista. En ElevenLabs, elige scribe_v2_realtime para transcribir mientras hablas y scribe_v2 para transcribir cuando termines.",
@@ -1204,7 +1252,8 @@
         },
         "keyterms": {
           "label": "Enviar mis palabras personalizadas",
-          "description": "Pasa tu vocabulario personalizado al proveedor para que dé preferencia a esas grafías."
+          "description": "Pasa tu vocabulario personalizado al proveedor para que dé preferencia a esas grafías.",
+          "unsupported": "{{provider}} no admite una lista de palabras, así que tus palabras personalizadas se corrigen en este equipo."
         },
         "noVerbatim": {
           "label": "Quitar las muletillas",
@@ -1405,7 +1454,20 @@
       },
       "appendTrailingSpace": {
         "label": "Añadir espacio al final",
-        "description": ""
+        "description": "Añade un espacio después de cada dictado. Con el espaciado inteligente activado, solo se aplica donde no se puede leer el campo."
+      },
+      "smartSpacing": {
+        "label": "Espaciado inteligente",
+        "description": "Ajusta cada dictado al texto que ya hay en el campo, para parar y continuar sin que las palabras se junten.",
+        "info": "Antes de pegar, SpeakoFlow mira los pocos caracteres alrededor del cursor y añade un espacio solo donde hace falta. Si una app oculta su texto, usa en su lugar su propio último dictado. No se guarda ni se envía nada. En macOS usa el permiso de Accesibilidad que SpeakoFlow ya tiene. En Linux, las apps de Chrome, Electron y Qt solo comparten su texto cuando la accesibilidad del escritorio está activada."
+      },
+      "smartSpacingFixCase": {
+        "label": "Corregir mayúsculas",
+        "description": "Empieza el dictado en minúscula cuando continúa una frase. Los nombres, las siglas e «I» conservan sus mayúsculas."
+      },
+      "smartSpacingJoin": {
+        "label": "Unir frases interrumpidas",
+        "description": "Quita el punto que SpeakoFlow añadió cuando te detuviste a mitad de frase, como en «Compré un.»"
       },
       "keyboardImplementation": {
         "title": "Implementación del teclado",
@@ -1963,9 +2025,19 @@
       "hide": "Ocultar el indicador flotante",
       "show": "Mostrar el indicador flotante"
     },
+    "notesPrefs": {
+      "autoTitle": "Escribir notas al terminar una llamada",
+      "autoDescription": "Desactívalo si solo necesitas la transcripción. Aun así puedes escribir notas de una reunión desde su transcripción.",
+      "languageTitle": "Idioma de las notas",
+      "languageDescription": "Por defecto, las notas se escriben en el idioma de la reunión. Elige uno para recibirlas siempre en ese idioma.",
+      "auto": "El de la reunión",
+      "autoHint": "El idioma en que transcurrió casi toda la reunión"
+    },
     "pill": {
       "expand": "Abrir la transcripción en directo",
       "collapse": "Volver a la píldora pequeña",
+      "copy": "Copiar transcripción",
+      "copied": "Transcripción copiada",
       "stop": "Detener la grabación",
       "listening": "Escuchando. Lo que se diga aparecerá aquí.",
       "micOnly": "Solo se está capturando tu micrófono: nada de lo que digan los demás participantes estará en esta transcripción."
@@ -2045,6 +2117,7 @@
       "empty": "Esta reunión no tiene transcripción.",
       "loadingMore": "Cargando más transcripción…",
       "renameSpeaker": "Cambiar el nombre de este hablante",
+      "copyTitle": "Copiar toda la transcripción con los nombres de los participantes",
       "lowConfidence": "Dudoso",
       "lowConfidenceHelp": "Esta etiqueta de hablante es una suposición. Las palabras se transcriben tal como se dijeron; lo único dudoso es quién las dijo."
     },
@@ -2069,6 +2142,7 @@
     },
     "summary": {
       "template": "Plantilla",
+      "languageAuto": "Idioma de la reunión",
       "templates": {
         "general": "General",
         "standup": "Reunión diaria",
@@ -2211,6 +2285,7 @@
     "copied": "Copiado",
     "copyFailed": "No se pudo copiar: vuelve a intentarlo",
     "done": "Listo",
+    "finish": "Terminar",
     "askAssistant": "Preguntar al asistente en lugar de escribir esto",
     "recovery": {
       "dismissed": "Descartado",
@@ -2222,7 +2297,10 @@
       "title": "Descargando el modelo de voz…",
       "percent": "Descargando el modelo de voz · {{percent}} %",
       "hint": "El dictado funcionará cuando termine"
-    }
+    },
+    "handsFreeHint": "Pulsa {{key}} para manos libres",
+    "lockedKeys": "Grabando con manos libres. Pulsa {{keys}} para terminar",
+    "finishKeys": "Terminar ({{keys}})"
   },
   "reminders": {
     "title": "Recordatorio",
@@ -2519,10 +2597,7 @@
       "dictation": "Dictado",
       "assistant": "Asistente",
       "cleanupOff": "Activa la limpieza con IA para usar este atajo.",
-      "cleanupOnDictation": "Tu atajo de dictado ya limpia todos los dictados, así que este no hace falta.",
-      "openCleanup": "Abrir Limpieza con IA",
-      "assistantOff": "El asistente está desactivado, así que sus atajos no hacen nada.",
-      "openAssistant": "Abrir Asistente"
+      "assistantOff": "El asistente está desactivado, así que sus atajos no hacen nada."
     },
     "audio": {
       "microphone": "Micrófono",
@@ -2607,6 +2682,10 @@
         "whatHold": "Mantén pulsado, habla y suelta. Tus palabras se escriben donde está el cursor.",
         "whatTap": "Pulsa, habla y vuelve a pulsar. Tus palabras se escriben donde está el cursor."
       },
+      "handsFree": {
+        "what": "Mantén {{keys}}, pulsa {{key}} y suelta: sigue escuchando hasta que vuelvas a pulsar {{keys}}.",
+        "linux": "Para dictar con manos libres en Linux, desactiva «Mantener para hablar». Así una pulsación empieza y la siguiente detiene."
+      },
       "cleanup": {
         "title": "Dictar y limpiar",
         "description": "Igual que Dictar, y luego la IA corrige la puntuación, las muletillas y el estilo.",
@@ -2615,7 +2694,8 @@
       "ask": {
         "title": "Preguntar al asistente",
         "description": "Haz una pregunta en voz alta y recibe la respuesta en un panel flotante.",
-        "what": "Pregunta en voz alta. La respuesta aparece en un panel flotante."
+        "whatHold": "Mantén pulsado, pregunta y suelta. La respuesta aparece en un panel flotante.",
+        "whatTap": "Pulsa, pregunta y vuelve a pulsar. La respuesta aparece en un panel flotante."
       },
       "call": {
         "title": "Iniciar una conversación",
@@ -2624,10 +2704,6 @@
       },
       "info": "Púlsalos en cualquier aplicación. Haz clic en las teclas para cambiarlas.",
       "offHint": "Desactivado",
-      "mode": {
-        "hold": "Mantén pulsado para hablar",
-        "tap": "Pulsa para activar o desactivar"
-      },
       "cancel": {
         "title": "Cancelar",
         "what": "Detén una grabación o una respuesta que se está leyendo en voz alta."
@@ -2824,6 +2900,15 @@
       "info": "Dale a la limpieza su propio atajo, o deja que tu atajo de dictado limpie cada dictado para recordar una sola combinación de teclas.",
       "separate": "Atajo propio",
       "dictation": "El mismo que el dictado"
+    },
+    "skipShort": {
+      "title": "Omitir la limpieza en dictados cortos",
+      "info": "Los dictados cortos, como una búsqueda o una respuesta rápida, se escriben tal como los dijiste, sin esperar al modelo. Los más largos se siguen limpiando.",
+      "limit": "Menos de",
+      "limitInfo": "Se cuenta en palabras. En idiomas que se escriben sin espacios, como el chino, el japonés o el tailandés, las palabras se estiman a partir del número de caracteres.",
+      "words_one": "palabra",
+      "words_many": "palabras",
+      "words_other": "palabras"
     },
     "shortcutRow": "Atajo"
   },
@@ -3212,7 +3297,19 @@
     "useDefault": "Usar predeterminado",
     "turnOff": "Desactivar",
     "turnedOff": "Atajo de {{name}} desactivado",
-    "undo": "Deshacer"
+    "undo": "Deshacer",
+    "addAnother": "Añadir otro",
+    "addAnotherHint": "Dale a este atajo una segunda combinación de teclas, como un botón del ratón",
+    "remove": "Quitar",
+    "or": "o",
+    "changeOther": "Cambiar las otras teclas del atajo de {{name}}",
+    "pressKeysOrButton": "Presiona teclas o un botón del ratón…",
+    "mouseNeedsKeysEngine": "Los botones del ratón necesitan la implementación de teclado SpeakoFlow Keys (Ajustes → Avanzado → Experimental).",
+    "mouse": {
+      "middle": "Botón central",
+      "back": "Botón Atrás",
+      "forward": "Botón Adelante"
+    }
   },
   "memoryManager": {
     "status": {

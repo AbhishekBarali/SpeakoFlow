@@ -10,6 +10,7 @@
 //! setting and can be changed at runtime.
 
 pub mod chord;
+pub mod combos;
 pub mod environment;
 mod handler;
 pub mod handy_keys;
@@ -83,8 +84,25 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
     }
 }
 
-/// Register a shortcut using the appropriate implementation
+/// Register a shortcut using the appropriate implementation: its own keys, and
+/// its other keys when it has them. Fails only when its own keys could not be
+/// registered; see [`arm_shortcut`] for a caller that needs to know about the
+/// other keys too.
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    let id = binding.id.clone();
+    arm_shortcut(app, &binding).into_result(&id)
+}
+
+/// Register a shortcut's keys with the active engine and report on each set
+/// separately. Nothing is registered for a shortcut that is not in use right
+/// now (below).
+pub fn arm_shortcut(app: &AppHandle, binding: &ShortcutBinding) -> combos::Armed {
+    // The hands-free key is never a shortcut of its own: registered alone it
+    // would take its key, Space by default, from every app. It only ever goes
+    // on top of the dictation keys (`hands_free`).
+    if binding.id == settings::HANDS_FREE_BINDING_ID {
+        return combos::Armed::nothing();
+    }
     let settings = get_settings(app);
     // The assistant's master switch owns its two hotkeys: while it is off they
     // stay unregistered no matter who asks. The Settings shortcut editor calls
@@ -96,7 +114,7 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
             "Not registering '{}': the assistant is switched off",
             binding.id
         );
-        return Ok(());
+        return combos::Armed::nothing();
     }
     // Same for the separate cleanup shortcut, which is only live while it is
     // the shortcut that runs cleanup. Without this, finishing an edit of it in
@@ -104,16 +122,20 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
     // shortcut that already cleans up.
     if binding.id == settings::CLEANUP_BINDING_ID && !settings::cleanup_binding_active(&settings) {
         debug!("Not registering '{}': it is not in use", binding.id);
-        return Ok(());
+        return combos::Armed::nothing();
     }
     match settings.keyboard_implementation {
-        KeyboardImplementation::Tauri => tauri_impl::register_shortcut(app, binding),
-        KeyboardImplementation::HandyKeys => handy_keys::register_shortcut(app, binding),
+        KeyboardImplementation::Tauri => tauri_impl::arm(app, binding),
+        KeyboardImplementation::HandyKeys => handy_keys::arm(app, binding),
     }
 }
 
 /// Unregister a shortcut using the appropriate implementation
 pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    // Never registered on its own (see `register_shortcut`).
+    if binding.id == settings::HANDS_FREE_BINDING_ID {
+        return Ok(());
+    }
     let settings = get_settings(app);
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => tauri_impl::unregister_shortcut(app, binding),
@@ -175,6 +197,21 @@ pub fn change_binding(
         }
     };
 
+    // Keys someone else already answers to, or that cannot work here (a mouse
+    // button on an engine that cannot see one). The editors catch both first,
+    // with friendlier words; this keeps a stale editor or a scripted call from
+    // storing a clash that would only surface later, as a shortcut that does
+    // nothing.
+    if !removing {
+        if let Some(reason) = combos::refusal(&settings, &binding, settings.keyboard_implementation)
+        {
+            return Err(reason.to_string());
+        }
+        if let Some(conflict) = combos::conflict(&settings, &id, &binding, combos::Slot::Primary) {
+            return Err(conflict.describe(&settings, &binding));
+        }
+    }
+
     // If this is the cancel binding, just update the settings and return
     // It's managed dynamically, so we don't register/unregister here
     if id == "cancel" {
@@ -188,6 +225,29 @@ pub fn change_binding(
                 error: None,
             });
         }
+    }
+
+    // The hands-free key is one key that only ever extends the dictation keys
+    // (`hands_free`), so it is stored, never registered on its own, and put
+    // back on top of the dictation keys from here. Recorded while the
+    // dictation keys were held, it arrives with them; what is kept is the key.
+    if id == settings::HANDS_FREE_BINDING_ID {
+        let key = if removing {
+            String::new()
+        } else {
+            crate::hands_free::main_key(&binding)
+                .ok_or_else(|| "The hands-free key has to be a key, not a modifier".to_string())?
+        };
+        let mut updated = binding_to_modify;
+        updated.current_binding = key;
+        settings.bindings.insert(id, updated.clone());
+        settings::write_settings(&app, settings);
+        handy_keys::sync_hands_free_keys(&app);
+        return Ok(BindingResponse {
+            success: true,
+            binding: Some(updated),
+            error: None,
+        });
     }
 
     // Validate the new shortcut before touching the old one. A validation failure
@@ -252,6 +312,76 @@ pub fn change_binding(
 pub fn reset_binding(app: AppHandle, id: String) -> Result<BindingResponse, String> {
     let binding = settings::get_stored_binding(&app, &id);
     change_binding(app, id, binding.default_binding)
+}
+
+/// Give a shortcut other keys that do the same thing, or remove them with an
+/// empty `binding`. Its own keys are left exactly as they are.
+#[tauri::command]
+#[specta::specta]
+pub fn change_alternate_binding(
+    app: AppHandle,
+    id: String,
+    binding: String,
+) -> Result<BindingResponse, String> {
+    let mut settings = settings::get_settings(&app);
+    let Some(current) = settings.bindings.get(&id).cloned() else {
+        return Ok(BindingResponse {
+            success: false,
+            binding: None,
+            error: Some(format!("Binding with id '{}' not found", id)),
+        });
+    };
+
+    let combo = binding.trim().to_string();
+    // The hands-free key is one key on top of the dictation keys
+    // (`hands_free`); other keys for it would be listened for by nothing.
+    if !combo.is_empty() && id == settings::HANDS_FREE_BINDING_ID {
+        return Err("The hands-free key has no other keys".to_string());
+    }
+    if !combo.is_empty() {
+        let engine = settings.keyboard_implementation;
+        if let Some(reason) = combos::refusal(&settings, &combo, engine) {
+            return Err(reason.to_string());
+        }
+        validate_shortcut_for_implementation(&combo, engine)?;
+        if let Some(conflict) = combos::conflict(&settings, &id, &combo, combos::Slot::Alternate) {
+            return Err(conflict.describe(&settings, &combo));
+        }
+    }
+
+    let mut updated = current.clone();
+    updated.alternate_binding = combo;
+
+    // Cancel is registered only while something is running; the next run
+    // picks the new keys up.
+    if id != "cancel" {
+        let _ = unregister_shortcut(&app, current.clone());
+        let armed = arm_shortcut(&app, &updated);
+        if let Some(Err(e)) = armed.alternate {
+            // Another app holds those keys. Put things back as they were, so the
+            // settings never claim keys that do nothing.
+            let _ = unregister_shortcut(&app, updated);
+            if let Err(restore) = register_shortcut(&app, current) {
+                warn!("change_alternate_binding could not restore '{id}': {restore}");
+            }
+            return Ok(BindingResponse {
+                success: false,
+                binding: None,
+                error: Some(e),
+            });
+        }
+        if let Some(Err(e)) = armed.primary {
+            warn!("change_alternate_binding: '{id}' lost its own keys on re-registering: {e}");
+        }
+    }
+
+    settings.bindings.insert(id, updated.clone());
+    settings::write_settings(&app, settings);
+    Ok(BindingResponse {
+        success: true,
+        binding: Some(updated),
+        error: None,
+    })
 }
 
 /// Temporarily unregister a binding while the user is editing it in the UI.
@@ -371,6 +501,48 @@ pub fn get_keyboard_implementation(app: AppHandle) -> String {
     }
 }
 
+/// Let mouse buttons be shortcut keys, or stop (Experimental).
+///
+/// Turned off, a shortcut whose own keys are a mouse button goes back to its
+/// default keys: dictation and the ask always keep a key, and a button nothing
+/// listens for any more is not one. Other keys that are a mouse button are
+/// kept, only not listened for, and work again once this is back on.
+#[tauri::command]
+#[specta::specta]
+pub fn change_mouse_button_shortcuts_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let before = settings::get_settings(&app);
+    let mut settings = before.clone();
+    settings.mouse_button_shortcuts = enabled;
+    if !enabled {
+        for binding in settings.bindings.values_mut() {
+            if combos::has_mouse_button(&binding.current_binding) {
+                info!(
+                    "Mouse buttons are off: '{}' goes back to its default keys",
+                    binding.id
+                );
+                binding.current_binding = binding.default_binding.clone();
+            }
+        }
+    }
+    settings::write_settings(&app, settings.clone());
+
+    // Every shortcut with a mouse button in it starts or stops listening for
+    // the button. Cancel is registered only while something is running, and
+    // picks the change up the next time.
+    for (id, old) in before.bindings {
+        if id == "cancel" || !old.combos().iter().any(|c| combos::has_mouse_button(c)) {
+            continue;
+        }
+        let _ = unregister_shortcut(&app, old);
+        if let Some(binding) = settings.bindings.get(&id).cloned() {
+            if let Err(e) = register_shortcut(&app, binding) {
+                warn!("Could not re-register '{id}' after the mouse button change: {e}");
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Whether the Fn (globe) key still does something of its own on this Mac.
 ///
 /// Fn is the macOS dictation default, and macOS acts on a globe press itself
@@ -459,8 +631,9 @@ fn unregister_all_shortcuts(app: &AppHandle, implementation: KeyboardImplementat
     let bindings = settings::get_bindings(app);
 
     for (id, binding) in bindings {
-        // Skip cancel shortcut as it's dynamically registered
-        if id == "cancel" {
+        // Skip cancel shortcut as it's dynamically registered, and the
+        // hands-free key, which only ever extends the dictation keys
+        if id == "cancel" || id == settings::HANDS_FREE_BINDING_ID {
             continue;
         }
 
@@ -488,8 +661,9 @@ fn register_all_shortcuts_for_implementation(
     let mut current_settings = settings::get_settings(app);
 
     for (id, default_binding) in &default_bindings {
-        // Skip cancel shortcut as it's dynamically registered
-        if id == "cancel" {
+        // Skip cancel shortcut as it's dynamically registered, and the
+        // hands-free key, which only ever extends the dictation keys
+        if id == "cancel" || id == settings::HANDS_FREE_BINDING_ID {
             continue;
         }
 
@@ -558,6 +732,26 @@ fn register_all_shortcuts_for_implementation(
             reset_bindings.push(id.clone());
         }
 
+        // Other keys this engine cannot take (a mouse button on Tauri's, or a
+        // modifier-only combo) have no default to fall back to, so they go.
+        // Leaving them would show keys in Settings that nothing listens for.
+        let alternate = binding.alternate_binding.trim().to_string();
+        if !alternate.is_empty() {
+            if let Err(e) = validate_shortcut_for_implementation(&alternate, implementation) {
+                info!(
+                    "Other keys of '{}' ({}) are invalid for {:?}: {}. Removing them.",
+                    id, alternate, implementation, e
+                );
+                binding.alternate_binding.clear();
+                current_settings
+                    .bindings
+                    .insert(id.clone(), binding.clone());
+                if !reset_bindings.contains(id) {
+                    reset_bindings.push(id.clone());
+                }
+            }
+        }
+
         // Register with the appropriate implementation
         let result = match implementation {
             KeyboardImplementation::Tauri => tauri_impl::register_shortcut(app, binding),
@@ -607,11 +801,36 @@ fn initialize_handy_keys_with_rollback(app: &AppHandle) -> Result<bool, String> 
 // General Settings Commands
 // ============================================================================
 
+/// Hold to talk or Tap to toggle for dictation (and the cleanup shortcut).
 #[tauri::command]
 #[specta::specta]
 pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.push_to_talk = enabled;
+    settings::write_settings(&app, settings);
+    handy_keys::apply_recording_mode(&app);
+    Ok(())
+}
+
+/// Seconds of silence after which a hands-free dictation ends by itself; 0
+/// turns it off. Read when a recording starts, so a change applies to the next
+/// one rather than to a recording already under way.
+#[tauri::command]
+#[specta::specta]
+pub fn change_dictation_silence_stop_setting(app: AppHandle, secs: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.dictation_silence_stop_secs = secs;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Hold to talk or Tap to toggle for the ask, which no longer has to match
+/// dictation (`settings::holds_to_record`).
+#[tauri::command]
+#[specta::specta]
+pub fn change_assistant_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.assistant_push_to_talk = enabled;
     settings::write_settings(&app, settings);
     handy_keys::apply_recording_mode(&app);
     Ok(())
@@ -1140,6 +1359,32 @@ fn sync_cleanup_binding(app: &AppHandle) {
             warn!("Could not register the cleanup shortcut: {e}");
         }
     }
+}
+
+/// Paste a dictation shorter than the word threshold as spoken, without AI
+/// cleanup. Only cleanup that rides on the dictation shortcut is skipped.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_skip_short_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_skip_short = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// How many words a dictation needs for cleanup to run while short ones are
+/// skipped. Clamped like the cleanup timeout, so an out-of-range value from a
+/// script still lands somewhere sensible.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_min_words_setting(app: AppHandle, words: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_min_words = words.clamp(
+        settings::MIN_POST_PROCESS_WORDS,
+        settings::MAX_POST_PROCESS_WORDS,
+    );
+    settings::write_settings(&app, settings);
+    Ok(())
 }
 
 /// Toggle "Generate with Flow" (the spoken activation-phrase generation path).
@@ -1672,6 +1917,35 @@ pub fn change_append_trailing_space_setting(app: AppHandle, enabled: bool) -> Re
     settings::write_settings(&app, settings);
     Ok(())
 }
+#[tauri::command]
+#[specta::specta]
+pub fn change_smart_spacing_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.smart_spacing = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_smart_spacing_fix_case_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.smart_spacing_fix_case = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_smart_spacing_join_sentences_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.smart_spacing_join_sentences = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
 
 #[tauri::command]
 #[specta::specta]
@@ -1788,6 +2062,20 @@ pub fn change_show_tray_icon_setting(app: AppHandle, enabled: bool) -> Result<()
 
     // Apply change immediately
     tray::set_tray_visibility(&app, enabled);
+
+    Ok(())
+}
+
+/// Linux only: draw the tray icon in colour instead of as a white glyph. The
+/// other platforms ignore the setting, so redrawing there changes nothing.
+#[tauri::command]
+#[specta::specta]
+pub fn change_tray_icon_color_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.tray_icon_color = enabled;
+    settings::write_settings(&app, settings);
+
+    tray::refresh_tray_icon(&app);
 
     Ok(())
 }

@@ -20,7 +20,7 @@ use crate::utils::{
 };
 use crate::TranscriptionCoordinator;
 use ferrous_opencc::{config::BuiltinConfig, OpenCC};
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -95,6 +95,62 @@ fn uses_ai_cleanup(post_process: bool) -> bool {
 /// moved onto it.
 fn cleans_up(cleanup_binding: bool, settings: &AppSettings) -> bool {
     cleanup_binding || crate::settings::cleanup_on_dictation(settings)
+}
+
+/// Whether a dictation that would be cleaned up is pasted as spoken instead,
+/// because it is shorter than the user's threshold (Settings → AI cleanup →
+/// Skip cleanup for short dictations).
+///
+/// A search, a file name or a two-word reply rarely has anything to clean, and
+/// waiting on a model for it is the only delay left in such a dictation. Only
+/// cleanup that rides on the dictation shortcut is skipped: the dedicated
+/// "dictate and clean up" shortcut is a request for cleanup, so `explicit`
+/// always cleans. Spoken edits ("no wait, Thursday") do not override the
+/// threshold. Recognising them is English-only guesswork, and anyone who
+/// corrects themselves in a few words can lower it.
+///
+/// `text` is what cleanup would be given. The only change between here and
+/// the model is the Simplified/Traditional Chinese conversion, which keeps
+/// the character count.
+pub(crate) fn skips_short_cleanup(settings: &AppSettings, explicit: bool, text: &str) -> bool {
+    !explicit
+        && settings.post_process_skip_short
+        && crate::audio_toolkit::count_words(text) < short_dictation_limit(settings)
+}
+
+/// The fewest words a dictation needs for cleanup to run on it while short
+/// ones are skipped, held to the range the setting allows (a hand-edited
+/// store can hold anything).
+fn short_dictation_limit(settings: &AppSettings) -> usize {
+    settings.post_process_min_words.clamp(
+        crate::settings::MIN_POST_PROCESS_WORDS,
+        crate::settings::MAX_POST_PROCESS_WORDS,
+    ) as usize
+}
+
+/// Whether this dictation's transcript goes through AI cleanup: it was asked
+/// for, and the dictation is not one a short-dictation threshold lets through
+/// as spoken.
+fn runs_cleanup(context: DictationContext, settings: &AppSettings, transcription: &str) -> bool {
+    context.post_process && !skips_short_cleanup(settings, context.explicit_cleanup, transcription)
+}
+
+/// [`runs_cleanup`] for a History row being recovered or retried. The row
+/// stores whether cleanup was asked for (`post_process_requested`), not
+/// whether it ran, so a short dictation that skipped it is judged again on
+/// the new transcript: a retranscription that comes back long is cleaned.
+///
+/// The row does not remember which shortcut asked. While cleanup rides on the
+/// dictation shortcut, that is the one that did (the dedicated shortcut is not
+/// even registered then); otherwise it was the dedicated one, which always
+/// cleans.
+pub(crate) fn rerun_runs_cleanup(
+    settings: &AppSettings,
+    requested: bool,
+    transcription: &str,
+) -> bool {
+    let explicit = !crate::settings::cleanup_on_dictation(settings);
+    requested && !skips_short_cleanup(settings, explicit, transcription)
 }
 
 /// Return the UI to rest: overlay down, tray idle.
@@ -2545,6 +2601,11 @@ impl ShortcutAction for TranscribeAction {
         // ever reaches whatever holds keyboard focus at the moment it is sent.
         crate::input::remember_paste_target();
 
+        // Smart spacing: read the field this dictation is aimed at, now, while
+        // the caret is where the user left it and before any window of ours is
+        // in front. Runs in the background; a no-op when the setting is off.
+        crate::smart_spacing::begin(app);
+
         // Abandon any correction watch still running from the previous dictation. The
         // field it was reading is no longer the one that matters, and watching two at
         // once would attribute one field's edit to the other's transcript.
@@ -2785,6 +2846,10 @@ impl ShortcutAction for TranscribeAction {
         // Let go before the press settled: it was this shortcut after all.
         shortcut::chord::reveal_now(app);
 
+        // Smart spacing: read the field again in case the caret moved while
+        // the user spoke. Runs alongside the transcription.
+        crate::smart_spacing::refresh(app);
+
         let ah = app.clone();
         let rm = Arc::clone(&app.state::<Arc<AudioRecordingManager>>());
         let tm = Arc::clone(&app.state::<Arc<TranscriptionManager>>());
@@ -2804,8 +2869,11 @@ impl ShortcutAction for TranscribeAction {
                                                  // and on the dictation shortcut too once it has been moved there.
         let context = DictationContext {
             post_process: cleans_up(self.post_process, &get_settings(app)),
+            explicit_cleanup: self.post_process,
             flow_eligible: !self.post_process,
         };
+        // Whether a short dictation skips cleanup is only known once there is
+        // a transcript, so the pill budgets for cleanup whenever it may follow.
         show_transcribing_overlay(app, context.post_process);
         let flow_cancel_generation = crate::flow::cancellation_generation();
         // The coordinator runs this straight after this recording's own start,
@@ -3168,6 +3236,20 @@ async fn deliver_transcription(d: Dictation, transcription: String) {
         }
     }
 
+    // A dictation shorter than the user's threshold is pasted as spoken. The
+    // model is never asked and the pill never says "processing". Its row still
+    // records that cleanup was asked for, so a History retry decides again on
+    // the new transcript (`rerun_runs_cleanup`).
+    let settings = get_settings(&ah);
+    let post_process = runs_cleanup(d.context, &settings, &transcription);
+    if d.context.post_process && !post_process {
+        info!(
+            "Skipping AI cleanup for a short dictation ({} words, under the {}-word threshold)",
+            crate::audio_toolkit::count_words(&transcription),
+            short_dictation_limit(&settings)
+        );
+    }
+
     if post_process {
         show_processing_overlay(&ah);
     }
@@ -3202,7 +3284,7 @@ async fn deliver_transcription(d: Dictation, transcription: String) {
             transcription_text: transcription,
             post_processed_text: processed.post_processed_text,
             post_process_prompt: processed.post_process_prompt,
-            post_process_requested: post_process,
+            post_process_requested: d.context.post_process,
             dismissed: false,
         },
     );
@@ -3302,6 +3384,15 @@ fn paste_final(
     {
         utils::seal_working_overlay(&app);
     }
+    // Smart spacing: fit the dictation onto the field it is going into, from
+    // the reads made while the user spoke. Done here, before the main thread is
+    // taken for the paste, because it may wait briefly for a read in flight.
+    let fitted = if pending.flow {
+        None
+    } else {
+        let can_erase = crate::clipboard::paste_method_can_erase(get_settings(&app).paste_method);
+        crate::smart_spacing::prepare(&app, &pending.text, can_erase)
+    };
     app.run_on_main_thread(move || {
         // A cancel can arrive after the text was ready but before this
         // main-thread closure runs.
@@ -3342,6 +3433,20 @@ fn paste_final(
                 crate::clipboard::PasteBehavior {
                     allow_trailing_space: false,
                     allow_auto_submit: false,
+                    smart_spacing: None,
+                },
+            )
+        } else if let Some(fitted) = fitted {
+            utils::paste_with_behavior(
+                fitted.text,
+                ah.clone(),
+                crate::clipboard::PasteBehavior {
+                    smart_spacing: Some(crate::clipboard::SmartSpacingPaste {
+                        known: fitted.known,
+                        erase_before: fitted.erase_before,
+                        type_leading_space: fitted.type_leading_space,
+                    }),
+                    ..Default::default()
                 },
             )
         } else {
@@ -3504,6 +3609,7 @@ pub fn keep_cancelled_recording(app: &AppHandle, recording: CancelledRecording) 
 
     let context = DictationContext {
         post_process: cleans_up(cleanup_binding, &get_settings(app)),
+        explicit_cleanup: cleanup_binding,
         flow_eligible: !cleanup_binding,
     };
     let samples = Arc::new(crate::managers::audio::pad_short_recording(
@@ -3603,7 +3709,13 @@ async fn run_recovery(app: AppHandle, offer: Offer) {
     change_tray_icon(&app, TrayIconState::Transcribing);
     match &remaining {
         Remaining::Transcribe(_) => show_transcribing_overlay(&app, context.post_process),
-        Remaining::Deliver(_) if context.post_process => show_processing_overlay(&app),
+        // The same rule `deliver_transcription` applies, so a short dictation
+        // taken back does not say "processing" for a cleanup that never runs.
+        Remaining::Deliver(transcription)
+            if runs_cleanup(context, &get_settings(&app), transcription) =>
+        {
+            show_processing_overlay(&app)
+        }
         Remaining::Deliver(_) => show_transcribing_overlay(&app, false),
         Remaining::Paste(_) => {}
     }
@@ -4034,6 +4146,7 @@ mod tests {
         cleanup_token_budget as cleanup_token_budget_at, cleanup_unavailable_message, prompt_echo,
         validate_cleaned_output_against_prompt, FOLDED_TRANSCRIPT_BOUNDARY,
     };
+    use super::{rerun_runs_cleanup, runs_cleanup, skips_short_cleanup, DictationContext};
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessResolutionError, PostProcessTone,
         PostProcessUnavailableReason, ResolvedPostProcessConfig, ThinkingLevel,
@@ -5217,6 +5330,155 @@ Try plugging it into a coding agent or productivity app listed on https://openro
         let settings: crate::settings::AppSettings = serde_json::from_value(stored).unwrap();
         assert!(!settings.post_process_on_dictation);
         assert!(crate::settings::cleanup_binding_active(&settings));
+    }
+
+    /// A dictation from the dictation shortcut with cleanup riding on it.
+    const ON_DICTATION: DictationContext = DictationContext {
+        post_process: true,
+        explicit_cleanup: false,
+        flow_eligible: true,
+    };
+
+    /// A dictation from the dedicated "dictate and clean up" shortcut.
+    const CLEANUP_SHORTCUT: DictationContext = DictationContext {
+        post_process: true,
+        explicit_cleanup: true,
+        flow_eligible: false,
+    };
+
+    fn skipping_under(words: u32) -> crate::settings::AppSettings {
+        let mut settings = crate::settings::get_default_settings();
+        settings.post_process_enabled = true;
+        settings.post_process_on_dictation = true;
+        settings.post_process_skip_short = true;
+        settings.post_process_min_words = words;
+        settings
+    }
+
+    #[test]
+    fn short_dictations_are_cleaned_up_unless_the_user_turns_skipping_on() {
+        let mut settings = skipping_under(5);
+        settings.post_process_skip_short = false;
+        assert!(runs_cleanup(ON_DICTATION, &settings, "ok"));
+        assert!(!skips_short_cleanup(&settings, false, "ok"));
+    }
+
+    #[test]
+    fn the_threshold_is_the_fewest_words_cleanup_runs_on() {
+        let settings = skipping_under(5);
+        assert!(!runs_cleanup(ON_DICTATION, &settings, "weather tomorrow"));
+        assert!(!runs_cleanup(ON_DICTATION, &settings, "send it to Sam"));
+        assert!(runs_cleanup(
+            ON_DICTATION,
+            &settings,
+            "send it to Sam today"
+        ));
+        assert!(runs_cleanup(
+            ON_DICTATION,
+            &settings,
+            "can you move the meeting to Thursday afternoon"
+        ));
+        // Silence never reaches cleanup either way, but an empty transcript
+        // is short, not an error.
+        assert!(!runs_cleanup(ON_DICTATION, &settings, ""));
+    }
+
+    #[test]
+    fn the_cleanup_shortcut_always_cleans_however_short() {
+        let settings = skipping_under(5);
+        assert!(runs_cleanup(CLEANUP_SHORTCUT, &settings, "ok"));
+        assert!(!skips_short_cleanup(&settings, true, "ok"));
+    }
+
+    #[test]
+    fn a_dictation_that_asked_for_no_cleanup_gets_none_whatever_its_length() {
+        let settings = skipping_under(5);
+        let plain = DictationContext {
+            post_process: false,
+            explicit_cleanup: false,
+            flow_eligible: true,
+        };
+        assert!(!runs_cleanup(plain, &settings, "ok"));
+        assert!(!runs_cleanup(
+            plain,
+            &settings,
+            "a dictation long enough to be cleaned up if anyone had asked"
+        ));
+    }
+
+    #[test]
+    fn spoken_edits_do_not_override_the_threshold() {
+        let settings = skipping_under(5);
+        assert!(!runs_cleanup(
+            ON_DICTATION,
+            &settings,
+            "Tuesday no wait Wednesday"
+        ));
+        assert!(!runs_cleanup(ON_DICTATION, &settings, "scratch that"));
+    }
+
+    #[test]
+    fn the_word_threshold_is_held_to_its_range() {
+        // Zero or one would mean "never skip"; the floor of two still lets a
+        // one-word dictation through.
+        let settings = skipping_under(0);
+        assert!(skips_short_cleanup(&settings, false, "ok"));
+        assert!(!skips_short_cleanup(&settings, false, "ok then"));
+
+        let settings = skipping_under(10_000);
+        let words = |n: usize| vec!["word"; n].join(" ");
+        assert!(skips_short_cleanup(&settings, false, &words(49)));
+        assert!(!skips_short_cleanup(&settings, false, &words(50)));
+    }
+
+    #[test]
+    fn scripts_without_spaces_use_the_same_threshold() {
+        let settings = skipping_under(5);
+        // 谢谢 ("thanks") is one word; a full sentence is many.
+        assert!(!runs_cleanup(ON_DICTATION, &settings, "谢谢"));
+        assert!(runs_cleanup(
+            ON_DICTATION,
+            &settings,
+            "我们明天早上九点在公司开会讨论预算"
+        ));
+    }
+
+    #[test]
+    fn a_retried_dictation_is_judged_on_its_new_transcript() {
+        let settings = skipping_under(5);
+        // Skipped the first time, but the row still says cleanup was asked
+        // for, so a retranscription that comes back long is cleaned.
+        assert!(!rerun_runs_cleanup(&settings, true, "send it to Sam"));
+        assert!(rerun_runs_cleanup(
+            &settings,
+            true,
+            "send it to Sam before the meeting on Thursday"
+        ));
+        // A row that never asked for cleanup gets none.
+        assert!(!rerun_runs_cleanup(
+            &settings,
+            false,
+            "send it to Sam before the meeting on Thursday"
+        ));
+        // With cleanup on its own shortcut, the row came from that shortcut,
+        // which cleans however short.
+        let mut own_shortcut = settings.clone();
+        own_shortcut.post_process_on_dictation = false;
+        assert!(rerun_runs_cleanup(&own_shortcut, true, "ok"));
+    }
+
+    #[test]
+    fn a_store_from_before_the_setting_skips_short_dictations() {
+        // On by default, for a new install and for one updating into the
+        // feature alike: the settings never existed there, so there is no
+        // choice of the user's to keep.
+        let mut stored = serde_json::to_value(crate::settings::get_default_settings()).unwrap();
+        let object = stored.as_object_mut().unwrap();
+        assert!(object.remove("post_process_skip_short").is_some());
+        assert!(object.remove("post_process_min_words").is_some());
+        let settings: crate::settings::AppSettings = serde_json::from_value(stored).unwrap();
+        assert!(settings.post_process_skip_short);
+        assert_eq!(settings.post_process_min_words, 15);
     }
 
     #[test]

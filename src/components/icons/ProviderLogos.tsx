@@ -422,6 +422,7 @@ const EXACT: Record<string, Entry> = {
   // Cloud STT extras
   elevenlabs: E.elevenlabs,
   deepgram: E.deepgram,
+  amazon_transcribe: E.aws,
   // TTS engines
   kokoro: E.kokoro,
   kitten: E.kitten,

@@ -1,4 +1,6 @@
-use crate::audio_toolkit::{list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad};
+use crate::audio_toolkit::{
+    list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad, SpeechActivity,
+};
 use crate::helpers::clamshell;
 use crate::managers::transcription::StreamRouter;
 use crate::settings::{get_settings, AppSettings};
@@ -123,6 +125,7 @@ fn create_audio_recorder(
     vad_path: &Path,
     app_handle: &tauri::AppHandle,
     stream_router: Arc<StreamRouter>,
+    speech: Arc<SpeechActivity>,
 ) -> Result<AudioRecorder, anyhow::Error> {
     let silero = SileroVad::new(vad_path, 0.3)
         .map_err(|e| anyhow::anyhow!("Failed to create SileroVad: {}", e))?;
@@ -134,6 +137,7 @@ fn create_audio_recorder(
     let recorder = AudioRecorder::new()
         .map_err(|e| anyhow::anyhow!("Failed to create AudioRecorder: {}", e))?
         .with_vad(Box::new(smoothed_vad))
+        .with_speech_activity(speech)
         .with_level_callback({
             let app_handle = app_handle.clone();
             move |levels| {
@@ -164,6 +168,10 @@ pub struct AudioRecordingManager {
     /// Shared with the `TranscriptionManager`; the recorder's frame callback
     /// feeds raw frames into it while a live-transcription stream is active.
     stream_router: Arc<StreamRouter>,
+    /// What the VAD has heard in the recording under way. Held here rather
+    /// than read through `recorder`, whose lock an opening or draining
+    /// microphone holds for seconds (see [`Self::speech_activity`]).
+    speech: Arc<SpeechActivity>,
 }
 
 impl AudioRecordingManager {
@@ -191,6 +199,7 @@ impl AudioRecordingManager {
             did_mute: Arc::new(Mutex::new(false)),
             close_generation: Arc::new(AtomicU64::new(0)),
             stream_router,
+            speech: Arc::new(SpeechActivity::default()),
         };
 
         // Always-on?  Open immediately.
@@ -292,6 +301,7 @@ impl AudioRecordingManager {
                 &vad_path,
                 &self.app_handle,
                 self.stream_router.clone(),
+                self.speech.clone(),
             )?);
         }
         Ok(())
@@ -567,6 +577,14 @@ impl AudioRecordingManager {
             *self.state.lock().unwrap(),
             RecordingState::Recording { .. }
         )
+    }
+
+    /// What the VAD has heard in the recording under way, for telling when a
+    /// hands-free dictation has gone quiet. Takes no lock, so the coordinator
+    /// can look as often as it likes without ever waiting on a microphone that
+    /// is opening or draining. Meaningless between recordings.
+    pub fn speech_activity(&self) -> &SpeechActivity {
+        &self.speech
     }
 
     /// Cancel any ongoing recording and hand back what it captured.

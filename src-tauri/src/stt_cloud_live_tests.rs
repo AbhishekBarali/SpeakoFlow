@@ -483,3 +483,170 @@ fn a_bad_key_is_reported_as_such() {
     // The user has to be able to tell an auth failure from an outage.
     assert!(error.contains("ElevenLabs"), "should name the provider");
 }
+
+/// Amazon Transcribe credentials from `AWS_ACCESS_KEY_ID`,
+/// `AWS_SECRET_ACCESS_KEY` and, for temporary credentials, `AWS_SESSION_TOKEN`
+/// — falling back to the key saved in the app — with the region from
+/// `AWS_REGION` (us-east-1 otherwise). `language` is the app's dictation
+/// language code, `auto` for AWS's own identification.
+///
+/// ```text
+/// $env:AWS_ACCESS_KEY_ID = "<key id>"
+/// $env:AWS_SECRET_ACCESS_KEY = "<secret>"
+/// $env:AWS_REGION = "eu-west-1"
+/// cargo test --lib amazon_transcribe -- --ignored --nocapture
+/// ```
+fn amazon_config(language: &str) -> Option<ResolvedCloudStt> {
+    let id = std::env::var("AWS_ACCESS_KEY_ID").unwrap_or_default();
+    let secret = std::env::var("AWS_SECRET_ACCESS_KEY").unwrap_or_default();
+    let from_env =
+        (!id.trim().is_empty() && !secret.trim().is_empty()).then(|| {
+            match std::env::var("AWS_SESSION_TOKEN") {
+                Ok(token) if !token.trim().is_empty() => {
+                    format!("{}:{}:{}", id.trim(), secret.trim(), token.trim())
+                }
+                _ => format!("{}:{}", id.trim(), secret.trim()),
+            }
+        });
+    let key = from_env.or_else(|| {
+        crate::secret_store::get(&crate::secret_store::account_cloud_stt(
+            crate::settings::CLOUD_STT_AMAZON,
+        ))
+    })?;
+    let mut settings = get_default_settings();
+    settings.stt_engine_mode = SttEngineMode::Cloud;
+    settings.cloud_stt_provider_id = crate::settings::CLOUD_STT_AMAZON.to_string();
+    settings
+        .cloud_stt_api_keys
+        .insert(crate::settings::CLOUD_STT_AMAZON.to_string(), key);
+    if let Ok(region) = std::env::var("AWS_REGION") {
+        settings
+            .cloud_stt_base_urls
+            .insert(crate::settings::CLOUD_STT_AMAZON.to_string(), region);
+    }
+    settings.selected_language = language.to_string();
+    settings.app_language = "en".to_string();
+    crate::stt_cloud::resolve_cloud_stt(&settings).ok()
+}
+
+/// Stream a real recording the way a dictation does: 30 ms frames at speaking
+/// speed, live updates counted, then the end of the stream.
+fn stream_like_a_dictation(cfg: &ResolvedCloudStt, samples: &[f32]) -> (String, usize) {
+    let updates = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let seen = updates.clone();
+    let mut session = crate::stt_cloud_stream::CloudStreamSession::connect(
+        Box::new(move |committed, tentative| {
+            let n = seen.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if n < 6 {
+                eprintln!("live[{n}] committed={committed:?} tentative={tentative:?}");
+            }
+        }),
+        cfg,
+    )
+    .expect("the signed WebSocket should be accepted");
+    for chunk in samples.chunks(480) {
+        session.feed(chunk);
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+    let text = session
+        .finish()
+        .expect("the stream should end with a transcript");
+    (text, updates.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+#[test]
+#[ignore = "live network test; needs AWS credentials"]
+fn amazon_transcribe_streams_a_real_recording() {
+    let cfg = require!(
+        amazon_config("en"),
+        "set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or save a key in the app"
+    );
+    let wav = require!(sample_wav(), "no recording found to transcribe");
+    let samples = read_wav(&wav);
+    let (text, updates) = stream_like_a_dictation(&cfg, &samples);
+    eprintln!("amazon live transcript ({updates} live updates): {text:?}");
+    assert!(!text.trim().is_empty(), "real speech should produce text");
+    assert!(
+        updates > 0,
+        "streaming should have produced live updates before the end"
+    );
+}
+
+/// AWS's auto-detection chooses among the candidates it is given; English is
+/// always one of them.
+#[test]
+#[ignore = "live network test; needs AWS credentials"]
+fn amazon_transcribe_identifies_the_language_on_auto() {
+    let cfg = require!(
+        amazon_config("auto"),
+        "set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or save a key in the app"
+    );
+    let wav = require!(sample_wav(), "no recording found to transcribe");
+    let samples = read_wav(&wav);
+    let (text, _) = stream_like_a_dictation(&cfg, &samples);
+    eprintln!("amazon auto-detect transcript: {text:?}");
+    assert!(!text.trim().is_empty(), "real speech should produce text");
+}
+
+/// The fallback path: no batch endpoint, so the finished recording is streamed
+/// again at speaking speed. This is the run that answers whether AWS would take
+/// it faster — if it ever does, `transcribe_by_streaming` can stop pacing.
+#[test]
+#[ignore = "live network test; needs AWS credentials"]
+fn amazon_transcribe_replays_a_finished_recording() {
+    let cfg = require!(
+        amazon_config("en"),
+        "set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or save a key in the app"
+    );
+    let wav = require!(sample_wav(), "no recording found to transcribe");
+    let samples = read_wav(&wav);
+    let seconds = samples.len() as f32 / 16_000.0;
+    let started = std::time::Instant::now();
+    let text = crate::stt_cloud::transcribe_cloud_blocking(&cfg, &samples)
+        .expect("the replay should return a transcript");
+    eprintln!(
+        "amazon replay of {seconds:.1}s took {:?}: {text:?}",
+        started.elapsed()
+    );
+    assert!(!text.trim().is_empty(), "real speech should produce text");
+}
+
+#[test]
+#[ignore = "live network test; needs AWS credentials"]
+fn amazon_transcribe_verification_probe_succeeds() {
+    let cfg = require!(
+        amazon_config("en"),
+        "set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or save a key in the app"
+    );
+    let message = crate::stt_cloud::verify_cloud_stt(&cfg).expect("the Settings test should pass");
+    eprintln!("verify: {message}");
+    assert!(message.contains("Amazon Transcribe"));
+}
+
+/// Needs a network but no AWS account: AWS's documentation example key is
+/// well-formed and belongs to nobody, so AWS must refuse it — and the refusal
+/// has to read as a key problem, not as an outage.
+#[test]
+#[ignore = "live network test; reaches AWS with a key that is not valid"]
+fn amazon_transcribe_refuses_a_key_that_is_not_valid() {
+    let mut settings = get_default_settings();
+    settings.stt_engine_mode = SttEngineMode::Cloud;
+    settings.cloud_stt_provider_id = crate::settings::CLOUD_STT_AMAZON.to_string();
+    settings.cloud_stt_api_keys.insert(
+        crate::settings::CLOUD_STT_AMAZON.to_string(),
+        "AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+    );
+    settings.selected_language = "en".to_string();
+    let cfg = crate::stt_cloud::resolve_cloud_stt(&settings).expect("should resolve");
+    let error = crate::stt_cloud::verify_cloud_stt(&cfg)
+        .expect_err("a key that belongs to nobody must not pass");
+    eprintln!("bad-key error: {error}");
+    assert!(
+        error.contains("Amazon Transcribe"),
+        "should name the provider"
+    );
+    assert!(
+        error.contains("access key"),
+        "should say the key is the problem"
+    );
+}

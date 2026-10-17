@@ -641,12 +641,17 @@
           "assistant_call": {
             "name": "Sohbet başlat",
             "description": "Asistanla elleriniz serbest konuşun ve yanıtlarını dinleyin. Bitirmek için yine basın."
+          },
+          "hands_free": {
+            "name": "Eller serbest",
+            "description": "Dikte tuşlarını basılı tutarken basın; tuşları bıraktıktan sonra da kayıt devam eder. Bitirmek için dikte tuşlarına yeniden basın."
           }
         },
         "errors": {
           "restore": "Orijinal kısayol geri yüklenemedi.",
           "set": "Kısayol ayarlanamadı: {{error}}",
           "inUse": "“{{name}}” zaten {{keys}} kullanıyor. Başka tuşlar seçin veya önce o kısayolu değiştirin.",
+          "sameAsOther": "{{keys}} bu kısayol için zaten ayarlı.",
           "reset": "Kısayol sıfırlanamadı."
         },
         "clickToChange": "Değiştirmek için tıklayın",
@@ -661,10 +666,24 @@
         "auto": "Otomatik"
       },
       "pushToTalk": {
-        "label": "Kayıt davranışı",
-        "description": "Basılı tut: bir kayıt kısayolunu basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki basış durdurur. Tüm kayıt kısayollarına uygulanır.",
-        "hold": "Basılı tut",
-        "tap": "Dokun"
+        "dictation": "Açık: tuşları basılı tuttuğunuz sürece kayıt devam eder. Kapalı: bir basış başlatır, sonraki durdurur; böylece her dikte eller serbest olur.",
+        "assistant": "Açık: tuşları basılı tuttuğunuz sürece dinler. Kapalı: bir basış başlatır, sonraki gönderir.",
+        "dictationLabel": "Konuşmak için basılı tut",
+        "assistantLabel": "Sormak için basılı tut"
+      },
+      "handsFree": {
+        "unavailableKeys": "Dikte yalnızca Ctrl + Win gibi değiştirici tuşlardan oluştuğunda çalışır. {{keys}} ile bunun yerine “Konuşmak için basılı tut” seçeneğini kapatın: her dikte, tuşlara yeniden basana kadar sürer.",
+        "unavailableEngine": "SpeakoFlow Keys klavye motoru gerekir ({{where}}). Ya da “Konuşmak için basılı tut” seçeneğini kapatın: her dikte, tuşlara yeniden basana kadar sürer.",
+        "taken": "{{name}} zaten {{keys}} kullanıyor; biri değişene kadar bu tuş bir şey yapmaz.",
+        "needsKey": "Boşluk ya da Enter gibi tek bir tuş seçin. Tek başına bir değiştirici tuş eller serbest tuşu olamaz.",
+        "pressKey": "Bir tuşa basın…",
+        "descriptionOff": "Kapalı. Yeniden açmak için tıklayıp Boşluk gibi bir tuşa basın.",
+        "linux": "Linux'ta bunun yerine “Konuşmak için basılı tut” seçeneğini kapatın: her dikte, tuşlara yeniden basana kadar sürer.",
+        "whileDictating": "Dikte ederken basılacak tuş"
+      },
+      "silenceStop": {
+        "label": "Sessizlikte durdur",
+        "description": "Bu süre boyunca konuşma duyulmayan eller serbest bir dikte kendiliğinden durur ve kısayola yeniden basmışsınız gibi yapıştırılır. Durmadan hemen önce kapsüldeki çizgi kısalır; yeniden konuşursanız kayıt devam eder."
       }
     },
     "models": {
@@ -824,6 +843,13 @@
         "label": "Transkripsiyonlar arasında mikrofonu açık tut",
         "description": "Ardışık diktelerde daha hızlı. Bluetooth ses kalitesini etkileyebilir."
       },
+      "mouseButtonShortcuts": {
+        "label": "Kısayol olarak fare düğmeleri",
+        "description": "Farenizin orta, Geri veya İleri düğmesini kısayol olarak kullanın: bir kısayolun tuşlarına tıklayın, ardından düğmeye basın. Kısayol olduğu sürece düğme başka bir şey yapmaz.",
+        "linux": "Linux'ta yalnızca orta düğme çalışır.",
+        "needsEngine": "SpeakoFlow Keys klavye altyapısını gerektirir.",
+        "reset": "Fare düğmesi kullanan kısayollar varsayılan tuşlarına döndü."
+      },
       "liveTranscription": {
         "label": "Canlı transkripsiyon",
         "description": "Konuşmayı, siz durduğunuzda hepsini birden değil, konuşurken yazıya döker. Deneysel."
@@ -858,6 +884,10 @@
       "showTrayIcon": {
         "label": "Tepsi simgesini göster",
         "description": "SpeakoFlow'u sistem tepsisinde tutar."
+      },
+      "trayIconColor": {
+        "label": "Renkli tepsi simgesi",
+        "description": "Beyaz simge yerine renkli logoyu gösterir. Paneliniz açık renkliyse ve beyaz simge zor görünüyorsa açın."
       },
       "closeBehavior": {
         "label": "Pencereyi kapattığımda uygulamadan çık",
@@ -1186,6 +1216,24 @@
           "azureDescription": "Azure kaynağınızın uç noktası; Azure portalındaki Anahtarlar ve Uç Nokta bölümünde bulunur. MAI-Transcribe için Central India, Southeast Asia, East US, West US, West US 2 veya North Europe bölgesinde bir kaynak gerekir.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS erişim anahtarı",
+            "missing": "Henüz kayıtlı anahtar yok. transcribe:StartStreamTranscriptionWebSocket çağırma izni olan bir IAM kullanıcısının veya rolünün erişim anahtarını kullanın.",
+            "keyId": "Erişim anahtarı kimliği",
+            "secret": "Gizli erişim anahtarı",
+            "sessionToken": "Oturum belirteci (yalnızca geçici kimlik bilgileri için)",
+            "invalid": "Bu bir AWS anahtarına benzemiyor. Erişim anahtarı kimliği yalnızca harf ve rakamlardan oluşur; hiçbir alan boşluk veya iki nokta içeremez.",
+            "permission": "Gereken izin"
+          },
+          "region": {
+            "title": "Bölge",
+            "description": "Amazon Transcribe'ın çalıştığı yer. Size en yakın bölge en hızlı yanıtı verir."
+          },
+          "streaming": "Her zaman açık: Amazon Transcribe yalnızca canlı yazıya döker. Kayıt sırasında bağlantı koparsa kayıt konuşma hızında yeniden gönderilir; bu yüzden tamamlanması kaydın süresi kadar sürer.",
+          "language": "Amazon Transcribe'a dili söylemek gerekir. Otomatik mod İngilizce, uygulama diliniz ve birkaç yaygın dil arasından seçim yapar; başka bir dil konuşuyorsanız kendi dilinizi seçin.",
+          "unsupportedLanguage": "Amazon Transcribe bu dili {{region}} bölgesinde canlı olarak yazıya dökemiyor. Başka bir dil veya bölge seçin. O zamana kadar dikte Amazon Transcribe'ı kullanmayacak."
+        },
         "model": {
           "title": "Model",
           "info": "Sağlayıcının sunduğu herhangi bir modeli yazın ya da listeyi yükleyin. ElevenLabs için, konuşurken yazıya dökmek üzere scribe_v2_realtime, durduktan sonra yazıya dökmek üzere scribe_v2 seçin.",
@@ -1198,7 +1246,8 @@
         },
         "keyterms": {
           "label": "Özel kelimelerimi gönder",
-          "description": "Özel kelime dağarcığınızı sağlayıcıya iletir; böylece o yazılışları tercih eder."
+          "description": "Özel kelime dağarcığınızı sağlayıcıya iletir; böylece o yazılışları tercih eder.",
+          "unsupported": "{{provider}} kelime listesi kabul etmiyor; bu yüzden özel kelimeleriniz bunun yerine bu bilgisayarda düzeltilir."
         },
         "noVerbatim": {
           "label": "Dolgu sözcüklerini kaldır",
@@ -1396,7 +1445,20 @@
       },
       "appendTrailingSpace": {
         "label": "Sona boşluk ekle",
-        "description": ""
+        "description": "Her dikteden sonra bir boşluk ekler. Akıllı boşluk açıkken bu yalnızca alanın okunamadığı yerlerde geçerlidir."
+      },
+      "smartSpacing": {
+        "label": "Akıllı boşluk",
+        "description": "Her dikteyi alanda zaten bulunan metne uydurur; böylece durup devam ettiğinizde kelimeler birbirine yapışmaz.",
+        "info": "Yapıştırmadan önce SpeakoFlow imlecin çevresindeki birkaç karaktere bakar ve yalnızca gereken yerde boşluk ekler. Bir uygulama metnini gizliyorsa, bunun yerine kendi son diktesini kullanır. Hiçbir şey kaydedilmez veya bir yere gönderilmez. macOS'ta SpeakoFlow'un zaten sahip olduğu Erişilebilirlik iznini kullanır. Linux'ta Chrome, Electron ve Qt uygulamaları metinlerini yalnızca masaüstünün erişilebilirlik ayarı açıkken paylaşır."
+      },
+      "smartSpacingFixCase": {
+        "label": "Büyük harfleri düzelt",
+        "description": "Bir cümleyi sürdüren dikteyi küçük harfle başlatır. Adlar, kısaltmalar ve \"I\" büyük harfli kalır; Türkçe metin değiştirilmez."
+      },
+      "smartSpacingJoin": {
+        "label": "Yarım kalan cümleleri birleştir",
+        "description": "Cümlenin ortasında durduğunuzda SpeakoFlow'un eklediği noktayı kaldırır, örneğin \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Klavye altyapısı",
@@ -1954,9 +2016,19 @@
       "hide": "Yüzen göstergeyi gizle",
       "show": "Yüzen göstergeyi göster"
     },
+    "notesPrefs": {
+      "autoTitle": "Arama bitince not yaz",
+      "autoDescription": "Yalnızca dökümü istiyorsanız kapatın. Tek bir toplantının notlarını yine de dökümünden yazabilirsiniz.",
+      "languageTitle": "Not dili",
+      "languageDescription": "Varsayılan olarak notlar toplantının yapıldığı dilde yazılır. Hep aynı dilde almak için bir dil seçin.",
+      "auto": "Toplantıyla aynı",
+      "autoHint": "Toplantının çoğunun yapıldığı dil"
+    },
     "pill": {
       "expand": "Canlı transkripti aç",
       "collapse": "Küçük kapsüle dön",
+      "copy": "Dökümü kopyala",
+      "copied": "Döküm kopyalandı",
       "stop": "Kaydı durdur",
       "listening": "Dinleniyor. Söylenenler burada görünür.",
       "micOnly": "Yalnızca mikrofonunuz kaydediliyor — diğer katılımcıların söyledikleri bu transkriptte yer almayacak."
@@ -2034,6 +2106,7 @@
       "empty": "Bu toplantının transkripti yok.",
       "loadingMore": "Transkriptin devamı yükleniyor…",
       "renameSpeaker": "Bu konuşmacıyı yeniden adlandır",
+      "copyTitle": "Tüm dökümü konuşmacı adlarıyla kopyala",
       "lowConfidence": "Belirsiz",
       "lowConfidenceHelp": "Bu konuşmacı etiketi bir tahmin. Sözcükler söylendiği gibi yazıya döküldü; yalnızca kimin söylediği belirsiz."
     },
@@ -2058,6 +2131,7 @@
     },
     "summary": {
       "template": "Şablon",
+      "languageAuto": "Toplantı dili",
       "templates": {
         "general": "Genel",
         "standup": "Günlük toplantı",
@@ -2199,6 +2273,7 @@
     "copied": "Kopyalandı",
     "copyFailed": "Kopyalanamadı — tekrar deneyin",
     "done": "Bitti",
+    "finish": "Bitir",
     "askAssistant": "Bunu yazmak yerine asistana sor",
     "recovery": {
       "dismissed": "İptal edildi",
@@ -2210,7 +2285,10 @@
       "title": "Konuşma modeli indiriliyor…",
       "percent": "Konuşma modeli indiriliyor · %{{percent}}",
       "hint": "İndirme bitince dikte çalışmaya başlar"
-    }
+    },
+    "handsFreeHint": "Eller serbest için {{key}} tuşuna basın",
+    "lockedKeys": "Eller serbest kaydediliyor. Bitirmek için {{keys}} tuşlarına basın",
+    "finishKeys": "Bitir ({{keys}})"
   },
   "reminders": {
     "title": "Hatırlatıcı",
@@ -2501,10 +2579,7 @@
       "dictation": "Dikte",
       "assistant": "Asistan",
       "cleanupOff": "Bu kısayolu kullanmak için yapay zekâ temizlemeyi açın.",
-      "cleanupOnDictation": "Dikte kısayolunuz her dikteyi zaten temizliyor, bu yüzden buna gerek yok.",
-      "openCleanup": "Yapay zekâ temizlemeyi aç",
-      "assistantOff": "Asistan kapalı, bu yüzden kısayolları hiçbir şey yapmaz.",
-      "openAssistant": "Asistanı aç"
+      "assistantOff": "Asistan kapalı, bu yüzden kısayolları hiçbir şey yapmaz."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2586,6 +2661,10 @@
         "whatHold": "Basılı tutun, konuşun, bırakın. Sözleriniz imlecin olduğu yere yazılır.",
         "whatTap": "Dokunun, konuşun, yeniden dokunun. Sözleriniz imlecin olduğu yere yazılır."
       },
+      "handsFree": {
+        "what": "{{keys}} tuşlarını basılı tutun, {{key}} tuşuna basın ve bırakın: {{keys}} tuşlarına yeniden basana kadar dinlemeye devam eder.",
+        "linux": "Linux'ta eller serbest dikte için “Konuşmak için basılı tut” seçeneğini kapatın. Böylece bir basış başlatır, sonraki durdurur."
+      },
       "cleanup": {
         "title": "Dikte et ve temizle",
         "description": "Dikte et ile aynı; ardından yapay zekâ noktalamayı, dolgu sözcüklerini ve üslubu düzeltir.",
@@ -2594,7 +2673,8 @@
       "ask": {
         "title": "Asistana sor",
         "description": "Sesli bir soru sorun ve yanıtı yüzen bir panelde alın.",
-        "what": "Sesli sorun. Yanıt yüzen bir panelde görünür."
+        "whatHold": "Basılı tutun, sorun, bırakın. Yanıt yüzen bir panelde görünür.",
+        "whatTap": "Dokunun, sorun, yeniden dokunun. Yanıt yüzen bir panelde görünür."
       },
       "call": {
         "title": "Sohbet başlat",
@@ -2603,10 +2683,6 @@
       },
       "info": "Bunlara herhangi bir uygulamada basın. Değiştirmek için tuşlara tıklayın.",
       "offHint": "Kapalı",
-      "mode": {
-        "hold": "Konuşmak için basılı tut",
-        "tap": "Açıp kapatmak için dokun"
-      },
       "cancel": {
         "title": "İptal",
         "what": "Bir kaydı ya da sesli okunan bir yanıtı durdurun."
@@ -2801,6 +2877,14 @@
       "info": "Temizlemeye kendi kısayolunu verin ya da dikte kısayolunuzun her dikteyi temizlemesine izin verin; böylece hatırlamanız gereken tek bir tuş kombinasyonu olur.",
       "separate": "Kendi kısayolu",
       "dictation": "Dikteyle aynı"
+    },
+    "skipShort": {
+      "title": "Kısa diktelerde temizlemeyi atla",
+      "info": "Arama ya da kısa bir yanıt gibi kısa dikteler, model beklenmeden söylediğiniz gibi yazılır. Daha uzun olanlar yine temizlenir.",
+      "limit": "Kısa sayılma sınırı",
+      "limitInfo": "Kelime olarak sayılır. Çince, Japonca ya da Tayca gibi boşluksuz yazılan dillerde kelime sayısı karakter sayısından tahmin edilir.",
+      "words_one": "kelimeden az",
+      "words_other": "kelimeden az"
     },
     "shortcutRow": "Kısayol"
   },
@@ -3184,7 +3268,19 @@
     "useDefault": "Varsayılanı kullan",
     "turnOff": "Kapat",
     "turnedOff": "{{name}} kısayolu kapatıldı",
-    "undo": "Geri al"
+    "undo": "Geri al",
+    "addAnother": "Başka ekle",
+    "addAnotherHint": "Bu kısayola ikinci bir tuş takımı verin, örneğin bir fare düğmesi",
+    "remove": "Kaldır",
+    "or": "veya",
+    "changeOther": "{{name}} kısayolunun diğer tuşlarını değiştir",
+    "pressKeysOrButton": "Tuşlara veya bir fare düğmesine basın…",
+    "mouseNeedsKeysEngine": "Fare düğmeleri SpeakoFlow Keys klavye altyapısını gerektirir (Ayarlar → Gelişmiş → Deneysel).",
+    "mouse": {
+      "middle": "Orta fare düğmesi",
+      "back": "Fare Geri düğmesi",
+      "forward": "Fare İleri düğmesi"
+    }
   },
   "memoryManager": {
     "status": {
