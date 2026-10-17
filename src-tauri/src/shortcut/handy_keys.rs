@@ -38,8 +38,9 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::settings::{self, get_settings, ShortcutBinding};
+use crate::settings::{self, get_settings, AppSettings, KeyboardImplementation, ShortcutBinding};
 
+use super::combos::{self, Armed};
 use super::handler::{handle_shortcut_cancelled, handle_shortcut_event};
 
 /// How long a caller waits for the manager thread to answer a register /
@@ -140,8 +141,9 @@ impl HandyKeysState {
         // let go, so the ask never starts on the way to the call's Ctrl+Alt+C.
         manager.set_fire_on_release(!get_settings(&app).push_to_talk);
 
-        // Maps binding IDs to HotkeyIds and hotkey strings
-        let mut binding_to_hotkey: HashMap<String, HotkeyId> = HashMap::new();
+        // Maps binding IDs to their hotkeys (its own keys, and its other keys
+        // when it has them), and each hotkey back to its binding and string.
+        let mut binding_to_hotkey: HashMap<String, Vec<HotkeyId>> = HashMap::new();
         let mut hotkey_to_binding: HashMap<HotkeyId, (String, String)> = HashMap::new(); // (binding_id, hotkey_string)
 
         // Hotkeys and configuration commands wake the same blocking receive.
@@ -202,10 +204,11 @@ impl HandyKeysState {
         info!("handy-keys manager thread stopped");
     }
 
-    /// Register a hotkey
+    /// Register one of a binding's hotkeys. A binding with other keys has two,
+    /// both reporting its id.
     fn do_register(
         manager: &HotkeyManager,
-        binding_to_hotkey: &mut HashMap<String, HotkeyId>,
+        binding_to_hotkey: &mut HashMap<String, Vec<HotkeyId>>,
         hotkey_to_binding: &mut HashMap<HotkeyId, (String, String)>,
         binding_id: &str,
         hotkey_string: &str,
@@ -218,7 +221,10 @@ impl HandyKeysState {
             .register(hotkey)
             .map_err(|e| format!("Failed to register hotkey: {}", e))?;
 
-        binding_to_hotkey.insert(binding_id.to_string(), id);
+        binding_to_hotkey
+            .entry(binding_id.to_string())
+            .or_default()
+            .push(id);
         hotkey_to_binding.insert(id, (binding_id.to_string(), hotkey_string.to_string()));
 
         debug!(
@@ -228,32 +234,38 @@ impl HandyKeysState {
         Ok(())
     }
 
-    /// Unregister a hotkey
+    /// Unregister every hotkey of a binding. One that fails does not keep the
+    /// rest registered.
     fn do_unregister(
         manager: &HotkeyManager,
-        binding_to_hotkey: &mut HashMap<String, HotkeyId>,
+        binding_to_hotkey: &mut HashMap<String, Vec<HotkeyId>>,
         hotkey_to_binding: &mut HashMap<HotkeyId, (String, String)>,
         binding_id: &str,
     ) -> Result<(), String> {
-        if let Some(id) = binding_to_hotkey.remove(binding_id) {
-            manager
-                .unregister(id)
-                .map_err(|e| format!("Failed to unregister hotkey: {}", e))?;
+        let mut result = Ok(());
+        for id in binding_to_hotkey.remove(binding_id).unwrap_or_default() {
             hotkey_to_binding.remove(&id);
+            if let Err(e) = manager.unregister(id) {
+                if result.is_ok() {
+                    result = Err(format!("Failed to unregister hotkey: {}", e));
+                }
+            }
+        }
+        if result.is_ok() {
             debug!("Unregistered handy-keys shortcut: {}", binding_id);
         }
-        Ok(())
+        result
     }
 
-    /// Register a shortcut binding
-    pub fn register(&self, binding: &ShortcutBinding) -> Result<(), String> {
+    /// Register one set of a binding's keys.
+    pub fn register(&self, binding_id: &str, hotkey_string: &str) -> Result<(), String> {
         let (tx, rx) = mpsc::channel();
         self.command_sender
             .lock()
             .map_err(|_| "Failed to lock command_sender")?
             .send(ManagerCommand::Register {
-                binding_id: binding.id.clone(),
-                hotkey_string: binding.current_binding.clone(),
+                binding_id: binding_id.to_string(),
+                hotkey_string: hotkey_string.to_string(),
                 response: tx,
             })
             .map_err(|_| "Failed to send register command")?;
@@ -262,14 +274,25 @@ impl HandyKeysState {
             .map_err(|_| "Timed out waiting for the hotkey engine to register".to_string())?
     }
 
-    /// Unregister a shortcut binding
-    pub fn unregister(&self, binding: &ShortcutBinding) -> Result<(), String> {
+    /// Register every set of keys `binding` should answer to right now (see
+    /// `combos::armed`), its own first.
+    fn arm(&self, settings: &AppSettings, binding: &ShortcutBinding) -> Armed {
+        combos::arm_with(
+            settings,
+            binding,
+            KeyboardImplementation::HandyKeys,
+            |combo| self.register(&binding.id, combo),
+        )
+    }
+
+    /// Unregister every hotkey of a binding
+    pub fn unregister(&self, binding_id: &str) -> Result<(), String> {
         let (tx, rx) = mpsc::channel();
         self.command_sender
             .lock()
             .map_err(|_| "Failed to lock command_sender")?
             .send(ManagerCommand::Unregister {
-                binding_id: binding.id.clone(),
+                binding_id: binding_id.to_string(),
                 response: tx,
             })
             .map_err(|_| "Failed to send unregister command")?;
@@ -477,7 +500,7 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
             continue;
         }
 
-        if let Err(e) = state.register(&binding) {
+        if let Err(e) = state.arm(&user_settings, &binding).into_result(&id) {
             error!(
                 "Failed to register handy-keys shortcut {} during init: {}",
                 id, e
@@ -522,7 +545,8 @@ pub fn register_cancel_shortcut(app: &AppHandle) {
                     return;
                 }
                 if let Some(state) = app_clone.try_state::<HandyKeysState>() {
-                    if let Err(e) = state.register(&cancel_binding) {
+                    let settings = get_settings(&app_clone);
+                    if let Err(e) = state.arm(&settings, &cancel_binding).into_result("cancel") {
                         error!("Failed to register cancel shortcut: {}", e);
                     }
                 }
@@ -543,36 +567,41 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
     {
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
-            if let Some(cancel_binding) = get_settings(&app_clone).bindings.get("cancel").cloned() {
-                if let Some(state) = app_clone.try_state::<HandyKeysState>() {
-                    let _ = state.unregister(&cancel_binding);
-                }
+            // By id: both of Cancel's keys go, whatever they are now.
+            if let Some(state) = app_clone.try_state::<HandyKeysState>() {
+                let _ = state.unregister("cancel");
             }
         });
     }
 }
 
-/// Register a shortcut
+/// Register a shortcut: its own keys, and its other keys when it has them.
+/// Fails only when its own keys could not be registered (see `Armed`).
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
-    // An empty binding means "disabled" — nothing to register.
-    if binding.current_binding.trim().is_empty() {
-        return Ok(());
-    }
-    let state = app
-        .try_state::<HandyKeysState>()
-        .ok_or("HandyKeysState not initialized")?;
-    state.register(&binding)
+    arm(app, &binding).into_result(&binding.id)
 }
 
-/// Unregister a shortcut
-pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
-    if binding.current_binding.trim().is_empty() {
-        return Ok(());
+/// Register a shortcut's keys and report on each set separately.
+pub fn arm(app: &AppHandle, binding: &ShortcutBinding) -> Armed {
+    // A shortcut that is turned off has nothing to register.
+    if binding.combos().is_empty() {
+        return Armed::nothing();
     }
-    let state = app
-        .try_state::<HandyKeysState>()
-        .ok_or("HandyKeysState not initialized")?;
-    state.unregister(&binding)
+    match app.try_state::<HandyKeysState>() {
+        Some(state) => state.arm(&get_settings(app), binding),
+        None => Armed::failed("HandyKeysState not initialized".to_string()),
+    }
+}
+
+/// Unregister a shortcut: every hotkey registered under its id, so keys that
+/// changed since they were registered are released all the same.
+pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    match app.try_state::<HandyKeysState>() {
+        Some(state) => state.unregister(&binding.id),
+        // Nothing can have been registered without the engine.
+        None if binding.combos().is_empty() => Ok(()),
+        None => Err("HandyKeysState not initialized".to_string()),
+    }
 }
 
 /// Start key recording mode

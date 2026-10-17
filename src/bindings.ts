@@ -21,6 +21,18 @@ async resetBinding(id: string) : Promise<Result<BindingResponse, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Give a shortcut other keys that do the same thing, or remove them with an
+ * empty `binding`. Its own keys are left exactly as they are.
+ */
+async changeAlternateBinding(id: string, binding: string) : Promise<Result<BindingResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_alternate_binding", { id, binding }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_ptt_setting", { enabled }) };
@@ -674,6 +686,22 @@ async changeKeyboardImplementationSetting(implementation: string) : Promise<Resu
  */
 async getKeyboardImplementation() : Promise<string> {
     return await TAURI_INVOKE("get_keyboard_implementation");
+},
+/**
+ * Let mouse buttons be shortcut keys, or stop (Experimental).
+ * 
+ * Turned off, a shortcut whose own keys are a mouse button goes back to its
+ * default keys: dictation and the ask always keep a key, and a button nothing
+ * listens for any more is not one. Other keys that are a mouse button are
+ * kept, only not listened for, and work again once this is back on.
+ */
+async changeMouseButtonShortcutsSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_mouse_button_shortcuts_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 /**
  * Whether the Fn (globe) key still does something of its own on this Mac.
@@ -3904,7 +3932,14 @@ flow_phrase?: string;
  * clearly refers to the screen. Separate from the assistant's screen
  * access mode on purpose — the two features are permissioned independently.
  */
-flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
+flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; 
+/**
+ * Experimental: let the middle, Back and Forward mouse buttons be a
+ * shortcut's keys. Off, a stored mouse button is kept but not registered,
+ * and the shortcut editor ignores the mouse. Only the SpeakoFlow Keys
+ * engine can see mouse buttons at all.
+ */
+mouse_button_shortcuts?: boolean; show_tray_icon?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
 /**
  * Master switch for the assistant experience: the floating panel window,
  * its two hotkeys, spoken replies, profiles and personal memory.
@@ -5438,7 +5473,17 @@ export type SettingsNoticeKind =
  * Saving has been failing. Cleared by the next save that works.
  */
 "save_failing"
-export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
+export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string; 
+/**
+ * A second set of keys that does exactly what `current_binding` does, or
+ * empty for none: a mouse button, or a combo a mouse's own software can
+ * send. Both are registered under this binding's id, so everything that
+ * acts on a shortcut by id (the coordinator, Cancel, the chord hold-back)
+ * takes one for the other, and a recording started with either stops
+ * with either. Only armed while `current_binding` is set: a shortcut that
+ * is turned off is off by both.
+ */
+alternate_binding?: string }
 /**
  * Everything the Shortcuts card needs to explain a Linux session.
  */

@@ -645,6 +645,7 @@
           "restore": "元のショートカットを復元できませんでした。",
           "set": "ショートカットを設定できませんでした: {{error}}",
           "inUse": "「{{name}}」はすでに {{keys}} を使っています。別のキーを選ぶか、先にそちらのショートカットを変更してください。",
+          "sameAsOther": "{{keys}} はこのショートカットにすでに設定されています。",
           "reset": "ショートカットをリセットできませんでした。"
         },
         "clickToChange": "クリックして変更",
@@ -822,6 +823,13 @@
       "lazyStreamClose": {
         "label": "文字起こし間でマイクを開いたままにする",
         "description": "連続した音声入力が速くなります。Bluetooth の音質に影響する場合があります。"
+      },
+      "mouseButtonShortcuts": {
+        "label": "マウスボタンをショートカットに使う",
+        "description": "マウスの中ボタン、戻るボタン、進むボタンをショートカットとして使えます。ショートカットのキーをクリックしてから、ボタンを押してください。ショートカットに割り当てたボタンは、ほかの動作をしません。",
+        "linux": "Linux では中ボタンだけが使えます。",
+        "needsEngine": "キーボード実装が SpeakoFlow Keys の場合のみ使えます。",
+        "reset": "マウスボタンを使っていたショートカットは既定のキーに戻りました。"
       },
       "liveTranscription": {
         "label": "リアルタイム文字起こし",
@@ -3187,7 +3195,19 @@
     "useDefault": "既定に戻す",
     "turnOff": "オフにする",
     "turnedOff": "{{name}} のショートカットをオフにしました",
-    "undo": "元に戻す"
+    "undo": "元に戻す",
+    "addAnother": "別のキーを追加",
+    "addAnotherHint": "このショートカットに、マウスボタンなど2つ目のキーを割り当てます",
+    "remove": "削除",
+    "or": "または",
+    "changeOther": "{{name}}のもう一方のキーを変更",
+    "pressKeysOrButton": "キーかマウスボタンを押してください…",
+    "mouseNeedsKeysEngine": "マウスボタンを使うには、キーボード実装を SpeakoFlow Keys にする必要があります（設定 → 詳細設定 → 実験的）。",
+    "mouse": {
+      "middle": "マウス中ボタン",
+      "back": "マウス戻るボタン",
+      "forward": "マウス進むボタン"
+    }
   },
   "memoryManager": {
     "status": {

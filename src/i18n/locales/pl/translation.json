@@ -651,6 +651,7 @@
           "restore": "Nie udało się przywrócić oryginalnego skrótu.",
           "set": "Nie udało się ustawić skrótu: {{error}}",
           "inUse": "„{{name}}” już używa {{keys}}. Wybierz inne klawisze albo najpierw zmień tamten skrót.",
+          "sameAsOther": "{{keys}} jest już ustawione dla tego skrótu.",
           "reset": "Nie udało się zresetować skrótu."
         },
         "clickToChange": "Kliknij, aby zmienić",
@@ -840,6 +841,13 @@
       "lazyStreamClose": {
         "label": "Nie zamykaj mikrofonu między transkrypcjami",
         "description": "Szybsze dyktowanie jedno po drugim. Może wpłynąć na jakość dźwięku Bluetooth."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Przyciski myszy jako skróty",
+        "description": "Używaj środkowego przycisku myszy albo przycisków Wstecz i Dalej jako skrótu: kliknij klawisze skrótu, a potem naciśnij przycisk. Dopóki jest skrótem, przycisk nie robi nic innego.",
+        "linux": "W systemie Linux działa tylko środkowy przycisk.",
+        "needsEngine": "Wymaga implementacji klawiatury SpeakoFlow Keys.",
+        "reset": "Skróty, które używały przycisku myszy, wróciły do domyślnych klawiszy."
       },
       "liveTranscription": {
         "label": "Transkrypcja na bieżąco",
@@ -3274,7 +3282,19 @@
     "useDefault": "Domyślny",
     "turnOff": "Wyłącz",
     "turnedOff": "Skrót {{name}} wyłączony",
-    "undo": "Cofnij"
+    "undo": "Cofnij",
+    "addAnother": "Dodaj kolejny",
+    "addAnotherHint": "Przypisz temu skrótowi drugi zestaw klawiszy, np. przycisk myszy",
+    "remove": "Usuń",
+    "or": "lub",
+    "changeOther": "Zmień dodatkowe klawisze skrótu: {{name}}",
+    "pressKeysOrButton": "Naciśnij klawisze lub przycisk myszy…",
+    "mouseNeedsKeysEngine": "Przyciski myszy wymagają implementacji klawiatury SpeakoFlow Keys (Ustawienia → Zaawansowane → Eksperymentalne).",
+    "mouse": {
+      "middle": "Środkowy przycisk myszy",
+      "back": "Przycisk myszy Wstecz",
+      "forward": "Przycisk myszy Dalej"
+    }
   },
   "memoryManager": {
     "status": {

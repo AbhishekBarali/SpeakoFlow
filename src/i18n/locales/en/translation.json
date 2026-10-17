@@ -647,6 +647,7 @@
           "restore": "Couldn't restore the original shortcut.",
           "set": "Couldn't set the shortcut: {{error}}",
           "inUse": "{{name}} already uses {{keys}}. Pick other keys, or change that shortcut first.",
+          "sameAsOther": "{{keys}} is already set for this shortcut.",
           "reset": "Couldn't reset the shortcut."
         },
         "clickToChange": "Click to change",
@@ -828,6 +829,13 @@
       "lazyStreamClose": {
         "label": "Keep mic open between transcriptions",
         "description": "Faster back-to-back dictation. May affect Bluetooth audio quality."
+      },
+      "mouseButtonShortcuts": {
+        "label": "Mouse buttons as shortcuts",
+        "description": "Use your mouse's middle, Back or Forward button as a shortcut: click a shortcut's keys, then press the button. While it is a shortcut, the button does nothing else.",
+        "linux": "On Linux only the middle button works.",
+        "needsEngine": "Needs the SpeakoFlow Keys keyboard implementation.",
+        "reset": "Shortcuts that used a mouse button are back on their default keys."
       },
       "liveTranscription": {
         "label": "Live transcription",
@@ -3216,7 +3224,19 @@
     "useDefault": "Use default",
     "turnOff": "Turn off",
     "turnedOff": "{{name}} shortcut turned off",
-    "undo": "Undo"
+    "undo": "Undo",
+    "addAnother": "Add another",
+    "addAnotherHint": "Give this shortcut a second set of keys, such as a mouse button",
+    "remove": "Remove",
+    "or": "or",
+    "changeOther": "Change the other keys for the {{name}} shortcut",
+    "pressKeysOrButton": "Press keys or a mouse button…",
+    "mouseNeedsKeysEngine": "Mouse buttons need the SpeakoFlow Keys keyboard implementation (Settings → Advanced → Experimental).",
+    "mouse": {
+      "middle": "Mouse Middle",
+      "back": "Mouse Back",
+      "forward": "Mouse Forward"
+    }
   },
   "memoryManager": {
     "status": {

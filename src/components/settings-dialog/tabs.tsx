@@ -71,6 +71,7 @@ import { ExperimentalToggle } from "@/components/settings/ExperimentalToggle";
 import { KeyboardImplementationSelector } from "@/components/settings/debug/KeyboardImplementationSelector";
 import { AccelerationSelector } from "@/components/settings/AccelerationSelector";
 import { LazyStreamClose } from "@/components/settings/LazyStreamClose";
+import { MouseButtonShortcuts } from "@/components/settings/MouseButtonShortcuts";
 import { LogLevelSelector } from "@/components/settings/debug/LogLevelSelector";
 import { WordCorrectionThreshold } from "@/components/settings/debug/WordCorrectionThreshold";
 import { PasteDelay } from "@/components/settings/debug/PasteDelay";
@@ -355,6 +356,7 @@ export const AdvancedTab: React.FC = () => {
             descriptionMode="tooltip"
             grouped={true}
           />
+          <MouseButtonShortcuts descriptionMode="tooltip" grouped={true} />
           <AccelerationSelector descriptionMode="tooltip" grouped={true} />
           <LazyStreamClose descriptionMode="tooltip" grouped={true} />
         </SettingsGroup>

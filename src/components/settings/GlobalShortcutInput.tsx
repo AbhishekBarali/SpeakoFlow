@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   getKeyName,
   formatKeyCombination,
+  hasMouseButton,
   normalizeKey,
 } from "../../lib/utils/keyboard";
 import { shortcutUsingKeys } from "../../lib/utils/shortcutConflict";
@@ -15,9 +16,10 @@ import { toast } from "sonner";
 import {
   RecordingKeys,
   ShortcutEditActions,
-  ShortcutKeysButton,
+  ShortcutKeysAtRest,
   announceTurnedOff,
   isOptionalShortcut,
+  useMouseButtonsWhileRecording,
   type ShortcutFinish,
   type ShortcutSize,
 } from "./ShortcutControl";
@@ -47,18 +49,36 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
   size,
 }) => {
   const { t } = useTranslation();
-  const { getSetting, updateBinding, resetBinding, isUpdating, isLoading } =
-    useSettings();
+  const {
+    getSetting,
+    updateBinding,
+    updateAlternateBinding,
+    resetBinding,
+    isUpdating,
+    isLoading,
+  } = useSettings();
   const [keyPressed, setKeyPressed] = useState<string[]>([]);
   const [recordedKeys, setRecordedKeys] = useState<string[]>([]);
   const [editingShortcutId, setEditingShortcutId] = useState<string | null>(
     null,
+  );
+  // Which of the shortcut's two sets of keys is being recorded.
+  const [editingSlot, setEditingSlot] = useState<"primary" | "alternate">(
+    "primary",
   );
   const [originalBinding, setOriginalBinding] = useState<string>("");
   const shortcutRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const osType = useOsType();
 
   const bindings = getSetting("bindings") || {};
+  const mouseButtons = getSetting("mouse_button_shortcuts") ?? false;
+
+  // This engine cannot see a mouse button at all. Someone who turned mouse
+  // buttons on and presses one here is told where they work, instead of
+  // watching the editor ignore it.
+  useMouseButtonsWhileRecording(editingShortcutId !== null, () => {
+    if (mouseButtons) toast.info(t("shortcutEditor.mouseNeedsKeysEngine"));
+  });
 
   useEffect(() => {
     // Only add event listeners when we're in editing mode
@@ -123,21 +143,51 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
         });
         const newShortcut = sortedKeys.join("+");
         const takenBy = editingShortcutId
-          ? shortcutUsingKeys(bindings, newShortcut, editingShortcutId)
+          ? shortcutUsingKeys(
+              bindings,
+              newShortcut,
+              editingShortcutId,
+              editingSlot,
+            )
           : null;
 
         if (editingShortcutId && takenBy) {
           // Nothing was changed: put the suspended shortcut back as it was.
           toast.error(
-            t("settings.general.shortcut.errors.inUse", {
-              name: t(
-                `settings.general.shortcut.bindings.${takenBy}.name`,
-                bindings[takenBy]?.name ?? takenBy,
-              ),
-              keys: formatKeyCombination(newShortcut, osType),
-            }),
+            takenBy === editingShortcutId
+              ? t("settings.general.shortcut.errors.sameAsOther", {
+                  keys: formatKeyCombination(newShortcut, osType),
+                })
+              : t("settings.general.shortcut.errors.inUse", {
+                  name: t(
+                    `settings.general.shortcut.bindings.${takenBy}.name`,
+                    bindings[takenBy]?.name ?? takenBy,
+                  ),
+                  keys: formatKeyCombination(newShortcut, osType),
+                }),
           );
           commands.resumeBinding(editingShortcutId).catch(console.error);
+          setEditingShortcutId(null);
+          setKeyPressed([]);
+          setRecordedKeys([]);
+          setOriginalBinding("");
+        } else if (
+          editingShortcutId &&
+          bindings[editingShortcutId] &&
+          editingSlot === "alternate"
+        ) {
+          try {
+            // Registers both sets of keys again, which also ends the suspend.
+            await updateAlternateBinding(editingShortcutId, newShortcut);
+          } catch (error) {
+            console.error("Failed to set the other keys:", error);
+            toast.error(
+              t("settings.general.shortcut.errors.set", {
+                error: String(error),
+              }),
+            );
+            commands.resumeBinding(editingShortcutId).catch(console.error);
+          }
           setEditingShortcutId(null);
           setKeyPressed([]);
           setRecordedKeys([]);
@@ -177,9 +227,14 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
     const handleClickOutside = async (e: MouseEvent) => {
       if (cleanup) return;
       const activeElement = shortcutRefs.current.get(editingShortcutId);
-      if (activeElement && !activeElement.contains(e.target as Node)) {
-        // Cancel shortcut recording and restore original binding
-        if (editingShortcutId && originalBinding) {
+      // Judged by the path the click took when it happened: "Add another"
+      // re-renders the editor during its own click, so by the time the click
+      // reaches the window the button it landed on is no longer in the page.
+      if (activeElement && !e.composedPath().includes(activeElement)) {
+        // Cancel shortcut recording and restore original binding. Other keys
+        // being recorded changed nothing, so the suspended shortcut only
+        // needs registering again.
+        if (editingShortcutId && editingSlot === "primary" && originalBinding) {
           try {
             await updateBinding(editingShortcutId, originalBinding);
           } catch (error) {
@@ -210,21 +265,29 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
     keyPressed,
     recordedKeys,
     editingShortcutId,
+    editingSlot,
     bindings,
     originalBinding,
     updateBinding,
+    updateAlternateBinding,
     osType,
   ]);
 
-  // Start recording a new shortcut
-  const startRecording = async (id: string) => {
+  // Start recording new keys for one of the shortcut's two sets
+  const startRecording = async (
+    id: string,
+    slot: "primary" | "alternate" = "primary",
+  ) => {
     if (editingShortcutId === id) return; // Already editing this shortcut
 
     // Suspend current binding to avoid firing while recording
     await commands.suspendBinding(id).catch(console.error);
 
     // Store the original binding to restore if canceled
-    setOriginalBinding(bindings[id]?.current_binding || "");
+    setOriginalBinding(
+      slot === "primary" ? bindings[id]?.current_binding || "" : "",
+    );
+    setEditingSlot(slot);
     setEditingShortcutId(id);
     setKeyPressed([]);
     setRecordedKeys([]);
@@ -307,6 +370,10 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
 
   const optional = isOptionalShortcut(shortcutId);
   const busy = isUpdating(`binding_${shortcutId}`);
+  // This engine never listens for a mouse button, so one stored from the
+  // other engine is not shown as working keys.
+  const storedOther = binding.alternate_binding?.trim() ?? "";
+  const otherKeys = hasMouseButton(storedOther) ? "" : storedOther;
 
   // Leave the editor without restoring anything: the action that follows
   // decides what the shortcut becomes (and registers it).
@@ -315,6 +382,26 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
     setKeyPressed([]);
     setRecordedKeys([]);
     setOriginalBinding("");
+  };
+  // The shortcut stays suspended and the next keys become its other keys.
+  // Its own keys were not changed, so abandoning this only resumes it.
+  const addAnother = () => {
+    setEditingSlot("alternate");
+    setOriginalBinding("");
+    setKeyPressed([]);
+    setRecordedKeys([]);
+  };
+  const removeOther = async () => {
+    leaveEditor();
+    try {
+      await updateAlternateBinding(shortcutId, "");
+    } catch (error) {
+      console.error("Failed to remove the other keys:", error);
+      toast.error(
+        t("settings.general.shortcut.errors.set", { error: String(error) }),
+      );
+      commands.resumeBinding(shortcutId).catch(console.error);
+    }
   };
   const useDefault = async () => {
     leaveEditor();
@@ -348,25 +435,41 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
             finish={finish}
             size={size ?? "md"}
           />
-          <ShortcutEditActions
-            current={originalBinding}
-            defaultBinding={binding.default_binding}
-            optional={optional}
-            finish={finish}
-            disabled={busy}
-            onUseDefault={() => void useDefault()}
-            onTurnOff={() => void turnOff()}
-          />
+          {editingSlot === "primary" ? (
+            <ShortcutEditActions
+              current={originalBinding}
+              defaultBinding={binding.default_binding}
+              optional={optional}
+              finish={finish}
+              disabled={busy}
+              onUseDefault={() => void useDefault()}
+              onTurnOff={() => void turnOff()}
+              onAddAnother={
+                originalBinding.trim() && !otherKeys ? addAnother : undefined
+              }
+            />
+          ) : (
+            <ShortcutEditActions
+              current={otherKeys}
+              defaultBinding=""
+              optional={false}
+              finish={finish}
+              disabled={busy}
+              onRemove={otherKeys ? () => void removeOther() : undefined}
+            />
+          )}
         </div>
       ) : (
-        <ShortcutKeysButton
+        <ShortcutKeysAtRest
           binding={binding.current_binding}
+          alternate={otherKeys}
           name={translatedName}
           finish={finish}
           size={size}
           disabled={disabled}
           emptyLabel={optional ? t("common.off") : undefined}
           onClick={() => void startRecording(shortcutId)}
+          onClickAlternate={() => void startRecording(shortcutId, "alternate")}
         />
       )}
     </div>
