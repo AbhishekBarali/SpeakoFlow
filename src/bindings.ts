@@ -3987,7 +3987,7 @@ recording_retention_days?: number; paste_method?: PasteMethod; clipboard_handlin
  * Only matters while `post_process_enabled` is on; see
  * [`cleanup_on_dictation`] and [`cleanup_binding_active`].
  */
-post_process_on_dictation?: boolean;
+post_process_on_dictation?: boolean; 
 /**
  * Paste a dictation with fewer than `post_process_min_words` words as
  * spoken, without AI cleanup. On by default: a search or a two-word reply
@@ -3996,7 +3996,7 @@ post_process_on_dictation?: boolean;
  * skipped: the dedicated cleanup shortcut always cleans. See
  * `actions::skips_short_cleanup`.
  */
-post_process_skip_short?: boolean;
+post_process_skip_short?: boolean; 
 /**
  * How many words a dictation needs for cleanup to run while
  * `post_process_skip_short` is on.
@@ -4045,7 +4045,26 @@ flow_phrase?: string;
  * clearly refers to the screen. Separate from the assistant's screen
  * access mode on purpose — the two features are permissioned independently.
  */
-flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; smart_spacing?: boolean; smart_spacing_fix_case?: boolean; smart_spacing_join_sentences?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; 
+flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; 
+/**
+ * Smart spacing: fit each dictation onto the text already in the field
+ * (a space where one is needed, the right case, no stray period from the
+ * previous dictation), so dictations do not run together. Off by default:
+ * it reads the few characters around the caret of the field being pasted
+ * into. See `smart_spacing`.
+ */
+smart_spacing?: boolean; 
+/**
+ * Smart spacing: lowercase a dictation's first word when it continues a
+ * sentence, and match the case of a replaced selection.
+ */
+smart_spacing_fix_case?: boolean; 
+/**
+ * Smart spacing: remove the period SpeakoFlow itself pasted at the end of
+ * an unfinished sentence ("I went to the.") when the next dictation
+ * continues it.
+ */
+smart_spacing_join_sentences?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; 
 /**
  * Experimental: let the middle, Back and Forward mouse buttons be a
  * shortcut's keys. Off, a stored mouse button is kept but not registered,
@@ -4757,7 +4776,7 @@ export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missi
 /**
  * The provider's endpoint is the user's own resource and none is set.
  */
-"missing_endpoint" |
+"missing_endpoint" | 
 /**
  * The provider cannot transcribe the selected language. Amazon Transcribe
  * streams a fixed list of languages, and a few of them not in every region;
@@ -5166,6 +5185,19 @@ segment_count: number }
  */
 export type MeetingAttachment = { meetingId: number; title: string }
 /**
+ * The two notes preferences, read together because the Meetings page and a
+ * meeting's own page both need both.
+ */
+export type MeetingNotesPrefs = { 
+/**
+ * Write notes automatically when a call ends.
+ */
+auto_notes: boolean; 
+/**
+ * `"auto"` or a code from `summarize::NOTES_LANGUAGES`.
+ */
+language: string }
+/**
  * One utterance in a meeting transcript.
  */
 export type MeetingSegment = { id: number; meeting_id: number; 
@@ -5205,19 +5237,6 @@ is_me: boolean }
 /**
  * Live recording state, mirrored to the UI.
  */
-/**
- * The two notes preferences, read together because the Meetings page and a
- * meeting's own page both need both.
- */
-export type MeetingNotesPrefs = { 
-/**
- * Write notes automatically when a call ends.
- */
-auto_notes: boolean; 
-/**
- * `"auto"` or a code from `summarize::NOTES_LANGUAGES`.
- */
-language: string }
 export type MeetingState = { meeting_id: number | null; status: MeetingStatus; paused: boolean; 
 /**
  * Whether system audio is actually being captured. False means the
