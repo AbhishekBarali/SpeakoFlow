@@ -882,17 +882,17 @@ const RecordingOverlay: React.FC = () => {
         ? t("overlay.listening")
         : t("overlay.preparing")
       : busyLabel;
+  // A hands-free card reads "Recording" like a held one. The ring already says
+  // nothing has to be held, and the finish keys are on ✓'s tooltip and in the
+  // aria-label below; spelled out in the header they were read on every
+  // dictation by someone who learned them once.
   const cardLabel = completed
     ? doneLabel
     : isRecording
       ? live
-        ? handsFreeNow
-          ? finishLabel
-            ? t("overlay.handsFreeFinish", { keys: finishLabel })
-            : t("overlay.handsFree")
-          : showHint
-            ? t("overlay.handsFreeHint", { key: hintKey })
-            : t("overlay.recording")
+        ? showHint && !handsFreeNow
+          ? t("overlay.handsFreeHint", { key: hintKey })
+          : t("overlay.recording")
         : t("overlay.preparing")
       : busyLabel;
   const ariaLabel = handsFreeNow

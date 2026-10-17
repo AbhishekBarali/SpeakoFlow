@@ -2195,7 +2195,6 @@
     },
     "listening": "聞いています…",
     "locked": "ハンズフリーで録音中 — 停止するにはもう一度ホットキーを押してください",
-    "handsFree": "ハンズフリー",
     "cancel": "キャンセル",
     "copy": "文字起こしをコピー",
     "transcript": "文字起こし",
@@ -2216,7 +2215,6 @@
       "hint": "完了すると音声入力が使えるようになります"
     },
     "handsFreeHint": "{{key}} でハンズフリー",
-    "handsFreeFinish": "ハンズフリー · {{keys}} で終了",
     "lockedKeys": "ハンズフリーで録音中。{{keys}} を押すと終了します",
     "finishKeys": "完了（{{keys}}）"
   },

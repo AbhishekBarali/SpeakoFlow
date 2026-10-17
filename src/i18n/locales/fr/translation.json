@@ -2219,7 +2219,6 @@
     },
     "listening": "À l'écoute…",
     "locked": "Enregistrement mains libres — appuyez à nouveau sur le raccourci pour arrêter",
-    "handsFree": "Mains libres",
     "cancel": "Annuler",
     "copy": "Copier la transcription",
     "transcript": "Transcription",
@@ -2240,7 +2239,6 @@
       "hint": "La dictée fonctionnera une fois le téléchargement terminé"
     },
     "handsFreeHint": "Appuyez sur {{key}} pour passer en mains libres",
-    "handsFreeFinish": "Mains libres · {{keys}} pour terminer",
     "lockedKeys": "Enregistrement mains libres. Appuyez sur {{keys}} pour terminer",
     "finishKeys": "Terminer ({{keys}})"
   },

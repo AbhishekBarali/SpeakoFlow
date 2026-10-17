@@ -2207,7 +2207,6 @@
     },
     "listening": "Listening…",
     "locked": "Recording hands-free — press your shortcut again to finish",
-    "handsFree": "Hands-free",
     "cancel": "Cancel",
     "copy": "Copy the transcript",
     "transcript": "Transcript",
@@ -2228,7 +2227,6 @@
       "hint": "Dictation starts working when it's done"
     },
     "handsFreeHint": "Press {{key}} to go hands-free",
-    "handsFreeFinish": "Hands-free · {{keys}} to finish",
     "lockedKeys": "Recording hands-free. Press {{keys}} to finish",
     "finishKeys": "Finish ({{keys}})"
   },

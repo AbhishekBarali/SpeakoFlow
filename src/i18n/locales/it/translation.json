@@ -2219,7 +2219,6 @@
     },
     "listening": "In ascolto…",
     "locked": "Registrazione a mani libere — premi di nuovo la scorciatoia per fermarti",
-    "handsFree": "A mani libere",
     "cancel": "Annulla",
     "copy": "Copia la trascrizione",
     "transcript": "Trascrizione",
@@ -2240,7 +2239,6 @@
       "hint": "La dettatura funzionerà al termine"
     },
     "handsFreeHint": "Premi {{key}} per le mani libere",
-    "handsFreeFinish": "Mani libere · {{keys}} per terminare",
     "lockedKeys": "Registrazione a mani libere. Premi {{keys}} per terminare",
     "finishKeys": "Termina ({{keys}})"
   },

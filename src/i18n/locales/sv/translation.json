@@ -2207,7 +2207,6 @@
     },
     "listening": "Lyssnar…",
     "locked": "Spelar in handsfree — tryck på kortkommandot igen för att stoppa",
-    "handsFree": "Handsfree",
     "cancel": "Avbryt",
     "copy": "Kopiera transkriptionen",
     "transcript": "Transkription",
@@ -2228,7 +2227,6 @@
       "hint": "Dikteringen fungerar när den är klar"
     },
     "handsFreeHint": "Tryck {{key}} för handsfree",
-    "handsFreeFinish": "Handsfree · {{keys}} för att avsluta",
     "lockedKeys": "Spelar in handsfree. Tryck på {{keys}} för att avsluta",
     "finishKeys": "Avsluta ({{keys}})"
   },

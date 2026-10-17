@@ -2231,7 +2231,6 @@
     },
     "listening": "Słucham…",
     "locked": "Nagrywanie bez trzymania klawisza — naciśnij skrót ponownie, aby zakończyć",
-    "handsFree": "Bez trzymania",
     "cancel": "Anuluj",
     "copy": "Kopiuj transkrypcję",
     "transcript": "Transkrypcja",
@@ -2252,7 +2251,6 @@
       "hint": "Dyktowanie zacznie działać po zakończeniu"
     },
     "handsFreeHint": "Naciśnij {{key}}, aby nie trzymać",
-    "handsFreeFinish": "Bez trzymania · {{keys}}, aby zakończyć",
     "lockedKeys": "Nagrywanie bez trzymania. Naciśnij {{keys}}, aby zakończyć",
     "finishKeys": "Zakończ ({{keys}})"
   },

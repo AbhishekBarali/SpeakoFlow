@@ -2207,7 +2207,6 @@
     },
     "listening": "Hört zu…",
     "locked": "Freihändige Aufnahme — drücke das Tastenkürzel erneut zum Stoppen",
-    "handsFree": "Freihändig",
     "cancel": "Abbrechen",
     "copy": "Transkript kopieren",
     "transcript": "Transkript",
@@ -2228,7 +2227,6 @@
       "hint": "Das Diktieren funktioniert, sobald es fertig ist"
     },
     "handsFreeHint": "{{key}} drücken für freihändig",
-    "handsFreeFinish": "Freihändig · {{keys}} zum Beenden",
     "lockedKeys": "Freihändige Aufnahme. Drücke {{keys}} zum Beenden",
     "finishKeys": "Abschließen ({{keys}})"
   },

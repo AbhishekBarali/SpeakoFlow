@@ -717,12 +717,12 @@ test("cancel and finish each reach the backend once", async () => {
   });
 });
 
-test("the live card says hands-free and keeps cancel and finish by copy", async () => {
+test("the live card wears the ring, reads Recording, and keeps cancel and finish by copy", async () => {
   await fire("show-overlay", { ...handsFreePill, streamingWindow: true });
   await fire("mic-level", [0.4, 0.6, 0.5, 0.7]);
   expect(hasClass("hands-free")).toBe(true);
   expect(textOf(renderer.root.findByProps({ className: "card-label" }))).toBe(
-    "overlay.handsFree",
+    "overlay.recording",
   );
   expect(buttonLabels()).toEqual(["overlay.cancel", "overlay.finish"]);
 
@@ -798,7 +798,7 @@ test("no hint where there is no hands-free key, and none once hands-free", async
   expect(hintKeys()).toHaveLength(0);
 });
 
-test("the hands-free card names the keys that finish it", async () => {
+test("the hands-free card keeps its finish keys off the header", async () => {
   await fire("show-overlay", {
     ...handsFreePill,
     streamingWindow: true,
@@ -806,7 +806,8 @@ test("the hands-free card names the keys that finish it", async () => {
   });
   await fire("mic-level", [0.4, 0.6, 0.5, 0.7]);
   expect(textOf(renderer.root.findByProps({ className: "card-label" }))).toBe(
-    "overlay.handsFreeFinish",
+    "overlay.recording",
   );
+  // Still told to a screen reader, and on ✓'s tooltip.
   expect(surface().props["aria-label"]).toBe("overlay.lockedKeys");
 });

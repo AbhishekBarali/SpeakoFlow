@@ -2195,7 +2195,6 @@
     },
     "listening": "正在聆听…",
     "locked": "免持录制中——再次按下快捷键即可停止",
-    "handsFree": "免持",
     "cancel": "取消",
     "copy": "复制转录",
     "transcript": "转录",
@@ -2216,7 +2215,6 @@
       "hint": "下载完成后即可开始语音输入"
     },
     "handsFreeHint": "按 {{key}} 进入免持",
-    "handsFreeFinish": "免持 · 按 {{keys}} 结束",
     "lockedKeys": "免持录制中。按 {{keys}} 结束",
     "finishKeys": "完成（{{keys}}）"
   },

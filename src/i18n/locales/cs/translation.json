@@ -2231,7 +2231,6 @@
     },
     "listening": "Poslouchám…",
     "locked": "Nahrávám bez držení — dalším stiskem zkratky nahrávání zastavíte",
-    "handsFree": "Bez držení",
     "cancel": "Zrušit",
     "copy": "Zkopírovat přepis",
     "transcript": "Přepis",
@@ -2252,7 +2251,6 @@
       "hint": "Diktování začne fungovat po dokončení"
     },
     "handsFreeHint": "Stiskněte {{key}} pro diktování bez držení",
-    "handsFreeFinish": "Bez držení · {{keys}} pro dokončení",
     "lockedKeys": "Nahrávám bez držení. Stiskněte {{keys}} pro dokončení",
     "finishKeys": "Dokončit ({{keys}})"
   },
