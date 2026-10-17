@@ -1186,6 +1186,24 @@
           "azureDescription": "Azure kaynağınızın uç noktası; Azure portalındaki Anahtarlar ve Uç Nokta bölümünde bulunur. MAI-Transcribe için Central India, Southeast Asia, East US, West US, West US 2 veya North Europe bölgesinde bir kaynak gerekir.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS erişim anahtarı",
+            "missing": "Henüz kayıtlı anahtar yok. transcribe:StartStreamTranscriptionWebSocket çağırma izni olan bir IAM kullanıcısının veya rolünün erişim anahtarını kullanın.",
+            "keyId": "Erişim anahtarı kimliği",
+            "secret": "Gizli erişim anahtarı",
+            "sessionToken": "Oturum belirteci (yalnızca geçici kimlik bilgileri için)",
+            "invalid": "Bu bir AWS anahtarına benzemiyor. Erişim anahtarı kimliği yalnızca harf ve rakamlardan oluşur; hiçbir alan boşluk veya iki nokta içeremez.",
+            "permission": "Gereken izin"
+          },
+          "region": {
+            "title": "Bölge",
+            "description": "Amazon Transcribe'ın çalıştığı yer. Size en yakın bölge en hızlı yanıtı verir."
+          },
+          "streaming": "Her zaman açık: Amazon Transcribe yalnızca canlı yazıya döker. Kayıt sırasında bağlantı koparsa kayıt konuşma hızında yeniden gönderilir; bu yüzden tamamlanması kaydın süresi kadar sürer.",
+          "language": "Amazon Transcribe'a dili söylemek gerekir. Otomatik mod İngilizce, uygulama diliniz ve birkaç yaygın dil arasından seçim yapar; başka bir dil konuşuyorsanız kendi dilinizi seçin.",
+          "unsupportedLanguage": "Amazon Transcribe bu dili {{region}} bölgesinde canlı olarak yazıya dökemiyor. Başka bir dil veya bölge seçin. O zamana kadar dikte Amazon Transcribe'ı kullanmayacak."
+        },
         "model": {
           "title": "Model",
           "info": "Sağlayıcının sunduğu herhangi bir modeli yazın ya da listeyi yükleyin. ElevenLabs için, konuşurken yazıya dökmek üzere scribe_v2_realtime, durduktan sonra yazıya dökmek üzere scribe_v2 seçin.",
@@ -1198,7 +1216,8 @@
         },
         "keyterms": {
           "label": "Özel kelimelerimi gönder",
-          "description": "Özel kelime dağarcığınızı sağlayıcıya iletir; böylece o yazılışları tercih eder."
+          "description": "Özel kelime dağarcığınızı sağlayıcıya iletir; böylece o yazılışları tercih eder.",
+          "unsupported": "{{provider}} kelime listesi kabul etmiyor; bu yüzden özel kelimeleriniz bunun yerine bu bilgisayarda düzeltilir."
         },
         "noVerbatim": {
           "label": "Dolgu sözcüklerini kaldır",

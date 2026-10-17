@@ -1192,6 +1192,24 @@
           "azureDescription": "O endpoint do seu recurso do Azure, em Chaves e Ponto de Extremidade no portal do Azure. O MAI-Transcribe precisa de um recurso em Central India, Southeast Asia, East US, West US, West US 2 ou North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Chave de acesso da AWS",
+            "missing": "Nenhuma chave salva ainda. Use uma chave de acesso de um usuário ou função do IAM com permissão para chamar transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID da chave de acesso",
+            "secret": "Chave de acesso secreta",
+            "sessionToken": "Token de sessão (só para credenciais temporárias)",
+            "invalid": "Isto não parece uma chave da AWS. O ID da chave de acesso tem apenas letras e números, e nenhum campo pode conter espaços ou dois-pontos.",
+            "permission": "Permissão necessária"
+          },
+          "region": {
+            "title": "Região",
+            "description": "Onde o Amazon Transcribe é executado. A região mais próxima de você responde mais rápido."
+          },
+          "streaming": "Sempre ativado: o Amazon Transcribe só transcreve ao vivo. Se a conexão cair durante a gravação, ela é enviada de novo na velocidade da fala, então terminar leva o mesmo tempo que a gravação.",
+          "language": "O Amazon Transcribe precisa saber o idioma. O modo automático escolhe entre inglês, o idioma do app e alguns outros idiomas comuns, então escolha o seu se você fala outro.",
+          "unsupportedLanguage": "O Amazon Transcribe não consegue transcrever este idioma ao vivo em {{region}}. Escolha outro idioma ou região. Até lá, o ditado não usará o Amazon Transcribe."
+        },
         "model": {
           "title": "Modelo",
           "info": "Digite qualquer modelo que o provedor ofereça ou carregue a lista. No ElevenLabs, escolha scribe_v2_realtime para transcrever enquanto você fala e scribe_v2 para transcrever quando você parar.",
@@ -1204,7 +1222,8 @@
         },
         "keyterms": {
           "label": "Enviar minhas palavras personalizadas",
-          "description": "Passa seu vocabulário personalizado ao provedor para que ele prefira essas grafias."
+          "description": "Passa seu vocabulário personalizado ao provedor para que ele prefira essas grafias.",
+          "unsupported": "{{provider}} não aceita uma lista de palavras, então suas palavras personalizadas são corrigidas neste computador."
         },
         "noVerbatim": {
           "label": "Remover palavras de preenchimento",

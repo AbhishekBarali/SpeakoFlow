@@ -1192,6 +1192,24 @@
           "azureDescription": "L'endpoint della tua risorsa Azure, da Chiavi ed endpoint nel portale di Azure. MAI-Transcribe richiede una risorsa in Central India, Southeast Asia, East US, West US, West US 2 o North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Chiave di accesso AWS",
+            "missing": "Nessuna chiave ancora salvata. Usa una chiave di accesso di un utente o ruolo IAM autorizzato a chiamare transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID chiave di accesso",
+            "secret": "Chiave di accesso segreta",
+            "sessionToken": "Token di sessione (solo credenziali temporanee)",
+            "invalid": "Non sembra una chiave AWS. L'ID chiave di accesso contiene solo lettere e cifre, e nessun campo può contenere spazi o due punti.",
+            "permission": "Autorizzazione necessaria"
+          },
+          "region": {
+            "title": "Regione",
+            "description": "Dove viene eseguito Amazon Transcribe. La regione più vicina a te risponde più velocemente."
+          },
+          "streaming": "Sempre attivo: Amazon Transcribe trascrive solo in diretta. Se la connessione cade durante la registrazione, questa viene inviata di nuovo alla velocità del parlato, quindi il completamento richiede quanto la registrazione stessa.",
+          "language": "Amazon Transcribe deve sapere la lingua. Automatico sceglie tra l'inglese, la lingua dell'app e poche altre lingue comuni, quindi scegli la tua se parli un'altra lingua.",
+          "unsupportedLanguage": "Amazon Transcribe non può trascrivere questa lingua in diretta in {{region}}. Scegli un'altra lingua o regione. Fino ad allora, la dettatura non userà Amazon Transcribe."
+        },
         "model": {
           "title": "Modello",
           "info": "Scrivi qualsiasi modello offerto dal provider, oppure carica l'elenco. Per ElevenLabs, scegli scribe_v2_realtime per trascrivere mentre parli e scribe_v2 per trascrivere quando ti fermi.",
@@ -1204,7 +1222,8 @@
         },
         "keyterms": {
           "label": "Invia le mie parole personalizzate",
-          "description": "Passa il tuo vocabolario personalizzato al provider, così privilegia quelle grafie."
+          "description": "Passa il tuo vocabolario personalizzato al provider, così privilegia quelle grafie.",
+          "unsupported": "{{provider}} non accetta un elenco di parole, quindi le tue parole personalizzate vengono corrette su questo computer."
         },
         "noVerbatim": {
           "label": "Rimuovi le parole di riempimento",

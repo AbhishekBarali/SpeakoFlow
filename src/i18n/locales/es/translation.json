@@ -1192,6 +1192,24 @@
           "azureDescription": "El endpoint de tu recurso de Azure, que encontrarás en Claves y punto de conexión en Azure Portal. MAI-Transcribe necesita un recurso en Central India, Southeast Asia, East US, West US, West US 2 o North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Clave de acceso de AWS",
+            "missing": "Aún no hay ninguna clave guardada. Usa una clave de acceso de un usuario o rol de IAM con permiso para llamar a transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID de clave de acceso",
+            "secret": "Clave de acceso secreta",
+            "sessionToken": "Token de sesión (solo credenciales temporales)",
+            "invalid": "Esto no parece una clave de AWS. El ID de clave de acceso tiene solo letras y números, y ningún campo puede contener espacios ni dos puntos.",
+            "permission": "Permiso que necesita"
+          },
+          "region": {
+            "title": "Región",
+            "description": "Dónde se ejecuta Amazon Transcribe. La más cercana a ti responde más rápido."
+          },
+          "streaming": "Siempre activado: Amazon Transcribe solo transcribe en directo. Si la conexión se corta durante la grabación, se vuelve a enviar a la velocidad del habla, así que terminar tarda lo mismo que duró la grabación.",
+          "language": "Amazon Transcribe necesita saber el idioma. Automático elige entre el inglés, el idioma de la app y algunos otros idiomas comunes, así que elige el tuyo si hablas otro.",
+          "unsupportedLanguage": "Amazon Transcribe no puede transcribir este idioma en directo en {{region}}. Elige otro idioma u otra región. Hasta entonces, el dictado no usará Amazon Transcribe."
+        },
         "model": {
           "title": "Modelo",
           "info": "Escribe cualquier modelo que ofrezca el proveedor, o carga la lista. En ElevenLabs, elige scribe_v2_realtime para transcribir mientras hablas y scribe_v2 para transcribir cuando termines.",
@@ -1204,7 +1222,8 @@
         },
         "keyterms": {
           "label": "Enviar mis palabras personalizadas",
-          "description": "Pasa tu vocabulario personalizado al proveedor para que dé preferencia a esas grafías."
+          "description": "Pasa tu vocabulario personalizado al proveedor para que dé preferencia a esas grafías.",
+          "unsupported": "{{provider}} no admite una lista de palabras, así que tus palabras personalizadas se corrigen en este equipo."
         },
         "noVerbatim": {
           "label": "Quitar las muletillas",

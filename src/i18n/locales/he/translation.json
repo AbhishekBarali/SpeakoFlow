@@ -1192,6 +1192,24 @@
           "azureDescription": "נקודת הקצה של משאב ה-Azure שלך, מתוך Keys and Endpoint בפורטל Azure. MAI-Transcribe דורש משאב באזור Central India, Southeast Asia, East US, West US, West US 2 או North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "מפתח גישה של AWS",
+            "missing": "עדיין לא נשמר מפתח. השתמש במפתח גישה של משתמש או תפקיד IAM שמורשה לקרוא ל-transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "מזהה מפתח גישה",
+            "secret": "מפתח גישה סודי",
+            "sessionToken": "אסימון הפעלה (רק לאישורים זמניים)",
+            "invalid": "זה לא נראה כמו מפתח AWS. מזהה מפתח הגישה מורכב מאותיות וספרות, ואף שדה לא יכול להכיל רווחים או נקודתיים.",
+            "permission": "ההרשאה הנדרשת"
+          },
+          "region": {
+            "title": "אזור",
+            "description": "היכן Amazon Transcribe פועל. האזור הקרוב אליך עונה הכי מהר."
+          },
+          "streaming": "פועל תמיד: Amazon Transcribe מתמלל רק בזמן אמת. אם החיבור נקטע באמצע ההקלטה, ההקלטה נשלחת שוב במהירות הדיבור, כך שהסיום לוקח זמן כמו ההקלטה עצמה.",
+          "language": "צריך לומר ל-Amazon Transcribe מה השפה. מצב אוטומטי בוחר בין אנגלית, שפת האפליקציה וכמה שפות נפוצות אחרות, אז בחר את השפה שלך אם אתה מדבר שפה אחרת.",
+          "unsupportedLanguage": "Amazon Transcribe לא יכול לתמלל את השפה הזו בזמן אמת ב-{{region}}. בחר שפה או אזור אחרים. עד אז, ההכתבה לא תשתמש ב-Amazon Transcribe."
+        },
         "model": {
           "title": "מודל",
           "info": "הקלד כל מודל שהספק מציע, או טען את הרשימה. ב-ElevenLabs, בחר scribe_v2_realtime כדי לתמלל תוך כדי דיבור ו-scribe_v2 כדי לתמלל אחרי שאתה מפסיק.",
@@ -1204,7 +1222,8 @@
         },
         "keyterms": {
           "label": "שלח את המילים המותאמות שלי",
-          "description": "מעביר את אוצר המילים המותאם שלך לספק כדי שיעדיף את האיותים האלה."
+          "description": "מעביר את אוצר המילים המותאם שלך לספק כדי שיעדיף את האיותים האלה.",
+          "unsupported": "{{provider}} לא יכול לקבל רשימת מילים, ולכן המילים המותאמות שלך מתוקנות במחשב הזה במקום זאת."
         },
         "noVerbatim": {
           "label": "הסר מילות מילוי",
