@@ -273,11 +273,100 @@ export const setMeetingMyNotes = (
 
 /* ──────────────────────────── notes / deleting ─────────────────────────── */
 
+/** Stored notes language meaning "the language the meeting was held in". */
+export const AUTO_NOTES_LANGUAGE = "auto";
+
+/**
+ * Languages the notes can be pinned to. Mirrors `NOTES_LANGUAGES` in
+ * `meetings/summarize.rs`, which refuses any other code. Names are drawn by
+ * `Intl.DisplayNames` in the app's own language, so this list holds codes only.
+ */
+export const NOTES_LANGUAGES: readonly string[] = [
+  "en",
+  "ar",
+  "bn",
+  "bg",
+  "zh-Hans",
+  "zh-Hant",
+  "cs",
+  "da",
+  "nl",
+  "fi",
+  "fr",
+  "de",
+  "el",
+  "he",
+  "hi",
+  "hu",
+  "id",
+  "it",
+  "ja",
+  "ko",
+  "ms",
+  "ne",
+  "no",
+  "fa",
+  "pl",
+  "pt",
+  "ro",
+  "ru",
+  "sk",
+  "es",
+  "sv",
+  "ta",
+  "th",
+  "tr",
+  "uk",
+  "ur",
+  "vi",
+];
+
+/**
+ * `language` is the one picked beside Regenerate; omitted, the backend uses the
+ * user's default from the Meetings page.
+ */
 export const generateMeetingNotes = (
   meetingId: number,
   template: NotesTemplateId,
+  language?: string,
 ): Promise<GeneratedNotes> =>
-  invoke<GeneratedNotes>("generate_meeting_notes", { meetingId, template });
+  invoke<GeneratedNotes>("generate_meeting_notes", {
+    meetingId,
+    template,
+    language: language ?? null,
+  });
+
+/** Mirrors `MeetingNotesPrefs`. */
+export interface MeetingNotesPrefs {
+  /** Write notes automatically when a call ends. */
+  auto_notes: boolean;
+  /** `"auto"` or one of `NOTES_LANGUAGES`. */
+  language: string;
+}
+
+export const getMeetingNotesPrefs = (): Promise<MeetingNotesPrefs> =>
+  invoke<MeetingNotesPrefs>("get_meeting_notes_prefs");
+
+export const setMeetingAutoNotes = (enabled: boolean): Promise<null> =>
+  invoke<null>("set_meeting_auto_notes", { enabled });
+
+export const setMeetingNotesLanguage = (language: string): Promise<null> =>
+  invoke<null>("set_meeting_notes_language", { language });
+
+/** The post-call pass relabelled a meeting's speakers; a transcript on screen
+ *  should re-read its rows. Payload `{ meeting_id }`. */
+export const MEETING_SPEAKERS_LABELLED_EVENT = "meeting-speakers-labelled";
+
+/**
+ * Copy text through the OS clipboard from Rust.
+ *
+ * Not `navigator.clipboard`: the floating pill never takes keyboard focus, and a
+ * webview without focus may refuse a clipboard write. Rust has no such rule, so
+ * one path works in every window. (The command is the recording overlay's,
+ * which has the same constraint.)
+ */
+export const copyText = (text: string): Promise<null> =>
+  invoke<null>("copy_overlay_transcript", { text });
 
 /** Whether notes are being written right now, for a page opened mid-job. */
 export const isMeetingNotesRunning = (meetingId: number): Promise<boolean> =>

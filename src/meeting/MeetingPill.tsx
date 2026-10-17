@@ -1,8 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Mic, MicOff, Minimize2, Pause, Play, Square } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Mic,
+  MicOff,
+  Minimize2,
+  Pause,
+  Play,
+  Square,
+} from "lucide-react";
 import {
   acceptCallOffer,
+  copyText,
   dismissCallOffer,
   fitMeetingPill,
   getMeetingSpeakers,
@@ -18,6 +28,7 @@ import {
   otherSpeakerOrder,
   speakerNameResolver,
   speakerTone,
+  transcriptToText,
   type SpeakerTurn,
 } from "@/components/settings/meetings/speakers";
 import AudioWaveform from "@/components/shared/AudioWaveform";
@@ -164,6 +175,22 @@ const MeetingPill: React.FC = () => {
       }),
     [speakers, others, t],
   );
+
+  // Copy what has been said so far. Through Rust, because this window never
+  // takes keyboard focus and a webview without focus may refuse the write.
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+  const copyTranscript = () => {
+    const text = transcriptToText(turns, nameFor);
+    if (!text) return;
+    void copyText(text)
+      .then(() => setCopied(true))
+      .catch(() => {});
+  };
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const turnCount = turns.length;
@@ -389,6 +416,21 @@ const MeetingPill: React.FC = () => {
             >
               <Square size={10} aria-hidden="true" />
               {t("meetings.recorder.stop")}
+            </button>
+            <button
+              type="button"
+              className="pill-action"
+              data-variant="ghost"
+              onClick={copyTranscript}
+              disabled={turns.length === 0}
+              title={
+                copied ? t("meetings.pill.copied") : t("meetings.pill.copy")
+              }
+              aria-label={
+                copied ? t("meetings.pill.copied") : t("meetings.pill.copy")
+              }
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>
             <button
               type="button"

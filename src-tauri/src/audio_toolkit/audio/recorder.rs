@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     io::Error,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Arc, Condvar, Mutex,
     },
     time::Duration,
@@ -40,6 +40,68 @@ enum RecorderEvent {
     EndOfStream,
 }
 
+/// What the VAD has heard so far in the recording under way, measured on the
+/// audio's own clock.
+///
+/// Written by the consumer thread for every 16 kHz frame it processes while
+/// recording, and read by the transcription coordinator to tell when a
+/// hands-free dictation has gone quiet (`dictation_silence_stop_secs`).
+/// Positions count samples since [`AudioRecorder::start`], so silence is
+/// measured in audio actually captured: a microphone that is slow to wake, or a
+/// consumer thread that falls behind, can never make the user seem to have been
+/// quiet for longer than they were. Lock-free on purpose: the recorder's own
+/// lock is held for seconds while a microphone opens or drains, and the reader
+/// is the thread every shortcut goes through.
+#[derive(Debug, Default)]
+pub struct SpeechActivity {
+    /// Samples processed since the recording started.
+    heard: AtomicU64,
+    /// The sample position just past the last frame the VAD kept as speech,
+    /// or 0 while nothing has been.
+    speech_end: AtomicU64,
+}
+
+impl SpeechActivity {
+    /// Back to "nothing heard yet". Done by [`AudioRecorder::start`] before it
+    /// queues `Cmd::Start`, while the consumer is not recording, so it never
+    /// races a write and a reader can never see the last recording's silence.
+    fn reset(&self) {
+        self.speech_end.store(0, Ordering::Relaxed);
+        self.heard.store(0, Ordering::Release);
+    }
+
+    /// Count one processed frame. Only the consumer thread writes, so a plain
+    /// load and store is enough. The speech mark is published before the
+    /// length that covers it: a reader that sees the new length also sees the
+    /// mark, so it can never pair a new length with an older mark and overstate
+    /// the silence by a frame.
+    fn record(&self, samples: usize, speech: bool) {
+        let end = self.heard.load(Ordering::Relaxed) + samples as u64;
+        if speech {
+            self.speech_end.store(end, Ordering::Relaxed);
+        }
+        self.heard.store(end, Ordering::Release);
+    }
+
+    /// How long the recording has gone without speech: since the last frame
+    /// the VAD kept, or since the recording started if it has kept none. The
+    /// VAD's hangover counts as speech, so this starts a few hundred
+    /// milliseconds after the last word.
+    pub fn quiet_for(&self) -> Duration {
+        let heard = self.heard.load(Ordering::Acquire);
+        let speech_end = self.speech_end.load(Ordering::Relaxed);
+        let quiet = heard.saturating_sub(speech_end);
+        Duration::from_micros(
+            quiet.saturating_mul(1_000_000) / u64::from(constants::WHISPER_SAMPLE_RATE),
+        )
+    }
+
+    /// Whether anything in this recording has been kept as speech.
+    pub fn heard_speech(&self) -> bool {
+        self.speech_end.load(Ordering::Relaxed) > 0
+    }
+}
+
 pub struct AudioRecorder {
     device: Option<Device>,
     cmd_tx: Option<mpsc::Sender<RecorderEvent>>,
@@ -72,6 +134,10 @@ pub struct AudioRecorder {
     /// flag is the only signal that the stream must be rebuilt.
     /// Backport of Handy PRs #1874 / #1838.
     stream_error: Arc<AtomicBool>,
+    /// What the VAD has heard in the current recording. Shared, so whoever
+    /// decides when a recording has gone quiet can read it without this
+    /// recorder's lock (see [`AudioRecorder::with_speech_activity`]).
+    speech: Arc<SpeechActivity>,
 }
 
 impl AudioRecorder {
@@ -86,11 +152,21 @@ impl AudioRecorder {
             capture_ready: Arc::new((Mutex::new(false), Condvar::new())),
             config_cache: None,
             stream_error: Arc::new(AtomicBool::new(false)),
+            speech: Arc::new(SpeechActivity::default()),
         })
     }
 
     pub fn with_vad(mut self, vad: Box<dyn VoiceActivityDetector>) -> Self {
         self.vad = Some(Arc::new(Mutex::new(vad)));
+        self
+    }
+
+    /// Report what the VAD hears into `speech`, which the caller keeps. The
+    /// recorder lives behind a lock that opening or draining the microphone
+    /// holds for seconds, so a handle taken up front is the only way to read
+    /// this without waiting on that.
+    pub fn with_speech_activity(mut self, speech: Arc<SpeechActivity>) -> Self {
+        self.speech = speech;
         self
     }
 
@@ -174,6 +250,7 @@ impl AudioRecorder {
         let frame_cb = self.frame_cb.clone();
         let capture_ready = self.capture_ready.clone();
         let stream_error = self.stream_error.clone();
+        let speech = self.speech.clone();
 
         let worker = std::thread::spawn(move || {
             let stop_flag = Arc::new(AtomicBool::new(false));
@@ -277,6 +354,7 @@ impl AudioRecorder {
                         idle,
                         stop_flag,
                         capture_ready,
+                        speech,
                     );
                     drop(stream);
                 }
@@ -343,6 +421,10 @@ impl AudioRecorder {
             let (lock, _) = &*self.capture_ready;
             *lock.lock().unwrap() = false;
         }
+        // Same reasoning for what the VAD has heard: a reader polling between
+        // this call and the consumer picking up `Start` must see a recording
+        // that has just begun, not the last one's trailing silence.
+        self.speech.reset();
         if let Some(tx) = &self.cmd_tx {
             tx.send(RecorderEvent::Command(Cmd::Start))?;
         }
@@ -588,6 +670,7 @@ mod tests {
                 Arc::new(AtomicBool::new(true)),
                 Arc::new(AtomicBool::new(false)),
                 Arc::new((Mutex::new(false), Condvar::new())),
+                Arc::default(),
             );
             done_tx.send(()).unwrap();
         });
@@ -734,6 +817,7 @@ mod tests {
             Arc::new(AtomicBool::new(true)),
             Arc::new(AtomicBool::new(false)),
             ready.clone(),
+            Arc::default(),
         );
         assert_eq!(levels.load(Ordering::Relaxed), 0);
         assert_eq!(frames.load(Ordering::Relaxed), 0);
@@ -768,6 +852,7 @@ mod tests {
                 worker_idle,
                 worker_stop,
                 worker_ready,
+                Arc::default(),
             )
         });
 
@@ -809,6 +894,77 @@ mod tests {
         // again, ready for the next Start.
         assert!(idle.load(Ordering::Relaxed));
         assert!(!stop.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn silence_is_counted_from_the_last_speech_on_the_audio_clock() {
+        let speech = SpeechActivity::default();
+        assert_eq!(speech.quiet_for(), Duration::ZERO);
+        assert!(!speech.heard_speech());
+        // Room tone before the first word is silence too: someone who never
+        // speaks is quiet from the moment the recording starts.
+        speech.record(4_800, false);
+        assert_eq!(speech.quiet_for(), Duration::from_millis(300));
+        // Speech resets it, and the silence after it grows from there.
+        speech.record(480, true);
+        assert_eq!(speech.quiet_for(), Duration::ZERO);
+        assert!(speech.heard_speech());
+        speech.record(16_000, false);
+        assert_eq!(speech.quiet_for(), Duration::from_secs(1));
+        // The next recording starts from nothing, not from this one's silence.
+        speech.reset();
+        assert_eq!(speech.quiet_for(), Duration::ZERO);
+        assert!(!speech.heard_speech());
+    }
+
+    /// Calls a frame speech when anything in it is loud: enough to drive the
+    /// consumer without loading a model.
+    struct LoudIsSpeech;
+    impl VoiceActivityDetector for LoudIsSpeech {
+        fn push_frame<'a>(&'a mut self, frame: &'a [f32]) -> anyhow::Result<VadFrame<'a>> {
+            Ok(if frame.iter().any(|s| s.abs() > 0.5) {
+                VadFrame::Speech(frame)
+            } else {
+                VadFrame::Noise
+            })
+        }
+    }
+
+    #[test]
+    fn the_consumer_reports_the_silence_after_the_last_word() {
+        let (tx, rx) = mpsc::channel();
+        let speech = Arc::new(SpeechActivity::default());
+        let worker_speech = speech.clone();
+        let vad: Box<dyn VoiceActivityDetector> = Box::new(LoudIsSpeech);
+        let worker = std::thread::spawn(move || {
+            run_consumer(
+                16_000,
+                Some(Arc::new(Mutex::new(vad))),
+                rx,
+                None,
+                None,
+                Arc::new(AtomicBool::new(true)),
+                Arc::new(AtomicBool::new(false)),
+                Arc::new((Mutex::new(false), Condvar::new())),
+                worker_speech,
+            )
+        });
+
+        // Two 30 ms frames of speech, then three of silence.
+        tx.send(RecorderEvent::Command(Cmd::Start)).unwrap();
+        tx.send(RecorderEvent::Samples(vec![0.9; 960])).unwrap();
+        tx.send(RecorderEvent::Samples(vec![0.0; 1440])).unwrap();
+        let (reply_tx, reply_rx) = mpsc::channel();
+        tx.send(RecorderEvent::Command(Cmd::Stop(reply_tx)))
+            .unwrap();
+        tx.send(RecorderEvent::EndOfStream).unwrap();
+        let kept = reply_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        drop(tx);
+        worker.join().unwrap();
+
+        assert_eq!(kept, vec![0.9; 960], "only the speech is kept");
+        assert!(speech.heard_speech());
+        assert_eq!(speech.quiet_for(), Duration::from_millis(90));
     }
 
     #[test]
@@ -859,6 +1015,7 @@ fn run_consumer(
     idle: Arc<AtomicBool>,
     stop_flag: Arc<AtomicBool>,
     capture_ready: Arc<(Mutex<bool>, Condvar)>,
+    speech: Arc<SpeechActivity>,
 ) {
     let mut frame_resampler = FrameResampler::new(
         in_sample_rate as usize,
@@ -897,20 +1054,29 @@ fn run_consumer(
         recording: bool,
         vad: &Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
         out_buf: &mut Vec<f32>,
+        speech: &SpeechActivity,
     ) {
         if !recording {
             return;
         }
 
-        if let Some(vad_arc) = vad {
+        // A frame the VAD could not judge is kept, and so is every frame when
+        // there is no VAD: both count as speech, so neither can ever end a
+        // recording on silence nobody measured.
+        let is_speech = if let Some(vad_arc) = vad {
             let mut det = vad_arc.lock().unwrap();
             match det.push_frame(samples).unwrap_or(VadFrame::Speech(samples)) {
-                VadFrame::Speech(buf) => out_buf.extend_from_slice(buf),
-                VadFrame::Noise => {}
+                VadFrame::Speech(buf) => {
+                    out_buf.extend_from_slice(buf);
+                    true
+                }
+                VadFrame::Noise => false,
             }
         } else {
             out_buf.extend_from_slice(samples);
-        }
+            true
+        };
+        speech.record(samples.len(), is_speech);
     }
 
     let mut pending_commands = VecDeque::new();
@@ -953,7 +1119,7 @@ fn run_consumer(
                         if let Some(cb) = &frame_cb {
                             cb(frame);
                         }
-                        handle_frame(frame, true, &vad, &mut processed_samples)
+                        handle_frame(frame, true, &vad, &mut processed_samples, &speech)
                     });
                 }
 
@@ -1015,7 +1181,7 @@ fn run_consumer(
                                     if let Some(cb) = &frame_cb {
                                         cb(frame);
                                     }
-                                    handle_frame(frame, true, &vad, &mut processed_samples)
+                                    handle_frame(frame, true, &vad, &mut processed_samples, &speech)
                                 });
                             }
                             Ok(RecorderEvent::EndOfStream) => break,
@@ -1035,7 +1201,7 @@ fn run_consumer(
                         if let Some(cb) = &frame_cb {
                             cb(frame);
                         }
-                        handle_frame(frame, true, &vad, &mut processed_samples)
+                        handle_frame(frame, true, &vad, &mut processed_samples, &speech)
                     });
 
                     let _ = reply_tx.send(std::mem::take(&mut processed_samples));

@@ -166,6 +166,9 @@ struct HookContext {
     /// process (`platform::withheld`). Kept so the shared record is only
     /// touched when the set changes.
     published_withheld: Modifiers,
+    /// Mouse buttons whose press this hook kept from Windows, so their release
+    /// is kept too (`platform::state::swallow_mouse_button`).
+    swallowed_buttons: std::collections::HashSet<Key>,
 }
 
 thread_local! {
@@ -296,6 +299,9 @@ fn reconcile_modifiers(ctx: &mut HookContext, hard: bool) {
     if hard {
         ctx.physically_down.retain(|vk| async_key_down(*vk));
         ctx.blocked_keys.retain(|vk| async_key_down(*vk));
+        // A button let go on the other desktop never comes up here, and its
+        // next press decides afresh anyway.
+        ctx.swallowed_buttons.clear();
     }
     if hard {
         publish_withheld(ctx);
@@ -489,6 +495,7 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<Windows
                 physically_down: std::collections::HashSet::new(),
                 blocked_keys: std::collections::HashSet::new(),
                 published_withheld: Modifiers::empty(),
+                swallowed_buttons: std::collections::HashSet::new(),
             });
         });
 
@@ -769,6 +776,7 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
     }
 
     // Process the mouse event
+    let mut should_block = false;
     HOOK_CONTEXT.with(|ctx_cell| {
         let mut ctx_ref = ctx_cell.borrow_mut();
         if let Some(ctx) = ctx_ref.as_mut() {
@@ -816,6 +824,15 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             };
 
             if let Some(key) = key {
+                // A button bound to a hotkey stops here, as a bound key does:
+                // Back pressed to dictate must not also leave the page.
+                should_block = crate::platform::state::swallow_mouse_button(
+                    &mut ctx.swallowed_buttons,
+                    ctx.blocking_hotkeys.as_ref(),
+                    ctx.current_modifiers,
+                    key,
+                    is_down,
+                );
                 let _ = ctx.event_sender.send(KeyEvent {
                     modifiers: ctx.current_modifiers,
                     key: Some(key),
@@ -826,8 +843,11 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
         }
     });
 
-    // Always pass mouse events through (no blocking for mouse)
-    CallNextHookEx(None, code, wparam, lparam)
+    if should_block {
+        LRESULT(1)
+    } else {
+        CallNextHookEx(None, code, wparam, lparam)
+    }
 }
 
 /// Check if a hotkey combination should be blocked
@@ -1014,6 +1034,7 @@ mod tests {
             physically_down: [0xA2, 0xA4].into_iter().collect(),
             blocked_keys: std::collections::HashSet::new(),
             published_withheld: Modifiers::empty(),
+            swallowed_buttons: std::collections::HashSet::new(),
         };
         reconcile_modifiers(&mut recorder, false);
         crate::platform::withheld::PROCESS.clear(manager);

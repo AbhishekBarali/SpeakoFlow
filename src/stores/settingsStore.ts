@@ -47,6 +47,8 @@ const commandSucceeded = (result: unknown): void => {
 const isCleanupSetting = (key: keyof Settings): boolean =>
   key === "post_process_enabled" ||
   key === "post_process_on_dictation" ||
+  key === "post_process_skip_short" ||
+  key === "post_process_min_words" ||
   key === "post_process_selected_prompt_id" ||
   key === "post_process_tone" ||
   key === "post_process_timeout_secs" ||
@@ -85,6 +87,7 @@ interface SettingsStore {
   refreshAudioDevices: () => Promise<void>;
   refreshOutputDevices: () => Promise<void>;
   updateBinding: (id: string, binding: string) => Promise<void>;
+  updateAlternateBinding: (id: string, binding: string) => Promise<void>;
   resetBinding: (id: string) => Promise<void>;
   getSetting: <K extends keyof Settings>(key: K) => Settings[K] | undefined;
   isUpdatingKey: (key: string) => boolean;
@@ -169,6 +172,10 @@ const settingUpdaters: {
   update_checks_enabled: (value) =>
     commands.changeUpdateChecksSetting(value as boolean),
   push_to_talk: (value) => commands.changePttSetting(value as boolean),
+  assistant_push_to_talk: (value) =>
+    commands.changeAssistantPttSetting(value as boolean),
+  dictation_silence_stop_secs: (value) =>
+    commands.changeDictationSilenceStopSetting(value as number),
   selected_microphone: (value) =>
     commands.setSelectedMicrophone(
       (value as string) === "Default" || value === null
@@ -226,6 +233,10 @@ const settingUpdaters: {
     commands.changePostProcessEnabledSetting(value as boolean),
   post_process_on_dictation: (value) =>
     commands.changePostProcessOnDictationSetting(value as boolean),
+  post_process_skip_short: (value) =>
+    commands.changePostProcessSkipShortSetting(value as boolean),
+  post_process_min_words: (value) =>
+    commands.changePostProcessMinWordsSetting(value as number),
   flow_enabled: (value) => commands.changeFlowEnabledSetting(value as boolean),
   flow_phrase: (value) => commands.changeFlowPhraseSetting(value as string),
   flow_screen_access: (value) =>
@@ -244,18 +255,28 @@ const settingUpdaters: {
     commands.changeMuteWhileRecordingSetting(value as boolean),
   append_trailing_space: (value) =>
     commands.changeAppendTrailingSpaceSetting(value as boolean),
+  smart_spacing: (value) =>
+    commands.changeSmartSpacingSetting(value as boolean),
+  smart_spacing_fix_case: (value) =>
+    commands.changeSmartSpacingFixCaseSetting(value as boolean),
+  smart_spacing_join_sentences: (value) =>
+    commands.changeSmartSpacingJoinSentencesSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),
   app_language: (value) => commands.changeAppLanguageSetting(value as string),
   experimental_enabled: (value) =>
     commands.changeExperimentalEnabledSetting(value as boolean),
   lazy_stream_close: (value) =>
     commands.changeLazyStreamCloseSetting(value as boolean),
+  mouse_button_shortcuts: (value) =>
+    commands.changeMouseButtonShortcutsSetting(value as boolean),
   live_transcription_enabled: (value) =>
     commands.changeLiveTranscriptionEnabledSetting(value as boolean),
   live_transcription_window_enabled: (value) =>
     commands.changeLiveTranscriptionWindowEnabledSetting(value as boolean),
   show_tray_icon: (value) =>
     commands.changeShowTrayIconSetting(value as boolean),
+  tray_icon_color: (value) =>
+    commands.changeTrayIconColorSetting(value as boolean),
   close_behavior: (value) =>
     commands.changeCloseBehaviorSetting(value as string),
   whisper_accelerator: (value) =>
@@ -533,6 +554,26 @@ export const useSettingsStore = create<SettingsStore>()(
         if (!result.data.success) {
           throw new Error(result.data.error || "Failed to update binding");
         }
+
+        // Show what was stored, which can differ from what was pressed: the
+        // hands-free key keeps only the key of what was recorded.
+        const stored = result.data.binding?.current_binding;
+        if (stored !== undefined && stored !== binding) {
+          set((state) => ({
+            settings: state.settings
+              ? {
+                  ...state.settings,
+                  bindings: {
+                    ...state.settings.bindings,
+                    [id]: {
+                      ...state.settings.bindings[id]!,
+                      current_binding: stored,
+                    },
+                  },
+                }
+              : null,
+          }));
+        }
       } catch (error) {
         console.error(`Failed to update binding ${id}:`, error);
 
@@ -555,6 +596,47 @@ export const useSettingsStore = create<SettingsStore>()(
         }
 
         // Re-throw to let the caller know it failed
+        throw error;
+      } finally {
+        setUpdating(updateKey, false);
+      }
+    },
+
+    // A shortcut's other keys: the same round trip as its own, on their own
+    // field, so a failure puts back only what this call changed.
+    updateAlternateBinding: async (id, binding) => {
+      const { settings, setUpdating } = get();
+      const updateKey = `binding_${id}`;
+      const original = settings?.bindings?.[id]?.alternate_binding ?? "";
+      const apply = (value: string) =>
+        set((state) => ({
+          settings: state.settings
+            ? {
+                ...state.settings,
+                bindings: {
+                  ...state.settings.bindings,
+                  [id]: {
+                    ...state.settings.bindings[id]!,
+                    alternate_binding: value,
+                  },
+                },
+              }
+            : null,
+        }));
+
+      setUpdating(updateKey, true);
+      try {
+        apply(binding);
+        const result = await commands.changeAlternateBinding(id, binding);
+        if (result.status === "error") {
+          throw new Error(result.error);
+        }
+        if (!result.data.success) {
+          throw new Error(result.data.error || "Failed to update binding");
+        }
+      } catch (error) {
+        console.error(`Failed to update the other keys of ${id}:`, error);
+        if (get().settings) apply(original);
         throw error;
       } finally {
         setUpdating(updateKey, false);

@@ -17,7 +17,11 @@ import {
   splitLocalModelName,
 } from "@/lib/utils/prettyModelName";
 import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
-import { cloudSttKeyOptional, cloudSttNeedsEndpoint } from "@/lib/cloudStt";
+import {
+  cloudSttFixedModel,
+  cloudSttKeyOptional,
+  cloudSttNeedsEndpoint,
+} from "@/lib/cloudStt";
 import { ProviderTile } from "@/components/icons/ProviderLogos";
 import { LogoSelect, type LogoSelectOption } from "@/components/ui/LogoSelect";
 import { Button } from "@/components/ui/Button";
@@ -313,6 +317,16 @@ export const SttModelPicker: React.FC<{ className?: string }> = ({
         const model =
           settings?.cloud_stt_models?.[provider.id]?.trim() ||
           provider.default_model;
+        // One fixed model (Amazon Transcribe) is named by its provider.
+        if (cloudSttFixedModel(provider)) {
+          return {
+            value: `cloud:${provider.id}`,
+            label: provider.label,
+            title: provider.label,
+            icon: <ProviderTile id={provider.id} kind="stt" size="sm" />,
+            group: t("pickers.groups.cloud"),
+          };
+        }
         return {
           value: `cloud:${provider.id}`,
           label: prettyModelName(model) || provider.label,

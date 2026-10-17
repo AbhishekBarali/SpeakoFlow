@@ -645,12 +645,17 @@
           "assistant_call": {
             "name": "Zahájit konverzaci",
             "description": "Mluvte s asistentem bez použití rukou a poslouchejte jeho odpovědi. Dalším stisknutím ukončíte."
+          },
+          "hands_free": {
+            "name": "Bez držení",
+            "description": "Stiskněte při držení kláves diktování a nahrávání bude pokračovat i po jejich puštění. Dalším stiskem kláves diktování skončíte."
           }
         },
         "errors": {
           "restore": "Nepodařilo se obnovit původní zkratku.",
           "set": "Nepodařilo se nastavit zkratku: {{error}}",
           "inUse": "„{{name}}“ už používá {{keys}}. Vyberte jiné klávesy, nebo nejdřív změňte tu zkratku.",
+          "sameAsOther": "{{keys}} už je pro tuto zkratku nastaveno.",
           "reset": "Nepodařilo se resetovat zkratku."
         },
         "clickToChange": "Kliknutím změníte",
@@ -665,10 +670,24 @@
         "auto": "Automaticky"
       },
       "pushToTalk": {
-        "label": "Způsob nahrávání",
-        "description": "Podržení: nahrává se, dokud držíte zkratku pro nahrávání. Stisknutí: jeden stisk spustí, další zastaví. Platí pro všechny zkratky pro nahrávání.",
-        "hold": "Podržení",
-        "tap": "Stisknutí"
+        "dictation": "Zapnuto: nahrává se, dokud držíte klávesy. Vypnuto: jeden stisk spustí, další zastaví, takže každé diktování je bez držení.",
+        "assistant": "Zapnuto: poslouchá, dokud držíte klávesy. Vypnuto: jeden stisk spustí, další odešle.",
+        "dictationLabel": "Držet pro mluvení",
+        "assistantLabel": "Držet pro dotaz"
+      },
+      "handsFree": {
+        "unavailableKeys": "Funguje, když je diktování jen z modifikačních kláves, třeba Ctrl + Win. S {{keys}} raději vypněte „Držet pro mluvení“: každé diktování pak běží, dokud znovu nestisknete klávesy.",
+        "unavailableEngine": "Vyžaduje klávesnicový modul SpeakoFlow Keys ({{where}}). Nebo vypněte „Držet pro mluvení“: každé diktování pak běží, dokud znovu nestisknete klávesy.",
+        "taken": "{{name}} už používá {{keys}}, takže tato klávesa nic nedělá, dokud se jedno z nich nezmění.",
+        "needsKey": "Vyberte jednu klávesu, například mezerník nebo Enter. Samotná modifikační klávesa nemůže být klávesou pro režim bez držení.",
+        "pressKey": "Stiskněte klávesu…",
+        "descriptionOff": "Vypnuto. Klikněte na něj a stiskněte klávesu, třeba mezerník, a znovu se zapne.",
+        "linux": "V Linuxu raději vypněte „Držet pro mluvení“: každé diktování pak běží, dokud znovu nestisknete klávesy.",
+        "whileDictating": "Během diktování stiskněte"
+      },
+      "silenceStop": {
+        "label": "Zastavit po tichu",
+        "description": "Diktování bez držení, ve kterém tak dlouho nezazní řeč, se samo zastaví a vloží text, jako byste znovu stiskli zkratku. Těsně před zastavením se na pilulce zkracuje čára; když znovu promluvíte, nahrávání pokračuje."
       }
     },
     "models": {
@@ -836,6 +855,13 @@
         "label": "Ponechat mikrofon zapnutý mezi přepisy",
         "description": "Rychlejší diktování za sebou. Může ovlivnit kvalitu zvuku Bluetooth."
       },
+      "mouseButtonShortcuts": {
+        "label": "Tlačítka myši jako zkratky",
+        "description": "Použijte prostřední tlačítko myši nebo tlačítka Zpět a Vpřed jako zkratku: klikněte na klávesy zkratky a pak stiskněte tlačítko. Dokud je zkratkou, tlačítko nedělá nic jiného.",
+        "linux": "V Linuxu funguje jen prostřední tlačítko.",
+        "needsEngine": "Vyžaduje implementaci klávesnice SpeakoFlow Keys.",
+        "reset": "Zkratky, které používaly tlačítko myši, mají zase výchozí klávesy."
+      },
       "liveTranscription": {
         "label": "Průběžný přepis",
         "description": "Přepisovat řeč průběžně, jak mluvíte, místo naráz po zastavení. Experimentální."
@@ -870,6 +896,10 @@
       "showTrayIcon": {
         "label": "Zobrazit ikonu v systémové liště",
         "description": "Ponechat SpeakoFlow v systémové liště."
+      },
+      "trayIconColor": {
+        "label": "Barevná ikona v systémové liště",
+        "description": "Zobrazí barevné logo místo bílé ikony. Zapněte, pokud máte světlý panel a bílá ikona je špatně vidět."
       },
       "closeBehavior": {
         "label": "Ukončit aplikaci při zavření okna",
@@ -1198,6 +1228,24 @@
           "azureDescription": "Koncový bod vašeho prostředku Azure, najdete ho v části Klíče a koncový bod na portálu Azure. MAI-Transcribe vyžaduje prostředek v oblasti Central India, Southeast Asia, East US, West US, West US 2 nebo North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Přístupový klíč AWS",
+            "missing": "Zatím není uložen žádný klíč. Použijte přístupový klíč uživatele nebo role IAM s oprávněním volat transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID přístupového klíče",
+            "secret": "Tajný přístupový klíč",
+            "sessionToken": "Token relace (jen pro dočasné přihlašovací údaje)",
+            "invalid": "Tohle nevypadá jako klíč AWS. ID přístupového klíče obsahuje jen písmena a číslice a žádné pole nesmí obsahovat mezery ani dvojtečky.",
+            "permission": "Potřebné oprávnění"
+          },
+          "region": {
+            "title": "Oblast",
+            "description": "Kde Amazon Transcribe běží. Nejrychleji odpovídá oblast, která je vám nejblíž."
+          },
+          "streaming": "Vždy zapnuto: Amazon Transcribe přepisuje jen živě. Když se spojení během nahrávání přeruší, nahrávka se odešle znovu rychlostí řeči, takže dokončení trvá stejně dlouho jako nahrávka.",
+          "language": "Amazon Transcribe musí znát jazyk. Automatický režim vybírá mezi angličtinou, jazykem aplikace a několika dalšími běžnými jazyky, proto zvolte svůj jazyk, pokud mluvíte jiným.",
+          "unsupportedLanguage": "Amazon Transcribe neumí tento jazyk přepisovat živě v oblasti {{region}}. Zvolte jiný jazyk nebo oblast. Do té doby diktování Amazon Transcribe nepoužije."
+        },
         "model": {
           "title": "Model",
           "info": "Zadejte jakýkoli model, který poskytovatel nabízí, nebo načtěte seznam. U ElevenLabs zvolte scribe_v2_realtime pro přepis během mluvení a scribe_v2 pro přepis až po skončení.",
@@ -1210,7 +1258,8 @@
         },
         "keyterms": {
           "label": "Posílat moje vlastní slova",
-          "description": "Předá poskytovateli váš vlastní slovník, aby dával přednost tomuto pravopisu."
+          "description": "Předá poskytovateli váš vlastní slovník, aby dával přednost tomuto pravopisu.",
+          "unsupported": "{{provider}} nepřijímá seznam slov, proto se vaše vlastní slova opravují místo toho na tomto počítači."
         },
         "noVerbatim": {
           "label": "Odstranit vycpávková slova",
@@ -1414,7 +1463,20 @@
       },
       "appendTrailingSpace": {
         "label": "Přidat koncovou mezeru",
-        "description": ""
+        "description": "Přidá mezeru za každý diktát. Se zapnutými chytrými mezerami platí jen tam, kde pole nelze přečíst."
+      },
+      "smartSpacing": {
+        "label": "Chytré mezery",
+        "description": "Přizpůsobí každý diktát textu, který už v poli je, takže můžete přestat a pokračovat, aniž by se slova slila.",
+        "info": "Před vložením se SpeakoFlow podívá na několik znaků kolem kurzoru a mezeru přidá jen tam, kde je potřeba. Když aplikace svůj text skrývá, použije místo toho svůj poslední diktát. Nic se neukládá ani nikam neodesílá. V macOS se používá oprávnění Zpřístupnění, které SpeakoFlow už má. V Linuxu sdílejí aplikace Chrome, Electron a Qt svůj text jen tehdy, když je v prostředí zapnuté zpřístupnění."
+      },
+      "smartSpacingFixCase": {
+        "label": "Opravovat velká písmena",
+        "description": "Začne diktát malým písmenem, když pokračuje ve větě. Jména, zkratky a „I“ si velká písmena ponechají."
+      },
+      "smartSpacingJoin": {
+        "label": "Spojovat přerušené věty",
+        "description": "Odstraní tečku, kterou SpeakoFlow přidal, když jste se zastavili uprostřed věty, například „I went to the.“"
       },
       "keyboardImplementation": {
         "title": "Implementace klávesnice",
@@ -1972,9 +2034,19 @@
       "hide": "Skrýt plovoucí indikátor",
       "show": "Zobrazit plovoucí indikátor"
     },
+    "notesPrefs": {
+      "autoTitle": "Psát poznámky po skončení hovoru",
+      "autoDescription": "Vypněte, pokud potřebujete jen přepis. Poznámky k jedné schůzce můžete i tak napsat z jejího přepisu.",
+      "languageTitle": "Jazyk poznámek",
+      "languageDescription": "Ve výchozím nastavení jsou poznámky v jazyce, kterým se na schůzce mluvilo. Vyberte jazyk, chcete-li je mít vždy v něm.",
+      "auto": "Stejný jako schůzka",
+      "autoHint": "Jazyk, kterým se mluvilo po většinu schůzky"
+    },
     "pill": {
       "expand": "Otevřít živý přepis",
       "collapse": "Zpět na malou pilulku",
+      "copy": "Kopírovat přepis",
+      "copied": "Přepis zkopírován",
       "stop": "Zastavit nahrávání",
       "listening": "Poslouchám. Co lidé říkají, se objeví tady.",
       "micOnly": "Zachytává se jen váš mikrofon — nic z toho, co řeknou ostatní účastníci, v tomto přepisu nebude."
@@ -2056,6 +2128,7 @@
       "empty": "Tato schůzka nemá přepis.",
       "loadingMore": "Načítá se další část přepisu…",
       "renameSpeaker": "Přejmenovat tohoto mluvčího",
+      "copyTitle": "Zkopírovat celý přepis se jmény mluvčích",
       "lowConfidence": "Nejisté",
       "lowConfidenceHelp": "Toto označení mluvčího je odhad. Slova jsou přepsaná tak, jak zazněla; nejisté je jen to, kdo je řekl."
     },
@@ -2080,6 +2153,7 @@
     },
     "summary": {
       "template": "Šablona",
+      "languageAuto": "Jazyk schůzky",
       "templates": {
         "general": "Obecná",
         "standup": "Stand-up",
@@ -2223,6 +2297,7 @@
     "copied": "Zkopírováno",
     "copyFailed": "Nepodařilo se zkopírovat — zkuste to znovu",
     "done": "Hotovo",
+    "finish": "Dokončit",
     "askAssistant": "Zeptat se asistenta místo vypsání tohoto textu",
     "recovery": {
       "dismissed": "Zrušeno",
@@ -2234,7 +2309,10 @@
       "title": "Stahuje se model pro přepis…",
       "percent": "Stahuje se model pro přepis · {{percent}} %",
       "hint": "Diktování začne fungovat po dokončení"
-    }
+    },
+    "handsFreeHint": "Stiskněte {{key}} pro diktování bez držení",
+    "lockedKeys": "Nahrávám bez držení. Stiskněte {{keys}} pro dokončení",
+    "finishKeys": "Dokončit ({{keys}})"
   },
   "reminders": {
     "title": "Připomínka",
@@ -2537,10 +2615,7 @@
       "dictation": "Diktování",
       "assistant": "Asistent",
       "cleanupOff": "Pro tuto zkratku zapněte čištění pomocí AI.",
-      "cleanupOnDictation": "Vaše zkratka pro diktování čistí každé diktování, takže tuto nepotřebujete.",
-      "openCleanup": "Otevřít čištění pomocí AI",
-      "assistantOff": "Asistent je vypnutý, takže jeho zkratky nic nedělají.",
-      "openAssistant": "Otevřít Asistenta"
+      "assistantOff": "Asistent je vypnutý, takže jeho zkratky nic nedělají."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2628,6 +2703,10 @@
         "whatHold": "Podržte, mluvte, pusťte. Slova se napíšou tam, kde je kurzor.",
         "whatTap": "Stiskněte, mluvte, stiskněte znovu. Slova se napíšou tam, kde je kurzor."
       },
+      "handsFree": {
+        "what": "Podržte {{keys}}, stiskněte {{key}} a pusťte: poslouchá dál, dokud znovu nestisknete {{keys}}.",
+        "linux": "Pro diktování bez držení v Linuxu vypněte „Držet pro mluvení“. Jeden stisk pak spustí a další zastaví."
+      },
       "cleanup": {
         "title": "Diktovat a vyčistit",
         "description": "Stejné jako Diktovat, jen AI navíc opraví interpunkci, vycpávková slova a styl.",
@@ -2636,7 +2715,8 @@
       "ask": {
         "title": "Zeptat se asistenta",
         "description": "Položte otázku nahlas a odpověď dostanete v plovoucím panelu.",
-        "what": "Ptejte se nahlas. Odpověď se zobrazí v plovoucím panelu."
+        "whatHold": "Podržte, zeptejte se, pusťte. Odpověď se zobrazí v plovoucím panelu.",
+        "whatTap": "Stiskněte, zeptejte se, stiskněte znovu. Odpověď se zobrazí v plovoucím panelu."
       },
       "call": {
         "title": "Zahájit konverzaci",
@@ -2645,10 +2725,6 @@
       },
       "info": "Stiskněte je v jakékoli aplikaci. Kliknutím na klávesy je změníte.",
       "offHint": "Vypnuto",
-      "mode": {
-        "hold": "Podržte a mluvte",
-        "tap": "Stiskem zapnout/vypnout"
-      },
       "cancel": {
         "title": "Zrušit",
         "what": "Zastaví nahrávání nebo předčítanou odpověď."
@@ -2847,6 +2923,16 @@
       "info": "Dejte čištění vlastní zkratku, nebo nechte zkratku pro diktování čistit každé diktování, abyste si museli pamatovat jen jednu kombinaci kláves.",
       "separate": "Vlastní zkratka",
       "dictation": "Stejná jako diktování"
+    },
+    "skipShort": {
+      "title": "Nečistit krátká diktování",
+      "info": "Krátká diktování, třeba hledání nebo rychlá odpověď, se napíšou tak, jak jste je řekli, bez čekání na model. Delší se dál čistí.",
+      "limit": "Kratší než",
+      "limitInfo": "Počítá se ve slovech. U jazyků psaných bez mezer, jako je čínština, japonština nebo thajština, se počet slov odhaduje z počtu znaků.",
+      "words_one": "slovo",
+      "words_few": "slova",
+      "words_many": "slova",
+      "words_other": "slov"
     },
     "shortcutRow": "Zkratka"
   },
@@ -3240,7 +3326,19 @@
     "useDefault": "Výchozí",
     "turnOff": "Vypnout",
     "turnedOff": "Zkratka {{name}} je vypnutá",
-    "undo": "Zpět"
+    "undo": "Zpět",
+    "addAnother": "Přidat další",
+    "addAnotherHint": "Přiřadit této zkratce druhou sadu kláves, třeba tlačítko myši",
+    "remove": "Odebrat",
+    "or": "nebo",
+    "changeOther": "Změnit další klávesy zkratky {{name}}",
+    "pressKeysOrButton": "Stiskněte klávesy nebo tlačítko myši…",
+    "mouseNeedsKeysEngine": "Tlačítka myši vyžadují implementaci klávesnice SpeakoFlow Keys (Nastavení → Pokročilé → Experimentální).",
+    "mouse": {
+      "middle": "Prostřední tlačítko myši",
+      "back": "Tlačítko myši Zpět",
+      "forward": "Tlačítko myši Vpřed"
+    }
   },
   "memoryManager": {
     "status": {

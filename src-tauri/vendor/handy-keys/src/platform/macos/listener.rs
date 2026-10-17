@@ -445,6 +445,9 @@ unsafe extern "C-unwind" fn event_tap_callback(
                     _ => None, // Unknown button
                 };
                 if let Some(key) = key {
+                    // A button bound to a hotkey stops here, as a bound key
+                    // does (see `swallow_mouse_button`).
+                    should_block = state.swallow_button(modifiers, key, true);
                     let _ = state.event_sender.send(KeyEvent {
                         modifiers,
                         key: Some(key),
@@ -465,6 +468,7 @@ unsafe extern "C-unwind" fn event_tap_callback(
                     _ => None,
                 };
                 if let Some(key) = key {
+                    should_block = state.swallow_button(modifiers, key, false);
                     let _ = state.event_sender.send(KeyEvent {
                         modifiers,
                         key: Some(key),

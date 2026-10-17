@@ -44,6 +44,21 @@ export const revealUpdateInstaller = (path: string) =>
 export const prepareUpdateInstall = (version: string) =>
   invoke<void>("prepare_update_install", { version });
 
+/** Progress of `downloadUpdate`, as an `InstallerProgress`. */
+export const UPDATE_PROGRESS_EVENT = "update-download-progress";
+
+/**
+ * Download the update on several connections and verify its signature.
+ * Resolves to the version downloaded. Replaces the plugin's
+ * `update.download()`, which used one connection and ran at a tenth of the
+ * speed against GitHub's per-connection throttle.
+ */
+export const downloadUpdate = () => invoke<string>("download_update");
+
+/** Install what `downloadUpdate` fetched. On Windows the app exits here. */
+export const installDownloadedUpdate = () =>
+  invoke<void>("install_downloaded_update");
+
 export interface FinishedUpdate {
   from: string;
   to: string;

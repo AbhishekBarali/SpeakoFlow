@@ -8,14 +8,16 @@
 //! OpenAI-compatible entry, and the whole thing is gated on
 //! [`SttEngineMode::Cloud`]; on `Local` not a single line here runs.
 //!
-//! ## Four protocols, not one
+//! ## Five protocols, not one
 //!
 //! "OpenAI-compatible" is close to universal for *chat*, so it is tempting to
 //! assume the same for transcription. It is not: ElevenLabs authenticates with
 //! an `xi-api-key` header and names the model field `model_id`, Deepgram
 //! takes the audio as a raw request body with every option as a query
-//! parameter and no multipart envelope at all, and Azure AI Speech wants an
-//! `audio` part plus a JSON `definition` in which the model is a nested field.
+//! parameter and no multipart envelope at all, Azure AI Speech wants an
+//! `audio` part plus a JSON `definition` in which the model is a nested field,
+//! and Amazon Transcribe has no request at all — only a signed WebSocket stream
+//! (`crate::stt_aws`), which is why it is the one provider that always streams.
 //! [`CloudSttKind`] is therefore a real dispatch, while the provider *list*
 //! stays data.
 //!
@@ -174,14 +176,46 @@ pub(crate) fn resolve_cloud_stt(
     // default to fall back to, and what people paste varies (the portal's
     // resource URL, a Foundry project URL, a region name). Normalised here so the
     // request path only ever sees a bare origin.
-    let base_url = if provider.kind == CloudSttKind::AzureSpeech {
-        azure_speech_base_url(&base_url).ok_or_else(|| CloudSttResolutionError {
-            reason: CloudSttUnavailableReason::MissingEndpoint,
+    //
+    // Amazon Transcribe's slot holds a region rather than a URL (the streaming
+    // host is derived from it), normalised the same way.
+    let base_url = match provider.kind {
+        CloudSttKind::AzureSpeech => azure_speech_base_url(&base_url),
+        CloudSttKind::AmazonTranscribe => crate::stt_aws::region_from(&base_url),
+        _ => Some(base_url),
+    }
+    .ok_or_else(|| CloudSttResolutionError {
+        reason: CloudSttUnavailableReason::MissingEndpoint,
+        provider_id: Some(provider.id.clone()),
+        provider_label: Some(provider.label.clone()),
+    })?;
+
+    // AWS needs what the generic fields cannot carry: the key split into its
+    // parts, and the language as a full locale or a candidate list. A language
+    // it cannot stream is a configuration that cannot run — exactly like a
+    // missing key — so dictation falls back to the local model instead of
+    // sending the audio to another language's model.
+    let amazon = if provider.kind == CloudSttKind::AmazonTranscribe {
+        let failed = |reason| CloudSttResolutionError {
+            reason,
             provider_id: Some(provider.id.clone()),
             provider_label: Some(provider.label.clone()),
-        })?
+        };
+        let credentials = crate::stt_aws::AwsCredentials::parse(&api_key)
+            .ok_or_else(|| failed(CloudSttUnavailableReason::MissingApiKey))?;
+        let language = crate::stt_aws::streaming_language(
+            &settings.selected_language,
+            &settings.app_language,
+            &base_url,
+        )
+        .ok_or_else(|| failed(CloudSttUnavailableReason::UnsupportedLanguage))?;
+        Some(crate::stt_aws::AmazonTranscribeConfig {
+            region: base_url.clone(),
+            credentials,
+            language,
+        })
     } else {
-        base_url
+        None
     };
 
     let language = cloud_language_code(&settings.selected_language);
@@ -234,6 +268,7 @@ pub(crate) fn resolve_cloud_stt(
         keyterms,
         no_verbatim: settings.cloud_stt_no_verbatim,
         timeout_secs: settings.cloud_stt_timeout_secs.max(5),
+        amazon,
     })
 }
 
@@ -409,10 +444,22 @@ pub fn cloud_stt_active(settings: &AppSettings) -> bool {
 /// Whether the next recording will use a realtime WebSocket rather than a batch
 /// request once recording stops.
 pub fn cloud_stt_streaming_active(settings: &AppSettings) -> bool {
-    settings.cloud_stt_streaming
-        && resolve_cloud_stt(settings)
-            .map(|cfg| crate::stt_cloud_stream::supports_streaming(&cfg))
-            .unwrap_or(false)
+    resolve_cloud_stt(settings)
+        .map(|cfg| streams_live(settings, &cfg))
+        .unwrap_or(false)
+}
+
+/// Whether a recording on this configuration streams while it is spoken.
+///
+/// "Transcribe as I speak" is the user's switch wherever the provider has a
+/// realtime endpoint, except on a provider with nothing else
+/// ([`crate::stt_cloud_stream::streams_only`]): with the switch off, Amazon
+/// Transcribe would have to replay the whole recording through a stream after
+/// the user stopped, at speaking speed, so the wait would be as long as the
+/// recording. Live is the only mode that makes sense there.
+pub(crate) fn streams_live(settings: &AppSettings, cfg: &ResolvedCloudStt) -> bool {
+    crate::stt_cloud_stream::supports_streaming(cfg)
+        && (settings.cloud_stt_streaming || crate::stt_cloud_stream::streams_only(cfg))
 }
 
 /// Configuration status for display in Settings.
@@ -422,8 +469,7 @@ pub fn cloud_stt_readiness(settings: &AppSettings) -> CloudSttReadiness {
             provider_id: cfg.provider.id.clone(),
             provider_label: cfg.provider.label.clone(),
             model: cfg.model.clone(),
-            streaming: settings.cloud_stt_streaming
-                && crate::stt_cloud_stream::supports_streaming(&cfg),
+            streaming: streams_live(settings, &cfg),
         },
         Err(e) => CloudSttReadiness::Unavailable {
             reason: e.reason,
@@ -780,13 +826,14 @@ where
 ///
 /// Skipped when a real request finished within [`ROUTE_WARM_FOR`], and skipped
 /// entirely for realtime streaming, which opens its own socket at recording start
-/// and uploads during speech anyway.
+/// and uploads during speech anyway — always the case for a streaming-only
+/// provider, which has no request to warm.
 pub(crate) fn prewarm_cloud_stt(settings: &AppSettings) {
     let Ok(cfg) = resolve_cloud_stt(settings) else {
         return;
     };
     // Realtime streaming opens its own socket at recording start already.
-    if settings.cloud_stt_streaming && crate::stt_cloud_stream::supports_streaming(&cfg) {
+    if streams_live(settings, &cfg) {
         return;
     }
     if route_is_warm() {
@@ -837,6 +884,21 @@ pub(crate) fn transcribe_cloud_blocking(
     samples: &[f32],
 ) -> Result<String, String> {
     let seconds = samples.len() as f64 / WHISPER_SAMPLE_RATE as f64;
+    // No batch endpoint to send it to: the recording goes back through a fresh
+    // stream, which AWS reads at speaking speed. This runs when a live session
+    // failed, for a call's utterances, and when History transcribes again.
+    if crate::stt_cloud_stream::streams_only(cfg) {
+        info!(
+            "Cloud transcription: {} ({seconds:.1}s, sent again through a stream at speaking \
+             speed — no batch endpoint)",
+            cfg.provider.label
+        );
+        let result = crate::stt_cloud_stream::transcribe_by_streaming(cfg, samples);
+        if result.is_ok() {
+            note_request_completed();
+        }
+        return result;
+    }
     let mut request = CloudRequest::from_config(cfg);
     // Encoded here, on the caller's blocking thread, rather than inside the
     // request future: the shared runtime has one worker, and half a second of
@@ -1182,6 +1244,13 @@ impl CloudRequest {
             CloudSttKind::OpenAiCompatible => self.transcribe_openai(audio).await,
             CloudSttKind::Deepgram => self.transcribe_deepgram(audio).await,
             CloudSttKind::AzureSpeech => self.transcribe_azure(audio).await,
+            // Routed to `stt_cloud_stream::transcribe_by_streaming` before a
+            // request is ever built; reaching this is a routing bug, reported
+            // as an error rather than a guess at an endpoint.
+            CloudSttKind::AmazonTranscribe => Err(format!(
+                "{} has no batch endpoint; it only transcribes through a stream",
+                self.label
+            )),
         }
     }
 
@@ -1512,6 +1581,22 @@ fn summarize_error_body(body: &str) -> String {
 /// signal, not what a second of silence says.
 pub(crate) fn verify_cloud_stt(cfg: &ResolvedCloudStt) -> Result<String, String> {
     let samples = vec![0.0f32; WHISPER_SAMPLE_RATE as usize];
+    // The same second of silence through a whole stream: the signed upgrade
+    // proves the key and the clock, the audio proves the permission and the
+    // language, and AWS closing the stream cleanly proves the end of it.
+    if crate::stt_cloud_stream::streams_only(cfg) {
+        let text = crate::stt_cloud_stream::transcribe_by_streaming(cfg, &samples)?;
+        debug!("Cloud STT verification transcript: {text:?}");
+        let region = cfg
+            .amazon
+            .as_ref()
+            .map(|amazon| amazon.region.as_str())
+            .unwrap_or_default();
+        return Ok(format!(
+            "{} responded — live transcription in {region} works.",
+            cfg.provider.label
+        ));
+    }
     let request = CloudRequest::from_config(cfg);
     // In the format dictations will use, so a pass means a real recording will
     // be accepted too, and with the same WAV fallback if it is not.
@@ -1941,6 +2026,160 @@ mod tests {
             ),
             "Access denied due to invalid subscription key."
         );
+    }
+
+    const AWS_KEY: &str = "AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+
+    fn amazon_settings(key: &str) -> AppSettings {
+        let mut settings = get_default_settings();
+        settings.stt_engine_mode = SttEngineMode::Cloud;
+        settings.cloud_stt_provider_id = crate::settings::CLOUD_STT_AMAZON.to_string();
+        settings.app_language = "en".to_string();
+        settings.selected_language = "auto".to_string();
+        settings.cloud_stt_api_keys.insert(
+            crate::settings::CLOUD_STT_AMAZON.to_string(),
+            key.to_string(),
+        );
+        settings
+    }
+
+    fn unavailable_reason(settings: &AppSettings) -> CloudSttUnavailableReason {
+        resolve_cloud_stt(settings)
+            .err()
+            .expect("this configuration should not resolve")
+            .reason
+    }
+
+    /// A fresh Amazon Transcribe setup needs only the key: the region ships as
+    /// us-east-1, and there is no model to choose.
+    #[test]
+    fn amazon_transcribe_resolves_with_just_a_key() {
+        let cfg = resolve_cloud_stt(&amazon_settings(AWS_KEY)).expect("should resolve");
+        assert_eq!(cfg.provider.kind, CloudSttKind::AmazonTranscribe);
+        assert_eq!(cfg.base_url, "us-east-1");
+        assert_eq!(cfg.model, "standard");
+        let amazon = cfg
+            .amazon
+            .as_ref()
+            .expect("the AWS half should be resolved");
+        assert_eq!(amazon.region, "us-east-1");
+        assert_eq!(amazon.credentials.access_key_id, "AKIAIOSFODNN7EXAMPLE");
+        assert!(amazon.credentials.session_token.is_none());
+        assert!(matches!(
+            amazon.language,
+            crate::stt_aws::StreamingLanguage::Identify(_)
+        ));
+        // AWS cannot take a word list inline, so nothing is sent upstream and
+        // the app's own custom-word pass stays on.
+        assert!(cfg.keyterms.is_empty());
+        assert!(!cfg.translate);
+
+        // Every other provider resolves without an AWS half.
+        assert!(resolve_cloud_stt(&cloud_settings())
+            .expect("should resolve")
+            .amazon
+            .is_none());
+    }
+
+    #[test]
+    fn amazon_transcribe_without_a_usable_key_is_unavailable() {
+        for key in ["", "AKIAIOSFODNN7EXAMPLE", "not a key at all"] {
+            assert_eq!(
+                unavailable_reason(&amazon_settings(key)),
+                CloudSttUnavailableReason::MissingApiKey,
+                "{key:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn amazon_transcribe_reads_its_region_from_the_endpoint_slot() {
+        let mut settings = amazon_settings(AWS_KEY);
+        settings.cloud_stt_base_urls.insert(
+            crate::settings::CLOUD_STT_AMAZON.to_string(),
+            "eu-central-1".to_string(),
+        );
+        let cfg = resolve_cloud_stt(&settings).expect("should resolve");
+        assert_eq!(cfg.base_url, "eu-central-1");
+        assert_eq!(cfg.amazon.unwrap().region, "eu-central-1");
+
+        settings.cloud_stt_base_urls.insert(
+            crate::settings::CLOUD_STT_AMAZON.to_string(),
+            "somewhere".to_string(),
+        );
+        assert_eq!(
+            unavailable_reason(&settings),
+            CloudSttUnavailableReason::MissingEndpoint
+        );
+    }
+
+    /// A language AWS cannot stream is a setup that cannot run, like a missing
+    /// key, so dictation falls back to the local model instead of sending the
+    /// audio to another language's model.
+    #[test]
+    fn a_language_amazon_cannot_stream_makes_it_unavailable() {
+        let mut settings = amazon_settings(AWS_KEY);
+        settings.selected_language = "la".to_string();
+        assert_eq!(
+            unavailable_reason(&settings),
+            CloudSttUnavailableReason::UnsupportedLanguage
+        );
+        assert!(!cloud_stt_active(&settings));
+
+        // Nepali streams in Mumbai, but not in Tokyo.
+        settings.selected_language = "ne".to_string();
+        settings.cloud_stt_base_urls.insert(
+            crate::settings::CLOUD_STT_AMAZON.to_string(),
+            "ap-south-1".to_string(),
+        );
+        assert!(cloud_stt_active(&settings));
+        settings.cloud_stt_base_urls.insert(
+            crate::settings::CLOUD_STT_AMAZON.to_string(),
+            "ap-northeast-1".to_string(),
+        );
+        assert_eq!(
+            unavailable_reason(&settings),
+            CloudSttUnavailableReason::UnsupportedLanguage
+        );
+    }
+
+    /// With live text switched off, Amazon Transcribe would have to replay the
+    /// whole recording at speaking speed after the user stopped, so it streams
+    /// regardless. The switch keeps its meaning everywhere else.
+    #[test]
+    fn amazon_transcribe_streams_even_with_live_text_switched_off() {
+        let mut settings = amazon_settings(AWS_KEY);
+        settings.cloud_stt_streaming = false;
+        assert!(cloud_stt_streaming_active(&settings));
+        assert!(matches!(
+            cloud_stt_readiness(&settings),
+            CloudSttReadiness::Ready {
+                streaming: true,
+                ..
+            }
+        ));
+
+        let mut deepgram = cloud_settings();
+        deepgram.cloud_stt_provider_id = "deepgram".to_string();
+        deepgram
+            .cloud_stt_api_keys
+            .insert("deepgram".to_string(), "key".to_string());
+        assert!(cloud_stt_streaming_active(&deepgram));
+        deepgram.cloud_stt_streaming = false;
+        assert!(!cloud_stt_streaming_active(&deepgram));
+    }
+
+    #[test]
+    fn amazon_transcribe_ships_just_before_custom() {
+        let ids: Vec<String> = crate::settings::default_cloud_stt_providers()
+            .into_iter()
+            .map(|p| p.id)
+            .collect();
+        let amazon = ids
+            .iter()
+            .position(|id| id == crate::settings::CLOUD_STT_AMAZON)
+            .expect("Amazon Transcribe should be in the registry");
+        assert_eq!(ids[amazon + 1], "custom");
     }
 
     #[test]

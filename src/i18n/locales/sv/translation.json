@@ -641,12 +641,17 @@
           "assistant_call": {
             "name": "Starta en konversation",
             "description": "Prata med assistenten handsfree och hör dess svar. Tryck igen för att avsluta."
+          },
+          "hands_free": {
+            "name": "Handsfree",
+            "description": "Tryck på den medan du håller dikteringstangenterna, så fortsätter inspelningen när du släpper. Tryck på dikteringstangenterna igen för att avsluta."
           }
         },
         "errors": {
           "restore": "Det gick inte att återställa det ursprungliga kortkommandot.",
           "set": "Det gick inte att ställa in kortkommandot: {{error}}",
           "inUse": "”{{name}}” använder redan {{keys}}. Välj andra tangenter eller ändra det kortkommandot först.",
+          "sameAsOther": "{{keys}} är redan inställt för det här kortkommandot.",
           "reset": "Kunde inte återställa kortkommandot."
         },
         "clickToChange": "Klicka för att ändra",
@@ -661,10 +666,24 @@
         "auto": "Automatiskt"
       },
       "pushToTalk": {
-        "label": "Inspelningsbeteende",
-        "description": "Håll: inspelningen pågår medan du håller ned ett inspelningskortkommando. Tryck: en tryckning startar, nästa stoppar. Gäller alla inspelningskortkommandon.",
-        "hold": "Håll",
-        "tap": "Tryck"
+        "dictation": "På: inspelningen pågår medan du håller ned tangenterna. Av: en tryckning startar, nästa stoppar, så varje diktering blir handsfree.",
+        "assistant": "På: lyssnar medan du håller ned tangenterna. Av: en tryckning startar, nästa skickar.",
+        "dictationLabel": "Håll för att prata",
+        "assistantLabel": "Håll för att fråga"
+      },
+      "handsFree": {
+        "unavailableKeys": "Fungerar när diktering bara består av modifierartangenter, som Ctrl + Win. Med {{keys}}, stäng av ”Håll för att prata” i stället: varje diktering fortsätter då tills du trycker på tangenterna igen.",
+        "unavailableEngine": "Kräver tangentbordsmotorn SpeakoFlow Keys ({{where}}). Eller stäng av ”Håll för att prata”: varje diktering fortsätter då tills du trycker på tangenterna igen.",
+        "taken": "{{name}} använder redan {{keys}}, så den här tangenten gör ingenting förrän en av dem ändras.",
+        "needsKey": "Välj en tangent, till exempel mellanslag eller Enter. En modifierartangent ensam kan inte vara handsfree-tangenten.",
+        "pressKey": "Tryck på en tangent…",
+        "descriptionOff": "Av. Klicka och tryck på en tangent, till exempel mellanslag, för att slå på igen.",
+        "linux": "På Linux, stäng av ”Håll för att prata” i stället: varje diktering fortsätter då tills du trycker på tangenterna igen.",
+        "whileDictating": "Medan du dikterar, tryck på"
+      },
+      "silenceStop": {
+        "label": "Stoppa efter tystnad",
+        "description": "En handsfree-diktering som inte hör något tal på så här länge stoppas och klistras in av sig själv, som om du hade tryckt på kortkommandot igen. Strax innan krymper en linje på rutan; börjar du prata igen fortsätter inspelningen."
       }
     },
     "models": {
@@ -824,6 +843,13 @@
         "label": "Håll mikrofonen öppen mellan transkriptioner",
         "description": "Snabbare diktering på raken. Kan påverka Bluetooth-ljudkvaliteten."
       },
+      "mouseButtonShortcuts": {
+        "label": "Musknappar som kortkommandon",
+        "description": "Använd musens mittenknapp, Bakåt eller Framåt som kortkommando: klicka på kortkommandots tangenter och tryck sedan på knappen. Så länge den är ett kortkommando gör knappen inget annat.",
+        "linux": "På Linux fungerar bara mittenknappen.",
+        "needsEngine": "Kräver tangentbordsimplementeringen SpeakoFlow Keys.",
+        "reset": "Kortkommandon som använde en musknapp har fått tillbaka sina standardtangenter."
+      },
       "liveTranscription": {
         "label": "Live-transkribering",
         "description": "Transkribera talet medan du pratar, i stället för allt på en gång när du slutar. Experimentellt."
@@ -858,6 +884,10 @@
       "showTrayIcon": {
         "label": "Visa ikon i systemfältet",
         "description": "Behåll SpeakoFlow i systemfältet."
+      },
+      "trayIconColor": {
+        "label": "Färgad ikon i systemfältet",
+        "description": "Visar den färgade logotypen i stället för den vita ikonen. Slå på om panelen är ljus och den vita ikonen syns dåligt."
       },
       "closeBehavior": {
         "label": "Avsluta när jag stänger fönstret",
@@ -1186,6 +1216,24 @@
           "azureDescription": "Slutpunkten för din Azure-resurs, från Nycklar och slutpunkt i Azure-portalen. MAI-Transcribe kräver en resurs i Central India, Southeast Asia, East US, West US, West US 2 eller North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS-åtkomstnyckel",
+            "missing": "Ingen nyckel sparad än. Använd en åtkomstnyckel för en IAM-användare eller IAM-roll som får anropa transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Åtkomstnyckel-ID",
+            "secret": "Hemlig åtkomstnyckel",
+            "sessionToken": "Sessionstoken (bara för tillfälliga autentiseringsuppgifter)",
+            "invalid": "Det här ser inte ut som en AWS-nyckel. Åtkomstnyckel-ID:t består av bokstäver och siffror, och inget fält får innehålla mellanslag eller kolon.",
+            "permission": "Behörighet som krävs"
+          },
+          "region": {
+            "title": "AWS-region",
+            "description": "Var Amazon Transcribe körs. Den region som ligger närmast dig svarar snabbast."
+          },
+          "streaming": "Alltid på: Amazon Transcribe transkriberar bara live. Om anslutningen bryts mitt i inspelningen skickas den igen i talhastighet, så det tar lika lång tid att bli klar som inspelningen tog.",
+          "language": "Amazon Transcribe måste veta språket. Automatiskt väljer mellan engelska, appens språk och några andra vanliga språk, så välj ditt om du talar något annat.",
+          "unsupportedLanguage": "Amazon Transcribe kan inte transkribera det här språket live i {{region}}. Välj ett annat språk eller en annan region. Tills dess använder dikteringen inte Amazon Transcribe."
+        },
         "model": {
           "title": "Modell",
           "info": "Skriv valfri modell som leverantören erbjuder, eller ladda listan. För ElevenLabs väljer du scribe_v2_realtime för att transkribera medan du talar och scribe_v2 för att transkribera när du har slutat.",
@@ -1198,7 +1246,8 @@
         },
         "keyterms": {
           "label": "Skicka mina anpassade ord",
-          "description": "Skickar ditt anpassade ordförråd till leverantören så att den föredrar de stavningarna."
+          "description": "Skickar ditt anpassade ordförråd till leverantören så att den föredrar de stavningarna.",
+          "unsupported": "{{provider}} kan inte ta emot en ordlista, så dina anpassade ord rättas på den här datorn i stället."
         },
         "noVerbatim": {
           "label": "Ta bort utfyllnadsord",
@@ -1396,7 +1445,20 @@
       },
       "appendTrailingSpace": {
         "label": "Lägg till avslutande mellanslag",
-        "description": ""
+        "description": "Lägger till ett mellanslag efter varje diktering. Med smart mellanrum på gäller det bara där fältet inte kan läsas."
+      },
+      "smartSpacing": {
+        "label": "Smart mellanrum",
+        "description": "Anpassar varje diktering till texten som redan finns i fältet, så att du kan pausa och fortsätta utan att orden klistras ihop.",
+        "info": "Innan inklistring tittar SpeakoFlow på de få tecknen runt markören och lägger bara till ett mellanslag där det behövs. Om en app döljer sin text används i stället den egna senaste dikteringen. Inget sparas eller skickas någonstans. På macOS används behörigheten för hjälpmedel som SpeakoFlow redan har. På Linux delar Chrome-, Electron- och Qt-appar bara sin text när skrivbordets hjälpmedelsinställning är på."
+      },
+      "smartSpacingFixCase": {
+        "label": "Rätta versaler",
+        "description": "Börjar dikteringen med liten bokstav när den fortsätter en mening. Namn, förkortningar och \"I\" behåller sina versaler."
+      },
+      "smartSpacingJoin": {
+        "label": "Sätt ihop avbrutna meningar",
+        "description": "Tar bort punkten som SpeakoFlow lade till när du stannade mitt i en mening, som i \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Tangentbordsimplementering",
@@ -1954,9 +2016,19 @@
       "hide": "Dölj den flytande indikatorn",
       "show": "Visa den flytande indikatorn"
     },
+    "notesPrefs": {
+      "autoTitle": "Skriv anteckningar när ett samtal slutar",
+      "autoDescription": "Stäng av om du bara behöver transkriptionen. Du kan ändå skriva anteckningar för ett möte från dess transkription.",
+      "languageTitle": "Språk för anteckningar",
+      "languageDescription": "Som standard skrivs anteckningarna på mötets språk. Välj ett språk för att alltid få dem på det.",
+      "auto": "Samma som mötet",
+      "autoHint": "Språket som större delen av mötet hölls på"
+    },
     "pill": {
       "expand": "Öppna transkriptionen live",
       "collapse": "Tillbaka till den lilla rutan",
+      "copy": "Kopiera transkription",
+      "copied": "Transkriptionen kopierades",
       "stop": "Stoppa inspelningen",
       "listening": "Lyssnar. Det som sägs visas här.",
       "micOnly": "Bara din mikrofon spelas in — inget som de andra deltagarna säger kommer med i transkriptionen."
@@ -2034,6 +2106,7 @@
       "empty": "Det här mötet har ingen transkription.",
       "loadingMore": "Laddar mer av transkriptionen…",
       "renameSpeaker": "Byt namn på talaren",
+      "copyTitle": "Kopiera hela transkriptionen med talarnas namn",
       "lowConfidence": "Osäker",
       "lowConfidenceHelp": "Den här talaretiketten är en gissning. Orden är transkriberade som de sades; bara vem som sa dem är osäkert."
     },
@@ -2058,6 +2131,7 @@
     },
     "summary": {
       "template": "Mall",
+      "languageAuto": "Mötets språk",
       "templates": {
         "general": "Allmän",
         "standup": "Standup",
@@ -2199,6 +2273,7 @@
     "copied": "Kopierat",
     "copyFailed": "Kunde inte kopiera — försök igen",
     "done": "Klar",
+    "finish": "Avsluta",
     "askAssistant": "Fråga assistenten i stället för att skriva in det här",
     "recovery": {
       "dismissed": "Avbruten",
@@ -2210,7 +2285,10 @@
       "title": "Talmodellen laddas ner…",
       "percent": "Talmodellen laddas ner · {{percent}}%",
       "hint": "Dikteringen fungerar när den är klar"
-    }
+    },
+    "handsFreeHint": "Tryck {{key}} för handsfree",
+    "lockedKeys": "Spelar in handsfree. Tryck på {{keys}} för att avsluta",
+    "finishKeys": "Avsluta ({{keys}})"
   },
   "reminders": {
     "title": "Påminnelse",
@@ -2501,10 +2579,7 @@
       "dictation": "Diktering",
       "assistant": "Assistent",
       "cleanupOff": "Slå på AI-rensning för att få det här kortkommandot.",
-      "cleanupOnDictation": "Ditt dikteringskortkommando rensar varje diktering, så det här behövs inte.",
-      "openCleanup": "Öppna AI-rensning",
-      "assistantOff": "Assistenten är avstängd, så dess kortkommandon gör ingenting.",
-      "openAssistant": "Öppna Assistent"
+      "assistantOff": "Assistenten är avstängd, så dess kortkommandon gör ingenting."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2586,6 +2661,10 @@
         "whatHold": "Håll ned, prata, släpp. Dina ord skrivs där markören är.",
         "whatTap": "Tryck, prata, tryck igen. Dina ord skrivs där markören är."
       },
+      "handsFree": {
+        "what": "Håll {{keys}}, tryck på {{key}} och släpp: den fortsätter lyssna tills du trycker på {{keys}} igen.",
+        "linux": "För att diktera handsfree på Linux, stäng av ”Håll för att prata”. Då startar en tryckning och nästa stoppar."
+      },
       "cleanup": {
         "title": "Diktera och rensa",
         "description": "Samma som Diktera, men sedan rättar AI:n skiljetecken, utfyllnadsord och stil.",
@@ -2594,7 +2673,8 @@
       "ask": {
         "title": "Fråga assistenten",
         "description": "Ställ en fråga högt och få svaret i en flytande panel.",
-        "what": "Fråga högt. Svaret visas i en flytande panel."
+        "whatHold": "Håll ned, fråga, släpp. Svaret visas i en flytande panel.",
+        "whatTap": "Tryck, fråga, tryck igen. Svaret visas i en flytande panel."
       },
       "call": {
         "title": "Starta en konversation",
@@ -2603,10 +2683,6 @@
       },
       "info": "Tryck på dessa i valfri app. Klicka på tangenterna för att ändra dem.",
       "offHint": "Avstängt",
-      "mode": {
-        "hold": "Håll ned för att tala",
-        "tap": "Tryck för att växla"
-      },
       "cancel": {
         "title": "Avbryt",
         "what": "Stoppa en inspelning eller ett svar som läses upp."
@@ -2801,6 +2877,14 @@
       "info": "Ge rensningen ett eget kortkommando, eller låt dikteringskortkommandot rensa upp varje diktering så att du bara har en tangentkombination att komma ihåg.",
       "separate": "Eget kortkommando",
       "dictation": "Samma som diktering"
+    },
+    "skipShort": {
+      "title": "Hoppa över rensning för korta dikteringar",
+      "info": "Korta dikteringar, som en sökning eller ett snabbt svar, skrivs ut som du sa dem utan att vänta på modellen. Längre dikteringar rensas som vanligt.",
+      "limit": "Kortare än",
+      "limitInfo": "Räknas i ord. För språk som skrivs utan mellanslag, som kinesiska, japanska eller thailändska, uppskattas antalet ord utifrån antalet tecken.",
+      "words_one": "ord",
+      "words_other": "ord"
     },
     "shortcutRow": "Kortkommando"
   },
@@ -3184,7 +3268,19 @@
     "useDefault": "Använd standard",
     "turnOff": "Stäng av",
     "turnedOff": "Kortkommandot för {{name}} är avstängt",
-    "undo": "Ångra"
+    "undo": "Ångra",
+    "addAnother": "Lägg till fler",
+    "addAnotherHint": "Ge kortkommandot en andra uppsättning tangenter, till exempel en musknapp",
+    "remove": "Ta bort",
+    "or": "eller",
+    "changeOther": "Ändra de andra tangenterna för {{name}}",
+    "pressKeysOrButton": "Tryck på tangenter eller en musknapp…",
+    "mouseNeedsKeysEngine": "Musknappar kräver tangentbordsimplementeringen SpeakoFlow Keys (Inställningar → Avancerat → Experimentellt).",
+    "mouse": {
+      "middle": "Mittenknapp på musen",
+      "back": "Musknapp Bakåt",
+      "forward": "Musknapp Framåt"
+    }
   },
   "memoryManager": {
     "status": {

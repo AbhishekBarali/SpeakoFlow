@@ -639,12 +639,17 @@
           "assistant_call": {
             "name": "Bắt đầu trò chuyện",
             "description": "Trò chuyện rảnh tay với trợ lý và nghe câu trả lời. Nhấn lần nữa để kết thúc."
+          },
+          "hands_free": {
+            "name": "Rảnh tay",
+            "description": "Nhấn phím này khi đang giữ các phím đọc chính tả để tiếp tục ghi âm sau khi thả tay. Nhấn lại các phím đọc chính tả để kết thúc."
           }
         },
         "errors": {
           "restore": "Không thể khôi phục phím tắt ban đầu.",
           "set": "Không thể đặt phím tắt: {{error}}",
           "inUse": "“{{name}}” đã dùng {{keys}}. Hãy chọn phím khác, hoặc đổi phím tắt đó trước.",
+          "sameAsOther": "{{keys}} đã được đặt cho phím tắt này.",
           "reset": "Không thể đặt lại phím tắt."
         },
         "clickToChange": "Nhấp để thay đổi",
@@ -659,10 +664,24 @@
         "auto": "Tự động"
       },
       "pushToTalk": {
-        "label": "Cách ghi âm",
-        "description": "Giữ: ghi âm trong khi bạn giữ phím tắt ghi âm. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng. Áp dụng cho mọi phím tắt ghi âm.",
-        "hold": "Giữ",
-        "tap": "Nhấn"
+        "dictation": "Bật: ghi âm trong khi bạn giữ các phím. Tắt: nhấn một lần để bắt đầu, nhấn lần nữa để dừng, nên mọi lần đọc chính tả đều rảnh tay.",
+        "assistant": "Bật: lắng nghe trong khi bạn giữ các phím. Tắt: nhấn một lần để bắt đầu, nhấn lần nữa để gửi.",
+        "dictationLabel": "Giữ để nói",
+        "assistantLabel": "Giữ để hỏi"
+      },
+      "handsFree": {
+        "unavailableKeys": "Hoạt động khi phím đọc chính tả chỉ gồm phím bổ trợ, như Ctrl + Win. Với {{keys}}, hãy tắt “Giữ để nói”: mỗi lần đọc chính tả sẽ tiếp tục cho đến khi bạn nhấn lại các phím.",
+        "unavailableEngine": "Cần bộ xử lý bàn phím SpeakoFlow Keys ({{where}}). Hoặc tắt “Giữ để nói”: mỗi lần đọc chính tả sẽ tiếp tục cho đến khi bạn nhấn lại các phím.",
+        "taken": "{{name}} đã dùng {{keys}}, nên phím này không có tác dụng cho đến khi một trong hai thay đổi.",
+        "needsKey": "Hãy chọn một phím, như phím cách hoặc Enter. Một phím bổ trợ riêng lẻ không thể là phím rảnh tay.",
+        "pressKey": "Nhấn một phím…",
+        "descriptionOff": "Đang tắt. Nhấp vào rồi nhấn một phím, như phím cách, để bật lại.",
+        "linux": "Trên Linux, hãy tắt “Giữ để nói”: mỗi lần đọc chính tả sẽ tiếp tục cho đến khi bạn nhấn lại các phím.",
+        "whileDictating": "Khi đang đọc chính tả, nhấn"
+      },
+      "silenceStop": {
+        "label": "Dừng khi im lặng",
+        "description": "Khi đọc chính tả rảnh tay, nếu không nghe thấy tiếng nói trong khoảng thời gian này, ứng dụng sẽ tự dừng và dán văn bản như khi bạn nhấn lại phím tắt. Ngay trước khi dừng, một vạch trên viên nhỏ sẽ ngắn dần; nói tiếp thì vẫn tiếp tục ghi âm."
       }
     },
     "models": {
@@ -818,6 +837,13 @@
         "label": "Giữ micrô mở giữa các lần chép lời",
         "description": "Đọc chính tả liên tiếp nhanh hơn. Có thể ảnh hưởng đến chất lượng âm thanh Bluetooth."
       },
+      "mouseButtonShortcuts": {
+        "label": "Dùng nút chuột làm phím tắt",
+        "description": "Dùng nút giữa, nút Lùi hoặc nút Tiến của chuột làm phím tắt: bấm vào phím của một phím tắt rồi nhấn nút đó. Khi đã là phím tắt, nút đó không làm gì khác.",
+        "linux": "Trên Linux chỉ nút giữa hoạt động.",
+        "needsEngine": "Cần cơ chế bàn phím SpeakoFlow Keys.",
+        "reset": "Các phím tắt dùng nút chuột đã trở về phím mặc định."
+      },
       "liveTranscription": {
         "label": "Chuyển đổi trực tiếp",
         "description": "Chuyển giọng nói thành văn bản ngay khi bạn nói, thay vì chờ đến lúc bạn dừng. Thử nghiệm."
@@ -852,6 +878,10 @@
       "showTrayIcon": {
         "label": "Hiện biểu tượng khay",
         "description": "Giữ SpeakoFlow trong khay hệ thống."
+      },
+      "trayIconColor": {
+        "label": "Biểu tượng khay có màu",
+        "description": "Hiện logo có màu thay cho biểu tượng trắng. Bật nếu thanh tác vụ của bạn sáng màu và khó thấy biểu tượng trắng."
       },
       "closeBehavior": {
         "label": "Thoát khi tôi đóng cửa sổ",
@@ -1180,6 +1210,24 @@
           "azureDescription": "Endpoint của tài nguyên Azure của bạn, lấy trong mục Keys and Endpoint trên cổng Azure. MAI-Transcribe cần một tài nguyên ở Central India, Southeast Asia, East US, West US, West US 2 hoặc North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Khóa truy cập AWS",
+            "missing": "Chưa lưu khóa nào. Hãy dùng khóa truy cập của một người dùng hoặc vai trò IAM được phép gọi transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID khóa truy cập",
+            "secret": "Khóa truy cập bí mật",
+            "sessionToken": "Mã thông báo phiên (chỉ cho thông tin xác thực tạm thời)",
+            "invalid": "Đây có vẻ không phải khóa AWS. ID khóa truy cập chỉ gồm chữ và số, và không ô nào được chứa dấu cách hoặc dấu hai chấm.",
+            "permission": "Quyền cần có"
+          },
+          "region": {
+            "title": "Khu vực",
+            "description": "Nơi Amazon Transcribe chạy. Khu vực gần bạn nhất phản hồi nhanh nhất."
+          },
+          "streaming": "Luôn bật: Amazon Transcribe chỉ chuyển đổi trực tiếp. Nếu kết nối bị ngắt giữa lúc ghi âm, bản ghi sẽ được gửi lại theo tốc độ nói, nên việc hoàn tất mất bằng thời gian ghi âm.",
+          "language": "Amazon Transcribe cần được cho biết ngôn ngữ. Chế độ Tự động chọn giữa tiếng Anh, ngôn ngữ của ứng dụng và một vài ngôn ngữ phổ biến khác, vì vậy hãy chọn ngôn ngữ của bạn nếu bạn nói thứ tiếng khác.",
+          "unsupportedLanguage": "Amazon Transcribe không thể chuyển đổi trực tiếp ngôn ngữ này ở {{region}}. Hãy chọn ngôn ngữ hoặc khu vực khác. Cho đến lúc đó, tính năng đọc chính tả sẽ không dùng Amazon Transcribe."
+        },
         "model": {
           "title": "Mô hình",
           "info": "Nhập bất kỳ mô hình nào nhà cung cấp hỗ trợ, hoặc tải danh sách. Với ElevenLabs, chọn scribe_v2_realtime để chuyển đổi ngay khi bạn nói và scribe_v2 để chuyển đổi sau khi bạn dừng.",
@@ -1192,7 +1240,8 @@
         },
         "keyterms": {
           "label": "Gửi từ tùy chỉnh của tôi",
-          "description": "Gửi từ vựng tùy chỉnh của bạn cho nhà cung cấp để họ ưu tiên đúng cách viết đó."
+          "description": "Gửi từ vựng tùy chỉnh của bạn cho nhà cung cấp để họ ưu tiên đúng cách viết đó.",
+          "unsupported": "{{provider}} không nhận danh sách từ, nên các từ tùy chỉnh của bạn được sửa ngay trên máy tính này."
         },
         "noVerbatim": {
           "label": "Bỏ từ đệm",
@@ -1387,7 +1436,20 @@
       },
       "appendTrailingSpace": {
         "label": "Thêm dấu cách ở cuối",
-        "description": ""
+        "description": "Thêm dấu cách sau mỗi lần đọc chính tả. Khi bật khoảng cách thông minh, tùy chọn này chỉ áp dụng ở những ô không đọc được."
+      },
+      "smartSpacing": {
+        "label": "Khoảng cách thông minh",
+        "description": "Khớp mỗi lần đọc chính tả với văn bản đã có trong ô, để bạn có thể dừng rồi nói tiếp mà các từ không bị dính vào nhau.",
+        "info": "Trước khi dán, SpeakoFlow xem vài ký tự quanh con trỏ và chỉ thêm dấu cách ở chỗ cần. Khi ứng dụng ẩn văn bản của mình, nó dùng lần đọc chính tả gần nhất của chính nó. Không có gì được lưu hay gửi đi đâu. Trên macOS, tính năng này dùng quyền Trợ năng mà SpeakoFlow đã có. Trên Linux, ứng dụng Chrome, Electron và Qt chỉ chia sẻ văn bản khi cài đặt trợ năng của màn hình nền được bật."
+      },
+      "smartSpacingFixCase": {
+        "label": "Sửa chữ hoa",
+        "description": "Bắt đầu bằng chữ thường khi lần đọc nối tiếp một câu. Tên riêng, từ viết tắt và \"I\" vẫn giữ chữ hoa."
+      },
+      "smartSpacingJoin": {
+        "label": "Nối câu bị ngắt giữa chừng",
+        "description": "Xóa dấu chấm mà SpeakoFlow đã thêm khi bạn dừng giữa câu, như trong \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Cơ chế bàn phím",
@@ -1945,9 +2007,19 @@
       "hide": "Ẩn chỉ báo nổi",
       "show": "Hiện chỉ báo nổi"
     },
+    "notesPrefs": {
+      "autoTitle": "Viết ghi chú khi cuộc gọi kết thúc",
+      "autoDescription": "Tắt nếu bạn chỉ cần bản ghi lời. Bạn vẫn có thể viết ghi chú cho từng cuộc họp từ bản ghi lời của nó.",
+      "languageTitle": "Ngôn ngữ ghi chú",
+      "languageDescription": "Mặc định, ghi chú được viết bằng ngôn ngữ của cuộc họp. Chọn một ngôn ngữ để luôn nhận ghi chú bằng ngôn ngữ đó.",
+      "auto": "Giống cuộc họp",
+      "autoHint": "Ngôn ngữ được dùng trong phần lớn cuộc họp"
+    },
     "pill": {
       "expand": "Mở bản chép lời trực tiếp",
       "collapse": "Trở về viên nhỏ",
+      "copy": "Sao chép bản ghi lời",
+      "copied": "Đã sao chép bản ghi lời",
       "stop": "Dừng ghi âm",
       "listening": "Đang nghe. Lời mọi người nói sẽ hiện ở đây.",
       "micOnly": "Chỉ micrô của bạn đang được ghi — lời của những người tham gia khác sẽ không có trong bản chép lời này."
@@ -2023,6 +2095,7 @@
       "empty": "Cuộc họp này không có bản chép lời.",
       "loadingMore": "Đang tải thêm bản chép lời…",
       "renameSpeaker": "Đổi tên người nói này",
+      "copyTitle": "Sao chép toàn bộ bản ghi lời kèm tên người nói",
       "lowConfidence": "Chưa chắc chắn",
       "lowConfidenceHelp": "Nhãn người nói này chỉ là phỏng đoán. Lời nói được chép đúng như đã nói; chỉ có người nói là chưa chắc chắn."
     },
@@ -2047,6 +2120,7 @@
     },
     "summary": {
       "template": "Mẫu",
+      "languageAuto": "Ngôn ngữ cuộc họp",
       "templates": {
         "general": "Chung",
         "standup": "Họp đứng",
@@ -2187,6 +2261,7 @@
     "copied": "Đã sao chép",
     "copyFailed": "Không thể sao chép — hãy thử lại",
     "done": "Xong",
+    "finish": "Hoàn tất",
     "askAssistant": "Hỏi trợ lý thay vì gõ nội dung này",
     "recovery": {
       "dismissed": "Đã hủy",
@@ -2198,7 +2273,10 @@
       "title": "Đang tải mô hình giọng nói…",
       "percent": "Đang tải mô hình giọng nói · {{percent}}%",
       "hint": "Đọc chính tả sẽ hoạt động khi tải xong"
-    }
+    },
+    "handsFreeHint": "Nhấn {{key}} để rảnh tay",
+    "lockedKeys": "Đang ghi âm rảnh tay. Nhấn {{keys}} để kết thúc",
+    "finishKeys": "Hoàn tất ({{keys}})"
   },
   "reminders": {
     "title": "Lời nhắc",
@@ -2483,10 +2561,7 @@
       "dictation": "Đọc chính tả",
       "assistant": "Trợ lý",
       "cleanupOff": "Bật Dọn dẹp bằng AI để dùng phím tắt này.",
-      "cleanupOnDictation": "Phím tắt đọc chính tả của bạn đã dọn dẹp mọi lần đọc chính tả, nên không cần phím tắt này.",
-      "openCleanup": "Mở Dọn dẹp bằng AI",
-      "assistantOff": "Trợ lý đang tắt, nên các phím tắt của nó không có tác dụng.",
-      "openAssistant": "Mở Trợ lý"
+      "assistantOff": "Trợ lý đang tắt, nên các phím tắt của nó không có tác dụng."
     },
     "audio": {
       "microphone": "Micrô",
@@ -2565,6 +2640,10 @@
         "whatHold": "Giữ, nói, thả ra. Lời bạn nói được gõ tại vị trí con trỏ.",
         "whatTap": "Nhấn, nói, nhấn lại. Lời bạn nói được gõ tại vị trí con trỏ."
       },
+      "handsFree": {
+        "what": "Giữ {{keys}}, nhấn {{key}} rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}.",
+        "linux": "Để đọc chính tả rảnh tay trên Linux, hãy tắt “Giữ để nói”. Khi đó nhấn một lần để bắt đầu, nhấn lần nữa để dừng."
+      },
       "cleanup": {
         "title": "Đọc chính tả và dọn dẹp",
         "description": "Giống Đọc chính tả, sau đó AI sửa dấu câu, từ đệm và văn phong.",
@@ -2573,7 +2652,8 @@
       "ask": {
         "title": "Hỏi trợ lý",
         "description": "Hỏi thành tiếng và nhận câu trả lời trong một bảng nổi.",
-        "what": "Hỏi thành tiếng. Câu trả lời hiện trong một bảng nổi."
+        "whatHold": "Giữ, hỏi, thả ra. Câu trả lời hiện trong một bảng nổi.",
+        "whatTap": "Nhấn, hỏi, nhấn lại. Câu trả lời hiện trong một bảng nổi."
       },
       "call": {
         "title": "Bắt đầu trò chuyện",
@@ -2582,10 +2662,6 @@
       },
       "info": "Nhấn các phím này trong bất kỳ ứng dụng nào. Nhấp vào phím để thay đổi.",
       "offHint": "Đã tắt",
-      "mode": {
-        "hold": "Giữ để nói",
-        "tap": "Nhấn để bật/tắt"
-      },
       "cancel": {
         "title": "Hủy",
         "what": "Dừng ghi âm, hoặc dừng câu trả lời đang được đọc to."
@@ -2778,6 +2854,13 @@
       "info": "Cho việc dọn dẹp một phím tắt riêng, hoặc để phím tắt đọc chính tả dọn dẹp mọi lần đọc, như vậy bạn chỉ cần nhớ một bộ phím.",
       "separate": "Phím tắt riêng",
       "dictation": "Giống đọc chính tả"
+    },
+    "skipShort": {
+      "title": "Bỏ qua dọn dẹp với lần đọc ngắn",
+      "info": "Những lần đọc ngắn, như một truy vấn tìm kiếm hay một câu trả lời nhanh, được gõ đúng như bạn nói mà không phải chờ mô hình. Những lần đọc dài hơn vẫn được dọn dẹp.",
+      "limit": "Ngắn hơn",
+      "limitInfo": "Tính theo số từ. Với các ngôn ngữ viết không có dấu cách như tiếng Trung, tiếng Nhật hay tiếng Thái, số từ được ước tính từ số ký tự.",
+      "words_other": "từ"
     },
     "shortcutRow": "Phím tắt"
   },
@@ -3156,7 +3239,19 @@
     "useDefault": "Dùng mặc định",
     "turnOff": "Tắt",
     "turnedOff": "Đã tắt phím tắt {{name}}",
-    "undo": "Hoàn tác"
+    "undo": "Hoàn tác",
+    "addAnother": "Thêm phím khác",
+    "addAnotherHint": "Gán cho phím tắt này bộ phím thứ hai, ví dụ một nút chuột",
+    "remove": "Xóa",
+    "or": "hoặc",
+    "changeOther": "Đổi phím khác của phím tắt {{name}}",
+    "pressKeysOrButton": "Nhấn phím hoặc một nút chuột…",
+    "mouseNeedsKeysEngine": "Nút chuột cần cơ chế bàn phím SpeakoFlow Keys (Cài đặt → Nâng cao → Thử nghiệm).",
+    "mouse": {
+      "middle": "Nút giữa chuột",
+      "back": "Nút Lùi của chuột",
+      "forward": "Nút Tiến của chuột"
+    }
   },
   "memoryManager": {
     "status": {

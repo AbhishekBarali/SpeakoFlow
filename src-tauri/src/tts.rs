@@ -3254,6 +3254,81 @@ mod tests {
         assert_eq!(elevenlabs_voice_settings(&settings), None);
     }
 
+    /// Live check against ElevenLabs with the key the app already has in the
+    /// keychain (or `ELEVENLABS_API_KEY`). Prints the voice's stored stability
+    /// and writes one clip per setting to the temp folder so they can be
+    /// compared by ear; the test itself proves ElevenLabs accepts each body.
+    ///
+    /// `cargo test --lib elevenlabs_stability_live -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn elevenlabs_stability_live() {
+        let key = std::env::var("ELEVENLABS_API_KEY")
+            .ok()
+            .filter(|k| !k.trim().is_empty())
+            .or_else(|| {
+                crate::secret_store::get(&crate::secret_store::account_assistant_tts("elevenlabs"))
+            })
+            .expect("no ElevenLabs key in ELEVENLABS_API_KEY or the keychain");
+        let voice = std::env::var("ELEVENLABS_VOICE_ID")
+            .unwrap_or_else(|_| "r1KmysJdVYZjJCm4mL3b".to_string());
+        let model = std::env::var("ELEVENLABS_MODEL").unwrap_or_else(|_| "eleven_v4".to_string());
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let stored = reqwest::Client::new()
+                .get(format!(
+                    "https://api.elevenlabs.io/v1/voices/{voice}/settings"
+                ))
+                .header("xi-api-key", key.trim())
+                .send()
+                .await
+                .expect("voice settings request");
+            println!(
+                "stored voice settings ({}): {}",
+                stored.status(),
+                stored.text().await.unwrap_or_default()
+            );
+
+            let text = "Oh wow, I honestly did not expect that! That is fantastic news. \
+                        Tell me everything, how did it happen?";
+            let repeats: usize = std::env::var("ELEVENLABS_REPEATS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1);
+            let cases = [
+                ("default", None),
+                ("expressive", Some(0.0)),
+                ("steady", Some(1.0)),
+            ];
+            for take in 1..=repeats {
+                for (name, stability) in cases {
+                    let mut settings = get_default_settings();
+                    settings.assistant_tts_engine = "elevenlabs".to_string();
+                    settings.assistant_tts_api_key = crate::settings::SecretString(key.clone());
+                    settings.assistant_tts_remote_voice = voice.clone();
+                    settings.assistant_tts_model = model.clone();
+                    settings.assistant_tts_elevenlabs_stability = stability;
+                    let speech = super::fetch_elevenlabs_speech(
+                        &settings,
+                        &super::SpeechRequest {
+                            text,
+                            previous_request_ids: &[],
+                        },
+                    )
+                    .await
+                    .unwrap_or_else(|e| panic!("{name}: ElevenLabs refused the request: {e}"));
+                    let path = std::env::temp_dir().join(format!("elevenlabs-{name}-{take}.mp3"));
+                    std::fs::write(&path, &speech.bytes).unwrap();
+                    println!("{name}: {} bytes -> {}", speech.bytes.len(), path.display());
+                }
+            }
+        });
+    }
+
     #[test]
     fn server_voice_listings_in_every_known_shape_parse() {
         use super::parse_voice_listing;
