@@ -470,6 +470,14 @@ async fn fetch_asset_parallel_with(
     let Ok(size) = usize::try_from(total) else {
         return None;
     };
+    // Retries go through the published URL rather than the one it redirected
+    // to. GitHub's signed asset URL carries a token that expires 30 minutes
+    // after it is issued, so on a slow enough link every chunk after that
+    // would be refused, and the whole download would start over on one
+    // connection. Going through the redirect again hands out a fresh token.
+    let Ok(origin_url) = reqwest::Url::parse(url) else {
+        return None;
+    };
 
     let started = std::time::Instant::now();
     let ranges = chunk_ranges(total, chunk_bytes);
@@ -490,8 +498,15 @@ async fn fetch_asset_parallel_with(
 
     // References, so each worker's `async move` copies them instead of
     // moving the values out of the shared closure.
-    let (ranges, shared, next, downloaded, failed, final_url) =
-        (&ranges, &buffer, &next, &downloaded, &failed, &final_url);
+    let (ranges, shared, next, downloaded, failed, final_url, origin_url) = (
+        &ranges,
+        &buffer,
+        &next,
+        &downloaded,
+        &failed,
+        &final_url,
+        &origin_url,
+    );
     let report: &(dyn Fn(u64) + Sync) = &report;
 
     let worker = move || async move {
@@ -505,7 +520,8 @@ async fn fetch_asset_parallel_with(
             let mut last_error = String::new();
             let mut bytes = None;
             for attempt in 1..=ASSET_CHUNK_ATTEMPTS {
-                match fetch_chunk(client, final_url, range, downloaded, report).await {
+                let from = if attempt == 1 { final_url } else { origin_url };
+                match fetch_chunk(client, from, range, downloaded, report).await {
                     Ok(chunk) => {
                         bytes = Some(chunk);
                         break;
@@ -578,6 +594,25 @@ fn verify_update_signature(
     })
 }
 
+/// The parallel download, if it passes the signature check the plugin
+/// makes; `None` sends the caller to the plugin's own single-stream download,
+/// which checks the signature itself. So a range a proxy mangled, or bytes
+/// that went wrong in any other way, cost a second download rather than the
+/// update.
+fn keep_if_verified(bytes: Vec<u8>, signature: &str, pubkey: Option<&str>) -> Option<Vec<u8>> {
+    let checked = match pubkey {
+        Some(key) => verify_update_signature(&bytes, signature, key),
+        None => Err("this build has no update key".to_string()),
+    };
+    match checked {
+        Ok(()) => Some(bytes),
+        Err(error) => {
+            warn!("The parallel download didn't verify ({error}); downloading on one connection");
+            None
+        }
+    }
+}
+
 /// The key `tauri.conf.json` gives the updater plugin.
 fn updater_pubkey(app: &AppHandle) -> Option<String> {
     app.config()
@@ -613,6 +648,11 @@ pub async fn download_update(app: AppHandle) -> Result<String, String> {
     let update = app
         .updater_builder()
         .timeout(Duration::from_secs(30))
+        // The plugin builds its single-stream download client from this, and
+        // the update it returns carries no overall timeout, so without a stall
+        // limit a dead connection would leave the progress bar where it was
+        // for ever. A slow link that is still moving is never cut off.
+        .configure_client(|client| client.read_timeout(ASSET_STALL_TIMEOUT))
         .build()
         .map_err(|e| e.to_string())?
         .check()
@@ -632,13 +672,14 @@ pub async fn download_update(app: AppHandle) -> Result<String, String> {
 
     let client = crate::managers::model::download_client().map_err(|e| e.to_string())?;
     let url = update.download_url.to_string();
-    let bytes = match fetch_asset_parallel(&client, &url, &emit).await {
-        Some(bytes) => {
-            let pubkey = updater_pubkey(&app).ok_or("This build has no update key.")?;
-            verify_update_signature(&bytes, &update.signature, &pubkey)?;
-            bytes
-        }
+    let pubkey = updater_pubkey(&app);
+    let parallel = fetch_asset_parallel(&client, &url, &emit)
+        .await
+        .and_then(|bytes| keep_if_verified(bytes, &update.signature, pubkey.as_deref()));
+    let bytes = match parallel {
+        Some(bytes) => bytes,
         None => {
+            info!("Downloading the update on one connection");
             // The plugin's own download, which verifies the signature itself.
             let downloaded = AtomicU64::new(0);
             update
@@ -1116,6 +1157,216 @@ mod tests {
             verify_update_signature(SIGNED_PAYLOAD, "not a signature", &configured_pubkey())
                 .is_err()
         );
+    }
+
+    #[test]
+    fn a_parallel_download_is_kept_only_if_it_verifies() {
+        let key = configured_pubkey();
+        assert_eq!(
+            keep_if_verified(SIGNED_PAYLOAD.to_vec(), SIGNATURE, Some(&key)),
+            Some(SIGNED_PAYLOAD.to_vec())
+        );
+        // Bytes that went wrong on the way send the caller to one stream
+        // instead of failing the update.
+        assert_eq!(
+            keep_if_verified(b"hello speakoflox".to_vec(), SIGNATURE, Some(&key)),
+            None
+        );
+        assert_eq!(
+            keep_if_verified(SIGNED_PAYLOAD.to_vec(), SIGNATURE, None),
+            None
+        );
+    }
+
+    /* ── The parallel downloader against a local server ──────────────────
+     *
+     * These run the real `fetch_asset_parallel_with` over real sockets, so
+     * what they prove is what an update download does: the bytes come back
+     * whole and in order, and every way a host can misbehave ends in `None`,
+     * which is the caller's cue to use one connection. */
+
+    #[derive(Clone, Copy, PartialEq)]
+    enum Host {
+        /// Answers ranges correctly, like GitHub.
+        Ranges,
+        /// Ignores `Range` and sends the whole file with 200.
+        IgnoresRange,
+        /// Answers the probe, then sends other bytes than were asked for.
+        WrongRange,
+        /// Ranges, but every chunk fails with 503.
+        Fails,
+        /// `/asset` redirects to a signed URL, like GitHub. The first token
+        /// handed out only answers the probe, as an expired token would.
+        ExpiringToken,
+    }
+
+    fn test_asset(len: usize) -> Vec<u8> {
+        (0..len).map(|i| (i * 31 + i / 4099) as u8).collect()
+    }
+
+    fn http_response(status: &str, headers: &[String], body: &[u8]) -> Vec<u8> {
+        let mut out = format!("HTTP/1.1 {status}\r\nConnection: close\r\n");
+        for header in headers {
+            out.push_str(header);
+            out.push_str("\r\n");
+        }
+        out.push_str(&format!("Content-Length: {}\r\n\r\n", body.len()));
+        let mut out = out.into_bytes();
+        out.extend_from_slice(body);
+        out
+    }
+
+    fn answer(
+        host: Host,
+        base: &str,
+        path: &str,
+        range: Option<&str>,
+        data: &[u8],
+        tokens: &AtomicU64,
+    ) -> Vec<u8> {
+        if host == Host::ExpiringToken && path == "/asset" {
+            let token = tokens.fetch_add(1, Ordering::SeqCst) + 1;
+            return http_response(
+                "302 Found",
+                &[format!("Location: {base}/signed?t={token}")],
+                b"",
+            );
+        }
+        let probe = range == Some("bytes=0-0");
+        if let Some(token) = path.strip_prefix("/signed?t=") {
+            if token == "1" && !probe {
+                return http_response("403 Forbidden", &[], b"expired");
+            }
+        }
+        let Some((start, end)) = range
+            .and_then(|r| r.strip_prefix("bytes="))
+            .and_then(|r| r.split_once('-'))
+            .and_then(|(a, b)| Some((a.parse::<usize>().ok()?, b.parse::<usize>().ok()?)))
+        else {
+            return http_response("200 OK", &[], data);
+        };
+        let total = data.len();
+        match host {
+            Host::IgnoresRange => http_response("200 OK", &[], data),
+            Host::Fails if !probe => http_response("503 Service Unavailable", &[], b""),
+            Host::WrongRange if !probe => http_response(
+                "206 Partial Content",
+                &[format!(
+                    "Content-Range: bytes {}-{}/{total}",
+                    start + 1,
+                    end + 1
+                )],
+                &data[start..=end],
+            ),
+            _ => http_response(
+                "206 Partial Content",
+                &[format!("Content-Range: bytes {start}-{end}/{total}")],
+                &data[start..=end],
+            ),
+        }
+    }
+
+    /// Serves `data` on a local port and returns the asset's URL.
+    async fn serve(host: Host, data: std::sync::Arc<Vec<u8>>) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let tokens = std::sync::Arc::new(AtomicU64::new(0));
+        let url = format!("{base}/asset");
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    return;
+                };
+                let (data, tokens, base) = (data.clone(), tokens.clone(), base.clone());
+                tokio::spawn(async move {
+                    let mut request = Vec::new();
+                    let mut buf = [0u8; 2048];
+                    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match socket.read(&mut buf).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => request.extend_from_slice(&buf[..n]),
+                        }
+                    }
+                    let text = String::from_utf8_lossy(&request).into_owned();
+                    let path = text.split_whitespace().nth(1).unwrap_or("/").to_string();
+                    let range = text.lines().find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("range")
+                            .then(|| value.trim().to_string())
+                    });
+                    let response = answer(host, &base, &path, range.as_deref(), &data, &tokens);
+                    let _ = socket.write_all(&response).await;
+                    let _ = socket.shutdown().await;
+                });
+            }
+        });
+        url
+    }
+
+    /// Downloads from a local `host` in small chunks, and reports what came
+    /// back and the last progress seen.
+    fn download_from(host: Host, len: usize) -> (Vec<u8>, Option<Vec<u8>>, (u64, u64)) {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let data = std::sync::Arc::new(test_asset(len));
+            let url = serve(host, data.clone()).await;
+            let client = crate::managers::model::download_client().unwrap();
+            let last = std::sync::Mutex::new((0u64, 0u64));
+            let got = fetch_asset_parallel_with(
+                &client,
+                &url,
+                &|done, total| *last.lock().unwrap() = (done, total),
+                4,
+                512 * 1024,
+            )
+            .await;
+            let last = *last.lock().unwrap();
+            ((*data).clone(), got, last)
+        })
+    }
+
+    #[test]
+    fn a_host_that_answers_ranges_gets_the_whole_file_back_in_order() {
+        // Not a multiple of the chunk size, so the last chunk is short.
+        let len = ASSET_PARALLEL_MIN_BYTES as usize + 777_777;
+        let (sent, got, last) = download_from(Host::Ranges, len);
+        assert!(got.as_deref() == Some(sent.as_slice()), "bytes differ");
+        assert_eq!(last, (len as u64, len as u64));
+    }
+
+    #[test]
+    fn a_host_that_ignores_ranges_falls_back_to_one_connection() {
+        let (_, got, _) = download_from(Host::IgnoresRange, ASSET_PARALLEL_MIN_BYTES as usize);
+        assert!(got.is_none());
+    }
+
+    #[test]
+    fn other_bytes_than_asked_for_fall_back_to_one_connection() {
+        let (_, got, _) = download_from(Host::WrongRange, ASSET_PARALLEL_MIN_BYTES as usize);
+        assert!(got.is_none());
+    }
+
+    #[test]
+    fn chunks_that_keep_failing_fall_back_to_one_connection() {
+        let (_, got, _) = download_from(Host::Fails, ASSET_PARALLEL_MIN_BYTES as usize);
+        assert!(got.is_none());
+    }
+
+    #[test]
+    fn a_small_file_uses_one_connection() {
+        let (_, got, _) = download_from(Host::Ranges, ASSET_PARALLEL_MIN_BYTES as usize - 1);
+        assert!(got.is_none());
+    }
+
+    #[test]
+    fn an_expired_signed_url_is_replaced_through_the_redirect() {
+        let len = ASSET_PARALLEL_MIN_BYTES as usize + 123_457;
+        let (sent, got, _) = download_from(Host::ExpiringToken, len);
+        assert!(got.as_deref() == Some(sent.as_slice()), "bytes differ");
     }
 
     /// Downloads the real Windows installer from the latest release through
