@@ -643,6 +643,10 @@
           "assistant_call": {
             "name": "Lancer une conversation",
             "description": "Parlez avec l'assistant sans les mains et écoutez ses réponses. Appuyez à nouveau pour terminer."
+          },
+          "hands_free": {
+            "name": "Mode mains libres",
+            "description": "Appuyez dessus en maintenant les touches de dictée pour continuer d'enregistrer après les avoir relâchées. Appuyez à nouveau sur les touches de dictée pour terminer."
           }
         },
         "errors": {
@@ -665,14 +669,22 @@
       },
       "pushToTalk": {
         "label": "Mode d'enregistrement",
-        "description": "Maintenir : l'enregistrement dure tant que vous maintenez un raccourci d'enregistrement. Appuyer : une pression lance l'enregistrement, la suivante l'arrête. S'applique à tous les raccourcis d'enregistrement.",
+        "dictation": "Maintenir : l'enregistrement dure tant que vous maintenez les touches de dictée. Appuyer : une pression lance, la suivante arrête.",
+        "assistant": "Maintenir : écoute tant que vous maintenez les touches de question. Appuyer : une pression lance, la suivante envoie.",
         "hold": "Maintenir",
         "tap": "Appuyer"
       },
+      "handsFree": {
+        "description": "En maintenant {{keys}}, appuyez sur cette touche puis relâchez : la dictée continue d'écouter jusqu'à ce que vous appuyiez à nouveau sur {{keys}}.",
+        "unavailableKeys": "Nécessite un raccourci de dictée composé uniquement de touches de modification. Avec {{keys}}, utilisez plutôt « Appuyer pour activer ».",
+        "unavailableEngine": "Nécessite le moteur clavier SpeakoFlow Keys, dans {{where}}.",
+        "taken": "{{name}} utilise déjà {{keys}} : cette touche ne fait rien tant que l'un des deux n'a pas changé.",
+        "needsKey": "Choisissez une seule touche, comme Espace ou Entrée. Une touche de modification seule ne peut pas être la touche mains libres.",
+        "pressKey": "Appuyez sur une touche…"
+      },
       "silenceStop": {
         "label": "Arrêter après un silence",
-        "description": "En mode « Appuyer », une dictée qui n'entend aucune parole pendant cette durée s'arrête et se colle d'elle-même, comme si vous appuyiez de nouveau sur le raccourci. Juste avant, une ligne s'épuise sur la pastille ; reprendre la parole poursuit l'enregistrement.",
-        "tapOnly": "Fonctionne avec « Appuyer ». Avec « Maintenir », relâcher la touche arrête déjà la dictée."
+        "description": "Une dictée mains libres qui n'entend aucune parole pendant cette durée s'arrête et se colle d'elle-même, comme si vous appuyiez de nouveau sur le raccourci. Juste avant, une ligne s'épuise sur la pastille ; reprendre la parole poursuit l'enregistrement."
       }
     },
     "models": {
@@ -2237,12 +2249,14 @@
     },
     "listening": "À l'écoute…",
     "locked": "Enregistrement mains libres — appuyez à nouveau sur le raccourci pour arrêter",
+    "handsFree": "Mains libres",
     "cancel": "Annuler",
     "copy": "Copier la transcription",
     "transcript": "Transcription",
     "copied": "Copié",
     "copyFailed": "Copie impossible — réessayez",
     "done": "Terminé",
+    "finish": "Terminer",
     "askAssistant": "Demander à l'assistant au lieu de taper ce texte",
     "recovery": {
       "dismissed": "Annulé",
@@ -2639,6 +2653,9 @@
         "whatHold": "Maintenez, parlez, relâchez. Vos mots s'écrivent là où est votre curseur.",
         "whatTap": "Appuyez, parlez, appuyez à nouveau. Vos mots s'écrivent là où est votre curseur."
       },
+      "handsFree": {
+        "what": "Maintenez {{keys}}, appuyez sur {{key}} puis relâchez : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur {{keys}}."
+      },
       "cleanup": {
         "title": "Dicter et nettoyer",
         "description": "Comme Dicter, puis l'IA corrige la ponctuation, les mots de remplissage et le style.",
@@ -2647,7 +2664,8 @@
       "ask": {
         "title": "Demander à l'assistant",
         "description": "Posez une question à voix haute et obtenez la réponse dans un panneau flottant.",
-        "what": "Demandez à voix haute. La réponse s'affiche dans un panneau flottant."
+        "whatHold": "Maintenez, demandez, relâchez. La réponse s'affiche dans un panneau flottant.",
+        "whatTap": "Appuyez, demandez, appuyez à nouveau. La réponse s'affiche dans un panneau flottant."
       },
       "call": {
         "title": "Lancer une conversation",
@@ -2656,10 +2674,6 @@
       },
       "info": "Utilisez-les dans n'importe quelle application. Cliquez sur les touches pour les modifier.",
       "offHint": "Désactivé",
-      "mode": {
-        "hold": "Maintenir pour parler",
-        "tap": "Appuyer pour activer"
-      },
       "cancel": {
         "title": "Annuler",
         "what": "Arrête un enregistrement ou une réponse en cours de lecture."

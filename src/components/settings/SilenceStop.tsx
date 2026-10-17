@@ -29,17 +29,17 @@ const secondsLabel = (seconds: number, locale: string) => {
 };
 
 /**
- * Ends a tap-started dictation once it has heard no speech for a while, as if
- * its shortcut had been pressed again. A held recording already ends when the
- * key is let go, so with Hold the dial is disabled and says why, rather than
- * being a setting that does nothing.
+ * Ends a hands-free dictation once it has heard no speech for a while, as if
+ * its shortcut had been pressed again. With Tap to toggle that is every
+ * dictation; with Hold, one turned hands-free with the hands-free key, so the
+ * dial applies in both. A dictation still held ends when the key is let go,
+ * and is never stopped under the user's finger.
  */
 export const SilenceStop: React.FC<SilenceStopProps> = React.memo(
   ({ descriptionMode = "tooltip", grouped = false }) => {
     const { t, i18n } = useTranslation();
     const { getSetting, updateSetting, isUpdating } = useSettings();
 
-    const holdToTalk = getSetting("push_to_talk") ?? true;
     const current = getSetting("dictation_silence_stop_secs") ?? 0;
     // A value from outside the list (the settings file edited by hand) still
     // shows as itself instead of an empty dropdown.
@@ -55,23 +55,18 @@ export const SilenceStop: React.FC<SilenceStopProps> = React.memo(
     return (
       <SettingContainer
         title={t("settings.general.silenceStop.label")}
-        description={
-          holdToTalk
-            ? t("settings.general.silenceStop.tapOnly")
-            : t("settings.general.silenceStop.description")
-        }
-        // A disabled control needs its reason in sight, not behind the (i).
-        descriptionMode={holdToTalk ? "caption" : descriptionMode}
+        description={t("settings.general.silenceStop.description")}
+        descriptionMode={descriptionMode}
         grouped={grouped}
       >
         <Dropdown
           size="sm"
           options={options}
-          selectedValue={holdToTalk ? "0" : String(current)}
+          selectedValue={String(current)}
           onSelect={(value) =>
             void updateSetting("dictation_silence_stop_secs", Number(value))
           }
-          disabled={holdToTalk || isUpdating("dictation_silence_stop_secs")}
+          disabled={isUpdating("dictation_silence_stop_secs")}
         />
       </SettingContainer>
     );

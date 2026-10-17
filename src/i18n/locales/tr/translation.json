@@ -641,6 +641,10 @@
           "assistant_call": {
             "name": "Sohbet başlat",
             "description": "Asistanla elleriniz serbest konuşun ve yanıtlarını dinleyin. Bitirmek için yine basın."
+          },
+          "hands_free": {
+            "name": "Eller serbest modu",
+            "description": "Dikte tuşlarını basılı tutarken basın; tuşları bıraktıktan sonra da kayıt devam eder. Bitirmek için dikte tuşlarına yeniden basın."
           }
         },
         "errors": {
@@ -663,14 +667,22 @@
       },
       "pushToTalk": {
         "label": "Kayıt davranışı",
-        "description": "Basılı tut: bir kayıt kısayolunu basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki basış durdurur. Tüm kayıt kısayollarına uygulanır.",
+        "dictation": "Basılı tut: dikte tuşlarını basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki durdurur.",
+        "assistant": "Basılı tut: soru tuşlarını basılı tuttuğunuz sürece dinler. Dokun: bir basış başlatır, sonraki gönderir.",
         "hold": "Basılı tut",
         "tap": "Dokun"
       },
+      "handsFree": {
+        "description": "{{keys}} basılıyken bu tuşa basıp bırakın: {{keys}} tuşlarına yeniden basana kadar dikte dinlemeye devam eder.",
+        "unavailableKeys": "Yalnızca değiştirici tuşlardan oluşan bir dikte kısayolu gerekir. {{keys}} ile bunun yerine “Açıp kapatmak için dokun” seçeneğini kullanın.",
+        "unavailableEngine": "SpeakoFlow Keys klavye motoru gerekir ({{where}}).",
+        "taken": "{{name}} zaten {{keys}} kullanıyor; biri değişene kadar bu tuş bir şey yapmaz.",
+        "needsKey": "Boşluk ya da Enter gibi tek bir tuş seçin. Tek başına bir değiştirici tuş eller serbest tuşu olamaz.",
+        "pressKey": "Bir tuşa basın…"
+      },
       "silenceStop": {
         "label": "Sessizlikte durdur",
-        "description": "Dokun modunda, bu süre boyunca konuşma duyulmayan bir dikte kendiliğinden durur ve kısayola yeniden basmışsınız gibi yapıştırılır. Durmadan hemen önce kapsüldeki çizgi kısalır; yeniden konuşursanız kayıt devam eder.",
-        "tapOnly": "Dokun modunda çalışır. Basılı tut modunda tuşu bırakmak dikteyi zaten durdurur."
+        "description": "Bu süre boyunca konuşma duyulmayan eller serbest bir dikte kendiliğinden durur ve kısayola yeniden basmışsınız gibi yapıştırılır. Durmadan hemen önce kapsüldeki çizgi kısalır; yeniden konuşursanız kayıt devam eder."
       }
     },
     "models": {
@@ -2225,12 +2237,14 @@
     },
     "listening": "Dinleniyor…",
     "locked": "Eller serbest kaydediliyor — durdurmak için kısayola tekrar basın",
+    "handsFree": "Eller serbest",
     "cancel": "İptal",
     "copy": "Transkripti kopyala",
     "transcript": "Transkript",
     "copied": "Kopyalandı",
     "copyFailed": "Kopyalanamadı — tekrar deneyin",
     "done": "Bitti",
+    "finish": "Bitir",
     "askAssistant": "Bunu yazmak yerine asistana sor",
     "recovery": {
       "dismissed": "İptal edildi",
@@ -2618,6 +2632,9 @@
         "whatHold": "Basılı tutun, konuşun, bırakın. Sözleriniz imlecin olduğu yere yazılır.",
         "whatTap": "Dokunun, konuşun, yeniden dokunun. Sözleriniz imlecin olduğu yere yazılır."
       },
+      "handsFree": {
+        "what": "{{keys}} tuşlarını basılı tutun, {{key}} tuşuna basın ve bırakın: {{keys}} tuşlarına yeniden basana kadar dinlemeye devam eder."
+      },
       "cleanup": {
         "title": "Dikte et ve temizle",
         "description": "Dikte et ile aynı; ardından yapay zekâ noktalamayı, dolgu sözcüklerini ve üslubu düzeltir.",
@@ -2626,7 +2643,8 @@
       "ask": {
         "title": "Asistana sor",
         "description": "Sesli bir soru sorun ve yanıtı yüzen bir panelde alın.",
-        "what": "Sesli sorun. Yanıt yüzen bir panelde görünür."
+        "whatHold": "Basılı tutun, sorun, bırakın. Yanıt yüzen bir panelde görünür.",
+        "whatTap": "Dokunun, sorun, yeniden dokunun. Yanıt yüzen bir panelde görünür."
       },
       "call": {
         "title": "Sohbet başlat",
@@ -2635,10 +2653,6 @@
       },
       "info": "Bunlara herhangi bir uygulamada basın. Değiştirmek için tuşlara tıklayın.",
       "offHint": "Kapalı",
-      "mode": {
-        "hold": "Konuşmak için basılı tut",
-        "tap": "Açıp kapatmak için dokun"
-      },
       "cancel": {
         "title": "İptal",
         "what": "Bir kaydı ya da sesli okunan bir yanıtı durdurun."

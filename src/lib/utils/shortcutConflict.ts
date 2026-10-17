@@ -64,6 +64,10 @@ export const canonicalShortcut = (binding: string): string =>
     .sort()
     .join("+");
 
+/** The hands-free key is one key that only ever goes on top of the dictation
+ *  keys (`src/lib/handsFree.ts`), so Space there is no shortcut on Space. */
+const ADD_ON_KEYS = new Set(["hands_free"]);
+
 /**
  * Every set of keys a shortcut answers to: its own and, when it has them, its
  * other keys. A shortcut that is turned off (no keys of its own) answers to
@@ -82,7 +86,8 @@ export const shortcutCombos = (binding: StoredShortcut): string[] => {
  *
  * Another shortcut holds keys through its own keys and its other keys alike.
  * `exceptId` itself is the answer when its other set already is `keys`: a
- * shortcut's two sets of keys must differ, or the second does nothing.
+ * shortcut's two sets of keys must differ, or the second does nothing. The
+ * hands-free key counts on neither side.
  */
 export const shortcutUsingKeys = (
   bindings: Record<string, StoredShortcut | undefined>,
@@ -91,7 +96,7 @@ export const shortcutUsingKeys = (
   slot: "primary" | "alternate" = "primary",
 ): string | null => {
   const wanted = canonicalShortcut(keys);
-  if (!wanted) return null;
+  if (!wanted || ADD_ON_KEYS.has(exceptId)) return null;
   const own = bindings[exceptId];
   if (own) {
     const otherSet =
@@ -101,7 +106,7 @@ export const shortcutUsingKeys = (
     }
   }
   for (const [id, binding] of Object.entries(bindings)) {
-    if (id === exceptId || !binding) continue;
+    if (id === exceptId || ADD_ON_KEYS.has(id) || !binding) continue;
     if (
       shortcutCombos(binding).some(
         (combo) => canonicalShortcut(combo) === wanted,

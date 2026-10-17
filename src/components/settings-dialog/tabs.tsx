@@ -43,6 +43,7 @@ import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { PushToTalk } from "@/components/settings/PushToTalk";
 import { SilenceStop } from "@/components/settings/SilenceStop";
+import { HandsFreeShortcut } from "@/components/settings/HandsFree";
 import { MicrophoneSelector } from "@/components/settings/MicrophoneSelector";
 import { AlwaysOnMicrophone } from "@/components/settings/AlwaysOnMicrophone";
 import { MuteWhileRecording } from "@/components/settings/MuteWhileRecording";
@@ -153,6 +154,13 @@ export const ShortcutsTab: React.FC = () => {
           icon={AudioLines}
           tone="teal"
         />
+        {/* Dictation's own Hold or Tap; the ask has its own below. With Hold,
+            the hands-free key is right under it, because it is what makes a
+            held dictation keep going. */}
+        <PushToTalk grouped={true} />
+        <HandsFreeShortcut grouped={true} />
+        {/* Every hands-free dictation, tapped or made hands-free mid-hold. */}
+        <SilenceStop grouped={true} />
         {cleanupEnabled && cleanupOnDictation ? (
           <UnavailableShortcut
             title={t(
@@ -188,8 +196,6 @@ export const ShortcutsTab: React.FC = () => {
             tone="rose"
           />
         )}
-        <PushToTalk descriptionMode="inline" grouped={true} />
-        <SilenceStop descriptionMode="inline" grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settingsDialog.shortcuts.assistant")}>
@@ -201,6 +207,7 @@ export const ShortcutsTab: React.FC = () => {
               icon={MessageCircle}
               tone="sky"
             />
+            <PushToTalk grouped={true} setting="assistant_push_to_talk" />
             <ShortcutInput
               shortcutId="assistant_call"
               grouped={true}

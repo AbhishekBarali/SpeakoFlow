@@ -641,6 +641,10 @@
           "assistant_call": {
             "name": "Start a conversation",
             "description": "Talk with the assistant hands-free and hear its replies. Press again to end."
+          },
+          "hands_free": {
+            "name": "Hands-free mode",
+            "description": "Press while holding the dictation keys to keep recording after you let go. Press the dictation keys again to finish."
           }
         },
         "errors": {
@@ -663,14 +667,22 @@
       },
       "pushToTalk": {
         "label": "Recording behavior",
-        "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Applies to every recording shortcut.",
+        "dictation": "Hold: records while you hold the dictation keys. Tap: one press starts, the next one stops.",
+        "assistant": "Hold: listens while you hold the ask keys. Tap: one press starts, the next one sends.",
         "hold": "Hold",
         "tap": "Tap"
       },
+      "handsFree": {
+        "description": "While holding {{keys}}, press this key and let go: dictation keeps listening until you press {{keys}} again.",
+        "unavailableKeys": "Needs a dictation shortcut of modifier keys alone. With {{keys}}, use Tap to toggle instead.",
+        "unavailableEngine": "Needs the SpeakoFlow Keys keyboard engine, under {{where}}.",
+        "taken": "{{name}} already uses {{keys}}, so this key does nothing until one of them changes.",
+        "needsKey": "Pick one key, like Space or Enter. A modifier on its own can't be the hands-free key.",
+        "pressKey": "Press a key…"
+      },
       "silenceStop": {
         "label": "Stop after silence",
-        "description": "With Tap, a dictation that hears no speech for this long stops and pastes by itself, as if you had pressed the shortcut again. A line on the pill runs out just before it stops; speaking again keeps it going.",
-        "tapOnly": "Works with Tap. With Hold, letting go already stops the dictation."
+        "description": "A hands-free dictation that hears no speech for this long stops and pastes by itself, as if you had pressed the shortcut again. A line on the pill runs out just before it stops; speaking again keeps it going."
       }
     },
     "models": {
@@ -2224,13 +2236,15 @@
       "noSpeechModel": "No speech model yet. Pick one on the Models page"
     },
     "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
+    "locked": "Recording hands-free — press your shortcut again to finish",
+    "handsFree": "Hands-free",
     "cancel": "Cancel",
     "copy": "Copy the transcript",
     "transcript": "Transcript",
     "copied": "Copied",
     "copyFailed": "Could not copy — try again",
     "done": "Done",
+    "finish": "Finish",
     "askAssistant": "Ask the assistant instead of typing this",
     "recovery": {
       "dismissed": "Dismissed",
@@ -2618,6 +2632,9 @@
         "whatHold": "Hold, talk, let go. Your words type where your cursor is.",
         "whatTap": "Tap, talk, tap again. Your words type where your cursor is."
       },
+      "handsFree": {
+        "what": "Hold {{keys}}, press {{key}}, then let go: it keeps listening until you press {{keys}} again."
+      },
       "cleanup": {
         "title": "Dictate and clean up",
         "description": "Same as Dictate, then AI fixes punctuation, filler words, and style.",
@@ -2626,7 +2643,8 @@
       "ask": {
         "title": "Ask the assistant",
         "description": "Ask a question out loud and get the answer in a floating panel.",
-        "what": "Ask out loud. The answer appears in a floating panel."
+        "whatHold": "Hold, ask, let go. The answer appears in a floating panel.",
+        "whatTap": "Tap, ask, tap again. The answer appears in a floating panel."
       },
       "call": {
         "title": "Start a conversation",
@@ -2635,10 +2653,6 @@
       },
       "info": "Press these in any app. Click the keys to change them.",
       "offHint": "Turned off",
-      "mode": {
-        "hold": "Hold to talk",
-        "tap": "Tap to toggle"
-      },
       "cancel": {
         "title": "Cancel",
         "what": "Stop a recording, or a reply being read aloud."

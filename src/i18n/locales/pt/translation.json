@@ -643,6 +643,10 @@
           "assistant_call": {
             "name": "Iniciar uma conversa",
             "description": "Converse com o assistente sem usar as mãos e ouça as respostas dele. Pressione de novo para encerrar."
+          },
+          "hands_free": {
+            "name": "Modo mãos livres",
+            "description": "Pressione enquanto segura as teclas de ditado para continuar gravando depois de soltá-las. Pressione as teclas de ditado de novo para terminar."
           }
         },
         "errors": {
@@ -665,14 +669,22 @@
       },
       "pushToTalk": {
         "label": "Modo de gravação",
-        "description": "Segurar: grava enquanto você mantém um atalho de gravação pressionado. Tocar: um toque começa, o próximo para. Vale para todos os atalhos de gravação.",
+        "dictation": "Segurar: grava enquanto você mantém as teclas de ditado pressionadas. Tocar: um toque começa, o próximo para.",
+        "assistant": "Segurar: escuta enquanto você mantém as teclas de pergunta pressionadas. Tocar: um toque começa, o próximo envia.",
         "hold": "Segurar",
         "tap": "Toque"
       },
+      "handsFree": {
+        "description": "Enquanto segura {{keys}}, pressione esta tecla e solte: o ditado continua ouvindo até você pressionar {{keys}} de novo.",
+        "unavailableKeys": "Precisa de um atalho de ditado só com teclas modificadoras. Com {{keys}}, use “Toque para alternar”.",
+        "unavailableEngine": "Precisa do mecanismo de teclado SpeakoFlow Keys, em {{where}}.",
+        "taken": "{{name}} já usa {{keys}}, então esta tecla não faz nada até que um dos dois mude.",
+        "needsKey": "Escolha uma tecla, como Espaço ou Enter. Uma tecla modificadora sozinha não pode ser a tecla de mãos livres.",
+        "pressKey": "Pressione uma tecla…"
+      },
       "silenceStop": {
         "label": "Parar após silêncio",
-        "description": "No modo Toque, um ditado que não ouve fala durante esse tempo para e cola sozinho, como se você tivesse pressionado o atalho de novo. Pouco antes, uma linha na pílula se esgota; se você voltar a falar, a gravação continua.",
-        "tapOnly": "Funciona no modo Toque. No modo Segurar, soltar a tecla já para o ditado."
+        "description": "Um ditado de mãos livres que não ouve fala durante esse tempo para e cola sozinho, como se você tivesse pressionado o atalho de novo. Pouco antes, uma linha na pílula se esgota; se você voltar a falar, a gravação continua."
       }
     },
     "models": {
@@ -2237,12 +2249,14 @@
     },
     "listening": "Ouvindo…",
     "locked": "Gravando mãos livres — pressione a tecla de atalho novamente para parar",
+    "handsFree": "Mãos livres",
     "cancel": "Cancelar",
     "copy": "Copiar a transcrição",
     "transcript": "Transcrição",
     "copied": "Copiado",
     "copyFailed": "Não foi possível copiar — tente novamente",
     "done": "Concluído",
+    "finish": "Concluir",
     "askAssistant": "Perguntar ao assistente em vez de digitar isso",
     "recovery": {
       "dismissed": "Descartado",
@@ -2639,6 +2653,9 @@
         "whatHold": "Segure, fale, solte. Suas palavras aparecem onde está o cursor.",
         "whatTap": "Toque, fale, toque de novo. Suas palavras aparecem onde está o cursor."
       },
+      "handsFree": {
+        "what": "Segure {{keys}}, pressione {{key}} e solte: ele continua ouvindo até você pressionar {{keys}} de novo."
+      },
       "cleanup": {
         "title": "Ditar e limpar",
         "description": "Igual a Ditar, e depois a IA corrige a pontuação, as palavras de preenchimento e o estilo.",
@@ -2647,7 +2664,8 @@
       "ask": {
         "title": "Perguntar ao assistente",
         "description": "Faça uma pergunta em voz alta e receba a resposta em um painel flutuante.",
-        "what": "Pergunte em voz alta. A resposta aparece em um painel flutuante."
+        "whatHold": "Segure, pergunte, solte. A resposta aparece em um painel flutuante.",
+        "whatTap": "Toque, pergunte, toque de novo. A resposta aparece em um painel flutuante."
       },
       "call": {
         "title": "Iniciar uma conversa",
@@ -2656,10 +2674,6 @@
       },
       "info": "Use em qualquer app. Clique nas teclas para mudá-las.",
       "offHint": "Desativado",
-      "mode": {
-        "hold": "Segure para falar",
-        "tap": "Toque para alternar"
-      },
       "cancel": {
         "title": "Cancelar",
         "what": "Para uma gravação ou uma resposta sendo lida em voz alta."

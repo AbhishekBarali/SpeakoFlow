@@ -641,6 +641,10 @@
           "assistant_call": {
             "name": "Gespräch starten",
             "description": "Sprich freihändig mit dem Assistenten und hör seine Antworten. Zum Beenden erneut drücken."
+          },
+          "hands_free": {
+            "name": "Freihändiger Modus",
+            "description": "Drücke sie, während du die Diktiertasten hältst, damit die Aufnahme nach dem Loslassen weiterläuft. Drücke die Diktiertasten erneut, um zu beenden."
           }
         },
         "errors": {
@@ -663,14 +667,22 @@
       },
       "pushToTalk": {
         "label": "Aufnahmeverhalten",
-        "description": "Halten: Die Aufnahme läuft, solange du ein Aufnahme-Tastenkürzel gedrückt hältst. Antippen: Ein Druck startet, der nächste stoppt. Gilt für alle Aufnahme-Tastenkürzel.",
+        "dictation": "Halten: Die Aufnahme läuft, solange du die Diktiertasten gedrückt hältst. Antippen: Ein Druck startet, der nächste stoppt.",
+        "assistant": "Halten: Hört zu, solange du die Fragetasten gedrückt hältst. Antippen: Ein Druck startet, der nächste sendet.",
         "hold": "Halten",
         "tap": "Antippen"
       },
+      "handsFree": {
+        "description": "Drücke diese Taste, während du {{keys}} hältst, und lass los: Das Diktat hört weiter zu, bis du {{keys}} erneut drückst.",
+        "unavailableKeys": "Braucht ein Diktierkürzel nur aus Sondertasten. Nutze mit {{keys}} stattdessen „Antippen zum Umschalten“.",
+        "unavailableEngine": "Braucht die Tastatur-Engine SpeakoFlow Keys, unter {{where}}.",
+        "taken": "{{name}} nutzt bereits {{keys}}, daher bewirkt diese Taste nichts, bis sich eins von beiden ändert.",
+        "needsKey": "Wähle eine Taste, etwa Leertaste oder Eingabe. Eine Sondertaste allein kann nicht die Freihändig-Taste sein.",
+        "pressKey": "Taste drücken…"
+      },
       "silenceStop": {
         "label": "Nach Stille beenden",
-        "description": "Bei „Antippen“ endet ein Diktat, in dem so lange keine Sprache zu hören ist, von selbst und wird eingefügt, als hättest du das Tastenkürzel erneut gedrückt. Kurz vorher läuft eine Linie auf der Pille ab; sprichst du weiter, läuft die Aufnahme weiter.",
-        "tapOnly": "Funktioniert mit „Antippen“. Bei „Halten“ beendet schon das Loslassen das Diktat."
+        "description": "Ein freihändiges Diktat, in dem so lange keine Sprache zu hören ist, endet von selbst und wird eingefügt, als hättest du das Tastenkürzel erneut gedrückt. Kurz vorher läuft eine Linie auf der Pille ab; sprichst du weiter, läuft die Aufnahme weiter."
       }
     },
     "models": {
@@ -2225,12 +2237,14 @@
     },
     "listening": "Hört zu…",
     "locked": "Freihändige Aufnahme — drücke das Tastenkürzel erneut zum Stoppen",
+    "handsFree": "Freihändig",
     "cancel": "Abbrechen",
     "copy": "Transkript kopieren",
     "transcript": "Transkript",
     "copied": "Kopiert",
     "copyFailed": "Kopieren fehlgeschlagen – versuche es erneut",
     "done": "Fertig",
+    "finish": "Abschließen",
     "askAssistant": "Den Assistenten fragen, statt das zu tippen",
     "recovery": {
       "dismissed": "Verworfen",
@@ -2618,6 +2632,9 @@
         "whatHold": "Halten, sprechen, loslassen. Deine Worte erscheinen dort, wo dein Cursor ist.",
         "whatTap": "Antippen, sprechen, erneut antippen. Deine Worte erscheinen dort, wo dein Cursor ist."
       },
+      "handsFree": {
+        "what": "Halte {{keys}}, drücke {{key}} und lass los: Es hört weiter zu, bis du {{keys}} erneut drückst."
+      },
       "cleanup": {
         "title": "Diktieren und bereinigen",
         "description": "Wie „Diktieren“, danach korrigiert die KI Zeichensetzung, Füllwörter und Stil.",
@@ -2626,7 +2643,8 @@
       "ask": {
         "title": "Assistenten fragen",
         "description": "Stell eine Frage laut und erhalte die Antwort in einem schwebenden Panel.",
-        "what": "Frag laut. Die Antwort erscheint in einem schwebenden Panel."
+        "whatHold": "Halten, fragen, loslassen. Die Antwort erscheint in einem schwebenden Panel.",
+        "whatTap": "Antippen, fragen, erneut antippen. Die Antwort erscheint in einem schwebenden Panel."
       },
       "call": {
         "title": "Gespräch starten",
@@ -2635,10 +2653,6 @@
       },
       "info": "Drück sie in einer beliebigen App. Klicke auf die Tasten, um sie zu ändern.",
       "offHint": "Ausgeschaltet",
-      "mode": {
-        "hold": "Zum Sprechen halten",
-        "tap": "Antippen zum Umschalten"
-      },
       "cancel": {
         "title": "Abbrechen",
         "what": "Beendet eine Aufnahme oder eine Antwort, die vorgelesen wird."

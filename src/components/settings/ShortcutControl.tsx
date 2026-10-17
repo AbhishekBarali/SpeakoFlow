@@ -14,7 +14,7 @@ export type ShortcutSize = "sm" | "md" | "lg";
  * Shortcuts that may be left without a key. Mirrors `OPTIONAL_BINDINGS` in
  * `settings.rs`, which is what actually accepts the empty binding.
  */
-const OPTIONAL_SHORTCUTS = new Set(["cancel", "assistant_call"]);
+const OPTIONAL_SHORTCUTS = new Set(["cancel", "assistant_call", "hands_free"]);
 
 export const isOptionalShortcut = (id: string): boolean =>
   OPTIONAL_SHORTCUTS.has(id);
