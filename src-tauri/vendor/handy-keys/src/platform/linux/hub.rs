@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 
+use super::keycode;
 use crate::platform::state::BlockingHotkeys;
 use crate::types::{Key, KeyEvent, Modifiers};
 
@@ -22,6 +23,16 @@ pub(crate) struct Subscriber {
 impl Subscriber {
     fn is_live(&self) -> bool {
         self.running.load(Ordering::SeqCst)
+    }
+
+    /// Whether this listener withholds a mouse button the engine can read.
+    fn withholds_a_button(&self) -> bool {
+        self.blocking.as_ref().is_some_and(|hotkeys| {
+            hotkeys.lock().is_ok_and(|set| {
+                set.iter()
+                    .any(|hotkey| hotkey.key.is_some_and(keycode::is_withholdable_button))
+            })
+        })
     }
 
     fn blocks(&self, modifiers: Modifiers, key: Key) -> bool {
@@ -82,6 +93,14 @@ impl Hub {
         self.lock()
             .iter()
             .any(|subscriber| subscriber.is_live() && subscriber.blocks(modifiers, key))
+    }
+
+    /// Whether any live listener withholds a mouse button, which is when the
+    /// pointers that have it are taken over.
+    pub(crate) fn withholds_buttons(&self) -> bool {
+        self.lock()
+            .iter()
+            .any(|subscriber| subscriber.is_live() && subscriber.withholds_a_button())
     }
 
     pub(crate) fn has_live_subscribers(&self) -> bool {
@@ -173,11 +192,40 @@ mod tests {
         assert_eq!(recorder_rx.try_iter().count(), 1);
         assert!(hub.has_live_subscribers());
 
+        assert!(
+            !hub.withholds_buttons(),
+            "Ctrl+K withholds a key, not a button"
+        );
         drop(recorder_rx);
         hub.broadcast(ctrl_k());
         assert!(
             !hub.has_live_subscribers(),
             "a listener whose receiver is gone is dropped too"
         );
+    }
+
+    #[test]
+    fn pointers_are_wanted_only_while_a_readable_button_is_a_shortcut() {
+        let hub = Hub::new().expect("eventfd");
+        let blocking: BlockingHotkeys = Arc::new(Mutex::new(HashSet::new()));
+        let (sender, _events) = mpsc::channel();
+        hub.subscribe(Subscriber {
+            sender,
+            running: Arc::new(AtomicBool::new(true)),
+            blocking: Some(Arc::clone(&blocking)),
+        });
+        assert!(!hub.withholds_buttons());
+        blocking
+            .lock()
+            .unwrap()
+            .insert(Hotkey::new(Modifiers::empty(), Key::MouseX1).unwrap());
+        assert!(!hub.withholds_buttons(), "Back is never read on Linux");
+        blocking
+            .lock()
+            .unwrap()
+            .insert(Hotkey::new(Modifiers::CTRL_LEFT, Key::MouseMiddle).unwrap());
+        assert!(hub.withholds_buttons());
+        blocking.lock().unwrap().clear();
+        assert!(!hub.withholds_buttons());
     }
 }

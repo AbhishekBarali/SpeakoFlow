@@ -29,6 +29,11 @@ pub(crate) enum Role {
     /// Taken over (`EVIOCGRAB`) and re-sent through a uinput mirror, so the
     /// key a hotkey ends in can be withheld from the focused app.
     Grab,
+    /// A pointer with a button a shortcut can use (the middle button). Taken
+    /// over like a keyboard, but only while some shortcut uses such a button,
+    /// so that the button's click can be withheld from the app under the
+    /// pointer; otherwise only read.
+    Pointer,
     /// Only read; the compositor keeps receiving it directly.
     Listen,
 }
@@ -36,6 +41,7 @@ pub(crate) enum Role {
 /// A device's role, from what it has.
 ///
 /// `hotkey_keys`: a key a hotkey can end in (anything but a modifier).
+/// `bindable_button`: a mouse button a shortcut can use.
 /// `followed`: a modifier or a mouse button the hotkey logic follows.
 /// `made_by_uinput`: another program created it in software.
 ///
@@ -44,10 +50,17 @@ pub(crate) enum Role {
 /// another listener's mirror; taking those over gets in the way of the program
 /// that made them, and two mirroring listeners would mirror each other's
 /// mirrors without end.
-pub(crate) fn role_for(hotkey_keys: bool, followed: bool, made_by_uinput: bool) -> Option<Role> {
+pub(crate) fn role_for(
+    hotkey_keys: bool,
+    bindable_button: bool,
+    followed: bool,
+    made_by_uinput: bool,
+) -> Option<Role> {
     if hotkey_keys && !made_by_uinput {
         Some(Role::Grab)
-    } else if hotkey_keys || followed {
+    } else if bindable_button && !made_by_uinput {
+        Some(Role::Pointer)
+    } else if hotkey_keys || bindable_button || followed {
         Some(Role::Listen)
     } else {
         None
@@ -141,6 +154,36 @@ impl Tracker {
         })
     }
 
+    /// Whether this event of `code` on `device` is withheld: a press as
+    /// `block_press` decides, its repeats and its release as the press was.
+    fn withhold(
+        &mut self,
+        device: DeviceId,
+        code: u16,
+        value: i32,
+        block_press: impl FnOnce() -> bool,
+    ) -> Verdict {
+        let keys = self.devices.entry(device).or_default();
+        let withheld = match value {
+            RELEASE => keys.withheld.remove(&code),
+            PRESS => {
+                let block = block_press();
+                if block {
+                    keys.withheld.insert(code);
+                } else {
+                    keys.withheld.remove(&code);
+                }
+                block
+            }
+            _ => keys.withheld.contains(&code),
+        };
+        if withheld {
+            Verdict::Swallow
+        } else {
+            Verdict::Forward
+        }
+    }
+
     /// A key a hotkey can end in, with its evdev `code` and event `value`.
     /// `block_press` decides a press, from the modifiers held and the key; a
     /// repeat or release follows its press. Repeats read as the key going down
@@ -154,25 +197,7 @@ impl Tracker {
         block_press: impl FnOnce(Modifiers, Key) -> bool,
     ) -> (Verdict, KeyEvent) {
         let modifiers = self.modifiers;
-        let keys = self.devices.entry(device).or_default();
-        let withheld = match value {
-            RELEASE => keys.withheld.remove(&code),
-            PRESS => {
-                let block = block_press(modifiers, key);
-                if block {
-                    keys.withheld.insert(code);
-                } else {
-                    keys.withheld.remove(&code);
-                }
-                block
-            }
-            _ => keys.withheld.contains(&code),
-        };
-        let verdict = if withheld {
-            Verdict::Swallow
-        } else {
-            Verdict::Forward
-        };
+        let verdict = self.withhold(device, code, value, || block_press(modifiers, key));
         let event = KeyEvent {
             modifiers,
             key: Some(key),
@@ -182,16 +207,29 @@ impl Tracker {
         (verdict, event)
     }
 
-    /// A mouse button. Plain left and right clicks only matter with a
-    /// modifier held (Ctrl+click is not a hotkey tap).
-    pub(crate) fn button(&self, key: Key, down: bool) -> Option<KeyEvent> {
-        let plain_click = matches!(key, Key::MouseLeft | Key::MouseRight);
-        (!plain_click || !self.modifiers.is_empty()).then_some(KeyEvent {
-            modifiers: self.modifiers,
+    /// A mouse button, withheld by the same rule as a key. The primary clicks
+    /// are never withheld, and plain left and right clicks are only reported
+    /// with a modifier held (Ctrl+click is not a hotkey tap).
+    pub(crate) fn button(
+        &mut self,
+        device: DeviceId,
+        code: u16,
+        key: Key,
+        value: i32,
+        block_press: impl FnOnce(Modifiers, Key) -> bool,
+    ) -> (Verdict, Option<KeyEvent>) {
+        let modifiers = self.modifiers;
+        let primary = matches!(key, Key::MouseLeft | Key::MouseRight);
+        let verdict = self.withhold(device, code, value, || {
+            !primary && block_press(modifiers, key)
+        });
+        let event = (value != REPEAT && (!primary || !modifiers.is_empty())).then_some(KeyEvent {
+            modifiers,
             key: Some(key),
-            is_key_down: down,
+            is_key_down: value != RELEASE,
             changed_modifier: None,
-        })
+        });
+        (verdict, event)
     }
 
     /// The device was handed back to the compositor: the releases of keys
@@ -350,32 +388,94 @@ mod tests {
         );
     }
 
+    const BTN_LEFT: u16 = 272;
+    const BTN_MIDDLE: u16 = 274;
+
     #[test]
     fn plain_clicks_are_only_reported_with_a_modifier_held() {
         let mut keys = Tracker::default();
-        assert!(keys.button(Key::MouseLeft, true).is_none());
-        assert!(keys.button(Key::MouseMiddle, true).is_some());
+        assert!(keys
+            .button(A, BTN_LEFT, Key::MouseLeft, PRESS, never)
+            .1
+            .is_none());
+        assert!(keys
+            .button(A, BTN_MIDDLE, Key::MouseMiddle, PRESS, never)
+            .1
+            .is_some());
         keys.modifier(A, Modifiers::CTRL_LEFT, true);
-        let click = keys.button(Key::MouseLeft, true).expect("Ctrl+click");
+        let click = keys
+            .button(A, BTN_LEFT, Key::MouseLeft, PRESS, never)
+            .1
+            .expect("Ctrl+click");
         assert_eq!(click.modifiers, Modifiers::CTRL_LEFT);
     }
 
     #[test]
-    fn only_hardware_keyboards_are_taken_over() {
-        assert_eq!(role_for(true, true, false), Some(Role::Grab));
-        assert_eq!(role_for(true, false, false), Some(Role::Grab));
+    fn a_bound_button_is_withheld_down_and_up_and_the_primary_clicks_never() {
+        let mut keys = Tracker::default();
         assert_eq!(
-            role_for(true, true, true),
+            keys.button(A, BTN_MIDDLE, Key::MouseMiddle, PRESS, always)
+                .0,
+            Verdict::Swallow
+        );
+        // Unbound by the time it comes up: still withheld, or the app under
+        // the pointer would see a release with no press.
+        assert_eq!(
+            keys.button(A, BTN_MIDDLE, Key::MouseMiddle, RELEASE, never)
+                .0,
+            Verdict::Swallow
+        );
+        assert_eq!(
+            keys.button(A, BTN_MIDDLE, Key::MouseMiddle, PRESS, never).0,
+            Verdict::Forward
+        );
+        assert_eq!(
+            keys.button(A, BTN_MIDDLE, Key::MouseMiddle, RELEASE, always)
+                .0,
+            Verdict::Forward
+        );
+        // No shortcut takes the primary clicks away from the mouse.
+        assert_eq!(
+            keys.button(A, BTN_LEFT, Key::MouseLeft, PRESS, always).0,
+            Verdict::Forward
+        );
+        assert_eq!(
+            keys.button(A, BTN_LEFT, Key::MouseLeft, RELEASE, always).0,
+            Verdict::Forward
+        );
+    }
+
+    #[test]
+    fn only_hardware_keyboards_and_pointers_with_a_middle_button_are_taken_over() {
+        assert_eq!(role_for(true, false, true, false), Some(Role::Grab));
+        assert_eq!(role_for(true, false, false, false), Some(Role::Grab));
+        assert_eq!(
+            role_for(true, true, true, false),
+            Some(Role::Grab),
+            "a keyboard with a pointing stick"
+        );
+        assert_eq!(
+            role_for(true, false, true, true),
             Some(Role::Listen),
             "keyd, ydotool, a mirror"
         );
         assert_eq!(
-            role_for(false, true, false),
-            Some(Role::Listen),
-            "a mouse or touchpad"
+            role_for(false, true, true, false),
+            Some(Role::Pointer),
+            "a wheel mouse"
         );
         assert_eq!(
-            role_for(false, false, false),
+            role_for(false, true, true, true),
+            Some(Role::Listen),
+            "a virtual mouse"
+        );
+        assert_eq!(
+            role_for(false, false, true, false),
+            Some(Role::Listen),
+            "a touchpad"
+        );
+        assert_eq!(
+            role_for(false, false, false, false),
             None,
             "a lid switch, a power button"
         );
