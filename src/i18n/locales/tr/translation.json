@@ -2207,7 +2207,6 @@
     },
     "listening": "Dinleniyor…",
     "locked": "Eller serbest kaydediliyor — durdurmak için kısayola tekrar basın",
-    "handsFree": "Eller serbest",
     "cancel": "İptal",
     "copy": "Transkripti kopyala",
     "transcript": "Transkript",
@@ -2228,7 +2227,6 @@
       "hint": "İndirme bitince dikte çalışmaya başlar"
     },
     "handsFreeHint": "Eller serbest için {{key}} tuşuna basın",
-    "handsFreeFinish": "Eller serbest · bitirmek için {{keys}}",
     "lockedKeys": "Eller serbest kaydediliyor. Bitirmek için {{keys}} tuşlarına basın",
     "finishKeys": "Bitir ({{keys}})"
   },

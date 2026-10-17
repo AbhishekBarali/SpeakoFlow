@@ -12,7 +12,7 @@
 const KEY = "speakoflow.overlay.handsFreeHint";
 
 /** How many held dictations show it, at most. */
-export const HINT_TIMES = 5;
+export const HINT_TIMES = 3;
 /** How long a dictation has to be held first, so a quick one never flashes
  *  it, and a hold that turns hands-free at once never needs it. */
 export const HINT_DELAY_MS = 900;

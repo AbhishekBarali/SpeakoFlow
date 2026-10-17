@@ -2195,7 +2195,6 @@
     },
     "listening": "듣고 있습니다…",
     "locked": "핸즈프리로 녹음 중 — 단축키를 다시 누르면 정지합니다",
-    "handsFree": "핸즈프리",
     "cancel": "취소",
     "copy": "전사 내용 복사",
     "transcript": "전사",
@@ -2216,7 +2215,6 @@
       "hint": "다운로드가 끝나면 받아쓰기를 쓸 수 있습니다"
     },
     "handsFreeHint": "{{key}}을(를) 누르면 핸즈프리",
-    "handsFreeFinish": "핸즈프리 · {{keys}}(으)로 완료",
     "lockedKeys": "핸즈프리로 녹음 중. {{keys}}을(를) 누르면 완료됩니다",
     "finishKeys": "완료 ({{keys}})"
   },

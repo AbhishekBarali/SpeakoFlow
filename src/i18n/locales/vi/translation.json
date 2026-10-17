@@ -2195,7 +2195,6 @@
     },
     "listening": "Đang lắng nghe…",
     "locked": "Đang ghi âm rảnh tay — nhấn lại phím tắt để dừng",
-    "handsFree": "Rảnh tay",
     "cancel": "Hủy",
     "copy": "Sao chép bản chép lời",
     "transcript": "Bản chép lời",
@@ -2216,7 +2215,6 @@
       "hint": "Đọc chính tả sẽ hoạt động khi tải xong"
     },
     "handsFreeHint": "Nhấn {{key}} để rảnh tay",
-    "handsFreeFinish": "Rảnh tay · {{keys}} để kết thúc",
     "lockedKeys": "Đang ghi âm rảnh tay. Nhấn {{keys}} để kết thúc",
     "finishKeys": "Hoàn tất ({{keys}})"
   },

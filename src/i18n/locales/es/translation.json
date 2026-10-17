@@ -2219,7 +2219,6 @@
     },
     "listening": "Escuchando…",
     "locked": "Grabando con manos libres: pulsa el atajo de nuevo para detener",
-    "handsFree": "Manos libres",
     "cancel": "Cancelar",
     "copy": "Copiar la transcripción",
     "transcript": "Transcripción",
@@ -2240,7 +2239,6 @@
       "hint": "El dictado funcionará cuando termine"
     },
     "handsFreeHint": "Pulsa {{key}} para manos libres",
-    "handsFreeFinish": "Manos libres · {{keys}} para terminar",
     "lockedKeys": "Grabando con manos libres. Pulsa {{keys}} para terminar",
     "finishKeys": "Terminar ({{keys}})"
   },
