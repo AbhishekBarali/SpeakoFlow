@@ -75,6 +75,10 @@ pub struct Fitted {
     /// Whether anything was known about the field. When not, the text is the
     /// transcript unchanged and the paste behaves as if Smart spacing were off.
     pub known: bool,
+    /// Type the leading space instead of pasting it, because the field trims
+    /// pasted text. Never set by the rules, which know nothing of the field's
+    /// paste handling; `prepare` sets it from the reading.
+    pub type_leading_space: bool,
     pub decision: Decision,
 }
 
@@ -120,6 +124,7 @@ fn fit_known(transcript: &str, context: Context<'_>, options: &Options<'_>) -> F
         text: transcript.to_string(),
         erase_before: 0,
         known: false,
+        type_leading_space: false,
         decision: Decision::default(),
     };
 
@@ -142,6 +147,7 @@ fn fit_known(transcript: &str, context: Context<'_>, options: &Options<'_>) -> F
                 text,
                 erase_before: 0,
                 known: true,
+                type_leading_space: false,
                 decision,
             }
         }
@@ -158,6 +164,7 @@ fn fit_known(transcript: &str, context: Context<'_>, options: &Options<'_>) -> F
                 text,
                 erase_before: 0,
                 known: true,
+                type_leading_space: false,
                 decision,
             }
         }
@@ -237,6 +244,7 @@ fn fit_field(
         text,
         erase_before,
         known: true,
+        type_leading_space: false,
         decision,
     }
 }

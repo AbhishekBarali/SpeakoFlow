@@ -786,6 +786,9 @@ pub struct SmartSpacingPaste {
     /// Characters to remove before the caret first: SpeakoFlow's own stray
     /// period from the previous dictation. Only ever 0 or 1.
     pub erase_before: usize,
+    /// The text starts with a space the field would trim if it were pasted
+    /// (a Chromium address bar), so the space is typed first.
+    pub type_leading_space: bool,
 }
 
 impl Default for PasteBehavior {
@@ -808,6 +811,15 @@ pub fn paste_method_can_erase(paste_method: PasteMethod) -> bool {
             | PasteMethod::CtrlShiftV
             | PasteMethod::ShiftInsert
     )
+}
+
+/// One Space into the focused app, for a field that trims the spaces of pasted
+/// text. Only the Windows reader recognises such a field today.
+fn send_space(enigo: &mut Enigo) -> Result<(), String> {
+    let _injected = handy_keys::ignore_injected_input();
+    enigo
+        .key(Key::Space, Direction::Click)
+        .map_err(|e| format!("Failed to send Space: {}", e))
 }
 
 /// One Backspace into the focused app, through the same tools the paste uses.
@@ -935,6 +947,33 @@ pub fn paste_with_behavior(
             info!("Smart spacing: another window is in front now; the stray period stays");
         }
     }
+
+    // A field that trims pasted text (a Chromium address bar) would drop the
+    // space Smart spacing put in front, and the dictation would run into the
+    // text before it ("feature.Don't"). Typed, the space stays.
+    let text = match behavior.smart_spacing {
+        Some(smart)
+            if smart.type_leading_space
+                && matches!(
+                    paste_method,
+                    PasteMethod::CtrlV | PasteMethod::CtrlShiftV | PasteMethod::ShiftInsert
+                )
+                && text.starts_with(' ')
+                && crate::smart_spacing::still_aimed_at_reading() =>
+        {
+            match send_space(&mut enigo) {
+                Ok(()) => {
+                    std::thread::sleep(Duration::from_millis(15));
+                    text[1..].to_string()
+                }
+                Err(e) => {
+                    log::warn!("Smart spacing: could not type the leading space: {}", e);
+                    text
+                }
+            }
+        }
+        _ => text,
+    };
 
     // Perform the paste operation. Capture the result instead of using `?` so we
     // can always run the modifier-release safety net below, even on failure.

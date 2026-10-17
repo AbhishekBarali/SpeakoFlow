@@ -61,18 +61,28 @@ pub struct Snapshot {
     /// that was read, so the last-paste memory only ever applies to the same
     /// place. `None` when not even that could be told.
     pub target: Option<String>,
+    /// The field trims the spaces at the edges of pasted text (a Chromium
+    /// address bar), so a space in front of a dictation must be typed.
+    pub trims_pasted_spaces: bool,
 }
 
 impl Snapshot {
     pub fn unknown(target: Option<String>) -> Self {
-        Self {
-            reading: Reading::Unknown,
-            target,
-        }
+        Self::new(Reading::Unknown, target)
     }
 
     pub fn new(reading: Reading, target: Option<String>) -> Self {
-        Self { reading, target }
+        Self {
+            reading,
+            target,
+            trims_pasted_spaces: false,
+        }
+    }
+
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+    pub fn trimming_pasted_spaces(mut self, trims: bool) -> Self {
+        self.trims_pasted_spaces = trims;
+        self
     }
 }
 
