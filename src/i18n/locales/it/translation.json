@@ -643,6 +643,10 @@
           "assistant_call": {
             "name": "Avvia una conversazione",
             "description": "Parla con l'assistente a mani libere e ascolta le sue risposte. Premi di nuovo per terminare."
+          },
+          "hands_free": {
+            "name": "Modalità a mani libere",
+            "description": "Premilo mentre tieni premuti i tasti di dettatura per continuare a registrare dopo averli rilasciati. Premi di nuovo i tasti di dettatura per finire."
           }
         },
         "errors": {
@@ -665,14 +669,22 @@
       },
       "pushToTalk": {
         "label": "Modalità di registrazione",
-        "description": "Tieni premuto: registri finché tieni premuta una scorciatoia di registrazione. Tocca: una pressione avvia, la successiva ferma. Vale per tutte le scorciatoie di registrazione.",
+        "dictation": "Tieni premuto: registri finché tieni premuti i tasti di dettatura. Tocca: una pressione avvia, la successiva ferma.",
+        "assistant": "Tieni premuto: ascolta finché tieni premuti i tasti della domanda. Tocca: una pressione avvia, la successiva invia.",
         "hold": "Tieni premuto",
         "tap": "Tocca"
       },
+      "handsFree": {
+        "description": "Mentre tieni premuto {{keys}}, premi questo tasto e rilascia: la dettatura continua ad ascoltare finché non premi di nuovo {{keys}}.",
+        "unavailableKeys": "Serve una scorciatoia di dettatura fatta solo di tasti modificatori. Con {{keys}}, usa invece «Tocca per avviare e fermare».",
+        "unavailableEngine": "Serve il motore della tastiera SpeakoFlow Keys, in {{where}}.",
+        "taken": "{{name}} usa già {{keys}}, quindi questo tasto non fa nulla finché uno dei due non cambia.",
+        "needsKey": "Scegli un solo tasto, come Spazio o Invio. Un tasto modificatore da solo non può essere il tasto mani libere.",
+        "pressKey": "Premi un tasto…"
+      },
       "silenceStop": {
         "label": "Interrompi dopo un silenzio",
-        "description": "Con «Tocca», una dettatura che non sente parlare per questo tempo si ferma e si incolla da sola, come se avessi premuto di nuovo la scorciatoia. Poco prima, una linea sulla pillola si esaurisce; se riprendi a parlare, la registrazione continua.",
-        "tapOnly": "Funziona con «Tocca». Con «Tieni premuto», rilasciare il tasto ferma già la dettatura."
+        "description": "Una dettatura a mani libere che non sente parlare per questo tempo si ferma e si incolla da sola, come se avessi premuto di nuovo la scorciatoia. Poco prima, una linea sulla pillola si esaurisce; se riprendi a parlare, la registrazione continua."
       }
     },
     "models": {
@@ -2237,12 +2249,14 @@
     },
     "listening": "In ascolto…",
     "locked": "Registrazione a mani libere — premi di nuovo la scorciatoia per fermarti",
+    "handsFree": "A mani libere",
     "cancel": "Annulla",
     "copy": "Copia la trascrizione",
     "transcript": "Trascrizione",
     "copied": "Copiato",
     "copyFailed": "Impossibile copiare: riprova",
     "done": "Fatto",
+    "finish": "Termina",
     "askAssistant": "Chiedi all'assistente invece di digitare questo testo",
     "recovery": {
       "dismissed": "Annullato",
@@ -2639,6 +2653,9 @@
         "whatHold": "Tieni premuto, parla, rilascia. Le parole compaiono dove si trova il cursore.",
         "whatTap": "Tocca, parla, tocca di nuovo. Le parole compaiono dove si trova il cursore."
       },
+      "handsFree": {
+        "what": "Tieni premuto {{keys}}, premi {{key}} e rilascia: continua ad ascoltare finché non premi di nuovo {{keys}}."
+      },
       "cleanup": {
         "title": "Detta e ripulisci",
         "description": "Come Detta, poi l'IA sistema punteggiatura, parole di riempimento e stile.",
@@ -2647,7 +2664,8 @@
       "ask": {
         "title": "Chiedi all'assistente",
         "description": "Fai una domanda a voce e ricevi la risposta in un pannello flottante.",
-        "what": "Chiedi a voce. La risposta compare in un pannello flottante."
+        "whatHold": "Tieni premuto, chiedi, rilascia. La risposta compare in un pannello flottante.",
+        "whatTap": "Tocca, chiedi, tocca di nuovo. La risposta compare in un pannello flottante."
       },
       "call": {
         "title": "Avvia una conversazione",
@@ -2656,10 +2674,6 @@
       },
       "info": "Premili in qualsiasi app. Fai clic sui tasti per cambiarli.",
       "offHint": "Disattivata",
-      "mode": {
-        "hold": "Tieni premuto per parlare",
-        "tap": "Tocca per avviare e fermare"
-      },
       "cancel": {
         "title": "Annulla",
         "what": "Ferma una registrazione o una risposta letta ad alta voce."

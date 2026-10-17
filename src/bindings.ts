@@ -33,6 +33,9 @@ async changeAlternateBinding(id: string, binding: string) : Promise<Result<Bindi
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Hold to talk or Tap to toggle for dictation (and the cleanup shortcut).
+ */
 async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_ptt_setting", { enabled }) };
@@ -42,13 +45,25 @@ async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
 }
 },
 /**
- * Seconds of silence after which a tap-started dictation ends by itself; 0
+ * Seconds of silence after which a hands-free dictation ends by itself; 0
  * turns it off. Read when a recording starts, so a change applies to the next
  * one rather than to a recording already under way.
  */
 async changeDictationSilenceStopSetting(secs: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_dictation_silence_stop_setting", { secs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Hold to talk or Tap to toggle for the ask, which no longer has to match
+ * dictation (`settings::holds_to_record`).
+ */
+async changeAssistantPttSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_assistant_ptt_setting", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3665,12 +3680,26 @@ historyUpdatePayload: "history-update-payload"
  * broken field can never reset the rest of the user's configuration
  * (backport of Handy #1631).
  */
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; 
 /**
- * Seconds without speech after which a dictation started with a tap ends
- * by itself, exactly as if its shortcut had been pressed again. 0 (the
- * default) never does: the recording runs until the next tap or the
- * 30-minute cap. Which recordings it covers is decided in one place,
+ * Hold to talk (true) or Tap to toggle (false) for the dictation
+ * shortcuts: dictation and the separate cleanup shortcut. With Hold, the
+ * hands-free key makes a dictation keep listening (`hands_free`). See
+ * [`holds_to_record`].
+ */
+push_to_talk: boolean; 
+/**
+ * Hold to talk or Tap to toggle for the ask. It used to share
+ * `push_to_talk`, so holding to dictate meant holding to ask too. A store
+ * from before the split gets the shared value (`normalize_settings_json`).
+ */
+assistant_push_to_talk?: boolean; 
+/**
+ * Seconds without speech after which a hands-free dictation (tapped, or
+ * held and then made hands-free) ends by itself, exactly as if its
+ * shortcut had been pressed again. 0 (the default) never does: the
+ * recording runs until the next press or the 30-minute cap. Which
+ * recordings it covers is decided in one place,
  * `transcription_coordinator::silence_timeout_for`.
  */
 dictation_silence_stop_secs?: number; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 

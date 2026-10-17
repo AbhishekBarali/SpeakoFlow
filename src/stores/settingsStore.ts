@@ -172,6 +172,8 @@ const settingUpdaters: {
   update_checks_enabled: (value) =>
     commands.changeUpdateChecksSetting(value as boolean),
   push_to_talk: (value) => commands.changePttSetting(value as boolean),
+  assistant_push_to_talk: (value) =>
+    commands.changeAssistantPttSetting(value as boolean),
   dictation_silence_stop_secs: (value) =>
     commands.changeDictationSilenceStopSetting(value as number),
   selected_microphone: (value) =>
@@ -543,6 +545,26 @@ export const useSettingsStore = create<SettingsStore>()(
         // Check if the binding change was successful
         if (!result.data.success) {
           throw new Error(result.data.error || "Failed to update binding");
+        }
+
+        // Show what was stored, which can differ from what was pressed: the
+        // hands-free key keeps only the key of what was recorded.
+        const stored = result.data.binding?.current_binding;
+        if (stored !== undefined && stored !== binding) {
+          set((state) => ({
+            settings: state.settings
+              ? {
+                  ...state.settings,
+                  bindings: {
+                    ...state.settings.bindings,
+                    [id]: {
+                      ...state.settings.bindings[id]!,
+                      current_binding: stored,
+                    },
+                  },
+                }
+              : null,
+          }));
         }
       } catch (error) {
         console.error(`Failed to update binding ${id}:`, error);

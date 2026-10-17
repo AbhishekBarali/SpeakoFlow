@@ -645,6 +645,10 @@
           "assistant_call": {
             "name": "Zahájit konverzaci",
             "description": "Mluvte s asistentem bez použití rukou a poslouchejte jeho odpovědi. Dalším stisknutím ukončíte."
+          },
+          "hands_free": {
+            "name": "Režim bez držení",
+            "description": "Stiskněte při držení kláves diktování a nahrávání bude pokračovat i po jejich puštění. Dalším stiskem kláves diktování skončíte."
           }
         },
         "errors": {
@@ -667,14 +671,22 @@
       },
       "pushToTalk": {
         "label": "Způsob nahrávání",
-        "description": "Podržení: nahrává se, dokud držíte zkratku pro nahrávání. Stisknutí: jeden stisk spustí, další zastaví. Platí pro všechny zkratky pro nahrávání.",
+        "dictation": "Podržení: nahrává se, dokud držíte klávesy diktování. Stisknutí: jeden stisk spustí, další zastaví.",
+        "assistant": "Podržení: poslouchá, dokud držíte klávesy pro dotaz. Stisknutí: jeden stisk spustí, další odešle.",
         "hold": "Podržení",
         "tap": "Stisknutí"
       },
+      "handsFree": {
+        "description": "Při držení {{keys}} stiskněte tuto klávesu a pusťte: diktování poslouchá dál, dokud znovu nestisknete {{keys}}.",
+        "unavailableKeys": "Vyžaduje zkratku diktování jen z modifikačních kláves. S {{keys}} použijte místo toho „Stiskem zapnout/vypnout“.",
+        "unavailableEngine": "Vyžaduje klávesnicový modul SpeakoFlow Keys, v části {{where}}.",
+        "taken": "{{name}} už používá {{keys}}, takže tato klávesa nic nedělá, dokud se jedno z nich nezmění.",
+        "needsKey": "Vyberte jednu klávesu, například mezerník nebo Enter. Samotná modifikační klávesa nemůže být klávesou pro režim bez držení.",
+        "pressKey": "Stiskněte klávesu…"
+      },
       "silenceStop": {
         "label": "Zastavit po tichu",
-        "description": "Při Stisknutí se diktování, ve kterém tak dlouho nezazní řeč, samo zastaví a vloží text, jako byste znovu stiskli zkratku. Těsně před zastavením se na pilulce zkracuje čára; když znovu promluvíte, nahrávání pokračuje.",
-        "tapOnly": "Funguje při Stisknutí. Při Podržení diktování zastaví už puštění klávesy."
+        "description": "Diktování bez držení, ve kterém tak dlouho nezazní řeč, se samo zastaví a vloží text, jako byste znovu stiskli zkratku. Těsně před zastavením se na pilulce zkracuje čára; když znovu promluvíte, nahrávání pokračuje."
       }
     },
     "models": {
@@ -2249,12 +2261,14 @@
     },
     "listening": "Poslouchám…",
     "locked": "Nahrávám bez držení — dalším stiskem zkratky nahrávání zastavíte",
+    "handsFree": "Bez držení",
     "cancel": "Zrušit",
     "copy": "Zkopírovat přepis",
     "transcript": "Přepis",
     "copied": "Zkopírováno",
     "copyFailed": "Nepodařilo se zkopírovat — zkuste to znovu",
     "done": "Hotovo",
+    "finish": "Dokončit",
     "askAssistant": "Zeptat se asistenta místo vypsání tohoto textu",
     "recovery": {
       "dismissed": "Zrušeno",
@@ -2660,6 +2674,9 @@
         "whatHold": "Podržte, mluvte, pusťte. Slova se napíšou tam, kde je kurzor.",
         "whatTap": "Stiskněte, mluvte, stiskněte znovu. Slova se napíšou tam, kde je kurzor."
       },
+      "handsFree": {
+        "what": "Podržte {{keys}}, stiskněte {{key}} a pusťte: poslouchá dál, dokud znovu nestisknete {{keys}}."
+      },
       "cleanup": {
         "title": "Diktovat a vyčistit",
         "description": "Stejné jako Diktovat, jen AI navíc opraví interpunkci, vycpávková slova a styl.",
@@ -2668,7 +2685,8 @@
       "ask": {
         "title": "Zeptat se asistenta",
         "description": "Položte otázku nahlas a odpověď dostanete v plovoucím panelu.",
-        "what": "Ptejte se nahlas. Odpověď se zobrazí v plovoucím panelu."
+        "whatHold": "Podržte, zeptejte se, pusťte. Odpověď se zobrazí v plovoucím panelu.",
+        "whatTap": "Stiskněte, zeptejte se, stiskněte znovu. Odpověď se zobrazí v plovoucím panelu."
       },
       "call": {
         "title": "Zahájit konverzaci",
@@ -2677,10 +2695,6 @@
       },
       "info": "Stiskněte je v jakékoli aplikaci. Kliknutím na klávesy je změníte.",
       "offHint": "Vypnuto",
-      "mode": {
-        "hold": "Podržte a mluvte",
-        "tap": "Stiskem zapnout/vypnout"
-      },
       "cancel": {
         "title": "Zrušit",
         "what": "Zastaví nahrávání nebo předčítanou odpověď."

@@ -641,6 +641,10 @@
           "assistant_call": {
             "name": "Starta en konversation",
             "description": "Prata med assistenten handsfree och hör dess svar. Tryck igen för att avsluta."
+          },
+          "hands_free": {
+            "name": "Handsfree-läge",
+            "description": "Tryck på den medan du håller dikteringstangenterna, så fortsätter inspelningen när du släpper. Tryck på dikteringstangenterna igen för att avsluta."
           }
         },
         "errors": {
@@ -663,14 +667,22 @@
       },
       "pushToTalk": {
         "label": "Inspelningsbeteende",
-        "description": "Håll: inspelningen pågår medan du håller ned ett inspelningskortkommando. Tryck: en tryckning startar, nästa stoppar. Gäller alla inspelningskortkommandon.",
+        "dictation": "Håll: inspelningen pågår medan du håller ned dikteringstangenterna. Tryck: en tryckning startar, nästa stoppar.",
+        "assistant": "Håll: lyssnar medan du håller ned frågetangenterna. Tryck: en tryckning startar, nästa skickar.",
         "hold": "Håll",
         "tap": "Tryck"
       },
+      "handsFree": {
+        "description": "Medan du håller {{keys}}, tryck på den här tangenten och släpp: dikteringen fortsätter lyssna tills du trycker på {{keys}} igen.",
+        "unavailableKeys": "Kräver ett dikteringskortkommando av bara modifierartangenter. Med {{keys}} kan du använda ”Tryck för att växla” i stället.",
+        "unavailableEngine": "Kräver tangentbordsmotorn SpeakoFlow Keys, under {{where}}.",
+        "taken": "{{name}} använder redan {{keys}}, så den här tangenten gör ingenting förrän en av dem ändras.",
+        "needsKey": "Välj en tangent, till exempel mellanslag eller Enter. En modifierartangent ensam kan inte vara handsfree-tangenten.",
+        "pressKey": "Tryck på en tangent…"
+      },
       "silenceStop": {
         "label": "Stoppa efter tystnad",
-        "description": "Med Tryck stoppas en diktering som inte hör något tal på så här länge och klistras in av sig själv, som om du hade tryckt på kortkommandot igen. Strax innan krymper en linje på rutan; börjar du prata igen fortsätter inspelningen.",
-        "tapOnly": "Fungerar med Tryck. Med Håll stoppas dikteringen redan när du släpper tangenten."
+        "description": "En handsfree-diktering som inte hör något tal på så här länge stoppas och klistras in av sig själv, som om du hade tryckt på kortkommandot igen. Strax innan krymper en linje på rutan; börjar du prata igen fortsätter inspelningen."
       }
     },
     "models": {
@@ -2225,12 +2237,14 @@
     },
     "listening": "Lyssnar…",
     "locked": "Spelar in handsfree — tryck på kortkommandot igen för att stoppa",
+    "handsFree": "Handsfree",
     "cancel": "Avbryt",
     "copy": "Kopiera transkriptionen",
     "transcript": "Transkription",
     "copied": "Kopierat",
     "copyFailed": "Kunde inte kopiera — försök igen",
     "done": "Klar",
+    "finish": "Avsluta",
     "askAssistant": "Fråga assistenten i stället för att skriva in det här",
     "recovery": {
       "dismissed": "Avbruten",
@@ -2618,6 +2632,9 @@
         "whatHold": "Håll ned, prata, släpp. Dina ord skrivs där markören är.",
         "whatTap": "Tryck, prata, tryck igen. Dina ord skrivs där markören är."
       },
+      "handsFree": {
+        "what": "Håll {{keys}}, tryck på {{key}} och släpp: den fortsätter lyssna tills du trycker på {{keys}} igen."
+      },
       "cleanup": {
         "title": "Diktera och rensa",
         "description": "Samma som Diktera, men sedan rättar AI:n skiljetecken, utfyllnadsord och stil.",
@@ -2626,7 +2643,8 @@
       "ask": {
         "title": "Fråga assistenten",
         "description": "Ställ en fråga högt och få svaret i en flytande panel.",
-        "what": "Fråga högt. Svaret visas i en flytande panel."
+        "whatHold": "Håll ned, fråga, släpp. Svaret visas i en flytande panel.",
+        "whatTap": "Tryck, fråga, tryck igen. Svaret visas i en flytande panel."
       },
       "call": {
         "title": "Starta en konversation",
@@ -2635,10 +2653,6 @@
       },
       "info": "Tryck på dessa i valfri app. Klicka på tangenterna för att ändra dem.",
       "offHint": "Avstängt",
-      "mode": {
-        "hold": "Håll ned för att tala",
-        "tap": "Tryck för att växla"
-      },
       "cancel": {
         "title": "Avbryt",
         "what": "Stoppa en inspelning eller ett svar som läses upp."

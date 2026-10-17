@@ -639,6 +639,10 @@
           "assistant_call": {
             "name": "Bắt đầu trò chuyện",
             "description": "Trò chuyện rảnh tay với trợ lý và nghe câu trả lời. Nhấn lần nữa để kết thúc."
+          },
+          "hands_free": {
+            "name": "Chế độ rảnh tay",
+            "description": "Nhấn phím này khi đang giữ các phím đọc chính tả để tiếp tục ghi âm sau khi thả tay. Nhấn lại các phím đọc chính tả để kết thúc."
           }
         },
         "errors": {
@@ -661,14 +665,22 @@
       },
       "pushToTalk": {
         "label": "Cách ghi âm",
-        "description": "Giữ: ghi âm trong khi bạn giữ phím tắt ghi âm. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng. Áp dụng cho mọi phím tắt ghi âm.",
+        "dictation": "Giữ: ghi âm trong khi bạn giữ các phím đọc chính tả. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để dừng.",
+        "assistant": "Giữ: lắng nghe trong khi bạn giữ các phím đặt câu hỏi. Nhấn: nhấn một lần để bắt đầu, nhấn lần nữa để gửi.",
         "hold": "Giữ",
         "tap": "Nhấn"
       },
+      "handsFree": {
+        "description": "Khi đang giữ {{keys}}, nhấn phím này rồi thả ra: chế độ đọc chính tả tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}.",
+        "unavailableKeys": "Cần phím tắt đọc chính tả chỉ gồm các phím bổ trợ. Với {{keys}}, hãy dùng “Nhấn để bật/tắt” thay thế.",
+        "unavailableEngine": "Cần bộ xử lý bàn phím SpeakoFlow Keys, trong {{where}}.",
+        "taken": "{{name}} đã dùng {{keys}}, nên phím này không có tác dụng cho đến khi một trong hai thay đổi.",
+        "needsKey": "Hãy chọn một phím, như phím cách hoặc Enter. Một phím bổ trợ riêng lẻ không thể là phím rảnh tay.",
+        "pressKey": "Nhấn một phím…"
+      },
       "silenceStop": {
         "label": "Dừng khi im lặng",
-        "description": "Ở chế độ Nhấn, nếu không nghe thấy tiếng nói trong khoảng thời gian này, việc đọc chính tả sẽ tự dừng và dán văn bản như khi bạn nhấn lại phím tắt. Ngay trước khi dừng, một vạch trên viên nhỏ sẽ ngắn dần; nói tiếp thì vẫn tiếp tục ghi âm.",
-        "tapOnly": "Dùng được ở chế độ Nhấn. Ở chế độ Giữ, thả phím là đã dừng đọc chính tả."
+        "description": "Khi đọc chính tả rảnh tay, nếu không nghe thấy tiếng nói trong khoảng thời gian này, ứng dụng sẽ tự dừng và dán văn bản như khi bạn nhấn lại phím tắt. Ngay trước khi dừng, một vạch trên viên nhỏ sẽ ngắn dần; nói tiếp thì vẫn tiếp tục ghi âm."
       }
     },
     "models": {
@@ -2213,12 +2225,14 @@
     },
     "listening": "Đang lắng nghe…",
     "locked": "Đang ghi âm rảnh tay — nhấn lại phím tắt để dừng",
+    "handsFree": "Rảnh tay",
     "cancel": "Hủy",
     "copy": "Sao chép bản chép lời",
     "transcript": "Bản chép lời",
     "copied": "Đã sao chép",
     "copyFailed": "Không thể sao chép — hãy thử lại",
     "done": "Xong",
+    "finish": "Hoàn tất",
     "askAssistant": "Hỏi trợ lý thay vì gõ nội dung này",
     "recovery": {
       "dismissed": "Đã hủy",
@@ -2597,6 +2611,9 @@
         "whatHold": "Giữ, nói, thả ra. Lời bạn nói được gõ tại vị trí con trỏ.",
         "whatTap": "Nhấn, nói, nhấn lại. Lời bạn nói được gõ tại vị trí con trỏ."
       },
+      "handsFree": {
+        "what": "Giữ {{keys}}, nhấn {{key}} rồi thả ra: ứng dụng tiếp tục nghe cho đến khi bạn nhấn lại {{keys}}."
+      },
       "cleanup": {
         "title": "Đọc chính tả và dọn dẹp",
         "description": "Giống Đọc chính tả, sau đó AI sửa dấu câu, từ đệm và văn phong.",
@@ -2605,7 +2622,8 @@
       "ask": {
         "title": "Hỏi trợ lý",
         "description": "Hỏi thành tiếng và nhận câu trả lời trong một bảng nổi.",
-        "what": "Hỏi thành tiếng. Câu trả lời hiện trong một bảng nổi."
+        "whatHold": "Giữ, hỏi, thả ra. Câu trả lời hiện trong một bảng nổi.",
+        "whatTap": "Nhấn, hỏi, nhấn lại. Câu trả lời hiện trong một bảng nổi."
       },
       "call": {
         "title": "Bắt đầu trò chuyện",
@@ -2614,10 +2632,6 @@
       },
       "info": "Nhấn các phím này trong bất kỳ ứng dụng nào. Nhấp vào phím để thay đổi.",
       "offHint": "Đã tắt",
-      "mode": {
-        "hold": "Giữ để nói",
-        "tap": "Nhấn để bật/tắt"
-      },
       "cancel": {
         "title": "Hủy",
         "what": "Dừng ghi âm, hoặc dừng câu trả lời đang được đọc to."

@@ -645,6 +645,10 @@
           "assistant_call": {
             "name": "Rozpocznij rozmowę",
             "description": "Rozmawiaj z asystentem bez użycia rąk i słuchaj jego odpowiedzi. Naciśnij ponownie, aby zakończyć."
+          },
+          "hands_free": {
+            "name": "Tryb bez trzymania",
+            "description": "Naciśnij go, trzymając klawisze dyktowania, a nagrywanie będzie trwać po ich puszczeniu. Naciśnij klawisze dyktowania ponownie, aby zakończyć."
           }
         },
         "errors": {
@@ -667,14 +671,22 @@
       },
       "pushToTalk": {
         "label": "Sposób nagrywania",
-        "description": "Przytrzymanie: nagrywanie trwa, dopóki trzymasz skrót nagrywania. Naciśnięcie: jedno naciśnięcie zaczyna, następne kończy. Dotyczy wszystkich skrótów nagrywania.",
+        "dictation": "Przytrzymanie: nagrywanie trwa, dopóki trzymasz klawisze dyktowania. Naciśnięcie: jedno naciśnięcie zaczyna, następne kończy.",
+        "assistant": "Przytrzymanie: słucha, dopóki trzymasz klawisze pytania. Naciśnięcie: jedno naciśnięcie zaczyna, następne wysyła.",
         "hold": "Przytrzymanie",
         "tap": "Naciśnięcie"
       },
+      "handsFree": {
+        "description": "Trzymając {{keys}}, naciśnij ten klawisz i puść: dyktowanie słucha dalej, dopóki ponownie nie naciśniesz {{keys}}.",
+        "unavailableKeys": "Wymaga skrótu dyktowania złożonego wyłącznie z klawiszy modyfikujących. Przy {{keys}} użyj zamiast tego „Stuknij, aby przełączyć”.",
+        "unavailableEngine": "Wymaga silnika klawiatury SpeakoFlow Keys, w sekcji {{where}}.",
+        "taken": "{{name}} już używa {{keys}}, więc ten klawisz nic nie robi, dopóki jedno z nich się nie zmieni.",
+        "needsKey": "Wybierz jeden klawisz, na przykład spację lub Enter. Sam klawisz modyfikujący nie może być klawiszem trybu bez trzymania.",
+        "pressKey": "Naciśnij klawisz…"
+      },
       "silenceStop": {
         "label": "Zatrzymaj po ciszy",
-        "description": "Przy Naciśnięciu dyktowanie, w którym przez tyle czasu nie słychać mowy, samo się zatrzymuje i wkleja tekst, jakby skrót został naciśnięty ponownie. Tuż przed zatrzymaniem kreska na pigułce się skraca; gdy znów zaczniesz mówić, nagrywanie trwa dalej.",
-        "tapOnly": "Działa przy Naciśnięciu. Przy Przytrzymaniu dyktowanie zatrzymuje już puszczenie klawisza."
+        "description": "Dyktowanie bez trzymania, w którym przez tyle czasu nie słychać mowy, samo się zatrzymuje i wkleja tekst, jakby skrót został naciśnięty ponownie. Tuż przed zatrzymaniem kreska na pigułce się skraca; gdy znów zaczniesz mówić, nagrywanie trwa dalej."
       }
     },
     "models": {
@@ -2249,12 +2261,14 @@
     },
     "listening": "Słucham…",
     "locked": "Nagrywanie bez trzymania klawisza — naciśnij skrót ponownie, aby zakończyć",
+    "handsFree": "Bez trzymania",
     "cancel": "Anuluj",
     "copy": "Kopiuj transkrypcję",
     "transcript": "Transkrypcja",
     "copied": "Skopiowano",
     "copyFailed": "Nie udało się skopiować — spróbuj ponownie",
     "done": "Gotowe",
+    "finish": "Zakończ",
     "askAssistant": "Zapytaj asystenta, zamiast to wpisywać",
     "recovery": {
       "dismissed": "Odrzucono",
@@ -2660,6 +2674,9 @@
         "whatHold": "Przytrzymaj, mów, puść. Słowa wpiszą się tam, gdzie jest kursor.",
         "whatTap": "Stuknij, mów, stuknij ponownie. Słowa wpiszą się tam, gdzie jest kursor."
       },
+      "handsFree": {
+        "what": "Przytrzymaj {{keys}}, naciśnij {{key}} i puść: nasłuchiwanie trwa, dopóki ponownie nie naciśniesz {{keys}}."
+      },
       "cleanup": {
         "title": "Dyktuj i oczyść",
         "description": "Jak dyktowanie, a potem AI poprawia interpunkcję, słowa wypełniające i styl.",
@@ -2668,7 +2685,8 @@
       "ask": {
         "title": "Zapytaj asystenta",
         "description": "Zadaj pytanie na głos i zobacz odpowiedź w pływającym panelu.",
-        "what": "Zapytaj na głos. Odpowiedź pojawi się w pływającym panelu."
+        "whatHold": "Przytrzymaj, zapytaj, puść. Odpowiedź pojawi się w pływającym panelu.",
+        "whatTap": "Stuknij, zapytaj, stuknij ponownie. Odpowiedź pojawi się w pływającym panelu."
       },
       "call": {
         "title": "Rozpocznij rozmowę",
@@ -2677,10 +2695,6 @@
       },
       "info": "Używaj ich w dowolnej aplikacji. Kliknij klawisze, aby je zmienić.",
       "offHint": "Wyłączony",
-      "mode": {
-        "hold": "Przytrzymaj, aby mówić",
-        "tap": "Stuknij, aby przełączyć"
-      },
       "cancel": {
         "title": "Anuluj",
         "what": "Zatrzymaj nagrywanie albo czytaną na głos odpowiedź."

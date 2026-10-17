@@ -8,6 +8,7 @@ import {
   isMouseButtonKey,
 } from "../../lib/utils/keyboard";
 import { shortcutUsingKeys } from "../../lib/utils/shortcutConflict";
+import { HANDS_FREE_ID, keysToSave } from "../../lib/handsFree";
 import { SettingContainer } from "../ui/SettingContainer";
 import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
@@ -164,16 +165,24 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
             currentKeysRef.current = hotkey_string;
             setCurrentKeys(hotkey_string);
           } else if (!is_key_down && currentKeysRef.current) {
-            // Key released - commit the shortcut using the ref value
-            const keysToCommit = currentKeysRef.current;
+            // Key released - commit the shortcut using the ref value. The
+            // hands-free key keeps only its key, so it can be recorded
+            // while holding the dictation keys or on its own.
+            const keysToCommit = keysToSave(shortcutId, currentKeysRef.current);
             const target = now.slot ?? "primary";
-            const takenBy = shortcutUsingKeys(
-              now.bindings,
-              keysToCommit,
-              shortcutId,
-              target,
-            );
-            if (takenBy === shortcutId) {
+            const takenBy =
+              keysToCommit === null
+                ? null
+                : shortcutUsingKeys(
+                    now.bindings,
+                    keysToCommit,
+                    shortcutId,
+                    target,
+                  );
+            if (keysToCommit === null) {
+              // Modifiers alone: nothing was changed.
+              toast.error(now.t("settings.general.handsFree.needsKey"));
+            } else if (takenBy === shortcutId) {
               toast.error(
                 now.t("settings.general.shortcut.errors.sameAsOther", {
                   keys: formatKeyCombination(keysToCommit, now.osType),
@@ -308,8 +317,10 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
   // Format the current shortcut keys being recorded
   const formatCurrentKeys = (): string => {
     if (!currentKeys)
-      return mouseButtons
-        ? t("shortcutEditor.pressKeysOrButton")
+      return shortcutId === HANDS_FREE_ID
+        ? t("settings.general.handsFree.pressKey")
+        : mouseButtons
+          ? t("shortcutEditor.pressKeysOrButton")
         : t("settings.general.shortcut.pressKeys");
     return formatKeyCombination(currentKeys, osType);
   };
@@ -453,8 +464,14 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
               disabled={busy}
               onUseDefault={() => void useDefault()}
               onTurnOff={() => void turnOff()}
+              // The hands-free key is one key on top of the dictation keys;
+              // a second one would be listened for by nothing.
               onAddAnother={
-                originalBinding.trim() && !otherKeys ? addAnother : undefined
+                shortcutId !== HANDS_FREE_ID &&
+                originalBinding.trim() &&
+                !otherKeys
+                  ? addAnother
+                  : undefined
               }
             />
           ) : (

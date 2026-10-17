@@ -84,18 +84,18 @@ fn is_dictation_binding(id: &str) -> bool {
 /// The silence after which a recording ends by itself, if it gets one at all
 /// (`dictation_silence_stop_secs`).
 ///
-/// Only a hands-free dictation: started with a tap, or by `--toggle-transcription`
-/// and the like, while the app is set to Tap. A held recording already ends when
-/// the key is let go, so stopping it under the user's finger could only surprise
-/// them. The assistant's ask, calls and meetings each have their own idea of when
-/// someone has finished, and are left to it.
+/// Only a hands-free dictation (`hands_free`): one started with a tap, one a
+/// held dictation turned into with the keys plus Space or a quick tap, and one
+/// started by `--toggle-transcription` and the like. A held recording already
+/// ends when the key is let go, so stopping it under the user's finger could
+/// only surprise them. The assistant's ask, calls and meetings each have their
+/// own idea of when someone has finished, and are left to it.
 pub(crate) fn silence_timeout_for(
     binding_id: &str,
     mode: RecordingMode,
-    push_to_talk: bool,
     secs: u32,
 ) -> Option<Duration> {
-    (is_dictation_binding(binding_id) && mode == RecordingMode::Lock && !push_to_talk && secs > 0)
+    (is_dictation_binding(binding_id) && mode == RecordingMode::Lock && secs > 0)
         .then(|| Duration::from_secs(u64::from(secs)))
 }
 
@@ -226,8 +226,9 @@ impl SilenceWatch {
     }
 }
 
-/// The silence watch for a recording that has just started, if it gets one.
-/// Settings are read here, once, so a change applies to the next recording.
+/// The silence watch for a recording that has just started or just turned
+/// hands-free, if it gets one. Settings are read here, once, so a change applies
+/// to the next recording.
 fn arm_silence_watch(
     app: &AppHandle,
     binding_id: &str,
@@ -235,12 +236,7 @@ fn arm_silence_watch(
     generation: u64,
 ) -> Option<SilenceWatch> {
     let settings = crate::settings::get_settings(app);
-    let timeout = silence_timeout_for(
-        binding_id,
-        mode,
-        settings.push_to_talk,
-        settings.dictation_silence_stop_secs,
-    )?;
+    let timeout = silence_timeout_for(binding_id, mode, settings.dictation_silence_stop_secs)?;
     debug!(
         "'{binding_id}' stops after {}s without speech",
         timeout.as_secs()
@@ -267,7 +263,7 @@ pub enum RecordingMode {
     /// Push-to-talk: hold the shortcut to record, release to stop & transcribe.
     Hold,
     /// Hands-free: press to start, press again (or commit/cancel) to stop.
-    /// Releases are ignored.
+    /// Releases are ignored. A held dictation can become one (`hands_free`).
     Lock,
 }
 
@@ -282,6 +278,19 @@ pub fn recording_mode(push_to_talk: bool) -> RecordingMode {
     }
 }
 
+/// Whether the hands-free key has a dictation to keep listening: one held to
+/// talk. With Tap to toggle a dictation already is hands-free, and anything
+/// else (an ask, a paste, nothing at all) is not the key's business.
+fn keeps_listening(stage: &Stage) -> bool {
+    matches!(
+        stage,
+        Stage::Recording {
+            binding_id,
+            mode: RecordingMode::Hold,
+        } if crate::hands_free::is_dictation_binding(binding_id)
+    )
+}
+
 /// Commands processed sequentially by the coordinator thread.
 enum Command {
     Input {
@@ -289,6 +298,12 @@ enum Command {
         hotkey_string: String,
         is_pressed: bool,
         mode: RecordingMode,
+    },
+    /// The hands-free key went down on top of dictation shortcut `binding_id`
+    /// (see `hands_free`). Never debounced: pressed right after the dictation
+    /// keys, it lands within the press debounce of their own press.
+    HandsFree {
+        binding_id: String,
     },
     /// Finish the active recording and transcribe it (overlay "done" tick /
     /// assistant panel finish button). No-op unless something is recording.
@@ -450,20 +465,6 @@ impl TranscriptionCoordinator {
                                             // later, unrelated one.
                                             generation = generation.wrapping_add(1);
                                             recording_since = Instant::now();
-                                            match mode {
-                                                // Hands-free (Push-to-talk OFF): a
-                                                // tap-to-toggle recording. Tell the
-                                                // overlay/pill so it shows the quiet
-                                                // "locked / tap again to stop" cue.
-                                                RecordingMode::Lock => {
-                                                    use tauri::Emitter;
-                                                    let _ = app.emit("recording-locked", true);
-                                                }
-                                                // Push-to-talk (hold): nothing extra
-                                                // to arm — tap-to-lock was removed in
-                                                // favour of the simple hold/tap model.
-                                                RecordingMode::Hold => {}
-                                            }
                                         }
                                     }
                                     // A second press only stops a hands-free
@@ -492,6 +493,28 @@ impl TranscriptionCoordinator {
                                 if should_stop {
                                     stop(&app, &mut stage, &binding_id, &hotkey_string);
                                 }
+                            }
+                        }
+                        Command::HandsFree { binding_id } => {
+                            if keeps_listening(&stage) {
+                                debug!("Hands-free key: the held dictation keeps listening");
+                                keep_listening(&app, &mut stage);
+                                // Hands-free from here, so it may stop on
+                                // silence. The stage did not change, so the
+                                // arming on entry never sees it.
+                                silence = match &stage {
+                                    Stage::Recording { binding_id, .. } => arm_silence_watch(
+                                        &app,
+                                        binding_id,
+                                        RecordingMode::Lock,
+                                        generation,
+                                    ),
+                                    _ => None,
+                                };
+                            } else {
+                                debug!(
+                                    "Ignoring the hands-free key of '{binding_id}': nothing held"
+                                );
                             }
                         }
                         Command::Commit => {
@@ -718,9 +741,9 @@ impl TranscriptionCoordinator {
                             emit_silence_countdown(&app, None);
                         }
                         silence = match &stage {
-                            Stage::Recording { binding_id, mode } => {
-                                arm_silence_watch(&app, binding_id, *mode, generation)
-                            }
+                            Stage::Recording {
+                                binding_id, mode, ..
+                            } => arm_silence_watch(&app, binding_id, *mode, generation),
                             _ => None,
                         };
                     }
@@ -769,6 +792,20 @@ impl TranscriptionCoordinator {
                 hotkey_string: hotkey_string.to_string(),
                 is_pressed,
                 mode,
+            })
+            .is_err()
+        {
+            warn!("Transcription coordinator channel closed");
+        }
+    }
+
+    /// The hands-free key went down on top of dictation shortcut `binding_id`
+    /// (see `hands_free`).
+    pub fn send_hands_free(&self, binding_id: &str) {
+        if self
+            .tx
+            .send(Command::HandsFree {
+                binding_id: binding_id.to_string(),
             })
             .is_err()
         {
@@ -865,6 +902,11 @@ fn start(
         warn!("No action in ACTION_MAP for '{binding_id}'");
         return;
     };
+    // Read by the recording's own show, which `action.start` puts up (or, held
+    // back by `shortcut::chord`, schedules).
+    crate::overlay::set_recording_hands_free(
+        mode == RecordingMode::Lock && crate::hands_free::is_dictation_binding(binding_id),
+    );
     action.start(app, binding_id, hotkey_string);
     if app
         .try_state::<Arc<AudioRecordingManager>>()
@@ -877,6 +919,18 @@ fn start(
     } else {
         debug!("Start for '{binding_id}' did not begin recording; staying idle");
     }
+}
+
+/// A held dictation keeps listening after its keys are let go: from here a
+/// release does nothing and the next press finishes it.
+fn keep_listening(app: &AppHandle, stage: &mut Stage) {
+    if let Stage::Recording { mode, .. } = stage {
+        *mode = RecordingMode::Lock;
+    }
+    crate::overlay::enter_hands_free(app);
+    // The pill may still be waiting to see whether the press was the start of
+    // a longer shortcut (`shortcut::chord`). It was not.
+    crate::shortcut::chord::reveal_now(app);
 }
 
 fn stop(app: &AppHandle, stage: &mut Stage, binding_id: &str, hotkey_string: &str) {
@@ -1029,6 +1083,46 @@ mod tests {
         }));
     }
 
+    fn recording(binding_id: &str, mode: RecordingMode) -> Stage {
+        Stage::Recording {
+            binding_id: binding_id.to_string(),
+            mode,
+        }
+    }
+
+    #[test]
+    fn the_hands_free_key_keeps_a_held_dictation_listening() {
+        assert!(keeps_listening(&recording(
+            "transcribe",
+            RecordingMode::Hold
+        )));
+        assert!(keeps_listening(&recording(
+            crate::settings::CLEANUP_BINDING_ID,
+            RecordingMode::Hold
+        )));
+    }
+
+    #[test]
+    fn the_hands_free_key_leaves_everything_else_alone() {
+        // Already hands-free.
+        assert!(!keeps_listening(&recording(
+            "transcribe",
+            RecordingMode::Lock
+        )));
+        // An ask is the assistant's, held or tapped.
+        assert!(!keeps_listening(&recording(
+            "assistant",
+            RecordingMode::Hold
+        )));
+        assert!(!keeps_listening(&recording(
+            "assistant",
+            RecordingMode::Lock
+        )));
+        // Nothing to keep, and nothing may interrupt a paste.
+        assert!(!keeps_listening(&Stage::Idle));
+        assert!(!keeps_listening(&Stage::Processing));
+    }
+
     #[test]
     fn every_stage_maps_to_its_own_deadline_kind() {
         assert!(stage_kind(&Stage::Idle) == StageKind::Idle);
@@ -1065,28 +1159,25 @@ mod tests {
     }
 
     const LOCK: RecordingMode = RecordingMode::Lock;
-    const TAP_MODE: bool = false;
 
     #[test]
     fn only_a_hands_free_dictation_stops_on_silence() {
         let five = Some(Duration::from_secs(5));
-        assert_eq!(silence_timeout_for("transcribe", LOCK, TAP_MODE, 5), five);
+        assert_eq!(silence_timeout_for("transcribe", LOCK, 5), five);
         assert_eq!(
-            silence_timeout_for("transcribe_with_post_process", LOCK, TAP_MODE, 5),
+            silence_timeout_for("transcribe_with_post_process", LOCK, 5),
             five
         );
         // Off.
-        assert_eq!(silence_timeout_for("transcribe", LOCK, TAP_MODE, 0), None);
+        assert_eq!(silence_timeout_for("transcribe", LOCK, 0), None);
         // The assistant's ask decides for itself when a question is over.
-        assert_eq!(silence_timeout_for("assistant", LOCK, TAP_MODE, 5), None);
-        // A held recording ends when the key is let go.
+        assert_eq!(silence_timeout_for("assistant", LOCK, 5), None);
+        // A held recording ends when the key is let go. Turned hands-free
+        // (the keys plus Space, a quick tap) it is `Lock`, and covered above.
         assert_eq!(
-            silence_timeout_for("transcribe", RecordingMode::Hold, TAP_MODE, 5),
+            silence_timeout_for("transcribe", RecordingMode::Hold, 5),
             None
         );
-        // Set to Hold, even a hands-free start (the CLI, the pill's mic) keeps
-        // running: the setting is offered for Tap only, so it applies to Tap only.
-        assert_eq!(silence_timeout_for("transcribe", LOCK, true, 5), None);
     }
 
     #[test]

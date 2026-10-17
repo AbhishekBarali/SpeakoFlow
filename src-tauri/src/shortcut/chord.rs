@@ -13,9 +13,9 @@
 //! So such a press records at once and only *shows* itself once the window has
 //! passed: [`reveal_when_settled`] holds back the visible part, releasing the
 //! keys reveals it at once ([`reveal_now`]), and a withdrawn press is dropped
-//! without ever having appeared ([`forget`]). With Tap to toggle none of this
-//! is needed: the engine fires those shortcuts when the keys are let go, by
-//! which point it already knows what was pressed.
+//! without ever having appeared ([`forget`]). A shortcut set to Tap to toggle
+//! needs none of this: the engine fires it when the keys are let go, by which
+//! point it already knows what was pressed.
 
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -65,7 +65,9 @@ fn extended_by_another(settings: &AppSettings, binding_id: &str, pressed: &str) 
         } else if crate::assistant::is_assistant_binding(id) {
             settings.assistant_enabled
         } else {
-            id != "cancel"
+            // The hands-free key is never a shortcut of its own, and it does
+            // not withdraw the dictation it is pressed on (`hands_free`).
+            id != "cancel" && id != settings::HANDS_FREE_BINDING_ID
         };
         live && other.combos().into_iter().any(|combo| {
             let longer = keys(combo);
@@ -80,11 +82,13 @@ fn extended_by_another(settings: &AppSettings, binding_id: &str, pressed: &str) 
 /// Whether this press should keep quiet until the chord window has passed.
 ///
 /// Only a held press from the hotkey engine that can withdraw it, of a shortcut
-/// another live one extends. `shortcut_str` is how a programmatic start (the
-/// pill, the CLI) is told apart: it is one of the binding's own sets of keys
-/// only when a hotkey fired it.
+/// another live one extends. Held is the shortcut's own setting: dictation can
+/// be held while the ask is tapped (`settings::holds_to_record`).
+/// `shortcut_str` is how a programmatic start (the pill, the CLI) is told
+/// apart: it is one of the binding's own sets of keys only when a hotkey fired
+/// it.
 pub fn holds_back(settings: &AppSettings, binding_id: &str, shortcut_str: &str) -> bool {
-    settings.push_to_talk
+    settings::holds_to_record(settings, binding_id)
         && settings.keyboard_implementation == KeyboardImplementation::HandyKeys
         && settings
             .bindings
@@ -156,6 +160,7 @@ mod tests {
     fn with(bindings: &[(&str, &str)]) -> AppSettings {
         let mut settings = settings::get_default_settings();
         settings.push_to_talk = true;
+        settings.assistant_push_to_talk = true;
         settings.keyboard_implementation = KeyboardImplementation::HandyKeys;
         settings.assistant_enabled = true;
         for (id, keys) in bindings {
@@ -186,8 +191,34 @@ mod tests {
             ("assistant_call", "ctrl_left+alt_left+c"),
         ]);
         assert!(!holds_back(&settings, "assistant", "signal"));
-        settings.push_to_talk = false;
+        settings.assistant_push_to_talk = false;
         assert!(!holds_back(&settings, "assistant", "ctrl_left+alt_left"));
+    }
+
+    #[test]
+    fn each_shortcut_holds_back_by_its_own_mode() {
+        // Dictation held, the ask tapped: the ask still extends Fn, so a held
+        // dictation may yet be withdrawn for it and keeps quiet until it settles.
+        let mut settings = with(&[
+            ("transcribe", "fn"),
+            ("assistant", "fn+ctrl"),
+            ("assistant_call", "fn+ctrl+c"),
+        ]);
+        settings.assistant_push_to_talk = false;
+        assert!(holds_back(&settings, "transcribe", "fn"));
+        assert!(!holds_back(&settings, "assistant", "fn+ctrl"));
+
+        settings.push_to_talk = false;
+        settings.assistant_push_to_talk = true;
+        assert!(!holds_back(&settings, "transcribe", "fn"));
+        assert!(holds_back(&settings, "assistant", "fn+ctrl"));
+    }
+
+    #[test]
+    fn the_hands_free_key_extends_nothing() {
+        let mut settings = with(&[("transcribe", "ctrl_left+super"), ("assistant_call", "")]);
+        settings.post_process_enabled = false;
+        assert!(!holds_back(&settings, "transcribe", "ctrl_left+super"));
     }
 
     #[test]

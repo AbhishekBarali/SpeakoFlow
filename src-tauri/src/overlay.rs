@@ -186,6 +186,45 @@ static WORKING_EPOCH: AtomicU64 = AtomicU64::new(0);
 /// When the run-out began, and for which show. The compact pill's hold counts
 /// from here rather than from the end of the paste.
 static SEAL_STARTED: Mutex<Option<(u64, Instant)>> = Mutex::new(None);
+/// Whether the dictation being recorded is hands-free: it keeps listening
+/// after its keys are let go (see `hands_free`). The coordinator sets it as
+/// each recording starts and when a held one turns hands-free; the recording's
+/// show reads it, since that show can come after the turn (`shortcut::chord`).
+static HANDS_FREE: AtomicBool = AtomicBool::new(false);
+/// The show that drew the recording pill or card, so turning hands-free only
+/// redraws it while it is still the one on screen.
+static RECORDING_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+/// Whether the recording that is starting is hands-free. Its show reads this.
+pub fn set_recording_hands_free(hands_free: bool) {
+    HANDS_FREE.store(hands_free, Ordering::SeqCst);
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HandsFreePayload {
+    /// Whether the window now takes the pointer, which is what the ✕ and ✓
+    /// need (see [`live_card_takes_pointer`]).
+    interactive: bool,
+}
+
+/// A held dictation just turned hands-free. A pill or card already on screen
+/// draws its ring and takes the pointer for ✕ and ✓; one not shown yet picks
+/// this up from its show.
+pub fn enter_hands_free(app: &AppHandle) {
+    HANDS_FREE.store(true, Ordering::SeqCst);
+    if RECORDING_EPOCH.load(Ordering::SeqCst) != OVERLAY_LIFECYCLE.current() {
+        return;
+    }
+    let Some(window) = app.get_webview_window("recording_overlay") else {
+        return;
+    };
+    let interactive = live_card_takes_pointer();
+    if interactive {
+        let _ = window.set_ignore_cursor_events(false);
+    }
+    let _ = window.emit("recording-hands-free", HandsFreePayload { interactive });
+}
 
 /// What is left of the compact pill's hold at `now`. A run-out that started for
 /// this show has already used part of it; anything else gets the whole hold,
@@ -300,6 +339,11 @@ struct ShowOverlayPayload {
     /// room for the cleanup instead of filling up and then starting over.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     cleanup_next: bool,
+    /// For `recording`: the dictation keeps listening after its keys are let go
+    /// (see [`set_recording_hands_free`]), so the surface wears its ring and
+    /// offers ✕ and ✓.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    hands_free: bool,
     /// For `transcribing`: an opaque fingerprint of what does the speech to
     /// text (`work_fingerprint`). The working fill learns each setup's timing
     /// separately, on this computer, rather than one average across every model
@@ -1178,14 +1222,19 @@ fn show_overlay(
     }
 
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        // The compact pill has nothing to act on, so it never intercepts the
-        // pointer. The live card takes it wherever that cannot cost the paste
-        // target its focus; elsewhere it waits for `finish_recording_overlay`.
-        // A recovery pill exists to be clicked, and is only ever offered where
-        // that is safe (see `show_recovery_overlay`).
-        let interactive = (streaming_window || recovery) && live_card_takes_pointer();
+        // A held dictation's pill has nothing to act on, so it never intercepts
+        // the pointer: the keys are under the user's fingers. A hands-free one
+        // offers ✕ and ✓. The live card takes it wherever that cannot cost the
+        // paste target its focus; elsewhere it waits for
+        // `finish_recording_overlay`. A recovery pill exists to be clicked, and
+        // is only ever offered where that is safe (see `show_recovery_overlay`).
+        let hands_free = state == "recording" && HANDS_FREE.load(Ordering::SeqCst);
+        let interactive = (streaming_window || recovery || hands_free) && live_card_takes_pointer();
         let _ = overlay_window.set_ignore_cursor_events(!interactive);
         let _ = overlay_window.show();
+        if state == "recording" {
+            RECORDING_EPOCH.store(epoch, Ordering::SeqCst);
+        }
 
         // On Windows, aggressively re-assert "topmost" in the native Z-order after showing
         #[cfg(target_os = "windows")]
@@ -1216,6 +1265,7 @@ fn show_overlay(
                 notice,
                 download,
                 cleanup_next,
+                hands_free,
                 stt_setup: (state == "transcribing").then(|| stt_setup_fingerprint(&settings)),
                 cleanup_setup: if state == "processing" || (state == "transcribing" && cleanup_next)
                 {

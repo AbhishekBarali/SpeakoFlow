@@ -524,9 +524,13 @@ const settings: Json = {
     assistant: binding("assistant", "ctrl_left+alt_left"),
     assistant_call: binding("assistant_call", "ctrl_left+alt_left+c"),
     cancel: binding("cancel", "escape"),
+    hands_free: binding("hands_free", "space"),
   },
   push_to_talk: true,
+  assistant_push_to_talk: true,
   dictation_silence_stop_secs: 0,
+  // Windows' default engine, the one modifier-only keys need.
+  keyboard_implementation: "handy_keys",
   audio_feedback: false,
   theme: params.get("theme") ?? "light",
   stt_engine_mode: params.get("stt") === "device" ? "local" : "cloud",
@@ -1832,6 +1836,7 @@ const handlers: Record<string, (args: Json) => unknown> = {
           "assistant_active_character_id",
         ],
         ["change_ptt_setting", "enabled", "push_to_talk"],
+        ["change_assistant_ptt_setting", "enabled", "assistant_push_to_talk"],
         [
           "change_dictation_silence_stop_setting",
           "secs",

@@ -680,3 +680,129 @@ test("a countdown never outlives its recording", async () => {
   await fire("show-overlay", { state: "recording", streamingWindow: false });
   expect(countdowns()).toHaveLength(0);
 });
+
+/** The surface on screen, pill or card, and whether it has a class. */
+const surface = () => renderer.root.findByProps({ role: "group" });
+const hasClass = (name: string) =>
+  String(surface().props.className).split(" ").includes(name);
+const buttonLabels = () =>
+  renderer.root
+    .findAllByType("button")
+    .map((button) => button.props["aria-label"] as string);
+const handsFreePill = {
+  state: "recording",
+  streamingWindow: false,
+  interactive: true,
+  handsFree: true,
+  epoch: 30,
+};
+
+test("a hands-free dictation wears its ring and offers cancel and finish", async () => {
+  await fire("show-overlay", handsFreePill);
+  expect(hasClass("hands-free")).toBe(true);
+  expect(hasClass("has-controls")).toBe(true);
+  expect(buttonLabels()).toEqual(["overlay.cancel", "overlay.finish"]);
+  expect(surface().props["aria-label"]).toBe("overlay.locked");
+});
+
+test("a held dictation has neither, until it turns hands-free", async () => {
+  await fire("show-overlay", {
+    state: "recording",
+    streamingWindow: false,
+    epoch: 31,
+  });
+  expect(hasClass("hands-free")).toBe(false);
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+
+  // The keys plus Space, or a quick tap: the window now takes the pointer.
+  await fire("recording-hands-free", { interactive: true });
+  expect(hasClass("hands-free")).toBe(true);
+  expect(buttonLabels()).toEqual(["overlay.cancel", "overlay.finish"]);
+});
+
+test("where the window cannot take the pointer, there is a ring and no buttons", async () => {
+  await fire("show-overlay", { ...handsFreePill, interactive: false });
+  expect(hasClass("hands-free")).toBe(true);
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+
+  await fire("show-overlay", {
+    state: "recording",
+    streamingWindow: false,
+    epoch: 32,
+  });
+  await fire("recording-hands-free", { interactive: false });
+  expect(hasClass("hands-free")).toBe(true);
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+});
+
+test("cancel and finish each reach the backend once", async () => {
+  await fire("show-overlay", handsFreePill);
+  const [cancel] = renderer.root.findAllByType("button");
+  await act(async () => {
+    cancel.props.onClick();
+  });
+  expect(calls).toEqual([{ command: "cancel_operation", args: undefined }]);
+  // Answered by the backend replacing the recording; until then, nothing more.
+  for (const button of renderer.root.findAllByType("button")) {
+    expect(button.props.disabled).toBe(true);
+    await act(async () => {
+      button.props.onClick();
+    });
+  }
+  expect(calls).toHaveLength(1);
+
+  // The next hands-free dictation starts with both back.
+  await fire("show-overlay", { ...handsFreePill, epoch: 33 });
+  const [, finish] = renderer.root.findAllByType("button");
+  expect(finish.props.disabled).toBe(false);
+  await act(async () => {
+    finish.props.onClick();
+  });
+  expect(calls.at(-1)).toEqual({
+    command: "commit_recording",
+    args: undefined,
+  });
+});
+
+test("the live card says hands-free and keeps cancel and finish by copy", async () => {
+  await fire("show-overlay", { ...handsFreePill, streamingWindow: true });
+  await fire("mic-level", [0.4, 0.6, 0.5, 0.7]);
+  expect(hasClass("hands-free")).toBe(true);
+  expect(textOf(renderer.root.findByProps({ className: "card-label" }))).toBe(
+    "overlay.handsFree",
+  );
+  expect(buttonLabels()).toEqual(["overlay.cancel", "overlay.finish"]);
+
+  await fire("stream-text", {
+    committed: "Long enough to copy",
+    tentative: "",
+  });
+  expect(buttonLabels()).toEqual([
+    "overlay.copy",
+    "overlay.cancel",
+    "overlay.finish",
+  ]);
+});
+
+test("hands-free ends with its recording and never reaches the next one", async () => {
+  await fire("show-overlay", handsFreePill);
+  await fire("show-overlay", {
+    state: "transcribing",
+    streamingWindow: false,
+    epoch: 34,
+  });
+  expect(hasClass("hands-free")).toBe(false);
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+
+  // A late turn for a recording that is already over changes nothing.
+  await fire("recording-hands-free", { interactive: true });
+  expect(hasClass("hands-free")).toBe(false);
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+
+  await fire("show-overlay", {
+    state: "recording",
+    streamingWindow: false,
+    epoch: 35,
+  });
+  expect(hasClass("hands-free")).toBe(false);
+});
