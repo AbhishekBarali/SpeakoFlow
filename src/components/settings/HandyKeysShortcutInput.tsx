@@ -321,7 +321,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
         ? t("settings.general.handsFree.pressKey")
         : mouseButtons
           ? t("shortcutEditor.pressKeysOrButton")
-        : t("settings.general.shortcut.pressKeys");
+          : t("settings.general.shortcut.pressKeys");
     return formatKeyCombination(currentKeys, osType);
   };
 
