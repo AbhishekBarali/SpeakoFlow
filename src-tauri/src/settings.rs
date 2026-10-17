@@ -7477,4 +7477,145 @@ mod tests {
         assert!(!out.contains("secret"));
         assert!(out.contains("[REDACTED]"));
     }
+
+    /* ── Upgrading from 2.0.1 ───────────────────────────────────────────────
+     *
+     * `testdata/settings-2.0.1.json` is exactly what a fresh 2.0.1 install
+     * saves, dumped from the v2.0.1 tag. The tests change it the way a user
+     * would, run it through what a launch does to a stored file, and check
+     * that every choice comes back. A field renamed or retyped, an enum value
+     * removed, or a migration that overwrites a choice fails here rather than
+     * on someone's machine. When a release ships, add its file beside this
+     * one. */
+
+    const SETTINGS_2_0_1: &str = include_str!("testdata/settings-2.0.1.json");
+
+    /// What `load_or_create_app_settings` does to a stored file, minus the
+    /// keychain steps, which move secrets but change no stored choice.
+    fn launch_with(stored: serde_json::Value) -> AppSettings {
+        let (mut settings, _) = deserialize_settings_value(stored);
+        let defaults = get_default_settings();
+        migrate_binding_defaults(&mut settings.bindings, &defaults.bindings);
+        apply_meeting_opt_in_defaults(&mut settings);
+        apply_ask_anchor_top_default(&mut settings);
+        for (key, value) in defaults.bindings {
+            settings.bindings.entry(key).or_insert(value);
+        }
+        for obsolete in [
+            "transcribe_toggle",
+            "assistant_vision",
+            "assistant_panel_toggle",
+        ] {
+            settings.bindings.remove(obsolete);
+        }
+        let _ = ensure_post_process_defaults(&mut settings)
+            | ensure_assistant_defaults(&mut settings)
+            | ensure_cloud_stt_defaults(&mut settings);
+        settings
+    }
+
+    /// A 2.0.1 store someone has used: every switch flipped from its default,
+    /// every whole number moved, and their own shortcuts, words and language.
+    fn used_2_0_1_store() -> serde_json::Value {
+        let mut stored: serde_json::Value = serde_json::from_str(SETTINGS_2_0_1).unwrap();
+        let map = stored.as_object_mut().unwrap();
+        for (key, value) in map.iter_mut() {
+            // A one-time marker is set in every 2.0.1 store. Flipping it would
+            // re-run its migration rather than stand for a choice. The retired
+            // incognito switch is always `false` on disk (2.0.1 already folds
+            // a `true` into memory off at launch), so it is no choice either.
+            if key.ends_with("_applied") || key == "assistant_memory_incognito" {
+                continue;
+            }
+            match value {
+                serde_json::Value::Bool(on) => *on = !*on,
+                serde_json::Value::Number(n) if n.is_u64() => {
+                    *value = serde_json::json!(n.as_u64().unwrap() + 1);
+                }
+                _ => {}
+            }
+        }
+        map.insert("selected_language".into(), serde_json::json!("de"));
+        map.insert("app_language".into(), serde_json::json!("de"));
+        map.insert(
+            "custom_words".into(),
+            serde_json::json!(["Kubernetes", "SpeakoFlow"]),
+        );
+        let bindings = map["bindings"].as_object_mut().unwrap();
+        for (i, binding) in bindings.values_mut().enumerate() {
+            binding["current_binding"] = serde_json::json!(format!("ctrl+alt+f{}", i + 1));
+        }
+        stored
+    }
+
+    /// Whether everything in `before` is still in `after`. New keys and new
+    /// list entries are fine (that is what an update adds); a value changed
+    /// or gone is not. Lists of objects with an `id` are matched by id, since
+    /// a launch may put providers in the shipped order.
+    fn kept(
+        before: &serde_json::Value,
+        after: &serde_json::Value,
+        path: &str,
+        lost: &mut Vec<String>,
+    ) {
+        use serde_json::Value;
+        match (before, after) {
+            (Value::Object(b), Value::Object(a)) => {
+                for (key, value) in b {
+                    match a.get(key) {
+                        Some(now) => kept(value, now, &format!("{path}.{key}"), lost),
+                        None => lost.push(format!("{path}.{key} (gone)")),
+                    }
+                }
+            }
+            (Value::Array(b), Value::Array(a)) if b.iter().all(|v| v.get("id").is_some()) => {
+                for item in b {
+                    let id = &item["id"];
+                    match a.iter().find(|now| &now["id"] == id) {
+                        Some(now) => kept(item, now, &format!("{path}[{id}]"), lost),
+                        None => lost.push(format!("{path}[{id}] (gone)")),
+                    }
+                }
+            }
+            _ if before == after => {}
+            _ => lost.push(path.to_string()),
+        }
+    }
+
+    #[test]
+    fn a_2_0_1_store_still_parses_as_a_whole() {
+        // Salvage would keep the rest, but only by dropping what no longer
+        // parses, so a 2.0.1 store must never need it.
+        let (normalized, _) = normalize_settings_json(used_2_0_1_store());
+        if let Err(error) = serde_json::from_value::<AppSettings>(normalized) {
+            panic!("a 2.0.1 store no longer parses as a whole: {error}");
+        }
+    }
+
+    #[test]
+    fn upgrading_from_2_0_1_keeps_every_choice() {
+        let before = used_2_0_1_store();
+        let after = serde_json::to_value(launch_with(before.clone())).unwrap();
+        let mut lost = Vec::new();
+        kept(&before, &after, "settings", &mut lost);
+        assert!(lost.is_empty(), "changed by the upgrade: {lost:#?}");
+    }
+
+    #[test]
+    fn upgrading_from_2_0_1_carries_hold_or_tap_over_to_the_ask() {
+        let before = used_2_0_1_store();
+        let shared = before["push_to_talk"].as_bool().unwrap();
+        let after = launch_with(before);
+        assert_eq!(after.push_to_talk, shared);
+        assert_eq!(after.assistant_push_to_talk, shared);
+        // The one new shortcut arrives; the user's own keys are untouched.
+        assert!(after.bindings.contains_key(HANDS_FREE_BINDING_ID));
+    }
+
+    #[test]
+    fn a_second_launch_after_upgrading_changes_nothing() {
+        let first = serde_json::to_value(launch_with(used_2_0_1_store())).unwrap();
+        let second = serde_json::to_value(launch_with(first.clone())).unwrap();
+        assert_eq!(first, second);
+    }
 }
