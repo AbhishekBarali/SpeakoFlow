@@ -5,19 +5,14 @@ import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import {
-  AudioLines,
-  Ban,
   ExternalLink,
   FolderOpen,
   Github,
-  MessageCircle,
   MessageSquareText,
   Mic,
-  PhoneCall,
   Scale,
   SunMoon,
   Type as TypeIcon,
-  Wand2,
 } from "lucide-react";
 import { commands } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
@@ -32,6 +27,7 @@ import { AppLanguageSelector } from "@/components/settings/AppLanguageSelector";
 import { AutostartToggle } from "@/components/settings/AutostartToggle";
 import { StartHidden } from "@/components/settings/StartHidden";
 import { ShowTrayIcon } from "@/components/settings/ShowTrayIcon";
+import { TrayIconColor } from "@/components/settings/TrayIconColor";
 import { QuitOnClose } from "@/components/settings/QuitOnClose";
 import { UpdateChecksToggle } from "@/components/settings/UpdateChecksToggle";
 import {
@@ -40,8 +36,11 @@ import {
   UpdateStatusLine,
 } from "@/components/update-checker/UpdatePanel";
 import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
-import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { PushToTalk } from "@/components/settings/PushToTalk";
+import { RowAction, ShortcutRow } from "@/components/settings/ShortcutRow";
+import { shortcutInfo } from "@/components/settings/shortcutInfo";
+import { SilenceStop } from "@/components/settings/SilenceStop";
+import { HandsFreeShortcut } from "@/components/settings/HandsFree";
 import { MicrophoneSelector } from "@/components/settings/MicrophoneSelector";
 import { AlwaysOnMicrophone } from "@/components/settings/AlwaysOnMicrophone";
 import { MuteWhileRecording } from "@/components/settings/MuteWhileRecording";
@@ -59,6 +58,7 @@ import { PasteMethodSetting } from "@/components/settings/PasteMethod";
 import { TypingToolSetting } from "@/components/settings/TypingTool";
 import { ClipboardHandlingSetting } from "@/components/settings/ClipboardHandling";
 import { AppendTrailingSpace } from "@/components/settings/AppendTrailingSpace";
+import { SmartSpacing } from "@/components/settings/SmartSpacing";
 import { AutoSubmit } from "@/components/settings/AutoSubmit";
 import { SpokenEmojiToggle } from "@/components/settings/dictation/SpokenEmojiToggle";
 import { GenerateWithFlowGroup } from "@/components/settings/dictation/GenerateWithFlowGroup";
@@ -70,6 +70,7 @@ import { ExperimentalToggle } from "@/components/settings/ExperimentalToggle";
 import { KeyboardImplementationSelector } from "@/components/settings/debug/KeyboardImplementationSelector";
 import { AccelerationSelector } from "@/components/settings/AccelerationSelector";
 import { LazyStreamClose } from "@/components/settings/LazyStreamClose";
+import { MouseButtonShortcuts } from "@/components/settings/MouseButtonShortcuts";
 import { LogLevelSelector } from "@/components/settings/debug/LogLevelSelector";
 import { WordCorrectionThreshold } from "@/components/settings/debug/WordCorrectionThreshold";
 import { PasteDelay } from "@/components/settings/debug/PasteDelay";
@@ -102,40 +103,23 @@ export const GeneralTab: React.FC = () => {
         <AutostartToggle descriptionMode="tooltip" grouped={true} />
         <StartHidden descriptionMode="tooltip" grouped={true} />
         <ShowTrayIcon descriptionMode="tooltip" grouped={true} />
+        <TrayIconColor descriptionMode="tooltip" grouped={true} />
         <QuitOnClose descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
     </>
   );
 };
 
-/** A shortcut row with no keys of its own right now (its feature is off, or it
- * rides on another shortcut), with a way to the page that changes that. */
-const UnavailableShortcut: React.FC<{
-  title: string;
-  hint: string;
-  action: string;
-  onAction: () => void;
-}> = ({ title, hint, action, onAction }) => (
-  <SettingContainer
-    title={title}
-    description={hint}
-    descriptionMode="inline"
-    grouped={true}
-  >
-    <Button variant="secondary" size="sm" onClick={onAction}>
-      {action}
-    </Button>
-  </SettingContainer>
-);
-
 export const ShortcutsTab: React.FC = () => {
   const { t } = useTranslation();
-  const { getSetting } = useSettings();
+  const { settings, getSetting } = useSettings();
   const { navigate, closeSettings } = useNavigation();
   const isLinux = type() === "linux";
   const cleanupEnabled = getSetting("post_process_enabled") ?? false;
-  const cleanupOnDictation = getSetting("post_process_on_dictation") ?? false;
+  const cleanupOnDictation =
+    cleanupEnabled && (getSetting("post_process_on_dictation") ?? false);
   const assistantEnabled = getSetting("assistant_enabled") ?? true;
+  const info = (id: string) => shortcutInfo(t, settings, id);
 
   const goTo = (page: "cleanup" | "assistant") => {
     closeSettings();
@@ -145,73 +129,74 @@ export const ShortcutsTab: React.FC = () => {
   return (
     <>
       <SettingsGroup title={t("settingsDialog.shortcuts.dictation")}>
-        <ShortcutInput
+        {/* Cleanup that rides on the dictation keys has no keys of its own,
+            so the dictation row takes its name, as on Home. */}
+        <ShortcutRow
           shortcutId="transcribe"
-          grouped={true}
-          icon={AudioLines}
-          tone="teal"
+          title={
+            cleanupOnDictation
+              ? t("home.shortcuts.cleanup.title")
+              : t("home.shortcuts.dictate.title")
+          }
+          info={info("transcribe")}
         />
-        {cleanupEnabled && cleanupOnDictation ? (
-          <UnavailableShortcut
-            title={t(
-              "settings.general.shortcut.bindings.transcribe_with_post_process.name",
-            )}
-            hint={t("settingsDialog.shortcuts.cleanupOnDictation")}
-            action={t("settingsDialog.shortcuts.openCleanup")}
-            onAction={() => goTo("cleanup")}
-          />
-        ) : cleanupEnabled ? (
-          <ShortcutInput
+        <PushToTalk grouped={true} />
+        {/* Only while dictation is held: off, every dictation already keeps
+            going on its own. */}
+        <HandsFreeShortcut />
+        <SilenceStop grouped={true} />
+        {cleanupOnDictation ? null : cleanupEnabled ? (
+          <ShortcutRow
             shortcutId="transcribe_with_post_process"
-            grouped={true}
-            icon={Wand2}
-            tone="violet"
+            title={t("home.shortcuts.cleanup.title")}
+            info={info("transcribe_with_post_process")}
           />
         ) : (
-          <UnavailableShortcut
-            title={t(
-              "settings.general.shortcut.bindings.transcribe_with_post_process.name",
-            )}
-            hint={t("settingsDialog.shortcuts.cleanupOff")}
-            action={t("settingsDialog.shortcuts.openCleanup")}
-            onAction={() => goTo("cleanup")}
-          />
+          <ShortcutRow
+            shortcutId="transcribe_with_post_process"
+            title={t("home.shortcuts.cleanup.title")}
+            info={t("settingsDialog.shortcuts.cleanupOff")}
+          >
+            <RowAction onClick={() => goTo("cleanup")}>
+              {t("home.shortcuts.turnOn")}
+            </RowAction>
+          </ShortcutRow>
         )}
         {/* Cancel is hidden on Linux (dynamic shortcut instability). */}
         {!isLinux && (
-          <ShortcutInput
+          <ShortcutRow
             shortcutId="cancel"
-            grouped={true}
-            icon={Ban}
-            tone="rose"
+            title={t("home.shortcuts.cancel.title")}
+            info={info("cancel")}
           />
         )}
-        <PushToTalk descriptionMode="inline" grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settingsDialog.shortcuts.assistant")}>
         {assistantEnabled ? (
           <>
-            <ShortcutInput
+            <ShortcutRow
               shortcutId="assistant"
-              grouped={true}
-              icon={MessageCircle}
-              tone="sky"
+              title={t("home.shortcuts.ask.title")}
+              info={info("assistant")}
             />
-            <ShortcutInput
+            <PushToTalk grouped={true} setting="assistant_push_to_talk" />
+            <ShortcutRow
               shortcutId="assistant_call"
-              grouped={true}
-              icon={PhoneCall}
-              tone="indigo"
+              title={t("home.shortcuts.call.title")}
+              info={info("assistant_call")}
             />
           </>
         ) : (
-          <UnavailableShortcut
-            title={t("settings.general.shortcut.bindings.assistant.name")}
-            hint={t("settingsDialog.shortcuts.assistantOff")}
-            action={t("settingsDialog.shortcuts.openAssistant")}
-            onAction={() => goTo("assistant")}
-          />
+          <ShortcutRow
+            shortcutId="assistant"
+            title={t("home.shortcuts.ask.title")}
+            info={t("settingsDialog.shortcuts.assistantOff")}
+          >
+            <RowAction onClick={() => goTo("assistant")}>
+              {t("home.shortcuts.turnOn")}
+            </RowAction>
+          </ShortcutRow>
         )}
       </SettingsGroup>
     </>
@@ -275,6 +260,7 @@ export const DictationTab: React.FC = () => {
         <PasteMethodSetting grouped={true} />
         <TypingToolSetting grouped={true} />
         <ClipboardHandlingSetting grouped={true} />
+        <SmartSpacing grouped={true} />
         <AppendTrailingSpace grouped={true} />
         <AutoSubmit grouped={true} />
       </SettingsGroup>
@@ -353,6 +339,7 @@ export const AdvancedTab: React.FC = () => {
             descriptionMode="tooltip"
             grouped={true}
           />
+          <MouseButtonShortcuts descriptionMode="tooltip" grouped={true} />
           <AccelerationSelector descriptionMode="tooltip" grouped={true} />
           <LazyStreamClose descriptionMode="tooltip" grouped={true} />
         </SettingsGroup>

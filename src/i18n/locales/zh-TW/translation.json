@@ -639,12 +639,17 @@
           "assistant_call": {
             "name": "開始對話",
             "description": "免動手與助理對話並聆聽它的回覆。再按一次即可結束。"
+          },
+          "hands_free": {
+            "name": "免持",
+            "description": "按住聽寫鍵時按下它，放開後會繼續錄音。再次按下聽寫鍵即可結束。"
           }
         },
         "errors": {
           "restore": "無法還原原本的快捷鍵。",
           "set": "無法設定快捷鍵：{{error}}",
           "inUse": "「{{name}}」已在使用 {{keys}}。請選擇其他按鍵，或先修改那個快捷鍵。",
+          "sameAsOther": "{{keys}} 已經是這個快捷鍵的按鍵。",
           "reset": "無法重設該快捷鍵。"
         },
         "clickToChange": "點一下以變更",
@@ -659,10 +664,24 @@
         "auto": "自動"
       },
       "pushToTalk": {
-        "label": "錄音方式",
-        "description": "按住：按住錄音快捷鍵期間持續錄音。點按：按一下開始，再按一下停止。適用於所有錄音快捷鍵。",
-        "hold": "按住",
-        "tap": "點按"
+        "dictation": "開：按住按鍵期間持續錄音。關：按一下開始，再按一下停止，因此每次聽寫都是免持的。",
+        "assistant": "開：按住按鍵期間持續聆聽。關：按一下開始，再按一下送出。",
+        "dictationLabel": "按住說話",
+        "assistantLabel": "按住提問"
+      },
+      "handsFree": {
+        "unavailableKeys": "僅在聽寫快捷鍵只由輔助鍵組成時可用，例如 Ctrl + Win。使用 {{keys}} 時，請改為關閉「按住說話」：每次聽寫都會持續到你再次按下按鍵。",
+        "unavailableEngine": "需要 SpeakoFlow Keys 鍵盤引擎（{{where}}）。或關閉「按住說話」：每次聽寫都會持續到你再次按下按鍵。",
+        "taken": "{{name}} 已在使用 {{keys}}，在其中之一變更前，這個鍵不會有作用。",
+        "needsKey": "請選擇一個鍵，例如空白鍵或 Enter。單獨的輔助鍵不能當作免持鍵。",
+        "pressKey": "請按下一個鍵…",
+        "descriptionOff": "已關閉。點選它並按一個鍵（例如空白鍵）即可重新開啟。",
+        "linux": "在 Linux 上，請改為關閉「按住說話」：每次聽寫都會持續到你再次按下按鍵。",
+        "whileDictating": "聽寫時按"
+      },
+      "silenceStop": {
+        "label": "靜音後停止",
+        "description": "免持語音輸入若這麼久都沒有聽到說話，會自動停止並貼上，就像再按一次快捷鍵一樣。停止前，膠囊上的細線會逐漸縮短；再次說話即可繼續錄音。"
       }
     },
     "models": {
@@ -818,6 +837,13 @@
         "label": "在兩次轉錄之間保持麥克風開啟",
         "description": "連續語音輸入更快。可能影響藍牙音訊品質。"
       },
+      "mouseButtonShortcuts": {
+        "label": "將滑鼠按鈕當作快捷鍵",
+        "description": "將滑鼠中鍵、上一頁鍵或下一頁鍵當作快捷鍵：點按快捷鍵的按鍵，然後按下該滑鼠按鈕。作為快捷鍵期間，該按鈕不會執行其他動作。",
+        "linux": "在 Linux 上只有滑鼠中鍵可用。",
+        "needsEngine": "需要使用 SpeakoFlow Keys 鍵盤實作方式。",
+        "reset": "使用滑鼠按鈕的快捷鍵已恢復為預設按鍵。"
+      },
       "liveTranscription": {
         "label": "即時轉錄",
         "description": "說話時就同步轉錄，而不是等停止後一次輸出。實驗性功能。"
@@ -852,6 +878,10 @@
       "showTrayIcon": {
         "label": "顯示系統匣圖示",
         "description": "將 SpeakoFlow 保留在系統匣中。"
+      },
+      "trayIconColor": {
+        "label": "彩色系統匣圖示",
+        "description": "顯示彩色標誌，而非白色圖示。如果面板是淺色、白色圖示看不清楚，請開啟此選項。"
       },
       "closeBehavior": {
         "label": "關閉視窗時結束程式",
@@ -1180,6 +1210,24 @@
           "azureDescription": "您 Azure 資源的端點，可在 Azure 入口網站的「金鑰和端點」中找到。MAI-Transcribe 需要位於印度中部、東南亞、美國東部、美國西部、美國西部 2 或北歐的資源。",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS 存取金鑰",
+            "missing": "尚未儲存金鑰。請使用有權呼叫 transcribe:StartStreamTranscriptionWebSocket 的 IAM 使用者或角色的存取金鑰。",
+            "keyId": "存取金鑰 ID",
+            "secret": "私密存取金鑰",
+            "sessionToken": "工作階段權杖（僅限臨時憑證）",
+            "invalid": "這看起來不像 AWS 金鑰。存取金鑰 ID 只包含字母和數字，任何欄位都不能包含空格或冒號。",
+            "permission": "所需權限"
+          },
+          "region": {
+            "title": "區域",
+            "description": "Amazon Transcribe 執行的位置。離您最近的區域回應最快。"
+          },
+          "streaming": "一律開啟：Amazon Transcribe 只支援即時轉錄。如果錄音途中連線中斷，錄音會以說話速度重新傳送，因此完成所需的時間與錄音長度相同。",
+          "language": "需要告訴 Amazon Transcribe 使用哪種語言。「自動」只會在英語、應用程式語言和其他幾種常用語言之間選擇，如果您說的是其他語言，請選擇您的語言。",
+          "unsupportedLanguage": "Amazon Transcribe 無法在 {{region}} 即時轉錄這種語言。請選擇其他語言或區域。在此之前，聽寫不會使用 Amazon Transcribe。"
+        },
         "model": {
           "title": "模型",
           "info": "輸入供應商提供的任何模型，或載入清單。若使用 ElevenLabs，選擇 scribe_v2_realtime 可邊說邊轉錄，選擇 scribe_v2 則會在您停止說話後才轉錄。",
@@ -1192,7 +1240,8 @@
         },
         "keyterms": {
           "label": "傳送我的自訂詞彙",
-          "description": "將您的自訂詞彙傳給供應商，讓它優先採用這些寫法。"
+          "description": "將您的自訂詞彙傳給供應商，讓它優先採用這些寫法。",
+          "unsupported": "{{provider}} 無法接收詞彙清單，因此您的自訂詞彙會改為在這台電腦上校正。"
         },
         "noVerbatim": {
           "label": "移除語助詞",
@@ -1387,7 +1436,20 @@
       },
       "appendTrailingSpace": {
         "label": "結尾加上空格",
-        "description": ""
+        "description": "每次聽寫後加上一個空格。開啟智慧空格時，只在無法讀取輸入框時生效。"
+      },
+      "smartSpacing": {
+        "label": "智慧空格",
+        "description": "讓每次聽寫與輸入框中已有的文字銜接，停下再繼續時，單字不會黏在一起。",
+        "info": "貼上前，SpeakoFlow 會查看游標附近的幾個字元，只在需要的地方加空格。如果應用程式隱藏了文字，則改用自己上一次的聽寫來判斷。不會儲存或傳送任何內容。在 macOS 上使用 SpeakoFlow 已取得的輔助使用權限。在 Linux 上，Chrome、Electron 和 Qt 應用程式只有在開啟桌面輔助功能設定時才會提供文字。中文和日文之間不會加空格。"
+      },
+      "smartSpacingFixCase": {
+        "label": "調整大小寫",
+        "description": "接續上一句繼續聽寫時，首字母改為小寫。人名、縮寫和「I」保持大寫。"
+      },
+      "smartSpacingJoin": {
+        "label": "連接中途停下的句子",
+        "description": "在句子中途停下時，刪除 SpeakoFlow 加上的句點，例如「I went to the.」"
       },
       "keyboardImplementation": {
         "title": "鍵盤實作方式",
@@ -1945,9 +2007,19 @@
       "hide": "隱藏浮動指示器",
       "show": "顯示浮動指示器"
     },
+    "notesPrefs": {
+      "autoTitle": "通話結束時撰寫筆記",
+      "autoDescription": "如果只需要逐字稿，請關閉此項。關閉後，仍可從單一會議的逐字稿為它撰寫筆記。",
+      "languageTitle": "筆記語言",
+      "languageDescription": "預設情況下，筆記使用會議所用的語言。選擇一種語言，筆記就會一律使用該語言。",
+      "auto": "與會議相同",
+      "autoHint": "會議大部分時間使用的語言"
+    },
     "pill": {
       "expand": "開啟即時逐字稿",
       "collapse": "返回小膠囊",
+      "copy": "複製逐字稿",
+      "copied": "已複製逐字稿",
       "stop": "停止錄製",
       "listening": "聆聽中。與會者說的話會顯示在這裡。",
       "micOnly": "目前只錄製您的麥克風——其他與會者說的話都不會出現在這份逐字稿中。"
@@ -2023,6 +2095,7 @@
       "empty": "這場會議沒有逐字稿。",
       "loadingMore": "正在載入更多逐字稿…",
       "renameSpeaker": "重新命名這位說話者",
+      "copyTitle": "複製完整逐字稿，包含發言者名稱",
       "lowConfidence": "不確定",
       "lowConfidenceHelp": "這個說話者標籤是推測的。文字依照說出的內容轉錄，只是不確定是誰說的。"
     },
@@ -2047,6 +2120,7 @@
     },
     "summary": {
       "template": "範本",
+      "languageAuto": "會議語言",
       "templates": {
         "general": "一般",
         "standup": "站立會議",
@@ -2187,6 +2261,7 @@
     "copied": "已複製",
     "copyFailed": "無法複製——請再試一次",
     "done": "完成",
+    "finish": "完成",
     "askAssistant": "改用助理提問，而不是把這段話輸入出來",
     "recovery": {
       "dismissed": "已取消",
@@ -2198,7 +2273,10 @@
       "title": "正在下載語音模型…",
       "percent": "正在下載語音模型 · {{percent}}%",
       "hint": "下載完成後即可開始語音輸入"
-    }
+    },
+    "handsFreeHint": "按 {{key}} 進入免持",
+    "lockedKeys": "免持錄製中。按 {{keys}} 結束",
+    "finishKeys": "完成（{{keys}}）"
   },
   "reminders": {
     "title": "提醒",
@@ -2483,10 +2561,7 @@
       "dictation": "語音輸入",
       "assistant": "助理",
       "cleanupOff": "開啟 AI 整理即可使用這個快捷鍵。",
-      "cleanupOnDictation": "您的語音輸入快捷鍵已會整理每次語音輸入，因此不需要這個快捷鍵。",
-      "openCleanup": "開啟 AI 整理",
-      "assistantOff": "助理已關閉，因此它的快捷鍵不會有任何作用。",
-      "openAssistant": "開啟助理"
+      "assistantOff": "助理已關閉，因此它的快捷鍵不會有任何作用。"
     },
     "audio": {
       "microphone": "麥克風",
@@ -2565,6 +2640,10 @@
         "whatHold": "按住、說話、放開。文字會出現在游標所在位置。",
         "whatTap": "按一下、說話，再按一下。文字會出現在游標所在位置。"
       },
+      "handsFree": {
+        "what": "按住 {{keys}}，按下 {{key}} 後放開：會持續聆聽，直到你再次按下 {{keys}}。",
+        "linux": "若要在 Linux 上免持聽寫，請關閉「按住說話」。之後按一下開始，再按一下停止。"
+      },
       "cleanup": {
         "title": "語音輸入並整理",
         "description": "與語音輸入相同，接著由 AI 修正標點、語助詞與文字風格。",
@@ -2573,7 +2652,8 @@
       "ask": {
         "title": "詢問助理",
         "description": "大聲說出問題，答案會顯示在浮動面板中。",
-        "what": "直接開口問，答案會出現在浮動面板中。"
+        "whatHold": "按住、提問、放開。答案會出現在浮動面板中。",
+        "whatTap": "按一下、提問，再按一下。答案會出現在浮動面板中。"
       },
       "call": {
         "title": "開始對話",
@@ -2582,10 +2662,6 @@
       },
       "info": "在任何應用程式中都能按這些快捷鍵。點選按鍵即可變更。",
       "offHint": "已關閉",
-      "mode": {
-        "hold": "按住說話",
-        "tap": "按一下切換"
-      },
       "cancel": {
         "title": "取消",
         "what": "停止錄音，或停止正在朗讀的回覆。"
@@ -2778,6 +2854,13 @@
       "info": "為整理設定專屬快捷鍵，或讓語音輸入快捷鍵整理每次語音輸入，只需記住一組按鍵。",
       "separate": "專屬快捷鍵",
       "dictation": "與語音輸入相同"
+    },
+    "skipShort": {
+      "title": "簡短語音輸入不整理",
+      "info": "搜尋關鍵字或快速回覆這類簡短的語音輸入，會照您說的內容直接輸入，不必等待模型。較長的仍會整理。",
+      "limit": "少於",
+      "limitInfo": "以詞數計算。中文、日文或泰文這類不以空格分詞的語言，會依字數估算詞數。",
+      "words_other": "個詞"
     },
     "shortcutRow": "快捷鍵"
   },
@@ -3156,7 +3239,19 @@
     "useDefault": "使用預設值",
     "turnOff": "關閉",
     "turnedOff": "已關閉{{name}}快速鍵",
-    "undo": "復原"
+    "undo": "復原",
+    "addAnother": "新增另一組",
+    "addAnotherHint": "為這個快捷鍵再設一組按鍵，例如滑鼠按鈕",
+    "remove": "移除",
+    "or": "或",
+    "changeOther": "變更「{{name}}」快捷鍵的另一組按鍵",
+    "pressKeysOrButton": "請按下按鍵或滑鼠按鈕…",
+    "mouseNeedsKeysEngine": "滑鼠按鈕需要使用 SpeakoFlow Keys 鍵盤實作方式（設定 → 進階 → 實驗性）。",
+    "mouse": {
+      "middle": "滑鼠中鍵",
+      "back": "滑鼠上一頁鍵",
+      "forward": "滑鼠下一頁鍵"
+    }
   },
   "memoryManager": {
     "status": {

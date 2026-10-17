@@ -13,6 +13,7 @@ mod commands;
 mod dictation_recovery;
 mod feedback;
 mod flow;
+mod hands_free;
 mod helpers;
 mod huggingface;
 mod input;
@@ -33,8 +34,10 @@ mod settings;
 mod settings_file;
 mod shortcut;
 mod signal_handle;
+mod smart_spacing;
 mod speech_readiness;
 mod speech_stream;
+mod stt_aws;
 mod stt_cloud;
 #[cfg(test)]
 mod stt_cloud_bench;
@@ -966,7 +969,10 @@ pub fn run(cli_args: CliArgs) {
         .commands(collect_commands![
             shortcut::change_binding,
             shortcut::reset_binding,
+            shortcut::change_alternate_binding,
             shortcut::change_ptt_setting,
+            shortcut::change_dictation_silence_stop_setting,
+            shortcut::change_assistant_ptt_setting,
             shortcut::change_audio_feedback_setting,
             shortcut::change_audio_feedback_volume_setting,
             shortcut::change_sound_theme_setting,
@@ -992,6 +998,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::post_process_test_connection,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_post_process_on_dictation_setting,
+            shortcut::change_post_process_skip_short_setting,
+            shortcut::change_post_process_min_words_setting,
             shortcut::set_cleanup_local_model,
             shortcut::restore_post_process_prompt,
             shortcut::change_flow_enabled_setting,
@@ -1023,6 +1031,9 @@ pub fn run(cli_args: CliArgs) {
             shortcut::resume_binding,
             shortcut::change_mute_while_recording_setting,
             shortcut::change_append_trailing_space_setting,
+            shortcut::change_smart_spacing_setting,
+            shortcut::change_smart_spacing_fix_case_setting,
+            shortcut::change_smart_spacing_join_sentences_setting,
             shortcut::change_lazy_stream_close_setting,
             shortcut::change_live_transcription_enabled_setting,
             shortcut::change_live_transcription_window_enabled_setting,
@@ -1033,10 +1044,12 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_update_checks_setting,
             shortcut::change_keyboard_implementation_setting,
             shortcut::get_keyboard_implementation,
+            shortcut::change_mouse_button_shortcuts_setting,
             shortcut::globe_key_has_own_action,
             shortcut::environment::get_shortcut_environment,
             shortcut::open_keyboard_settings,
             shortcut::change_show_tray_icon_setting,
+            shortcut::change_tray_icon_color_setting,
             shortcut::change_close_behavior_setting,
             shortcut::change_whisper_accelerator_setting,
             shortcut::change_ort_accelerator_setting,
@@ -1051,6 +1064,8 @@ pub fn run(cli_args: CliArgs) {
             updates::open_update_installer,
             updates::reveal_update_installer,
             updates::prepare_update_install,
+            updates::download_update,
+            updates::install_downloaded_update,
             updates::take_update_notice,
             feedback::get_feedback_system_info,
             feedback::send_feedback,
@@ -1285,6 +1300,9 @@ pub fn run(cli_args: CliArgs) {
             commands::meetings::set_meeting_auto_detect,
             commands::meetings::get_meeting_indicator,
             commands::meetings::set_meeting_indicator,
+            commands::meetings::get_meeting_notes_prefs,
+            commands::meetings::set_meeting_auto_notes,
+            commands::meetings::set_meeting_notes_language,
             commands::meetings::set_meeting_notes,
             commands::autolearn::get_auto_learn_status,
             commands::autolearn::set_auto_learn_corrections,
@@ -1341,6 +1359,12 @@ pub fn run(cli_args: CliArgs) {
         .plugin(
             LogBuilder::new()
                 .level(log::LevelFilter::Trace) // Set to most verbose level globally
+                // tungstenite traces every handshake request verbatim: the
+                // presigned Amazon Transcribe URL with its signature and session
+                // token, and the ElevenLabs / Deepgram key headers. Debug mode
+                // must not write those to a log a user may attach to a report.
+                .level_for("tungstenite", log::LevelFilter::Debug)
+                .level_for("tokio_tungstenite", log::LevelFilter::Debug)
                 .max_file_size(500_000)
                 .rotation_strategy(RotationStrategy::KeepOne)
                 .clear_targets()

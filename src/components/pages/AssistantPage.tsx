@@ -41,7 +41,7 @@ export const AssistantPage: React.FC = () => {
   const [switching, setSwitching] = useState(false);
   const enabled = settings?.assistant_enabled ?? true;
   const ttsEnabled = settings?.assistant_tts_enabled ?? false;
-  const holdToTalk = getSetting("push_to_talk") ?? true;
+  const holdToTalk = getSetting("assistant_push_to_talk") ?? true;
 
   const setEnabled = async (value: boolean) => {
     setSwitching(true);

@@ -284,6 +284,12 @@
   transform: scale(0.92);
 }
 
+/* Copy before anything has been said. */
+.pill-action:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
 .pill-action[data-variant="ghost"] {
   background: transparent;
   color: var(--mp-muted);

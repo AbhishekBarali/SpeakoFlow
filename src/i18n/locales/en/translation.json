@@ -641,12 +641,17 @@
           "assistant_call": {
             "name": "Start a conversation",
             "description": "Talk with the assistant hands-free and hear its replies. Press again to end."
+          },
+          "hands_free": {
+            "name": "Hands-free",
+            "description": "Press while holding the dictation keys to keep recording after you let go. Press the dictation keys again to finish."
           }
         },
         "errors": {
           "restore": "Couldn't restore the original shortcut.",
           "set": "Couldn't set the shortcut: {{error}}",
           "inUse": "{{name}} already uses {{keys}}. Pick other keys, or change that shortcut first.",
+          "sameAsOther": "{{keys}} is already set for this shortcut.",
           "reset": "Couldn't reset the shortcut."
         },
         "clickToChange": "Click to change",
@@ -661,10 +666,24 @@
         "auto": "Auto"
       },
       "pushToTalk": {
-        "label": "Recording behavior",
-        "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Applies to every recording shortcut.",
-        "hold": "Hold",
-        "tap": "Tap"
+        "dictation": "On: it records while you hold the keys. Off: one press starts and the next one stops, so every dictation is hands-free.",
+        "assistant": "On: it listens while you hold the keys. Off: one press starts and the next one sends.",
+        "dictationLabel": "Hold to talk",
+        "assistantLabel": "Hold to ask"
+      },
+      "handsFree": {
+        "unavailableKeys": "Works when Dictate is modifier keys alone, like Ctrl + Win. With {{keys}}, turn off Hold to talk instead: every dictation then keeps going until you press the keys again.",
+        "unavailableEngine": "Needs the SpeakoFlow Keys keyboard engine ({{where}}). Or turn off Hold to talk: every dictation then keeps going until you press the keys again.",
+        "taken": "{{name}} already uses {{keys}}, so this key does nothing until one of them changes.",
+        "needsKey": "Pick one key, like Space or Enter. A modifier on its own can't be the hands-free key.",
+        "pressKey": "Press a key…",
+        "descriptionOff": "Turned off. Click it and press a key, like Space, to turn it back on.",
+        "linux": "On Linux, turn off Hold to talk instead: every dictation then keeps going until you press the keys again.",
+        "whileDictating": "While dictating, press"
+      },
+      "silenceStop": {
+        "label": "Stop after silence",
+        "description": "A hands-free dictation that hears no speech for this long stops and pastes by itself, as if you had pressed the shortcut again. A line on the pill runs out just before it stops; speaking again keeps it going."
       }
     },
     "models": {
@@ -824,6 +843,13 @@
         "label": "Keep mic open between transcriptions",
         "description": "Faster back-to-back dictation. May affect Bluetooth audio quality."
       },
+      "mouseButtonShortcuts": {
+        "label": "Mouse buttons as shortcuts",
+        "description": "Use your mouse's middle, Back or Forward button as a shortcut: click a shortcut's keys, then press the button. While it is a shortcut, the button does nothing else.",
+        "linux": "On Linux only the middle button works.",
+        "needsEngine": "Needs the SpeakoFlow Keys keyboard implementation.",
+        "reset": "Shortcuts that used a mouse button are back on their default keys."
+      },
       "liveTranscription": {
         "label": "Live transcription",
         "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
@@ -858,6 +884,10 @@
       "showTrayIcon": {
         "label": "Show tray icon",
         "description": "Keep SpeakoFlow in your system tray."
+      },
+      "trayIconColor": {
+        "label": "Color tray icon",
+        "description": "Show the color logo instead of the white icon. Turn this on if your panel is light and the white icon is hard to see."
       },
       "closeBehavior": {
         "label": "Quit when I close the window",
@@ -1186,6 +1216,24 @@
           "azureDescription": "Your Azure resource's endpoint, from Keys and Endpoint in the Azure portal. MAI-Transcribe needs a resource in Central India, Southeast Asia, East US, West US, West US 2, or North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "AWS access key",
+            "missing": "No key saved yet. Use an access key for an IAM user or role allowed to call transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "Access key ID",
+            "secret": "Secret access key",
+            "sessionToken": "Session token (temporary credentials only)",
+            "invalid": "This doesn't look like an AWS key. The access key ID is letters and digits, and no field can contain spaces or colons.",
+            "permission": "Permission it needs"
+          },
+          "region": {
+            "title": "Region",
+            "description": "Where Amazon Transcribe runs. The one closest to you answers fastest."
+          },
+          "streaming": "Always on: Amazon Transcribe only transcribes live. If the connection drops mid-recording, the recording is sent again at speaking speed, so finishing takes as long as the recording did.",
+          "language": "Amazon Transcribe has to be told the language. Auto picks among English, your app language and a few other common languages, so choose yours if you speak something else.",
+          "unsupportedLanguage": "Amazon Transcribe can't transcribe this language live in {{region}}. Choose another language or region. Until then, dictation won't use Amazon Transcribe."
+        },
         "model": {
           "title": "Model",
           "info": "Type any model the provider offers, or load the list. For ElevenLabs, pick scribe_v2_realtime to transcribe as you speak and scribe_v2 to transcribe once you stop.",
@@ -1198,7 +1246,8 @@
         },
         "keyterms": {
           "label": "Send my custom words",
-          "description": "Passes your custom vocabulary to the provider so it biases toward those spellings."
+          "description": "Passes your custom vocabulary to the provider so it biases toward those spellings.",
+          "unsupported": "{{provider}} can't take a word list, so your custom words are corrected on this computer instead."
         },
         "noVerbatim": {
           "label": "Remove filler words",
@@ -1396,7 +1445,20 @@
       },
       "appendTrailingSpace": {
         "label": "Append trailing space",
-        "description": ""
+        "description": "Add a space after every dictation. With Smart spacing on, this only applies where a field can't be read."
+      },
+      "smartSpacing": {
+        "label": "Smart spacing",
+        "description": "Fit each dictation to the text already in the field, so you can stop and continue without words running together.",
+        "info": "Before pasting, SpeakoFlow looks at the few characters around the cursor and adds a space only where one is needed. Where an app hides its text, it uses its own last dictation instead. Nothing is stored or sent anywhere. On macOS this uses the Accessibility permission SpeakoFlow already has. On Linux, Chrome, Electron and Qt apps share their text only when the desktop accessibility setting is on."
+      },
+      "smartSpacingFixCase": {
+        "label": "Fix capital letters",
+        "description": "Start a dictation in lowercase when it continues a sentence. Names, acronyms and \"I\" keep their capitals."
+      },
+      "smartSpacingJoin": {
+        "label": "Join sentences you paused in",
+        "description": "Remove the period SpeakoFlow added when you stopped mid-sentence, as in \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Keyboard implementation",
@@ -1954,9 +2016,19 @@
       "hide": "Hide the floating indicator",
       "show": "Show the floating indicator"
     },
+    "notesPrefs": {
+      "autoTitle": "Write notes when a call ends",
+      "autoDescription": "Turn this off if you only need the transcript. You can still write notes for one meeting from its transcript.",
+      "languageTitle": "Notes language",
+      "languageDescription": "By default the notes are in the language the meeting was held in. Pick one to always get them in that language.",
+      "auto": "Same as the meeting",
+      "autoHint": "The language most of the meeting was in"
+    },
     "pill": {
       "expand": "Open the live transcript",
       "collapse": "Back to the small pill",
+      "copy": "Copy transcript",
+      "copied": "Transcript copied",
       "stop": "Stop recording",
       "listening": "Listening. What people say appears here.",
       "micOnly": "Only your microphone is being captured — nothing the other participants say will be in this transcript."
@@ -2034,6 +2106,7 @@
       "empty": "This meeting has no transcript.",
       "loadingMore": "Loading more of the transcript…",
       "renameSpeaker": "Rename this speaker",
+      "copyTitle": "Copy the whole transcript with speaker names",
       "lowConfidence": "Uncertain",
       "lowConfidenceHelp": "This speaker label is a guess. The words are transcribed as spoken; only who said them is uncertain."
     },
@@ -2058,6 +2131,7 @@
     },
     "summary": {
       "template": "Template",
+      "languageAuto": "Meeting language",
       "templates": {
         "general": "General",
         "standup": "Standup",
@@ -2192,13 +2266,14 @@
       "noSpeechModel": "No speech model yet. Pick one on the Models page"
     },
     "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
+    "locked": "Recording hands-free — press your shortcut again to finish",
     "cancel": "Cancel",
     "copy": "Copy the transcript",
     "transcript": "Transcript",
     "copied": "Copied",
     "copyFailed": "Could not copy — try again",
     "done": "Done",
+    "finish": "Finish",
     "askAssistant": "Ask the assistant instead of typing this",
     "recovery": {
       "dismissed": "Dismissed",
@@ -2210,7 +2285,10 @@
       "title": "Speech model downloading…",
       "percent": "Speech model downloading · {{percent}}%",
       "hint": "Dictation starts working when it's done"
-    }
+    },
+    "handsFreeHint": "Press {{key}} to go hands-free",
+    "lockedKeys": "Recording hands-free. Press {{keys}} to finish",
+    "finishKeys": "Finish ({{keys}})"
   },
   "reminders": {
     "title": "Reminder",
@@ -2501,10 +2579,7 @@
       "dictation": "Dictation",
       "assistant": "Assistant",
       "cleanupOff": "Turn on AI cleanup to get this shortcut.",
-      "cleanupOnDictation": "Your dictation shortcut cleans up every dictation, so this one is not needed.",
-      "openCleanup": "Open AI cleanup",
-      "assistantOff": "The assistant is turned off, so its shortcuts do nothing.",
-      "openAssistant": "Open Assistant"
+      "assistantOff": "The assistant is turned off, so its shortcuts do nothing."
     },
     "audio": {
       "microphone": "Microphone",
@@ -2586,6 +2661,10 @@
         "whatHold": "Hold, talk, let go. Your words type where your cursor is.",
         "whatTap": "Tap, talk, tap again. Your words type where your cursor is."
       },
+      "handsFree": {
+        "what": "Hold {{keys}}, press {{key}}, then let go: it keeps listening until you press {{keys}} again.",
+        "linux": "To dictate hands-free on Linux, turn off Hold to talk. One press then starts and the next one stops."
+      },
       "cleanup": {
         "title": "Dictate and clean up",
         "description": "Same as Dictate, then AI fixes punctuation, filler words, and style.",
@@ -2594,7 +2673,8 @@
       "ask": {
         "title": "Ask the assistant",
         "description": "Ask a question out loud and get the answer in a floating panel.",
-        "what": "Ask out loud. The answer appears in a floating panel."
+        "whatHold": "Hold, ask, let go. The answer appears in a floating panel.",
+        "whatTap": "Tap, ask, tap again. The answer appears in a floating panel."
       },
       "call": {
         "title": "Start a conversation",
@@ -2603,10 +2683,6 @@
       },
       "info": "Press these in any app. Click the keys to change them.",
       "offHint": "Turned off",
-      "mode": {
-        "hold": "Hold to talk",
-        "tap": "Tap to toggle"
-      },
       "cancel": {
         "title": "Cancel",
         "what": "Stop a recording, or a reply being read aloud."
@@ -2801,6 +2877,14 @@
       "info": "Give cleanup its own shortcut, or let your dictation shortcut clean up every dictation so there is one set of keys to remember.",
       "separate": "Its own shortcut",
       "dictation": "Same as dictation"
+    },
+    "skipShort": {
+      "title": "Skip cleanup for short dictations",
+      "info": "Short dictations, like a search or a quick reply, are typed as you said them, without waiting for the model. Longer ones are still cleaned up.",
+      "limit": "Shorter than",
+      "limitInfo": "Counted in words. In languages written without spaces, like Chinese, Japanese or Thai, words are estimated from the number of characters.",
+      "words_one": "word",
+      "words_other": "words"
     },
     "shortcutRow": "Shortcut"
   },
@@ -3184,7 +3268,19 @@
     "useDefault": "Use default",
     "turnOff": "Turn off",
     "turnedOff": "{{name}} shortcut turned off",
-    "undo": "Undo"
+    "undo": "Undo",
+    "addAnother": "Add another",
+    "addAnotherHint": "Give this shortcut a second set of keys, such as a mouse button",
+    "remove": "Remove",
+    "or": "or",
+    "changeOther": "Change the other keys for the {{name}} shortcut",
+    "pressKeysOrButton": "Press keys or a mouse button…",
+    "mouseNeedsKeysEngine": "Mouse buttons need the SpeakoFlow Keys keyboard implementation (Settings → Advanced → Experimental).",
+    "mouse": {
+      "middle": "Mouse Middle",
+      "back": "Mouse Back",
+      "forward": "Mouse Forward"
+    }
   },
   "memoryManager": {
     "status": {

@@ -33,6 +33,7 @@ interface UseSettingsReturn {
 
   // Binding-specific actions
   updateBinding: (id: string, binding: string) => Promise<void>;
+  updateAlternateBinding: (id: string, binding: string) => Promise<void>;
   resetBinding: (id: string) => Promise<void>;
 
   // Convenience getters
@@ -83,6 +84,7 @@ export const useSettings = (): UseSettingsReturn => {
     refreshAudioDevices: store.refreshAudioDevices,
     refreshOutputDevices: store.refreshOutputDevices,
     updateBinding: store.updateBinding,
+    updateAlternateBinding: store.updateAlternateBinding,
     resetBinding: store.resetBinding,
     getSetting: store.getSetting,
     setPostProcessProvider: store.setPostProcessProvider,

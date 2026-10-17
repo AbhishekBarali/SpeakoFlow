@@ -56,15 +56,30 @@ if (readme && typeof caches !== "undefined") {
     .catch(() => {});
 }
 
-(window as unknown as Record<string, unknown>).__TAURI_OS_PLUGIN_INTERNALS__ = {
-  platform: "windows",
-  os_type: "windows",
-  family: "windows",
-  eol: "\r\n",
-  version: "10.0.26100",
-  arch: "x86_64",
-  exe_extension: "exe",
-};
+// `?os=linux` previews Linux: its default engine (Tauri's) and its dictation
+// keys, which have a main key and so no hands-free key.
+const previewOs = params.get("os") === "linux" ? "linux" : "windows";
+
+(window as unknown as Record<string, unknown>).__TAURI_OS_PLUGIN_INTERNALS__ =
+  previewOs === "linux"
+    ? {
+        platform: "linux",
+        os_type: "linux",
+        family: "unix",
+        eol: "\n",
+        version: "6.8.0",
+        arch: "x86_64",
+        exe_extension: "",
+      }
+    : {
+        platform: "windows",
+        os_type: "windows",
+        family: "windows",
+        eol: "\r\n",
+        version: "10.0.26100",
+        arch: "x86_64",
+        exe_extension: "exe",
+      };
 
 const now = Math.floor(Date.now() / 1000);
 
@@ -501,31 +516,50 @@ const simulateDownload = (modelId: string): Promise<null> => {
   return promise;
 };
 
-const binding = (id: string, current: string): Json => ({
+const binding = (id: string, current: string, alternate = ""): Json => ({
   id,
   name: id,
   description: "",
   default_binding: current,
   current_binding: current,
+  alternate_binding: alternate,
 });
 
+// `?otherKeys=mousex1` gives Dictate other keys, to see a row with two sets.
+const otherKeys = params.get("otherKeys") ?? "";
+
 const settings: Json = {
-  // The Windows defaults from `settings::get_default_settings`.
   bindings: {
-    transcribe: binding("transcribe", "ctrl_left+super"),
+    // The Windows defaults from `settings::get_default_settings`, or Linux's.
+    transcribe: binding(
+      "transcribe",
+      previewOs === "linux" ? "ctrl+space" : "ctrl_left+super",
+      otherKeys,
+    ),
     transcribe_with_post_process: binding(
       "transcribe_with_post_process",
-      "ctrl_left+super+shift",
+      previewOs === "linux" ? "ctrl+shift+space" : "ctrl_left+super+shift",
     ),
-    assistant: binding("assistant", "ctrl_left+alt_left"),
-    assistant_call: binding("assistant_call", "ctrl_left+alt_left+c"),
+    assistant: binding(
+      "assistant",
+      previewOs === "linux" ? "ctrl+alt+space" : "ctrl_left+alt_left",
+    ),
+    assistant_call: binding(
+      "assistant_call",
+      previewOs === "linux" ? "ctrl+alt+c" : "ctrl_left+alt_left+c",
+    ),
     cancel: binding("cancel", "escape"),
+    hands_free: binding("hands_free", "space"),
   },
   push_to_talk: true,
+  assistant_push_to_talk: true,
+  dictation_silence_stop_secs: 0,
+  // Each platform's default engine; modifier-only keys need SpeakoFlow Keys.
+  keyboard_implementation: previewOs === "linux" ? "tauri" : "handy_keys",
   audio_feedback: false,
   theme: params.get("theme") ?? "light",
   stt_engine_mode: params.get("stt") === "device" ? "local" : "cloud",
-  cloud_stt_provider_id: "elevenlabs",
+  cloud_stt_provider_id: params.get("cloudProvider") ?? "elevenlabs",
   cloud_stt_models: {
     elevenlabs: "scribe_v2_realtime",
     openrouter: "microsoft/mai-transcribe-2",
@@ -544,6 +578,8 @@ const settings: Json = {
     : ["Abhishek Barali", "SpeakoFlow", "firecrawl", "Gintama", "Tauri"],
   post_process_enabled: true,
   post_process_on_dictation: params.get("cleanupShortcut") === "dictation",
+  post_process_skip_short: true,
+  post_process_min_words: 15,
   post_process_provider_id:
     params.get("cleanup") === "device" ? "builtin" : "bedrock_mantle",
   post_process_last_cloud_provider_id: "bedrock_mantle",
@@ -687,7 +723,12 @@ const settings: Json = {
   assistant_response_length: "default",
   local_llm_context_size: 16384,
   local_llm_unload_timeout: "min5",
-  experimental_enabled: false,
+  experimental_enabled: params.get("experimental") === "1",
+  // `?engine=handy_keys` shows the editor Windows and macOS really use.
+  ...(params.get("engine")
+    ? { keyboard_implementation: params.get("engine") }
+    : {}),
+  mouse_button_shortcuts: otherKeys.includes("mouse"),
   debug_mode: false,
   ui_text_size: "medium",
   external_script_path: null,
@@ -743,6 +784,7 @@ const cloudProviders: Json[] = [
     kind: "eleven_labs",
     default_model: "scribe_v2",
     models: ["scribe_v2", "scribe_v2_realtime"],
+    honors_keyterms: true,
     supports_streaming: true,
   },
   {
@@ -752,6 +794,7 @@ const cloudProviders: Json[] = [
     kind: "open_ai_compatible",
     default_model: "openai/whisper-large-v3",
     models: ["microsoft/mai-transcribe-2", "openai/whisper-large-v3"],
+    honors_keyterms: false,
     supports_streaming: false,
     api_key_url: "https://openrouter.ai/keys",
   },
@@ -761,6 +804,7 @@ const cloudProviders: Json[] = [
     base_url: "https://api.openai.com/v1",
     kind: "open_ai_compatible",
     default_model: "gpt-4o-transcribe",
+    honors_keyterms: true,
     supports_translation: true,
   },
   {
@@ -769,6 +813,7 @@ const cloudProviders: Json[] = [
     base_url: "https://api.deepgram.com",
     kind: "deepgram",
     default_model: "nova-3",
+    honors_keyterms: true,
     supports_streaming: true,
   },
   {
@@ -780,6 +825,20 @@ const cloudProviders: Json[] = [
     default_model: "MAI-Transcribe-2",
     models: ["MAI-Transcribe-2", "MAI-Transcribe-1.5"],
     honors_keyterms: true,
+  },
+  {
+    id: "amazon_transcribe",
+    label: "Amazon Transcribe",
+    base_url: "us-east-1",
+    allow_base_url_edit: true,
+    kind: "amazon_transcribe",
+    default_model: "standard",
+    models: ["standard"],
+    models_endpoint: null,
+    honors_keyterms: false,
+    supports_streaming: true,
+    api_key_url:
+      "https://docs.aws.amazon.com/transcribe/latest/dg/streaming-setting-up.html#streaming-websocket",
   },
 ];
 
@@ -1412,6 +1471,11 @@ const handlers: Record<string, (args: Json) => unknown> = {
   get_system_audio_status: () => ({ supported: true, help: null }),
   get_call_detection_status: () => ({ supported: true, enabled: false }),
   get_meeting_indicator: () => liveMeeting,
+  // `?notes=off` previews a meeting page with automatic notes switched off.
+  get_meeting_notes_prefs: () => ({
+    auto_notes: params.get("notes") !== "off",
+    language: params.get("notesLanguage") ?? "auto",
+  }),
   get_auto_learn_status: () => ({
     supported: true,
     enabled: false,
@@ -1569,6 +1633,33 @@ const handlers: Record<string, (args: Json) => unknown> = {
     settings.cloud_stt_provider_id = providerId;
     return null;
   },
+  set_cloud_stt_api_key: ({ providerId, apiKey }) => {
+    (settings.cloud_stt_api_keys as Json)[providerId as string] = apiKey;
+    return null;
+  },
+  set_cloud_stt_base_url: ({ providerId, baseUrl }) => {
+    const urls = settings.cloud_stt_base_urls as Json;
+    if (baseUrl) urls[providerId as string] = baseUrl;
+    else delete urls[providerId as string];
+    return null;
+  },
+  // `?cloudReadiness=unsupported_language` shows the Amazon Transcribe language
+  // warning; anything else reads as ready.
+  get_cloud_stt_readiness: () =>
+    params.get("cloudReadiness") === "unsupported_language"
+      ? {
+          state: "unavailable",
+          reason: "unsupported_language",
+          provider_id: settings.cloud_stt_provider_id,
+          provider_label: null,
+        }
+      : {
+          state: "ready",
+          provider_id: settings.cloud_stt_provider_id,
+          provider_label: "",
+          model: "",
+          streaming: true,
+        },
   set_active_model: ({ modelId }) => {
     const entry = models.find((item) => item.id === modelId);
     if (!entry?.is_downloaded)
@@ -1628,6 +1719,14 @@ const handlers: Record<string, (args: Json) => unknown> = {
   },
   change_post_process_on_dictation_setting: ({ enabled }) => {
     settings.post_process_on_dictation = enabled;
+    return null;
+  },
+  change_post_process_skip_short_setting: ({ enabled }) => {
+    settings.post_process_skip_short = enabled;
+    return null;
+  },
+  change_post_process_min_words_setting: ({ words }) => {
+    settings.post_process_min_words = words;
     return null;
   },
   set_assistant_enabled: ({ enabled }) => {
@@ -1767,6 +1866,12 @@ const handlers: Record<string, (args: Json) => unknown> = {
           "assistant_active_character_id",
         ],
         ["change_ptt_setting", "enabled", "push_to_talk"],
+        ["change_assistant_ptt_setting", "enabled", "assistant_push_to_talk"],
+        [
+          "change_dictation_silence_stop_setting",
+          "secs",
+          "dictation_silence_stop_secs",
+        ],
       ] as const
     ).map(([command, arg, key]) => [
       command,
@@ -1780,6 +1885,23 @@ const handlers: Record<string, (args: Json) => unknown> = {
     settings.custom_words = words;
     return null;
   },
+  change_alternate_binding: ({ id, binding: keys }) => {
+    const stored = (settings.bindings as Json)[id as string] as
+      | Json
+      | undefined;
+    if (!stored) return { success: false, binding: null, error: "not found" };
+    stored.alternate_binding = keys;
+    return { success: true, binding: structuredClone(stored), error: null };
+  },
+  change_mouse_button_shortcuts_setting: ({ enabled }) => {
+    settings.mouse_button_shortcuts = enabled;
+    return null;
+  },
+  // Real IPC answers after the click that asked has finished. Answering
+  // inside it let the shortcut editor's click-outside handler see the very
+  // click that opened the editor, and close it again.
+  start_handy_keys_recording: () =>
+    new Promise((resolve) => window.setTimeout(() => resolve(null), 0)),
   // The pill harness plays the window: Rust's sizing and mode, as DOM events.
   fit_meeting_pill: ({ height }) => {
     window.dispatchEvent(

@@ -110,8 +110,16 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<LinuxLi
                                 });
                             }
                         }
+                        // rdev's evdev grab only converts left, right and
+                        // middle, so Back and Forward never reach this
+                        // callback (they pass straight through): the middle
+                        // button is the one a Linux shortcut can use.
                         rdev::EventType::ButtonPress(button) => {
                             if let Some(key) = rdev_button_to_key(button) {
+                                // A button bound to a hotkey stops here, as a
+                                // bound key does (see `swallow_mouse_button`).
+                                let modifiers = state.current_modifiers;
+                                should_block = state.swallow_button(modifiers, key, true);
                                 let is_common = matches!(key, Key::MouseLeft | Key::MouseRight);
                                 if !is_common || !state.current_modifiers.is_empty() {
                                     let _ = state.event_sender.send(KeyEvent {
@@ -125,6 +133,8 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<LinuxLi
                         }
                         rdev::EventType::ButtonRelease(button) => {
                             if let Some(key) = rdev_button_to_key(button) {
+                                let modifiers = state.current_modifiers;
+                                should_block = state.swallow_button(modifiers, key, false);
                                 let is_common = matches!(key, Key::MouseLeft | Key::MouseRight);
                                 if !is_common || !state.current_modifiers.is_empty() {
                                     let _ = state.event_sender.send(KeyEvent {

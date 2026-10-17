@@ -12,7 +12,11 @@ import { useModelStore } from "@/stores/modelStore";
 import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
 import { ttsEngineSpec, ttsNeedsSetup, ttsValues } from "@/lib/ttsEngines";
 import { nativePackId } from "@/lib/nativeVoices";
-import { cloudSttKeyOptional, cloudSttNeedsEndpoint } from "@/lib/cloudStt";
+import {
+  cloudSttFixedModel,
+  cloudSttKeyOptional,
+  cloudSttNeedsEndpoint,
+} from "@/lib/cloudStt";
 import {
   prettyModelName,
   splitLocalModelName,
@@ -107,7 +111,11 @@ export const summarizeStt = (
       providerId: id,
       providerKind: "stt",
       providerLabel: provider?.label ?? id,
-      modelLabel: prettyModelName(model) || null,
+      // A provider with one fixed model (Amazon Transcribe's "standard") is
+      // named by the provider; the model id would tell the user nothing.
+      modelLabel: cloudSttFixedModel(provider)
+        ? (provider?.label ?? null)
+        : prettyModelName(model) || null,
       modelId: model || null,
       localModel: null,
       borrowsAssistant: false,

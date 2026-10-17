@@ -23,6 +23,8 @@ interface DropdownProps {
   placeholder?: string;
   disabled?: boolean;
   onRefresh?: () => void;
+  /** `sm` matches the keycaps and segmented controls of a shortcut row. */
+  size?: "md" | "sm";
 }
 
 interface MenuPosition {
@@ -57,6 +59,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   placeholder,
   disabled = false,
   onRefresh,
+  size = "md",
 }) => {
   const { t } = useTranslation();
   const portalTarget = usePortalTarget();
@@ -219,7 +222,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`w-full h-9 px-3 text-sm bg-surface border border-hairline-strong rounded-lg min-w-[12.5rem] text-start flex items-center justify-between shadow-[0_1px_1px_rgba(13,24,28,0.04)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+        className={`w-full ${size === "sm" ? "h-7 min-w-[7.5rem] rounded-md px-2.5 text-[0.8125rem]" : "h-9 min-w-[12.5rem] rounded-lg px-3 text-sm"} bg-surface border border-hairline-strong text-start flex items-center justify-between shadow-[0_1px_1px_rgba(13,24,28,0.04)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
           disabled
             ? "opacity-50 cursor-not-allowed"
             : "hover:border-ink/25 cursor-pointer"
@@ -239,7 +242,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
           {selectedOption?.label || placeholderText}
         </span>
         <svg
-          className={`w-4 h-4 ms-2 shrink-0 text-muted transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""}`}
+          className={`${size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4"} ms-2 shrink-0 text-muted transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

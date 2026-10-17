@@ -21,9 +21,49 @@ async resetBinding(id: string) : Promise<Result<BindingResponse, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Give a shortcut other keys that do the same thing, or remove them with an
+ * empty `binding`. Its own keys are left exactly as they are.
+ */
+async changeAlternateBinding(id: string, binding: string) : Promise<Result<BindingResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_alternate_binding", { id, binding }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Hold to talk or Tap to toggle for dictation (and the cleanup shortcut).
+ */
 async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_ptt_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Seconds of silence after which a hands-free dictation ends by itself; 0
+ * turns it off. Read when a recording starts, so a change applies to the next
+ * one rather than to a recording already under way.
+ */
+async changeDictationSilenceStopSetting(secs: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_dictation_silence_stop_setting", { secs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Hold to talk or Tap to toggle for the ask, which no longer has to match
+ * dictation (`settings::holds_to_record`).
+ */
+async changeAssistantPttSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_assistant_ptt_setting", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -224,6 +264,31 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
 async changePostProcessOnDictationSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_post_process_on_dictation_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Paste a dictation shorter than the word threshold as spoken, without AI
+ * cleanup. Only cleanup that rides on the dictation shortcut is skipped.
+ */
+async changePostProcessSkipShortSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_skip_short_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How many words a dictation needs for cleanup to run while short ones are
+ * skipped. Clamped like the cleanup timeout, so an out-of-range value from a
+ * script still lands somewhere sensible.
+ */
+async changePostProcessMinWordsSetting(words: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_min_words_setting", { words }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -532,6 +597,30 @@ async changeAppendTrailingSpaceSetting(enabled: boolean) : Promise<Result<null, 
     else return { status: "error", error: e  as any };
 }
 },
+async changeSmartSpacingSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_smart_spacing_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeSmartSpacingFixCaseSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_smart_spacing_fix_case_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeSmartSpacingJoinSentencesSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_smart_spacing_join_sentences_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeLazyStreamCloseSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_lazy_stream_close_setting", { enabled }) };
@@ -638,6 +727,22 @@ async getKeyboardImplementation() : Promise<string> {
     return await TAURI_INVOKE("get_keyboard_implementation");
 },
 /**
+ * Let mouse buttons be shortcut keys, or stop (Experimental).
+ * 
+ * Turned off, a shortcut whose own keys are a mouse button goes back to its
+ * default keys: dictation and the ask always keep a key, and a button nothing
+ * listens for any more is not one. Other keys that are a mouse button are
+ * kept, only not listened for, and work again once this is back on.
+ */
+async changeMouseButtonShortcutsSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_mouse_button_shortcuts_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Whether the Fn (globe) key still does something of its own on this Mac.
  * 
  * Fn is the macOS dictation default, and macOS acts on a globe press itself
@@ -671,6 +776,18 @@ async openKeyboardSettings() : Promise<Result<null, string>> {
 async changeShowTrayIconSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_show_tray_icon_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Linux only: draw the tray icon in colour instead of as a white glyph. The
+ * other platforms ignore the setting, so redrawing there changes nothing.
+ */
+async changeTrayIconColorSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_tray_icon_color_setting", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -818,6 +935,36 @@ async revealUpdateInstaller(path: string) : Promise<Result<null, string>> {
 async prepareUpdateInstall(version: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("prepare_update_install", { version }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Find the update and download it on several connections, verified.
+ * Returns the version downloaded; progress arrives as
+ * [`UPDATE_PROGRESS_EVENT`] carrying an [`InstallerProgress`].
+ * 
+ * Replaces the plugin's JS `update.download()`, which fetched on one
+ * connection. The update is looked up again here because the plugin's
+ * handle from the webview's `check()` is not reachable from Rust; it is one
+ * small request for `latest.json`.
+ */
+async downloadUpdate() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_update") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Install what [`download_update`] fetched. On Windows this starts the
+ * installer and ends the process, so call `prepare_update_install` first.
+ */
+async installDownloadedUpdate() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("install_downloaded_update") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3151,9 +3298,9 @@ async setMeetingMyNotes(meetingId: number, notes: string) : Promise<Result<null,
  * calls and one provider hiccup must not discard the eight that worked, so the
  * job continues and reports the hole rather than hiding it.
  */
-async generateMeetingNotes(meetingId: number, template: NotesTemplate | null) : Promise<Result<GeneratedNotes, string>> {
+async generateMeetingNotes(meetingId: number, template: NotesTemplate | null, language: string | null) : Promise<Result<GeneratedNotes, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("generate_meeting_notes", { meetingId, template }) };
+    return { status: "ok", data: await TAURI_INVOKE("generate_meeting_notes", { meetingId, template, language }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3405,6 +3552,38 @@ async setMeetingIndicator(enabled: boolean) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getMeetingNotesPrefs() : Promise<Result<MeetingNotesPrefs, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_notes_prefs") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether notes are written automatically when a call ends. Takes effect from
+ * the next call; a job already running for one that just ended is left alone.
+ */
+async setMeetingAutoNotes(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_auto_notes", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The default language for meeting notes. Refuses a code this build does not
+ * know rather than storing something that would silently read as auto.
+ */
+async setMeetingNotesLanguage(language: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_notes_language", { language }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Save an edit to the generated notes, such as a ticked next step.
  * 
@@ -3569,7 +3748,29 @@ historyUpdatePayload: "history-update-payload"
  * broken field can never reset the rest of the user's configuration
  * (backport of Handy #1631).
  */
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; 
+/**
+ * Hold to talk (true) or Tap to toggle (false) for the dictation
+ * shortcuts: dictation and the separate cleanup shortcut. With Hold, the
+ * hands-free key makes a dictation keep listening (`hands_free`). See
+ * [`holds_to_record`].
+ */
+push_to_talk: boolean; 
+/**
+ * Hold to talk or Tap to toggle for the ask. It used to share
+ * `push_to_talk`, so holding to dictate meant holding to ask too. A store
+ * from before the split gets the shared value (`normalize_settings_json`).
+ */
+assistant_push_to_talk?: boolean; 
+/**
+ * Seconds without speech after which a hands-free dictation (tapped, or
+ * held and then made hands-free) ends by itself, exactly as if its
+ * shortcut had been pressed again. 0 (the default) never does: the
+ * recording runs until the next press or the 30-minute cap. Which
+ * recordings it covers is decided in one place,
+ * `transcription_coordinator::silence_timeout_for`.
+ */
+dictation_silence_stop_secs?: number; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
 /**
  * Opt-in live/streaming transcription: while recording, feed audio into a
  * streaming transcriber and paste the merged running result at the end
@@ -3689,6 +3890,22 @@ meeting_show_indicator?: boolean;
  */
 meeting_opt_in_defaults_applied?: boolean; 
 /**
+ * Write notes automatically when a meeting ends.
+ * 
+ * **On by default**, because notes are what most people record a call for.
+ * Off is for people who only want the transcript: the post-call job then
+ * still identifies the speakers but makes no model call, and the meeting
+ * page leads with the transcript. Notes for one meeting can still be
+ * written on demand from its transcript.
+ */
+meeting_auto_notes?: boolean; 
+/**
+ * Language the meeting notes are written in: `"auto"` for the language the
+ * meeting was held in, or a code from
+ * `meetings::summarize::NOTES_LANGUAGES`. An unknown code reads as auto.
+ */
+meeting_notes_language?: string; 
+/**
  * Learn a spelling when the user corrects a dictated word.
  * 
  * **Off by default, and it must stay that way.** Unlike every other setting
@@ -3770,7 +3987,21 @@ recording_retention_days?: number; paste_method?: PasteMethod; clipboard_handlin
  * Only matters while `post_process_enabled` is on; see
  * [`cleanup_on_dictation`] and [`cleanup_binding_active`].
  */
-post_process_on_dictation?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
+post_process_on_dictation?: boolean; 
+/**
+ * Paste a dictation with fewer than `post_process_min_words` words as
+ * spoken, without AI cleanup. On by default: a search or a two-word reply
+ * rarely has anything to clean, and the wait for the model is the only
+ * delay left in it. Only cleanup that rides on the dictation shortcut is
+ * skipped: the dedicated cleanup shortcut always cleans. See
+ * `actions::skips_short_cleanup`.
+ */
+post_process_skip_short?: boolean; 
+/**
+ * How many words a dictation needs for cleanup to run while
+ * `post_process_skip_short` is on.
+ */
+post_process_min_words?: number; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
 /**
  * User-created writing styles. Built-ins remain code-defined/localized and
  * are selected by their stable IDs.
@@ -3814,7 +4045,41 @@ flow_phrase?: string;
  * clearly refers to the screen. Separate from the assistant's screen
  * access mode on purpose — the two features are permissioned independently.
  */
-flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
+flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; 
+/**
+ * Smart spacing: fit each dictation onto the text already in the field
+ * (a space where one is needed, the right case, no stray period from the
+ * previous dictation), so dictations do not run together. On by default,
+ * for a new install and an update alike: it reads only the few characters
+ * around the caret of the field being pasted into, and keeps none of
+ * them. See `smart_spacing`.
+ */
+smart_spacing?: boolean; 
+/**
+ * Smart spacing: lowercase a dictation's first word when it continues a
+ * sentence, and match the case of a replaced selection.
+ */
+smart_spacing_fix_case?: boolean; 
+/**
+ * Smart spacing: remove the period SpeakoFlow itself pasted at the end of
+ * an unfinished sentence ("I went to the.") when the next dictation
+ * continues it.
+ */
+smart_spacing_join_sentences?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; 
+/**
+ * Experimental: let the middle, Back and Forward mouse buttons be a
+ * shortcut's keys. Off, a stored mouse button is kept but not registered,
+ * and the shortcut editor ignores the mouse. Only the SpeakoFlow Keys
+ * engine can see mouse buttons at all.
+ */
+mouse_button_shortcuts?: boolean; show_tray_icon?: boolean; 
+/**
+ * Linux only: draw the tray icon in colour instead of as a white glyph.
+ * For a light panel, where the white glyph cannot be seen; the app has no
+ * reliable way to find out what colour the panel is (see
+ * `tray::linux_tray_theme`).
+ */
+tray_icon_color?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
 /**
  * Master switch for the assistant experience: the floating panel window,
  * its two hotkeys, spoken replies, profiles and personal memory.
@@ -4257,23 +4522,25 @@ export type AssistantResponseLength =
 "default" | "short" | "medium" | "long"
 /**
  * How thorough a web search should be. This is the single dial that replaces
- * the old raw "max results" number: it controls how many queries run, how many
- * pages get scraped, and how much source text the model receives. All three
- * tiers are tuned to stay fast (one retrieval pass, heavy parallelism, tight
- * timeouts) — this is "answer-with-search like ChatGPT/Gemini do in seconds",
- * not minutes-long deep research.
+ * the old raw "max results" number. It reaches the provider request (Tavily
+ * `fast` / `basic` / `advanced`, Exa's search type, result count), the timeout
+ * and the text kept per source, and the model's prompt, which tells it how many
+ * searches to make (`web_search::depth_guidance`). All three tiers stay fast
+ * enough to sit through: this is "answer-with-search like ChatGPT/Gemini do in
+ * seconds", not minutes-long deep research.
  */
 export type AssistantSearchDepth = 
 /**
- * Fastest. One query, snippets + a couple of scraped pages. Quick facts.
+ * Fastest. One search, shorter passages. Quick facts.
  */
 "low" | 
 /**
- * Balanced default. A few queries, rerank, scrape the top handful.
+ * Balanced default. One search, a second when the first misses something.
  */
 "medium" | 
 /**
- * Broadest single pass. More queries/sources, scrape more winners.
+ * Most thorough. The provider's best mode, the longest passages, and two
+ * or three searches from different angles.
  */
 "high"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
@@ -4411,8 +4678,12 @@ export type CloseBehavior = "minimize_to_tray" | "quit"
  * `Ocp-Apim-Subscription-Key` header and a multipart body of `audio` plus a
  * JSON `definition`. The model is not a form field: MAI-Transcribe is chosen
  * by `definition.enhancedMode.model`.
+ * - [`AmazonTranscribe`](Self::AmazonTranscribe): Amazon Transcribe's
+ * streaming WebSocket, with a SigV4-presigned URL instead of an auth header
+ * and binary event-stream frames instead of JSON. Streaming only: its batch
+ * API needs an S3 upload and a polled job (see `crate::stt_aws`).
  */
-export type CloudSttKind = "eleven_labs" | "open_ai_compatible" | "deepgram" | "azure_speech"
+export type CloudSttKind = "eleven_labs" | "open_ai_compatible" | "deepgram" | "azure_speech" | "amazon_transcribe"
 /**
  * A configurable cloud speech-to-text endpoint. Seeded from
  * [`default_cloud_stt_providers`] and repaired on load, so a provider added in
@@ -4506,7 +4777,14 @@ export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missi
 /**
  * The provider's endpoint is the user's own resource and none is set.
  */
-"missing_endpoint"
+"missing_endpoint" | 
+/**
+ * The provider cannot transcribe the selected language. Amazon Transcribe
+ * streams a fixed list of languages, and a few of them not in every region;
+ * sending the audio to another language's model instead would paste a
+ * confident transcript in the wrong language.
+ */
+"unsupported_language"
 /**
  * Where a conversation happened. The quick ask is one question and one answer;
  * a call is a back-and-forth conversation. History lists them separately and
@@ -4907,6 +5185,19 @@ segment_count: number }
  * History row, so continuing the conversation later brings the meeting back.
  */
 export type MeetingAttachment = { meetingId: number; title: string }
+/**
+ * The two notes preferences, read together because the Meetings page and a
+ * meeting's own page both need both.
+ */
+export type MeetingNotesPrefs = { 
+/**
+ * Write notes automatically when a call ends.
+ */
+auto_notes: boolean; 
+/**
+ * `"auto"` or a code from `summarize::NOTES_LANGUAGES`.
+ */
+language: string }
 /**
  * One utterance in a meeting transcript.
  */
@@ -5337,7 +5628,17 @@ export type SettingsNoticeKind =
  * Saving has been failing. Cleared by the next save that works.
  */
 "save_failing"
-export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
+export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string; 
+/**
+ * A second set of keys that does exactly what `current_binding` does, or
+ * empty for none: a mouse button, or a combo a mouse's own software can
+ * send. Both are registered under this binding's id, so everything that
+ * acts on a shortcut by id (the coordinator, Cancel, the chord hold-back)
+ * takes one for the other, and a recording started with either stops
+ * with either. Only armed while `current_binding` is set: a shortcut that
+ * is turned off is off by both.
+ */
+alternate_binding?: string }
 /**
  * Everything the Shortcuts card needs to explain a Linux session.
  */

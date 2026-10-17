@@ -1,8 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
-import { formatKeyCombination } from "../../lib/utils/keyboard";
+import {
+  formatKeyCombination,
+  hasMouseButton,
+  isClickKey,
+  isMouseButtonKey,
+} from "../../lib/utils/keyboard";
 import { shortcutUsingKeys } from "../../lib/utils/shortcutConflict";
+import { HANDS_FREE_ID, keysToSave } from "../../lib/handsFree";
 import { SettingContainer } from "../ui/SettingContainer";
 import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
@@ -12,9 +18,10 @@ import { toast } from "sonner";
 import {
   RecordingKeys,
   ShortcutEditActions,
-  ShortcutKeysButton,
+  ShortcutKeysAtRest,
   announceTurnedOff,
   isOptionalShortcut,
+  useMouseButtonsWhileRecording,
   type ShortcutFinish,
   type ShortcutSize,
 } from "./ShortcutControl";
@@ -39,6 +46,9 @@ interface HandyKeysEvent {
   hotkey_string: string;
 }
 
+/** Which of the shortcut's two sets of keys is being recorded. */
+type Slot = "primary" | "alternate";
+
 export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
   descriptionMode = "tooltip",
   grouped = false,
@@ -51,9 +61,16 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
   size,
 }) => {
   const { t } = useTranslation();
-  const { getSetting, updateBinding, resetBinding, isUpdating, isLoading } =
-    useSettings();
-  const [isRecording, setIsRecording] = useState(false);
+  const {
+    getSetting,
+    updateBinding,
+    updateAlternateBinding,
+    resetBinding,
+    isUpdating,
+    isLoading,
+  } = useSettings();
+  const [slot, setSlot] = useState<Slot | null>(null);
+  const isRecording = slot !== null;
   const [currentKeys, setCurrentKeys] = useState<string>("");
   const [originalBinding, setOriginalBinding] = useState<string>("");
   const shortcutRef = useRef<HTMLDivElement | null>(null);
@@ -63,9 +80,29 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
   const osType = useOsType();
 
   const bindings = getSetting("bindings") || {};
-  // Read by the key-event handler, which outlives a render.
-  const bindingsRef = useRef(bindings);
-  bindingsRef.current = bindings;
+  const mouseButtons = getSetting("mouse_button_shortcuts") ?? false;
+  // Read by the key-event handler, which outlives a render. Switching from
+  // the shortcut's own keys to its other keys must not restart the listener:
+  // tearing it down stops the backend recorder with it.
+  const latest = useRef({
+    bindings,
+    mouseButtons,
+    slot,
+    originalBinding,
+    osType,
+    t,
+  });
+  latest.current = { bindings, mouseButtons, slot, originalBinding, osType, t };
+
+  // Back, Forward and the middle button are being recorded, not acted on.
+  useMouseButtonsWhileRecording(isRecording);
+
+  const resetEditor = useCallback(() => {
+    setSlot(null);
+    setCurrentKeys("");
+    currentKeysRef.current = "";
+    setOriginalBinding("");
+  }, []);
 
   // Handle cancellation
   const cancelRecording = useCallback(async () => {
@@ -80,8 +117,8 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
     // Stop backend recording
     await commands.stopHandyKeysRecording().catch(console.error);
 
-    // Restore original binding
-    if (originalBinding) {
+    // Restore original binding. Other keys being recorded were never touched.
+    if (slot === "primary" && originalBinding) {
       try {
         await updateBinding(shortcutId, originalBinding);
       } catch (error) {
@@ -90,11 +127,16 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
       }
     }
 
-    setIsRecording(false);
-    setCurrentKeys("");
-    currentKeysRef.current = "";
-    setOriginalBinding("");
-  }, [isRecording, originalBinding, shortcutId, updateBinding, t]);
+    resetEditor();
+  }, [
+    isRecording,
+    slot,
+    originalBinding,
+    shortcutId,
+    updateBinding,
+    resetEditor,
+    t,
+  ]);
 
   // Set up event listener for handy-keys events
   useEffect(() => {
@@ -109,49 +151,85 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
         async (event) => {
           if (cleanup) return;
 
-          const { hotkey_string, is_key_down } = event.payload;
+          const { key, hotkey_string, is_key_down } = event.payload;
+          const now = latest.current;
+
+          // A mouse button is part of a shortcut only while mouse buttons are
+          // on, and a click never is: it is how the editor itself is used.
+          if (isMouseButtonKey(key) && (!now.mouseButtons || isClickKey(key))) {
+            return;
+          }
 
           if (is_key_down && hotkey_string) {
             // Update both state (for display) and ref (for release handler)
             currentKeysRef.current = hotkey_string;
             setCurrentKeys(hotkey_string);
           } else if (!is_key_down && currentKeysRef.current) {
-            // Key released - commit the shortcut using the ref value
-            const keysToCommit = currentKeysRef.current;
-            const takenBy = shortcutUsingKeys(
-              bindingsRef.current,
-              keysToCommit,
-              shortcutId,
-            );
-            if (takenBy) {
-              // Nothing was changed, so the shortcut keeps its keys.
+            // Key released - commit the shortcut using the ref value. The
+            // hands-free key keeps only its key, so it can be recorded
+            // while holding the dictation keys or on its own.
+            const keysToCommit = keysToSave(shortcutId, currentKeysRef.current);
+            const target = now.slot ?? "primary";
+            const takenBy =
+              keysToCommit === null
+                ? null
+                : shortcutUsingKeys(
+                    now.bindings,
+                    keysToCommit,
+                    shortcutId,
+                    target,
+                  );
+            if (keysToCommit === null) {
+              // Modifiers alone: nothing was changed.
+              toast.error(now.t("settings.general.handsFree.needsKey"));
+            } else if (takenBy === shortcutId) {
               toast.error(
-                t("settings.general.shortcut.errors.inUse", {
-                  name: t(
-                    `settings.general.shortcut.bindings.${takenBy}.name`,
-                    bindingsRef.current[takenBy]?.name ?? takenBy,
-                  ),
-                  keys: formatKeyCombination(keysToCommit, osType),
+                now.t("settings.general.shortcut.errors.sameAsOther", {
+                  keys: formatKeyCombination(keysToCommit, now.osType),
                 }),
               );
+            } else if (takenBy) {
+              // Nothing was changed, so the shortcut keeps its keys.
+              toast.error(
+                now.t("settings.general.shortcut.errors.inUse", {
+                  name: now.t(
+                    `settings.general.shortcut.bindings.${takenBy}.name`,
+                    now.bindings[takenBy]?.name ?? takenBy,
+                  ),
+                  keys: formatKeyCombination(keysToCommit, now.osType),
+                }),
+              );
+            } else if (target === "alternate") {
+              try {
+                await updateAlternateBinding(shortcutId, keysToCommit);
+              } catch (error) {
+                console.error("Failed to set the other keys:", error);
+                toast.error(
+                  now.t("settings.general.shortcut.errors.set", {
+                    error: String(error),
+                  }),
+                );
+              }
             } else {
               try {
                 await updateBinding(shortcutId, keysToCommit);
               } catch (error) {
                 console.error("Failed to change binding:", error);
                 toast.error(
-                  t("settings.general.shortcut.errors.set", {
+                  now.t("settings.general.shortcut.errors.set", {
                     error: String(error),
                   }),
                 );
 
                 // Reset to original binding on error
-                if (originalBinding) {
+                if (now.originalBinding) {
                   try {
-                    await updateBinding(shortcutId, originalBinding);
+                    await updateBinding(shortcutId, now.originalBinding);
                   } catch (resetError) {
                     console.error("Failed to reset binding:", resetError);
-                    toast.error(t("settings.general.shortcut.errors.reset"));
+                    toast.error(
+                      now.t("settings.general.shortcut.errors.reset"),
+                    );
                   }
                 }
               }
@@ -163,7 +241,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
               unlistenRef.current = null;
             }
             await commands.stopHandyKeysRecording().catch(console.error);
-            setIsRecording(false);
+            setSlot(null);
             setCurrentKeys("");
             currentKeysRef.current = "";
             setOriginalBinding("");
@@ -191,24 +269,19 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
       // Stop backend recording on unmount to prevent orphaned recording loops
       commands.stopHandyKeysRecording().catch(console.error);
     };
-  }, [
-    isRecording,
-    shortcutId,
-    originalBinding,
-    updateBinding,
-    cancelRecording,
-    osType,
-    t,
-  ]);
+  }, [isRecording, shortcutId, updateBinding, updateAlternateBinding]);
 
   // Handle click outside
   useEffect(() => {
     if (!isRecording) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      // Judged by the path the click took when it happened: "Add another"
+      // re-renders the editor during its own click, so by the time the click
+      // reaches the window the button it landed on is no longer in the page.
       if (
         shortcutRef.current &&
-        !shortcutRef.current.contains(e.target as Node)
+        !e.composedPath().includes(shortcutRef.current)
       ) {
         cancelRecording();
       }
@@ -218,17 +291,19 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
     return () => window.removeEventListener("click", handleClickOutside);
   }, [isRecording, cancelRecording]);
 
-  // Start recording a new shortcut
-  const startRecording = async () => {
+  // Start recording new keys for one of the shortcut's two sets
+  const startRecording = async (target: Slot) => {
     if (isRecording) return;
 
     // Store the original binding to restore if canceled
-    setOriginalBinding(bindings[shortcutId]?.current_binding || "");
+    setOriginalBinding(
+      target === "primary" ? bindings[shortcutId]?.current_binding || "" : "",
+    );
 
     // Start backend recording
     try {
       await commands.startHandyKeysRecording(shortcutId);
-      setIsRecording(true);
+      setSlot(target);
       setCurrentKeys("");
       currentKeysRef.current = "";
     } catch (error) {
@@ -241,7 +316,12 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
 
   // Format the current shortcut keys being recorded
   const formatCurrentKeys = (): string => {
-    if (!currentKeys) return t("settings.general.shortcut.pressKeys");
+    if (!currentKeys)
+      return shortcutId === HANDS_FREE_ID
+        ? t("settings.general.handsFree.pressKey")
+        : mouseButtons
+          ? t("shortcutEditor.pressKeysOrButton")
+          : t("settings.general.shortcut.pressKeys");
     return formatKeyCombination(currentKeys, osType);
   };
 
@@ -308,6 +388,13 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
 
   const optional = isOptionalShortcut(shortcutId);
   const busy = isUpdating(`binding_${shortcutId}`);
+  // A mouse button kept while mouse buttons are off is listened for by
+  // nothing, so it is not shown as working keys either.
+  const storedOther = binding.alternate_binding?.trim() ?? "";
+  const otherKeys =
+    storedOther && (mouseButtons || !hasMouseButton(storedOther))
+      ? storedOther
+      : "";
 
   // Leave the editor without restoring anything: the action that follows
   // decides what the shortcut becomes.
@@ -317,10 +404,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
       unlistenRef.current = null;
     }
     await commands.stopHandyKeysRecording().catch(console.error);
-    setIsRecording(false);
-    setCurrentKeys("");
-    currentKeysRef.current = "";
-    setOriginalBinding("");
+    resetEditor();
   };
   const useDefault = async () => {
     await leaveEditor();
@@ -341,6 +425,26 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
       );
     }
   };
+  // The recorder keeps running: the next keys pressed become the other keys.
+  // Nothing about the shortcut's own keys changed, so there is nothing to
+  // restore if this is abandoned.
+  const addAnother = () => {
+    setSlot("alternate");
+    setOriginalBinding("");
+    setCurrentKeys("");
+    currentKeysRef.current = "";
+  };
+  const removeOther = async () => {
+    await leaveEditor();
+    try {
+      await updateAlternateBinding(shortcutId, "");
+    } catch (error) {
+      console.error("Failed to remove the other keys:", error);
+      toast.error(
+        t("settings.general.shortcut.errors.set", { error: String(error) }),
+      );
+    }
+  };
 
   const control = (
     <div className="flex items-center gap-1">
@@ -351,25 +455,47 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
             finish={finish}
             size={size ?? "md"}
           />
-          <ShortcutEditActions
-            current={originalBinding}
-            defaultBinding={binding.default_binding}
-            optional={optional}
-            finish={finish}
-            disabled={busy}
-            onUseDefault={() => void useDefault()}
-            onTurnOff={() => void turnOff()}
-          />
+          {slot === "primary" ? (
+            <ShortcutEditActions
+              current={originalBinding}
+              defaultBinding={binding.default_binding}
+              optional={optional}
+              finish={finish}
+              disabled={busy}
+              onUseDefault={() => void useDefault()}
+              onTurnOff={() => void turnOff()}
+              // The hands-free key is one key on top of the dictation keys;
+              // a second one would be listened for by nothing.
+              onAddAnother={
+                shortcutId !== HANDS_FREE_ID &&
+                originalBinding.trim() &&
+                !otherKeys
+                  ? addAnother
+                  : undefined
+              }
+            />
+          ) : (
+            <ShortcutEditActions
+              current={otherKeys}
+              defaultBinding=""
+              optional={false}
+              finish={finish}
+              disabled={busy}
+              onRemove={otherKeys ? () => void removeOther() : undefined}
+            />
+          )}
         </div>
       ) : (
-        <ShortcutKeysButton
+        <ShortcutKeysAtRest
           binding={binding.current_binding}
+          alternate={otherKeys}
           name={translatedName}
           finish={finish}
           size={size}
           disabled={disabled}
           emptyLabel={optional ? t("common.off") : undefined}
-          onClick={() => void startRecording()}
+          onClick={() => void startRecording("primary")}
+          onClickAlternate={() => void startRecording("alternate")}
         />
       )}
     </div>
