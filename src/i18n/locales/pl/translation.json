@@ -669,6 +669,11 @@
         "description": "Przytrzymanie: nagrywanie trwa, dopóki trzymasz skrót nagrywania. Naciśnięcie: jedno naciśnięcie zaczyna, następne kończy. Dotyczy wszystkich skrótów nagrywania.",
         "hold": "Przytrzymanie",
         "tap": "Naciśnięcie"
+      },
+      "silenceStop": {
+        "label": "Zatrzymaj po ciszy",
+        "description": "Przy Naciśnięciu dyktowanie, w którym przez tyle czasu nie słychać mowy, samo się zatrzymuje i wkleja tekst, jakby skrót został naciśnięty ponownie. Tuż przed zatrzymaniem kreska na pigułce się skraca; gdy znów zaczniesz mówić, nagrywanie trwa dalej.",
+        "tapOnly": "Działa przy Naciśnięciu. Przy Przytrzymaniu dyktowanie zatrzymuje już puszczenie klawisza."
       }
     },
     "models": {

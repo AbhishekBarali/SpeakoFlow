@@ -667,6 +667,11 @@
         "description": "Tieni premuto: registri finché tieni premuta una scorciatoia di registrazione. Tocca: una pressione avvia, la successiva ferma. Vale per tutte le scorciatoie di registrazione.",
         "hold": "Tieni premuto",
         "tap": "Tocca"
+      },
+      "silenceStop": {
+        "label": "Interrompi dopo un silenzio",
+        "description": "Con «Tocca», una dettatura che non sente parlare per questo tempo si ferma e si incolla da sola, come se avessi premuto di nuovo la scorciatoia. Poco prima, una linea sulla pillola si esaurisce; se riprendi a parlare, la registrazione continua.",
+        "tapOnly": "Funziona con «Tocca». Con «Tieni premuto», rilasciare il tasto ferma già la dettatura."
       }
     },
     "models": {

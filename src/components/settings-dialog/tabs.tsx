@@ -42,6 +42,7 @@ import {
 import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { PushToTalk } from "@/components/settings/PushToTalk";
+import { SilenceStop } from "@/components/settings/SilenceStop";
 import { MicrophoneSelector } from "@/components/settings/MicrophoneSelector";
 import { AlwaysOnMicrophone } from "@/components/settings/AlwaysOnMicrophone";
 import { MuteWhileRecording } from "@/components/settings/MuteWhileRecording";
@@ -187,6 +188,7 @@ export const ShortcutsTab: React.FC = () => {
           />
         )}
         <PushToTalk descriptionMode="inline" grouped={true} />
+        <SilenceStop descriptionMode="inline" grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settingsDialog.shortcuts.assistant")}>

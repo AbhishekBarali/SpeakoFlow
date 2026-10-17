@@ -665,6 +665,11 @@
         "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Applies to every recording shortcut.",
         "hold": "Hold",
         "tap": "Tap"
+      },
+      "silenceStop": {
+        "label": "Stop after silence",
+        "description": "With Tap, a dictation that hears no speech for this long stops and pastes by itself, as if you had pressed the shortcut again. A line on the pill runs out just before it stops; speaking again keeps it going.",
+        "tapOnly": "Works with Tap. With Hold, letting go already stops the dictation."
       }
     },
     "models": {
