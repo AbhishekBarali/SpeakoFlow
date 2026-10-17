@@ -919,15 +919,21 @@ pub fn paste_with_behavior(
 
     // Smart spacing removes its own stray period ("I went to the.") right
     // before the continuation lands. The text was fitted assuming it is gone.
+    // Only in the window that period was read in: after a switch to another
+    // app, the Backspace would take a character of the user's own text there.
     let erase_before = behavior.smart_spacing.map_or(0, |smart| smart.erase_before);
     if erase_before > 0 && paste_method_can_erase(paste_method) {
-        for _ in 0..erase_before {
-            if let Err(e) = send_backspace(&mut enigo) {
-                log::warn!("Smart spacing: could not remove the stray period: {}", e);
-                break;
+        if crate::smart_spacing::still_aimed_at_reading() {
+            for _ in 0..erase_before {
+                if let Err(e) = send_backspace(&mut enigo) {
+                    log::warn!("Smart spacing: could not remove the stray period: {}", e);
+                    break;
+                }
             }
+            std::thread::sleep(Duration::from_millis(15));
+        } else {
+            info!("Smart spacing: another window is in front now; the stray period stays");
         }
-        std::thread::sleep(Duration::from_millis(15));
     }
 
     // Perform the paste operation. Capture the result instead of using `?` so we
