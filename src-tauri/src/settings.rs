@@ -1484,6 +1484,20 @@ pub struct AppSettings {
     /// then never touches them again, so a later opt-in sticks.
     #[serde(default)]
     pub meeting_opt_in_defaults_applied: bool,
+    /// Write notes automatically when a meeting ends.
+    ///
+    /// **On by default**, because notes are what most people record a call for.
+    /// Off is for people who only want the transcript: the post-call job then
+    /// still identifies the speakers but makes no model call, and the meeting
+    /// page leads with the transcript. Notes for one meeting can still be
+    /// written on demand from its transcript.
+    #[serde(default = "default_true")]
+    pub meeting_auto_notes: bool,
+    /// Language the meeting notes are written in: `"auto"` for the language the
+    /// meeting was held in, or a code from
+    /// `meetings::summarize::NOTES_LANGUAGES`. An unknown code reads as auto.
+    #[serde(default = "default_meeting_notes_language")]
+    pub meeting_notes_language: String,
     /// Learn a spelling when the user corrects a dictated word.
     ///
     /// **Off by default, and it must stay that way.** Unlike every other setting
@@ -2895,6 +2909,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_meeting_notes_language() -> String {
+    crate::meetings::summarize::AUTO_NOTES_LANGUAGE.to_string()
+}
+
 /// Default text-replacement rules. Empty by default — users add their own.
 fn default_text_replacements() -> Vec<crate::settings::Replacement> {
     Vec::new()
@@ -4241,6 +4259,8 @@ pub fn get_default_settings() -> AppSettings {
         meeting_auto_detect: false,
         meeting_show_indicator: false,
         meeting_opt_in_defaults_applied: true,
+        meeting_auto_notes: true,
+        meeting_notes_language: default_meeting_notes_language(),
         auto_learn_corrections: false,
         learned_words: Vec::new(),
         model_folders: Vec::new(),

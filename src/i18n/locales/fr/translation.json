@@ -2021,9 +2021,19 @@
       "hide": "Masquer l'indicateur flottant",
       "show": "Afficher l'indicateur flottant"
     },
+    "notesPrefs": {
+      "autoTitle": "Rédiger des notes à la fin d'un appel",
+      "autoDescription": "Désactivez-le si vous n'avez besoin que de la transcription. Vous pouvez toujours rédiger les notes d'une réunion depuis sa transcription.",
+      "languageTitle": "Langue des notes",
+      "languageDescription": "Par défaut, les notes sont rédigées dans la langue de la réunion. Choisissez-en une pour les obtenir toujours dans cette langue.",
+      "auto": "Celle de la réunion",
+      "autoHint": "La langue utilisée pendant la plus grande partie de la réunion"
+    },
     "pill": {
       "expand": "Ouvrir la transcription en direct",
       "collapse": "Revenir à la petite pastille",
+      "copy": "Copier la transcription",
+      "copied": "Transcription copiée",
       "stop": "Arrêter l'enregistrement",
       "listening": "À l'écoute. Les paroles s'affichent ici.",
       "micOnly": "Seul votre microphone est capturé : rien de ce que disent les autres participants ne figurera dans cette transcription."
@@ -2103,6 +2113,7 @@
       "empty": "Cette réunion n'a pas de transcription.",
       "loadingMore": "Chargement de la suite de la transcription…",
       "renameSpeaker": "Renommer cet intervenant",
+      "copyTitle": "Copier toute la transcription avec les noms des intervenants",
       "lowConfidence": "Incertain",
       "lowConfidenceHelp": "Cette attribution d'intervenant est une supposition. Les mots sont transcrits tels qu'ils ont été prononcés ; seul l'auteur est incertain."
     },
@@ -2127,6 +2138,7 @@
     },
     "summary": {
       "template": "Modèle de notes",
+      "languageAuto": "Langue de la réunion",
       "templates": {
         "general": "Général",
         "standup": "Point quotidien",

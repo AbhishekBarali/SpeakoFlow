@@ -2012,9 +2012,19 @@
       "hide": "Hide the floating indicator",
       "show": "Show the floating indicator"
     },
+    "notesPrefs": {
+      "autoTitle": "Write notes when a call ends",
+      "autoDescription": "Turn this off if you only need the transcript. You can still write notes for one meeting from its transcript.",
+      "languageTitle": "Notes language",
+      "languageDescription": "By default the notes are in the language the meeting was held in. Pick one to always get them in that language.",
+      "auto": "Same as the meeting",
+      "autoHint": "The language most of the meeting was in"
+    },
     "pill": {
       "expand": "Open the live transcript",
       "collapse": "Back to the small pill",
+      "copy": "Copy transcript",
+      "copied": "Transcript copied",
       "stop": "Stop recording",
       "listening": "Listening. What people say appears here.",
       "micOnly": "Only your microphone is being captured — nothing the other participants say will be in this transcript."
@@ -2092,6 +2102,7 @@
       "empty": "This meeting has no transcript.",
       "loadingMore": "Loading more of the transcript…",
       "renameSpeaker": "Rename this speaker",
+      "copyTitle": "Copy the whole transcript with speaker names",
       "lowConfidence": "Uncertain",
       "lowConfidenceHelp": "This speaker label is a guess. The words are transcribed as spoken; only who said them is uncertain."
     },
@@ -2116,6 +2127,7 @@
     },
     "summary": {
       "template": "Template",
+      "languageAuto": "Meeting language",
       "templates": {
         "general": "General",
         "standup": "Standup",

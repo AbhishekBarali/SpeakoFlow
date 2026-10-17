@@ -46,6 +46,9 @@ export const MenuButton: React.FC<{
   disabled?: boolean;
   /** Menu width in px. */
   width?: number;
+  /** Cap in px; a longer list scrolls inside the menu. For long lists only —
+   *  a short menu should show every choice at once. */
+  maxHeight?: number;
 }> = ({
   items,
   children,
@@ -54,6 +57,7 @@ export const MenuButton: React.FC<{
   title,
   disabled = false,
   width = 248,
+  maxHeight,
 }) => {
   const portalTarget = usePortalTarget();
   const [open, setOpen] = useState(false);
@@ -64,8 +68,10 @@ export const MenuButton: React.FC<{
   const place = useCallback(() => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const estimated =
-      items.reduce((sum, item) => sum + (item.hint ? 52 : 38), 0) + 12;
+    const estimated = Math.min(
+      items.reduce((sum, item) => sum + (item.hint ? 52 : 38), 0) + 12,
+      maxHeight ?? Number.POSITIVE_INFINITY,
+    );
     const below = window.innerHeight - rect.bottom - GAP - 8 >= estimated;
     setPosition({
       top: below ? rect.bottom + GAP : rect.top - GAP,
@@ -75,7 +81,7 @@ export const MenuButton: React.FC<{
       ),
       placement: below ? "below" : "above",
     });
-  }, [items, width]);
+  }, [items, width, maxHeight]);
 
   useLayoutEffect(() => {
     if (open) place();
@@ -167,6 +173,10 @@ export const MenuButton: React.FC<{
               position: "fixed",
               left: position.left,
               width,
+              ...(maxHeight !== undefined && {
+                maxHeight,
+                overflowY: "auto",
+              }),
               ...(position.placement === "below"
                 ? { top: position.top }
                 : { bottom: window.innerHeight - position.top }),
