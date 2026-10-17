@@ -27,6 +27,8 @@ interface MenuPosition {
   top: number;
   left: number;
   placement: "below" | "above";
+  /** Space between the trigger and the window edge on the chosen side. */
+  room: number;
 }
 
 const GAP = 6;
@@ -34,7 +36,8 @@ const GAP = 6;
 /**
  * A button that opens a short list of actions. The list renders in a portal
  * with fixed positioning, flips above the trigger near the bottom of the
- * window, and closes on Escape, outside click, scroll, or a choice.
+ * window, and closes on Escape, outside click, a scroll of the page under it,
+ * or a choice. A list capped with `maxHeight` scrolls inside itself.
  */
 export const MenuButton: React.FC<{
   items: MenuItem[];
@@ -72,7 +75,13 @@ export const MenuButton: React.FC<{
       items.reduce((sum, item) => sum + (item.hint ? 52 : 38), 0) + 12,
       maxHeight ?? Number.POSITIVE_INFINITY,
     );
-    const below = window.innerHeight - rect.bottom - GAP - 8 >= estimated;
+    const roomBelow = window.innerHeight - rect.bottom - GAP - 8;
+    const roomAbove = rect.top - GAP - 8;
+    // Below when it fits there; when it fits on neither side, on the side
+    // with more room, where a capped list is then shortened to that room.
+    const below =
+      roomBelow >= estimated ||
+      (roomAbove < estimated && roomBelow >= roomAbove);
     setPosition({
       top: below ? rect.bottom + GAP : rect.top - GAP,
       left: Math.min(
@@ -80,6 +89,7 @@ export const MenuButton: React.FC<{
         window.innerWidth - width - 8,
       ),
       placement: below ? "below" : "above",
+      room: Math.max(0, below ? roomBelow : roomAbove),
     });
   }, [items, width, maxHeight]);
 
@@ -108,15 +118,22 @@ export const MenuButton: React.FC<{
         buttonRef.current?.focus();
       }
     };
+    // Captured, so it hears every scroll on the page. A capped list scrolling
+    // inside itself is not the page moving out from under it, and closing on
+    // it made every choice past the first screen unreachable.
+    const onScroll = (event: Event) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      close();
+    };
     document.addEventListener("mousedown", onPointer);
     window.addEventListener("keydown", onKey);
     window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onPointer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -174,7 +191,7 @@ export const MenuButton: React.FC<{
               left: position.left,
               width,
               ...(maxHeight !== undefined && {
-                maxHeight,
+                maxHeight: Math.min(maxHeight, position.room),
                 overflowY: "auto",
               }),
               ...(position.placement === "below"
