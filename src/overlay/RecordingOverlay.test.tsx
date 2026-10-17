@@ -633,3 +633,50 @@ test("the recovery pill fades with its own epoch, and a hide clears it", async (
   }
   expect(calls).toHaveLength(0);
 });
+
+/** The hairline a dictation shows just before it stops on silence. */
+const countdowns = () =>
+  renderer.root.findAll(
+    (node) =>
+      typeof node.type === "string" &&
+      node.props.className === "silence-countdown",
+  );
+
+test("a dictation counts down before a silence stop, and speech calls it off", async () => {
+  await fire("show-overlay", { state: "recording", streamingWindow: false });
+  expect(countdowns()).toHaveLength(0);
+
+  await fire("recording-silence-countdown", 2000);
+  expect(countdowns()).toHaveLength(1);
+  expect(countdowns()[0].props.style).toEqual({ "--ov-countdown": "2000ms" });
+  expect(countdowns()[0].props["aria-hidden"]).toBe("true");
+
+  // Speech resumed.
+  await fire("recording-silence-countdown", null);
+  expect(countdowns()).toHaveLength(0);
+
+  // The live card counts down the same way.
+  await fire("show-overlay", { state: "recording", streamingWindow: true });
+  await fire("recording-silence-countdown", 1500);
+  expect(countdowns()).toHaveLength(1);
+});
+
+test("a countdown never outlives its recording", async () => {
+  await fire("show-overlay", { state: "recording", streamingWindow: false });
+  await fire("recording-silence-countdown", 2000);
+  expect(countdowns()).toHaveLength(1);
+
+  // The silence ran out: the recording moved on to transcription.
+  await fire("show-overlay", { state: "transcribing", streamingWindow: false });
+  expect(countdowns()).toHaveLength(0);
+  // A late countdown cannot bring it back once nothing is recording.
+  await fire("recording-silence-countdown", 1000);
+  expect(countdowns()).toHaveLength(0);
+
+  // Nor does one survive a hide into the next recording.
+  await fire("show-overlay", { state: "recording", streamingWindow: false });
+  await fire("recording-silence-countdown", 2000);
+  await fire("hide-overlay");
+  await fire("show-overlay", { state: "recording", streamingWindow: false });
+  expect(countdowns()).toHaveLength(0);
+});

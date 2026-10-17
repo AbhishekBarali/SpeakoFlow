@@ -10,7 +10,7 @@ pub use audio::{
     is_microphone_access_denied, is_no_input_device_error, list_input_devices, list_output_devices,
     loopback_supported, normalize_peak, read_wav_samples, save_wav_file, start_loopback,
     start_mic_capture, verify_wav_file, AudioRecorder, CpalDeviceInfo, LoopbackError,
-    LoopbackStream, MACOS_PERMISSION_HELP,
+    LoopbackStream, SpeechActivity, MACOS_PERMISSION_HELP,
 };
 pub use replacements::apply_replacements;
 pub use spoken_emojis::expand_spoken_emojis;

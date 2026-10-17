@@ -303,6 +303,13 @@ const RecordingOverlay: React.FC = () => {
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
   const downloadId = useRef<string | null>(null);
   const [locked, setLocked] = useState(false);
+  /** A dictation about to stop on its own after a silence: how long it has
+   * left, and a key so each new countdown starts from full. */
+  const [silenceCountdown, setSilenceCountdown] = useState<{
+    ms: number;
+    key: number;
+  } | null>(null);
+  const countdownCount = useRef(0);
   const levelStore = useRef<LevelStore | null>(null);
   levelStore.current ??= createLevelStore();
   const levels = levelStore.current;
@@ -523,6 +530,7 @@ const RecordingOverlay: React.FC = () => {
         setFading(false);
         // A show places the window itself, so any hop it interrupted is over.
         setHop(false);
+        setSilenceCountdown(null);
         setCopyFailed(false);
         visible = true;
         recording = payload.state === "recording";
@@ -570,6 +578,7 @@ const RecordingOverlay: React.FC = () => {
         setIsVisible(false);
         setInteractive(false);
         setLocked(false);
+        setSilenceCountdown(null);
         setMicLive(false);
         levels.set(EMPTY_LEVELS);
         replaceText(EMPTY_TRANSCRIPT, true);
@@ -620,6 +629,16 @@ const RecordingOverlay: React.FC = () => {
       }).then(register),
       listen<boolean>("recording-locked", ({ payload }) => {
         if (recording) setLocked(payload);
+      }).then(register),
+      // `dictation_silence_stop_secs`: the recording ends by itself in this
+      // many ms unless speech resumes, or `null` once it has. Only a recording
+      // counts down.
+      listen<number | null>("recording-silence-countdown", ({ payload }) => {
+        setSilenceCountdown(
+          recording && typeof payload === "number"
+            ? { ms: payload, key: ++countdownCount.current }
+            : null,
+        );
       }).then(register),
       listen<"out" | "in">("overlay-hop", ({ payload }) => {
         if (visible) setHop(payload === "out");
@@ -859,6 +878,25 @@ const RecordingOverlay: React.FC = () => {
     holdTimer.current = setTimeout(stopHolding, HOLD_LIMIT_MS);
   };
 
+  // The last moments before a dictation stops on its own: a hairline that runs
+  // out with the time left. Out of the flow, so nothing in the pill moves or
+  // resizes, and gone the moment speech resumes. Hidden from assistive tech and
+  // never announced on purpose: anything spoken now would be spoken into the
+  // microphone the user is dictating into, and would count as speech.
+  const countdown =
+    isRecording && silenceCountdown ? (
+      <span
+        key={silenceCountdown.key}
+        className="silence-countdown"
+        style={
+          {
+            "--ov-countdown": `${silenceCountdown.ms}ms`,
+          } as React.CSSProperties
+        }
+        aria-hidden="true"
+      />
+    ) : null;
+
   const transcriptLine = (
     <span className="transcript-line">
       {transcript.chunks.map((chunk) => (
@@ -1004,6 +1042,7 @@ const RecordingOverlay: React.FC = () => {
               )
             )}
           </div>
+          {countdown}
         </div>
       ) : recovery ? (
         <div
@@ -1073,6 +1112,7 @@ const RecordingOverlay: React.FC = () => {
               {indicator(PILL_WAVE)}
             </div>
           )}
+          {countdown}
         </div>
       )}
     </div>

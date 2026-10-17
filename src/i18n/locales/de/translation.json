@@ -665,6 +665,11 @@
         "description": "Halten: Die Aufnahme läuft, solange du ein Aufnahme-Tastenkürzel gedrückt hältst. Antippen: Ein Druck startet, der nächste stoppt. Gilt für alle Aufnahme-Tastenkürzel.",
         "hold": "Halten",
         "tap": "Antippen"
+      },
+      "silenceStop": {
+        "label": "Nach Stille beenden",
+        "description": "Bei „Antippen“ endet ein Diktat, in dem so lange keine Sprache zu hören ist, von selbst und wird eingefügt, als hättest du das Tastenkürzel erneut gedrückt. Kurz vorher läuft eine Linie auf der Pille ab; sprichst du weiter, läuft die Aufnahme weiter.",
+        "tapOnly": "Funktioniert mit „Antippen“. Bei „Halten“ beendet schon das Loslassen das Diktat."
       }
     },
     "models": {
