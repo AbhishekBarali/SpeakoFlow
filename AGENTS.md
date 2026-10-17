@@ -171,7 +171,7 @@ the reminder popup (`reminder/`).
 - `cpal` - Cross-platform audio I/O
 - `vad-rs` - Voice Activity Detection
 - `handy-keys` - Global keyboard shortcuts (supports modifier-only combos like `Ctrl+Super`); Tauri's global-shortcut plugin is the alternative engine, selected via the `keyboard_implementation` setting
-- `rdev` - Low-level input access (cursor position / virtual input)
+- `evdev-rs` - Linux input devices, read by the vendored handy-keys engine (`vendor/handy-keys/src/platform/linux/`)
 - `rubato` - Audio resampling
 - `rodio` - Audio playback for feedback sounds
 
@@ -265,7 +265,7 @@ Access debug features: `Cmd+Shift+D` (macOS) or `Ctrl+Shift+D` (Windows/Linux)
 
 - **macOS**: Metal acceleration, accessibility permissions required for keyboard shortcuts
 - **Windows**: Vulkan acceleration, code signing
-- **Linux**: OpenBLAS + Vulkan, limited Wayland support, overlay uses GTK layer shell (disable with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`)
+- **Linux**: OpenBLAS + Vulkan, limited Wayland support. **The SpeakoFlow keys engine is handy-keys' own evdev engine** (`vendor/handy-keys/src/platform/linux/engine.rs`), not rdev's grab: rdev's ended for good whenever an input device appeared (udev had not handed the new node over yet, `EACCES`), so a keyboard reconnecting killed every shortcut until a restart, and it took every device over at once, so a key held at that instant (Super, opening the app with Super+S) stayed pressed in the compositor. The engine takes a keyboard over only while no key on it is held (checked again right after `EVIOCGRAB`), after its uinput mirror has had `MIRROR_SETTLE` to be opened; withholds a key's repeats and release exactly when it withheld the press (`tracker.rs`); only reads pointers and devices other programs made through uinput; retries a node udev has not settled on `IN_ATTRIB`; drops a device that goes away without touching the others; and forwards libevdev's `SYN_DROPPED` resync. It needs no X display, so `shortcut/environment.rs` no longer reports a missing `DISPLAY`. Without `/dev/uinput` access shortcuts still fire, but their key also reaches the focused app. Its live tests (`cargo test -p handy-keys --lib -- --ignored --test-threads=1`) only ever touch their own virtual keyboards, but any new input node ends an older build's rdev grab, so stop a running copy of the app first. The overlay uses GTK layer shell (disable with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`).
 
 ## Troubleshooting
 

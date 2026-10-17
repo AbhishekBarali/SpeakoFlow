@@ -4784,11 +4784,7 @@ export type KeyboardAccessGap =
 /**
  * `/dev/uinput` cannot be opened for writing.
  */
-"uinput" | 
-/**
- * No X display (`DISPLAY`), which `rdev` needs for key names.
- */
-"display"
+"uinput"
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
 /**
