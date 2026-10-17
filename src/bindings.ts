@@ -824,6 +824,36 @@ async prepareUpdateInstall(version: string) : Promise<Result<null, string>> {
 }
 },
 /**
+ * Find the update and download it on several connections, verified.
+ * Returns the version downloaded; progress arrives as
+ * [`UPDATE_PROGRESS_EVENT`] carrying an [`InstallerProgress`].
+ * 
+ * Replaces the plugin's JS `update.download()`, which fetched on one
+ * connection. The update is looked up again here because the plugin's
+ * handle from the webview's `check()` is not reachable from Rust; it is one
+ * small request for `latest.json`.
+ */
+async downloadUpdate() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_update") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Install what [`download_update`] fetched. On Windows this starts the
+ * installer and ends the process, so call `prepare_update_install` first.
+ */
+async installDownloadedUpdate() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("install_downloaded_update") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * The update this launch finished, once, for the "Updated to …" notice.
  */
 async takeUpdateNotice() : Promise<FinishedUpdate | null> {
