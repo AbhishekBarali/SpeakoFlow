@@ -641,7 +641,7 @@
             "description": "免手动与助手对话，并听到它的回复。再按一次即可结束。"
           },
           "hands_free": {
-            "name": "免持模式",
+            "name": "免持",
             "description": "按住听写键时按下它，松开后录制会继续。再次按下听写键即可结束。"
           }
         },
@@ -664,19 +664,20 @@
         "auto": "自动"
       },
       "pushToTalk": {
-        "label": "录制方式",
-        "dictation": "按住：按住听写键期间持续录制。点按：按一下开始，再按一下停止。",
-        "assistant": "按住：按住提问键期间持续聆听。点按：按一下开始，再按一下发送。",
-        "hold": "按住",
-        "tap": "点按"
+        "dictation": "开：按住按键期间持续录制。关：按一下开始，再按一下停止，因此每次听写都是免持的。",
+        "assistant": "开：按住按键期间持续聆听。关：按一下开始，再按一下发送。",
+        "dictationLabel": "按住说话",
+        "assistantLabel": "按住提问"
       },
       "handsFree": {
-        "description": "按住 {{keys}} 时按下此键再松开：听写会一直聆听，直到你再次按下 {{keys}}。",
-        "unavailableKeys": "需要只由修饰键组成的听写快捷键。使用 {{keys}} 时，请改用“按一下切换”。",
-        "unavailableEngine": "需要 SpeakoFlow Keys 键盘引擎，位于 {{where}}。",
+        "unavailableKeys": "仅当听写快捷键只由修饰键组成时可用，例如 Ctrl + Win。使用 {{keys}} 时，请改为关闭“按住说话”：每次听写都会持续到你再次按下按键。",
+        "unavailableEngine": "需要 SpeakoFlow Keys 键盘引擎（{{where}}）。或关闭“按住说话”：每次听写都会持续到你再次按下按键。",
         "taken": "{{name}} 已在使用 {{keys}}，在其中之一更改前，此键不会起作用。",
         "needsKey": "请选择一个键，例如空格或 Enter。单独的修饰键不能作为免持键。",
-        "pressKey": "请按下一个键…"
+        "pressKey": "请按下一个键…",
+        "descriptionOff": "已关闭。点击它并按一个键（例如空格）即可重新开启。",
+        "linux": "在 Linux 上，请改为关闭“按住说话”：每次听写都会持续到你再次按下按键。",
+        "whileDictating": "听写时按"
       },
       "silenceStop": {
         "label": "静音后停止",
@@ -2225,7 +2226,6 @@
     },
     "listening": "正在聆听…",
     "locked": "免持录制中——再次按下快捷键即可停止",
-    "handsFree": "免持",
     "cancel": "取消",
     "copy": "复制转录",
     "transcript": "转录",
@@ -2244,7 +2244,10 @@
       "title": "正在下载语音模型…",
       "percent": "正在下载语音模型 · {{percent}}%",
       "hint": "下载完成后即可开始语音输入"
-    }
+    },
+    "handsFreeHint": "按 {{key}} 进入免持",
+    "lockedKeys": "免持录制中。按 {{keys}} 结束",
+    "finishKeys": "完成（{{keys}}）"
   },
   "reminders": {
     "title": "提醒",
@@ -2529,10 +2532,7 @@
       "dictation": "语音输入",
       "assistant": "助手",
       "cleanupOff": "开启 AI 清理后即可使用此快捷键。",
-      "cleanupOnDictation": "您的语音输入快捷键已会清理每次语音输入，因此无需此快捷键。",
-      "openCleanup": "打开 AI 清理",
-      "assistantOff": "助手已关闭，因此它的快捷键不起作用。",
-      "openAssistant": "打开助手"
+      "assistantOff": "助手已关闭，因此它的快捷键不起作用。"
     },
     "audio": {
       "microphone": "麦克风",
@@ -2612,7 +2612,8 @@
         "whatTap": "按一下、说话、再按一下。文字输入到光标处。"
       },
       "handsFree": {
-        "what": "按住 {{keys}}，按下 {{key}} 后松开：会一直聆听，直到你再次按下 {{keys}}。"
+        "what": "按住 {{keys}}，按下 {{key}} 后松开：会一直聆听，直到你再次按下 {{keys}}。",
+        "linux": "要在 Linux 上免持听写，请关闭“按住说话”。之后按一下开始，再按一下停止。"
       },
       "cleanup": {
         "title": "语音输入并清理",

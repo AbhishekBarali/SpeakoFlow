@@ -1,83 +1,104 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { SettingContainer } from "../ui/SettingContainer";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
-import { formatKeyCombination } from "@/lib/utils/keyboard";
-import { HANDS_FREE_ID, handsFree } from "@/lib/handsFree";
-import { ShortcutInput } from "./ShortcutInput";
+import { shortKeyCombination } from "../ui/Keycaps";
+import { SettingContainer } from "../ui/SettingContainer";
+import { HANDS_FREE_ID, handsFree, type HandsFree } from "@/lib/handsFree";
+import type { OSType } from "@/lib/utils/keyboard";
+import { KeysPrefix, ShortcutRow } from "./ShortcutRow";
 
-interface HandsFreeShortcutProps {
-  grouped?: boolean;
-}
+type T = (key: string, options?: Record<string, unknown>) => string;
 
-/**
- * The hands-free key (`hands_free.rs`): one key, pressed while the dictation
- * keys are held, that keeps the dictation listening after they are let go. It
- * is changed like any shortcut, and removing it is how hands-free mode is
- * turned off. With Tap to toggle every dictation already is hands-free, so
- * the row is not there. Where the key cannot work, the reason is on the row
- * rather than behind the (i): a control that does nothing needs its reason in
- * sight.
- */
-export const HandsFreeShortcut: React.FC<HandsFreeShortcutProps> = React.memo(
-  ({ grouped = false }) => {
-    const { t } = useTranslation();
-    const { settings } = useSettings();
-    const osType = useOsType();
-
-    const state = handsFree(settings);
-    if (state.state === "tapped") return null;
-
-    const dictationKeys = formatKeyCombination(
-      settings?.bindings?.transcribe?.current_binding ?? "",
-      osType,
-    );
-    const unavailable = state.state === "unavailable";
-    const reason =
-      state.state === "unavailable"
-        ? state.reason === "engine"
+/** What the hands-free row's (i) says, the same on Home and in Settings. */
+export const handsFreeInfo = (
+  t: T,
+  state: HandsFree,
+  dictationBinding: string | undefined,
+  os: OSType,
+): string => {
+  const keys = shortKeyCombination(dictationBinding, os);
+  switch (state.state) {
+    case "off":
+      return t("settings.general.handsFree.descriptionOff");
+    case "taken":
+      return t("settings.general.handsFree.taken", {
+        name: t(`settings.general.shortcut.bindings.${state.by}.name`),
+        keys: shortKeyCombination(state.keys, os),
+      });
+    case "unavailable":
+      return os === "linux"
+        ? t("settings.general.handsFree.linux")
+        : state.reason === "engine"
           ? t("settings.general.handsFree.unavailableEngine", {
               where: `${t("settingsDialog.title")} → ${t("settingsDialog.tabs.advanced")}`,
             })
-          : t("settings.general.handsFree.unavailableKeys", {
-              keys: dictationKeys,
-            })
-        : state.state === "taken"
-          ? t("settings.general.handsFree.taken", {
-              name: t(`settings.general.shortcut.bindings.${state.by}.name`),
-              keys: formatKeyCombination(state.keys, osType),
-            })
-          : undefined;
+          : t("settings.general.handsFree.unavailableKeys", { keys });
+    default:
+      return t("home.shortcuts.handsFree.what", {
+        keys,
+        key: state.state === "ready" ? shortKeyCombination(state.key, os) : "",
+      });
+  }
+};
 
+/**
+ * Hands-free (`hands_free.rs`): one key that, pressed while dictating, keeps
+ * the dictation listening after the dictation keys are let go. Shown as what
+ * it is: "While dictating, press [Space]". The whole combination
+ * (Ctrl + Win + Space) read as three keys to press at once, and "+ Space" as
+ * half a shortcut.
+ *
+ * With Hold to talk off every dictation already is hands-free, so the row is
+ * not there. Where there can be no hands-free key (Linux's Ctrl + Space, the
+ * other keyboard engine), the row says to turn Hold to talk off instead, which
+ * is the switch right above it.
+ */
+export const HandsFreeShortcut: React.FC = React.memo(() => {
+  const { t } = useTranslation();
+  const { settings } = useSettings();
+  const os = useOsType();
+
+  const state = handsFree(settings);
+  if (state.state === "tapped") return null;
+
+  const title = t("settings.general.shortcut.bindings.hands_free.name");
+  const info = handsFreeInfo(
+    t,
+    state,
+    settings?.bindings?.transcribe?.current_binding,
+    os,
+  );
+
+  if (state.state === "unavailable") {
+    // Nothing to press here: the fix is the Hold to talk switch above.
     return (
       <SettingContainer
-        title={t("settings.general.shortcut.bindings.hands_free.name")}
-        description={reason}
-        info={t("settings.general.handsFree.description", {
-          keys: dictationKeys,
-        })}
-        descriptionMode={reason ? "caption" : "tooltip"}
-        grouped={grouped}
-        disabled={unavailable}
+        title={title}
+        description={info}
+        descriptionMode="caption"
+        grouped={true}
       >
-        {/* One more key on top of the dictation keys, drawn that way, so it
-            does not read as a shortcut on Space alone. */}
-        <span className="flex items-center gap-1.5">
-          {state.state !== "off" && (
-            <span aria-hidden="true" className="text-[0.9375rem] text-muted">
-              +
-            </span>
-          )}
-          <ShortcutInput
-            shortcutId={HANDS_FREE_ID}
-            bare
-            disabled={unavailable}
-          />
-        </span>
+        {null}
       </SettingContainer>
     );
-  },
-);
+  }
+
+  return (
+    <ShortcutRow
+      shortcutId={HANDS_FREE_ID}
+      title={title}
+      info={state.state === "taken" ? undefined : info}
+      caption={state.state === "taken" ? info : undefined}
+      prefix={
+        state.state === "off" ? null : (
+          <KeysPrefix>
+            {t("settings.general.handsFree.whileDictating")}
+          </KeysPrefix>
+        )
+      }
+    />
+  );
+});
 
 HandsFreeShortcut.displayName = "HandsFreeShortcut";

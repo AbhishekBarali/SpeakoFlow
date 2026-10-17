@@ -643,7 +643,7 @@
             "description": "Talk with the assistant hands-free and hear its replies. Press again to end."
           },
           "hands_free": {
-            "name": "Hands-free mode",
+            "name": "Hands-free",
             "description": "Press while holding the dictation keys to keep recording after you let go. Press the dictation keys again to finish."
           }
         },
@@ -666,19 +666,20 @@
         "auto": "Auto"
       },
       "pushToTalk": {
-        "label": "Recording behavior",
-        "dictation": "Hold: records while you hold the dictation keys. Tap: one press starts, the next one stops.",
-        "assistant": "Hold: listens while you hold the ask keys. Tap: one press starts, the next one sends.",
-        "hold": "Hold",
-        "tap": "Tap"
+        "dictation": "On: it records while you hold the keys. Off: one press starts and the next one stops, so every dictation is hands-free.",
+        "assistant": "On: it listens while you hold the keys. Off: one press starts and the next one sends.",
+        "dictationLabel": "Hold to talk",
+        "assistantLabel": "Hold to ask"
       },
       "handsFree": {
-        "description": "While holding {{keys}}, press this key and let go: dictation keeps listening until you press {{keys}} again.",
-        "unavailableKeys": "Needs a dictation shortcut of modifier keys alone. With {{keys}}, use Tap to toggle instead.",
-        "unavailableEngine": "Needs the SpeakoFlow Keys keyboard engine, under {{where}}.",
+        "unavailableKeys": "Works when Dictate is modifier keys alone, like Ctrl + Win. With {{keys}}, turn off Hold to talk instead: every dictation then keeps going until you press the keys again.",
+        "unavailableEngine": "Needs the SpeakoFlow Keys keyboard engine ({{where}}). Or turn off Hold to talk: every dictation then keeps going until you press the keys again.",
         "taken": "{{name}} already uses {{keys}}, so this key does nothing until one of them changes.",
         "needsKey": "Pick one key, like Space or Enter. A modifier on its own can't be the hands-free key.",
-        "pressKey": "Press a key…"
+        "pressKey": "Press a key…",
+        "descriptionOff": "Turned off. Click it and press a key, like Space, to turn it back on.",
+        "linux": "On Linux, turn off Hold to talk instead: every dictation then keeps going until you press the keys again.",
+        "whileDictating": "While dictating, press"
       },
       "silenceStop": {
         "label": "Stop after silence",
@@ -2237,7 +2238,6 @@
     },
     "listening": "Listening…",
     "locked": "Recording hands-free — press your shortcut again to finish",
-    "handsFree": "Hands-free",
     "cancel": "Cancel",
     "copy": "Copy the transcript",
     "transcript": "Transcript",
@@ -2256,7 +2256,10 @@
       "title": "Speech model downloading…",
       "percent": "Speech model downloading · {{percent}}%",
       "hint": "Dictation starts working when it's done"
-    }
+    },
+    "handsFreeHint": "Press {{key}} to go hands-free",
+    "lockedKeys": "Recording hands-free. Press {{keys}} to finish",
+    "finishKeys": "Finish ({{keys}})"
   },
   "reminders": {
     "title": "Reminder",
@@ -2547,10 +2550,7 @@
       "dictation": "Dictation",
       "assistant": "Assistant",
       "cleanupOff": "Turn on AI cleanup to get this shortcut.",
-      "cleanupOnDictation": "Your dictation shortcut cleans up every dictation, so this one is not needed.",
-      "openCleanup": "Open AI cleanup",
-      "assistantOff": "The assistant is turned off, so its shortcuts do nothing.",
-      "openAssistant": "Open Assistant"
+      "assistantOff": "The assistant is turned off, so its shortcuts do nothing."
     },
     "audio": {
       "microphone": "Microphone",
@@ -2633,7 +2633,8 @@
         "whatTap": "Tap, talk, tap again. Your words type where your cursor is."
       },
       "handsFree": {
-        "what": "Hold {{keys}}, press {{key}}, then let go: it keeps listening until you press {{keys}} again."
+        "what": "Hold {{keys}}, press {{key}}, then let go: it keeps listening until you press {{keys}} again.",
+        "linux": "To dictate hands-free on Linux, turn off Hold to talk. One press then starts and the next one stops."
       },
       "cleanup": {
         "title": "Dictate and clean up",

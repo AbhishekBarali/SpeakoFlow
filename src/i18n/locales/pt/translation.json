@@ -645,7 +645,7 @@
             "description": "Converse com o assistente sem usar as mãos e ouça as respostas dele. Pressione de novo para encerrar."
           },
           "hands_free": {
-            "name": "Modo mãos livres",
+            "name": "Mãos livres",
             "description": "Pressione enquanto segura as teclas de ditado para continuar gravando depois de soltá-las. Pressione as teclas de ditado de novo para terminar."
           }
         },
@@ -668,19 +668,20 @@
         "auto": "Automático"
       },
       "pushToTalk": {
-        "label": "Modo de gravação",
-        "dictation": "Segurar: grava enquanto você mantém as teclas de ditado pressionadas. Tocar: um toque começa, o próximo para.",
-        "assistant": "Segurar: escuta enquanto você mantém as teclas de pergunta pressionadas. Tocar: um toque começa, o próximo envia.",
-        "hold": "Segurar",
-        "tap": "Toque"
+        "dictation": "Ligado: grava enquanto você segura as teclas. Desligado: um toque começa, o próximo para, então todo ditado é mãos livres.",
+        "assistant": "Ligado: escuta enquanto você segura as teclas. Desligado: um toque começa, o próximo envia.",
+        "dictationLabel": "Segurar para falar",
+        "assistantLabel": "Segurar para perguntar"
       },
       "handsFree": {
-        "description": "Enquanto segura {{keys}}, pressione esta tecla e solte: o ditado continua ouvindo até você pressionar {{keys}} de novo.",
-        "unavailableKeys": "Precisa de um atalho de ditado só com teclas modificadoras. Com {{keys}}, use “Toque para alternar”.",
-        "unavailableEngine": "Precisa do mecanismo de teclado SpeakoFlow Keys, em {{where}}.",
+        "unavailableKeys": "Funciona quando o ditado usa só teclas modificadoras, como Ctrl + Win. Com {{keys}}, desligue “Segurar para falar”: cada ditado continua até você pressionar as teclas de novo.",
+        "unavailableEngine": "Precisa do mecanismo de teclado SpeakoFlow Keys ({{where}}). Ou desligue “Segurar para falar”: cada ditado continua até você pressionar as teclas de novo.",
         "taken": "{{name}} já usa {{keys}}, então esta tecla não faz nada até que um dos dois mude.",
         "needsKey": "Escolha uma tecla, como Espaço ou Enter. Uma tecla modificadora sozinha não pode ser a tecla de mãos livres.",
-        "pressKey": "Pressione uma tecla…"
+        "pressKey": "Pressione uma tecla…",
+        "descriptionOff": "Desligado. Clique e pressione uma tecla, como Espaço, para ligar de novo.",
+        "linux": "No Linux, desligue “Segurar para falar”: cada ditado continua até você pressionar as teclas de novo.",
+        "whileDictating": "Enquanto dita, pressione"
       },
       "silenceStop": {
         "label": "Parar após silêncio",
@@ -2249,7 +2250,6 @@
     },
     "listening": "Ouvindo…",
     "locked": "Gravando mãos livres — pressione a tecla de atalho novamente para parar",
-    "handsFree": "Mãos livres",
     "cancel": "Cancelar",
     "copy": "Copiar a transcrição",
     "transcript": "Transcrição",
@@ -2268,7 +2268,10 @@
       "title": "Baixando o modelo de voz…",
       "percent": "Baixando o modelo de voz · {{percent}}%",
       "hint": "O ditado começa a funcionar quando terminar"
-    }
+    },
+    "handsFreeHint": "Pressione {{key}} para mãos livres",
+    "lockedKeys": "Gravando com mãos livres. Pressione {{keys}} para terminar",
+    "finishKeys": "Concluir ({{keys}})"
   },
   "reminders": {
     "title": "Lembrete",
@@ -2565,10 +2568,7 @@
       "dictation": "Ditado",
       "assistant": "Assistente",
       "cleanupOff": "Ative a limpeza com IA para ter este atalho.",
-      "cleanupOnDictation": "Seu atalho de ditado já limpa todos os ditados, então este não é necessário.",
-      "openCleanup": "Abrir Limpeza com IA",
-      "assistantOff": "O assistente está desativado, então os atalhos dele não fazem nada.",
-      "openAssistant": "Abrir Assistente"
+      "assistantOff": "O assistente está desativado, então os atalhos dele não fazem nada."
     },
     "audio": {
       "microphone": "Microfone",
@@ -2654,7 +2654,8 @@
         "whatTap": "Toque, fale, toque de novo. Suas palavras aparecem onde está o cursor."
       },
       "handsFree": {
-        "what": "Segure {{keys}}, pressione {{key}} e solte: ele continua ouvindo até você pressionar {{keys}} de novo."
+        "what": "Segure {{keys}}, pressione {{key}} e solte: ele continua ouvindo até você pressionar {{keys}} de novo.",
+        "linux": "Para ditar com mãos livres no Linux, desligue “Segurar para falar”. Assim um toque começa e o próximo para."
       },
       "cleanup": {
         "title": "Ditar e limpar",

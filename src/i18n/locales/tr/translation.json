@@ -643,7 +643,7 @@
             "description": "Asistanla elleriniz serbest konuşun ve yanıtlarını dinleyin. Bitirmek için yine basın."
           },
           "hands_free": {
-            "name": "Eller serbest modu",
+            "name": "Eller serbest",
             "description": "Dikte tuşlarını basılı tutarken basın; tuşları bıraktıktan sonra da kayıt devam eder. Bitirmek için dikte tuşlarına yeniden basın."
           }
         },
@@ -666,19 +666,20 @@
         "auto": "Otomatik"
       },
       "pushToTalk": {
-        "label": "Kayıt davranışı",
-        "dictation": "Basılı tut: dikte tuşlarını basılı tuttuğunuz sürece kayıt devam eder. Dokun: bir basış başlatır, sonraki durdurur.",
-        "assistant": "Basılı tut: soru tuşlarını basılı tuttuğunuz sürece dinler. Dokun: bir basış başlatır, sonraki gönderir.",
-        "hold": "Basılı tut",
-        "tap": "Dokun"
+        "dictation": "Açık: tuşları basılı tuttuğunuz sürece kayıt devam eder. Kapalı: bir basış başlatır, sonraki durdurur; böylece her dikte eller serbest olur.",
+        "assistant": "Açık: tuşları basılı tuttuğunuz sürece dinler. Kapalı: bir basış başlatır, sonraki gönderir.",
+        "dictationLabel": "Konuşmak için basılı tut",
+        "assistantLabel": "Sormak için basılı tut"
       },
       "handsFree": {
-        "description": "{{keys}} basılıyken bu tuşa basıp bırakın: {{keys}} tuşlarına yeniden basana kadar dikte dinlemeye devam eder.",
-        "unavailableKeys": "Yalnızca değiştirici tuşlardan oluşan bir dikte kısayolu gerekir. {{keys}} ile bunun yerine “Açıp kapatmak için dokun” seçeneğini kullanın.",
-        "unavailableEngine": "SpeakoFlow Keys klavye motoru gerekir ({{where}}).",
+        "unavailableKeys": "Dikte yalnızca Ctrl + Win gibi değiştirici tuşlardan oluştuğunda çalışır. {{keys}} ile bunun yerine “Konuşmak için basılı tut” seçeneğini kapatın: her dikte, tuşlara yeniden basana kadar sürer.",
+        "unavailableEngine": "SpeakoFlow Keys klavye motoru gerekir ({{where}}). Ya da “Konuşmak için basılı tut” seçeneğini kapatın: her dikte, tuşlara yeniden basana kadar sürer.",
         "taken": "{{name}} zaten {{keys}} kullanıyor; biri değişene kadar bu tuş bir şey yapmaz.",
         "needsKey": "Boşluk ya da Enter gibi tek bir tuş seçin. Tek başına bir değiştirici tuş eller serbest tuşu olamaz.",
-        "pressKey": "Bir tuşa basın…"
+        "pressKey": "Bir tuşa basın…",
+        "descriptionOff": "Kapalı. Yeniden açmak için tıklayıp Boşluk gibi bir tuşa basın.",
+        "linux": "Linux'ta bunun yerine “Konuşmak için basılı tut” seçeneğini kapatın: her dikte, tuşlara yeniden basana kadar sürer.",
+        "whileDictating": "Dikte ederken basılacak tuş"
       },
       "silenceStop": {
         "label": "Sessizlikte durdur",
@@ -2237,7 +2238,6 @@
     },
     "listening": "Dinleniyor…",
     "locked": "Eller serbest kaydediliyor — durdurmak için kısayola tekrar basın",
-    "handsFree": "Eller serbest",
     "cancel": "İptal",
     "copy": "Transkripti kopyala",
     "transcript": "Transkript",
@@ -2256,7 +2256,10 @@
       "title": "Konuşma modeli indiriliyor…",
       "percent": "Konuşma modeli indiriliyor · %{{percent}}",
       "hint": "İndirme bitince dikte çalışmaya başlar"
-    }
+    },
+    "handsFreeHint": "Eller serbest için {{key}} tuşuna basın",
+    "lockedKeys": "Eller serbest kaydediliyor. Bitirmek için {{keys}} tuşlarına basın",
+    "finishKeys": "Bitir ({{keys}})"
   },
   "reminders": {
     "title": "Hatırlatıcı",
@@ -2547,10 +2550,7 @@
       "dictation": "Dikte",
       "assistant": "Asistan",
       "cleanupOff": "Bu kısayolu kullanmak için yapay zekâ temizlemeyi açın.",
-      "cleanupOnDictation": "Dikte kısayolunuz her dikteyi zaten temizliyor, bu yüzden buna gerek yok.",
-      "openCleanup": "Yapay zekâ temizlemeyi aç",
-      "assistantOff": "Asistan kapalı, bu yüzden kısayolları hiçbir şey yapmaz.",
-      "openAssistant": "Asistanı aç"
+      "assistantOff": "Asistan kapalı, bu yüzden kısayolları hiçbir şey yapmaz."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2633,7 +2633,8 @@
         "whatTap": "Dokunun, konuşun, yeniden dokunun. Sözleriniz imlecin olduğu yere yazılır."
       },
       "handsFree": {
-        "what": "{{keys}} tuşlarını basılı tutun, {{key}} tuşuna basın ve bırakın: {{keys}} tuşlarına yeniden basana kadar dinlemeye devam eder."
+        "what": "{{keys}} tuşlarını basılı tutun, {{key}} tuşuna basın ve bırakın: {{keys}} tuşlarına yeniden basana kadar dinlemeye devam eder.",
+        "linux": "Linux'ta eller serbest dikte için “Konuşmak için basılı tut” seçeneğini kapatın. Böylece bir basış başlatır, sonraki durdurur."
       },
       "cleanup": {
         "title": "Dikte et ve temizle",

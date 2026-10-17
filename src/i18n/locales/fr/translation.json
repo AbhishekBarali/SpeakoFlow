@@ -645,7 +645,7 @@
             "description": "Parlez avec l'assistant sans les mains et écoutez ses réponses. Appuyez à nouveau pour terminer."
           },
           "hands_free": {
-            "name": "Mode mains libres",
+            "name": "Mains libres",
             "description": "Appuyez dessus en maintenant les touches de dictée pour continuer d'enregistrer après les avoir relâchées. Appuyez à nouveau sur les touches de dictée pour terminer."
           }
         },
@@ -668,19 +668,20 @@
         "auto": "Auto"
       },
       "pushToTalk": {
-        "label": "Mode d'enregistrement",
-        "dictation": "Maintenir : l'enregistrement dure tant que vous maintenez les touches de dictée. Appuyer : une pression lance, la suivante arrête.",
-        "assistant": "Maintenir : écoute tant que vous maintenez les touches de question. Appuyer : une pression lance, la suivante envoie.",
-        "hold": "Maintenir",
-        "tap": "Appuyer"
+        "dictation": "Activé : l'enregistrement dure tant que vous maintenez les touches. Désactivé : une pression lance, la suivante arrête, donc chaque dictée est mains libres.",
+        "assistant": "Activé : écoute tant que vous maintenez les touches. Désactivé : une pression lance, la suivante envoie.",
+        "dictationLabel": "Maintenir pour parler",
+        "assistantLabel": "Maintenir pour demander"
       },
       "handsFree": {
-        "description": "En maintenant {{keys}}, appuyez sur cette touche puis relâchez : la dictée continue d'écouter jusqu'à ce que vous appuyiez à nouveau sur {{keys}}.",
-        "unavailableKeys": "Nécessite un raccourci de dictée composé uniquement de touches de modification. Avec {{keys}}, utilisez plutôt « Appuyer pour activer ».",
-        "unavailableEngine": "Nécessite le moteur clavier SpeakoFlow Keys, dans {{where}}.",
+        "unavailableKeys": "Fonctionne quand la dictée n'utilise que des touches de modification, comme Ctrl + Win. Avec {{keys}}, désactivez plutôt « Maintenir pour parler » : chaque dictée continue jusqu'à ce que vous appuyiez à nouveau sur les touches.",
+        "unavailableEngine": "Nécessite le moteur clavier SpeakoFlow Keys ({{where}}). Ou désactivez « Maintenir pour parler » : chaque dictée continue jusqu'à ce que vous appuyiez à nouveau sur les touches.",
         "taken": "{{name}} utilise déjà {{keys}} : cette touche ne fait rien tant que l'un des deux n'a pas changé.",
         "needsKey": "Choisissez une seule touche, comme Espace ou Entrée. Une touche de modification seule ne peut pas être la touche mains libres.",
-        "pressKey": "Appuyez sur une touche…"
+        "pressKey": "Appuyez sur une touche…",
+        "descriptionOff": "Désactivé. Cliquez dessus et appuyez sur une touche, comme Espace, pour le réactiver.",
+        "linux": "Sous Linux, désactivez plutôt « Maintenir pour parler » : chaque dictée continue jusqu'à ce que vous appuyiez à nouveau sur les touches.",
+        "whileDictating": "Pendant la dictée, appuyez sur"
       },
       "silenceStop": {
         "label": "Arrêter après un silence",
@@ -2249,7 +2250,6 @@
     },
     "listening": "À l'écoute…",
     "locked": "Enregistrement mains libres — appuyez à nouveau sur le raccourci pour arrêter",
-    "handsFree": "Mains libres",
     "cancel": "Annuler",
     "copy": "Copier la transcription",
     "transcript": "Transcription",
@@ -2268,7 +2268,10 @@
       "title": "Téléchargement du modèle vocal…",
       "percent": "Téléchargement du modèle vocal · {{percent}} %",
       "hint": "La dictée fonctionnera une fois le téléchargement terminé"
-    }
+    },
+    "handsFreeHint": "Appuyez sur {{key}} pour passer en mains libres",
+    "lockedKeys": "Enregistrement mains libres. Appuyez sur {{keys}} pour terminer",
+    "finishKeys": "Terminer ({{keys}})"
   },
   "reminders": {
     "title": "Rappel",
@@ -2565,10 +2568,7 @@
       "dictation": "Dictée",
       "assistant": "Assistant",
       "cleanupOff": "Activez le nettoyage IA pour obtenir ce raccourci.",
-      "cleanupOnDictation": "Votre raccourci de dictée nettoie déjà chaque dictée, celui-ci n'est donc pas nécessaire.",
-      "openCleanup": "Ouvrir le nettoyage IA",
-      "assistantOff": "L'assistant est désactivé : ses raccourcis n'ont aucun effet.",
-      "openAssistant": "Ouvrir l'assistant"
+      "assistantOff": "L'assistant est désactivé : ses raccourcis n'ont aucun effet."
     },
     "audio": {
       "microphone": "Microphone",
@@ -2654,7 +2654,8 @@
         "whatTap": "Appuyez, parlez, appuyez à nouveau. Vos mots s'écrivent là où est votre curseur."
       },
       "handsFree": {
-        "what": "Maintenez {{keys}}, appuyez sur {{key}} puis relâchez : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur {{keys}}."
+        "what": "Maintenez {{keys}}, appuyez sur {{key}} puis relâchez : l'écoute continue jusqu'à ce que vous appuyiez à nouveau sur {{keys}}.",
+        "linux": "Pour dicter mains libres sous Linux, désactivez « Maintenir pour parler ». Une pression lance alors, la suivante arrête."
       },
       "cleanup": {
         "title": "Dicter et nettoyer",
