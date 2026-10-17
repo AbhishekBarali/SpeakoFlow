@@ -1582,6 +1582,12 @@ pub struct AppSettings {
     pub keyboard_implementation: KeyboardImplementation,
     #[serde(default = "default_show_tray_icon")]
     pub show_tray_icon: bool,
+    /// Linux only: draw the tray icon in colour instead of as a white glyph.
+    /// For a light panel, where the white glyph cannot be seen; the app has no
+    /// reliable way to find out what colour the panel is (see
+    /// `tray::linux_tray_theme`).
+    #[serde(default)]
+    pub tray_icon_color: bool,
     #[serde(default)]
     pub close_behavior: CloseBehavior,
     #[serde(default = "default_paste_delay_ms")]
@@ -4094,6 +4100,7 @@ pub fn get_default_settings() -> AppSettings {
         lazy_stream_close: false,
         keyboard_implementation: KeyboardImplementation::default(),
         show_tray_icon: default_show_tray_icon(),
+        tray_icon_color: false,
         close_behavior: CloseBehavior::default(),
         paste_delay_ms: default_paste_delay_ms(),
         typing_tool: default_typing_tool(),

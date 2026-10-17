@@ -865,6 +865,10 @@
         "label": "Afficher l'icône dans la barre système",
         "description": "Garder SpeakoFlow dans votre barre système."
       },
+      "trayIconColor": {
+        "label": "Icône de la barre système en couleur",
+        "description": "Affiche le logo en couleur au lieu de l'icône blanche. À activer si votre panneau est clair et que l'icône blanche se voit mal."
+      },
       "closeBehavior": {
         "label": "Quitter lorsque je ferme la fenêtre",
         "description": "Lorsque cette option est désactivée, fermer la fenêtre laisse SpeakoFlow actif dans la barre système et vos raccourcis continuent de fonctionner. Lorsqu'elle est activée, fermer la fenêtre quitte complètement l'application."

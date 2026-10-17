@@ -32,6 +32,7 @@ import { AppLanguageSelector } from "@/components/settings/AppLanguageSelector";
 import { AutostartToggle } from "@/components/settings/AutostartToggle";
 import { StartHidden } from "@/components/settings/StartHidden";
 import { ShowTrayIcon } from "@/components/settings/ShowTrayIcon";
+import { TrayIconColor } from "@/components/settings/TrayIconColor";
 import { QuitOnClose } from "@/components/settings/QuitOnClose";
 import { UpdateChecksToggle } from "@/components/settings/UpdateChecksToggle";
 import {
@@ -102,6 +103,7 @@ export const GeneralTab: React.FC = () => {
         <AutostartToggle descriptionMode="tooltip" grouped={true} />
         <StartHidden descriptionMode="tooltip" grouped={true} />
         <ShowTrayIcon descriptionMode="tooltip" grouped={true} />
+        <TrayIconColor descriptionMode="tooltip" grouped={true} />
         <QuitOnClose descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
     </>
