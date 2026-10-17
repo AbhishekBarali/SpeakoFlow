@@ -81,19 +81,31 @@ fn is_supported_fuzzy_key(key: &str) -> bool {
 /// ideographs (CJK Unified + Extension A + compatibility), Hiragana, Katakana,
 /// and Thai/Lao/Khmer/Myanmar.
 fn is_unspaced_script_char(c: char) -> bool {
-    matches!(
-        c as u32,
-        0x3040..=0x30FF   // Hiragana, Katakana
-        | 0x31F0..=0x31FF // Katakana phonetic extensions
-        | 0x3400..=0x4DBF // CJK Extension A
-        | 0x4E00..=0x9FFF // CJK Unified Ideographs
-        | 0xF900..=0xFAFF // CJK Compatibility Ideographs
-        | 0xFF66..=0xFF9F // Half-width Katakana
-        | 0x0E00..=0x0EFF // Thai, Lao
-        | 0x1000..=0x109F // Myanmar
-        | 0x1780..=0x17FF // Khmer
-        | 0x20000..=0x2FA1F // CJK Extensions B+ and compatibility supplement
-    )
+    unspaced_script(c).is_some()
+}
+
+/// A script written without spaces between words, grouped by how many
+/// characters a word takes (see [`count_words`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnspacedScript {
+    Han,
+    Kana,
+    SoutheastAsian,
+}
+
+fn unspaced_script(c: char) -> Option<UnspacedScript> {
+    match c as u32 {
+        // Hiragana, Katakana, Katakana phonetic extensions, half-width Katakana
+        0x3040..=0x30FF | 0x31F0..=0x31FF | 0xFF66..=0xFF9F => Some(UnspacedScript::Kana),
+        // CJK Extension A, CJK Unified Ideographs, CJK Compatibility Ideographs,
+        // and Extensions B+ with the compatibility supplement
+        0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF | 0x20000..=0x2FA1F => {
+            Some(UnspacedScript::Han)
+        }
+        // Thai, Lao, Myanmar, Khmer
+        0x0E00..=0x0EFF | 0x1000..=0x109F | 0x1780..=0x17FF => Some(UnspacedScript::SoutheastAsian),
+        _ => None,
+    }
 }
 
 /// Soundex is an English phonetic code: only meaningful for ASCII letters.
@@ -580,6 +592,96 @@ pub fn is_speechless_transcription(text: &str) -> bool {
         }
     }
     true
+}
+
+/// Roughly how many words a transcript holds, which decides whether a
+/// dictation is short enough to skip AI cleanup (`post_process_skip_short`).
+///
+/// A word is a run of letters or digits inside a whitespace-separated token,
+/// so punctuation, a dash or an emoji counts for nothing, and "don't" or
+/// "3:45" counts once. Scripts written without spaces cannot be split that
+/// way, so their words are estimated from how many characters they use:
+///
+/// - Han (Chinese, Japanese kanji): 1.5 characters a word, about the average
+///   word length of written Chinese.
+/// - Hiragana and Katakana: 2.5 characters a word. Kana spell sounds rather
+///   than meanings, so their words run longer: ありがとうございます is two words
+///   in ten kana.
+/// - Thai, Lao, Khmer and Myanmar: 4 characters a word. A syllable is a
+///   consonant plus its vowel signs and tone mark, and most words are one or
+///   two syllables.
+///
+/// An estimate is all the threshold needs. It has to tell a search query from
+/// a paragraph, not five words from six.
+pub fn count_words(text: &str) -> usize {
+    let mut words = 0;
+    let (mut han, mut kana, mut southeast_asian) = (0, 0, 0);
+    for token in text.split_whitespace() {
+        // Characters of an unspaced script end a run of spaced ones, so
+        // "用iPhone和Mac" is two Latin words among the Han characters.
+        let mut in_word = false;
+        for c in token.chars() {
+            match unspaced_script(c) {
+                Some(script) => {
+                    in_word = false;
+                    if is_word_char(c, script) {
+                        match script {
+                            UnspacedScript::Han => han += 1,
+                            UnspacedScript::Kana => kana += 1,
+                            UnspacedScript::SoutheastAsian => southeast_asian += 1,
+                        }
+                    }
+                }
+                None if c.is_alphanumeric() && !in_word => {
+                    words += 1;
+                    in_word = true;
+                }
+                None => {}
+            }
+        }
+    }
+    words
+        + estimated_words(han, 15)
+        + estimated_words(kana, 25)
+        + estimated_words(southeast_asian, 40)
+}
+
+/// Whether `c`, a character of an unspaced script, belongs to a word rather
+/// than being punctuation. Tone marks and some signs of the Thai-family
+/// scripts (Thai ่ ้, Myanmar ်, Khmer ្) are combining marks, not letters, so
+/// `is_alphanumeric` skipped them: five tone marks in a five-word Thai
+/// sentence left 15 of its 20 characters, an estimate of four words.
+fn is_word_char(c: char, script: UnspacedScript) -> bool {
+    match script {
+        UnspacedScript::SoutheastAsian => !is_southeast_asian_punctuation(c),
+        UnspacedScript::Han | UnspacedScript::Kana => c.is_alphanumeric(),
+    }
+}
+
+/// Punctuation and currency signs in the Thai, Lao, Myanmar and Khmer blocks.
+/// Everything else there is a letter, a digit or a mark on a letter.
+fn is_southeast_asian_punctuation(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x0E3F                  // Thai baht sign
+        | 0x0E4F                // Thai fongman
+        | 0x0E5A..=0x0E5B       // Thai angkhankhu, khomut
+        | 0x0EAF                // Lao ellipsis
+        | 0x104A..=0x104F       // Myanmar section marks
+        | 0x109E..=0x109F       // Myanmar symbols
+        | 0x17D4..=0x17D6       // Khmer khan, bariyoosan, camnuc pii kuuh
+        | 0x17D8..=0x17DB       // Khmer beyyal, phnaek muan, koomuut, riel sign
+    )
+}
+
+/// Words in `chars` characters of an unspaced script whose words average
+/// `tenths_per_word` / 10 characters (15 for 1.5): rounded to the nearest, and
+/// never zero when there is any such text at all.
+fn estimated_words(chars: usize, tenths_per_word: usize) -> usize {
+    if chars == 0 {
+        return 0;
+    }
+    ((chars * 10 + tenths_per_word / 2) / tenths_per_word).max(1)
 }
 
 /// Filters transcription output by removing filler words and stutter artifacts.
@@ -1160,5 +1262,96 @@ mod tests {
             detect_filler_language("ich glaube das ist nicht so einfach"),
             Some("de")
         );
+    }
+
+    #[test]
+    fn words_are_counted_between_spaces() {
+        assert_eq!(count_words(""), 0);
+        assert_eq!(count_words("  \n\t "), 0);
+        assert_eq!(count_words("weather tomorrow"), 2);
+        assert_eq!(count_words("  send it to   Sam  "), 4);
+        assert_eq!(count_words("Hello, world!"), 2);
+        assert_eq!(
+            count_words("Can you move the meeting to Thursday afternoon instead?"),
+            9
+        );
+    }
+
+    #[test]
+    fn punctuation_and_symbols_are_not_words() {
+        assert_eq!(count_words("..."), 0);
+        assert_eq!(count_words("— , . ! ?"), 0);
+        assert_eq!(count_words("🙂 👍"), 0);
+        assert_eq!(count_words("yes — 🙂"), 1);
+        // Joined by punctuation is still one word, as it is when read aloud.
+        assert_eq!(count_words("don't stop"), 2);
+        assert_eq!(count_words("e.g. this"), 2);
+        assert_eq!(count_words("state-of-the-art"), 1);
+    }
+
+    #[test]
+    fn digits_count_as_words() {
+        assert_eq!(count_words("7"), 1);
+        assert_eq!(count_words("call 555 1234"), 3);
+        assert_eq!(count_words("at 3:45 pm"), 3);
+        assert_eq!(count_words("v2.0.1"), 1);
+    }
+
+    #[test]
+    fn scripts_without_spaces_are_estimated_from_their_characters() {
+        // Chinese: 1.5 characters a word.
+        assert_eq!(count_words("谢谢"), 1);
+        assert_eq!(count_words("明天下雨吗"), 3); // 明天 / 下雨 / 吗
+        assert_eq!(count_words("我们明天早上九点在公司开会讨论预算"), 11);
+        // Japanese: kanji at 1.5, kana at 2.5 characters a word.
+        assert_eq!(count_words("ありがとうございます"), 4);
+        // 東京 / に / 行き / ます
+        assert_eq!(count_words("東京に行きます"), 4);
+        // Punctuation in these scripts counts for nothing, as anywhere else.
+        assert_eq!(count_words("。、！？「」"), 0);
+        // Any such text at all is at least a word.
+        assert_eq!(count_words("ね"), 1);
+    }
+
+    #[test]
+    fn thai_is_estimated_like_the_other_unspaced_scripts() {
+        // A greeting (two words) stays a short dictation; a full sentence
+        // does not.
+        let greeting = count_words("สวัสดีครับ");
+        assert!((1..=3).contains(&greeting), "{greeting}");
+        let sentence = count_words("พรุ่งนี้เราจะประชุมกันตอนเก้าโมงเช้าที่ออฟฟิศเพื่อคุยเรื่องงบประมาณ");
+        assert!(sentence >= 10, "{sentence}");
+        // Thai still separates phrases with spaces.
+        assert!(count_words("สวัสดีครับ ขอบคุณครับ") > greeting);
+    }
+
+    #[test]
+    fn thai_family_marks_count_toward_a_word() {
+        // บ้าน / ใหม่ / ใกล้ / ร้าน / เก่า: five words whose five tone marks
+        // are combining marks. Dropping them read four, under the default
+        // threshold, so cleanup was skipped for a five-word dictation.
+        assert_eq!(count_words("บ้านใหม่ใกล้ร้านเก่า"), 5);
+        // ผม / จะ / ไป / ทำงาน / พรุ่งนี้
+        assert_eq!(count_words("ผมจะไปทำงานพรุ่งนี้"), 5);
+        // วันนี้ / อากาศ / ดี / มาก
+        assert_eq!(count_words("วันนี้อากาศดีมาก"), 4);
+        // Khmer: ខ្ញុំ / ស្រលាញ់ / អ្នក. Its coeng (្) stacks consonants, so
+        // its words run long and this reads a word over, which errs toward
+        // cleaning rather than skipping.
+        let khmer = count_words("ខ្ញុំស្រលាញ់អ្នក");
+        assert!((3..=4).contains(&khmer), "{khmer}");
+        // Their punctuation is still not a word.
+        assert_eq!(count_words("๏ ๚ ๛ ។ ៕ ၊ ။"), 0);
+    }
+
+    #[test]
+    fn mixed_scripts_add_up() {
+        // The Latin words between Han characters count as words of their own.
+        assert_eq!(count_words("我用iPhone和Mac"), 4);
+        // Python / で / 書く
+        assert_eq!(count_words("Pythonで書く"), 3);
+        // Korean and Hindi are written with spaces.
+        assert_eq!(count_words("안녕하세요 반갑습니다"), 2);
+        assert_eq!(count_words("नमस्ते दुनिया"), 2);
     }
 }

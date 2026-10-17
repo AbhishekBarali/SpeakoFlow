@@ -1142,6 +1142,32 @@ fn sync_cleanup_binding(app: &AppHandle) {
     }
 }
 
+/// Paste a dictation shorter than the word threshold as spoken, without AI
+/// cleanup. Only cleanup that rides on the dictation shortcut is skipped.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_skip_short_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_skip_short = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// How many words a dictation needs for cleanup to run while short ones are
+/// skipped. Clamped like the cleanup timeout, so an out-of-range value from a
+/// script still lands somewhere sensible.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_min_words_setting(app: AppHandle, words: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_min_words = words.clamp(
+        settings::MIN_POST_PROCESS_WORDS,
+        settings::MAX_POST_PROCESS_WORDS,
+    );
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 /// Toggle "Generate with Flow" (the spoken activation-phrase generation path).
 #[tauri::command]
 #[specta::specta]

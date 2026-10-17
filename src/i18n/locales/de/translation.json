@@ -2802,6 +2802,14 @@
       "separate": "Eigenes Tastenkürzel",
       "dictation": "Wie beim Diktat"
     },
+    "skipShort": {
+      "title": "Kurze Diktate nicht bereinigen",
+      "info": "Kurze Diktate wie eine Suche oder eine schnelle Antwort werden so geschrieben, wie du sie gesagt hast, ohne auf das Modell zu warten. Längere werden weiterhin bereinigt.",
+      "limit": "Kürzer als",
+      "limitInfo": "Gezählt wird in Wörtern. Bei Sprachen, die ohne Leerzeichen geschrieben werden, wie Chinesisch, Japanisch oder Thai, wird die Wortzahl aus der Zeichenzahl geschätzt.",
+      "words_one": "Wort",
+      "words_other": "Wörter"
+    },
     "shortcutRow": "Tastenkürzel"
   },
   "dictionary": {

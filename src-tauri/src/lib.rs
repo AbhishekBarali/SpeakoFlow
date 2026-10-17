@@ -992,6 +992,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::post_process_test_connection,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_post_process_on_dictation_setting,
+            shortcut::change_post_process_skip_short_setting,
+            shortcut::change_post_process_min_words_setting,
             shortcut::set_cleanup_local_model,
             shortcut::restore_post_process_prompt,
             shortcut::change_flow_enabled_setting,

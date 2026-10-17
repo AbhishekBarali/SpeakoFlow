@@ -1515,6 +1515,18 @@ pub struct AppSettings {
     /// [`cleanup_on_dictation`] and [`cleanup_binding_active`].
     #[serde(default)]
     pub post_process_on_dictation: bool,
+    /// Paste a dictation with fewer than `post_process_min_words` words as
+    /// spoken, without AI cleanup. On by default: a search or a two-word reply
+    /// rarely has anything to clean, and the wait for the model is the only
+    /// delay left in it. Only cleanup that rides on the dictation shortcut is
+    /// skipped: the dedicated cleanup shortcut always cleans. See
+    /// `actions::skips_short_cleanup`.
+    #[serde(default = "default_true")]
+    pub post_process_skip_short: bool,
+    /// How many words a dictation needs for cleanup to run while
+    /// `post_process_skip_short` is on.
+    #[serde(default = "default_post_process_min_words")]
+    pub post_process_min_words: u32,
     #[serde(default = "default_post_process_provider_id")]
     pub post_process_provider_id: String,
     #[serde(default = "default_post_process_providers")]
@@ -2008,6 +2020,16 @@ pub fn cleanup_on_dictation(settings: &AppSettings) -> bool {
 /// does would only swallow those keys from other apps.
 pub fn cleanup_binding_active(settings: &AppSettings) -> bool {
     settings.post_process_enabled && !settings.post_process_on_dictation
+}
+
+/// Bounds for `post_process_min_words`. Below two words, "short" could only
+/// mean an empty dictation, which is never cleaned up anyway; past fifty it
+/// is a paragraph, which nobody means by short.
+pub const MIN_POST_PROCESS_WORDS: u32 = 2;
+pub const MAX_POST_PROCESS_WORDS: u32 = 50;
+
+fn default_post_process_min_words() -> u32 {
+    15
 }
 
 /// Binding id of the separate cleanup shortcut.
@@ -4069,6 +4091,8 @@ pub fn get_default_settings() -> AppSettings {
         auto_submit_key: AutoSubmitKey::default(),
         post_process_enabled: default_post_process_enabled(),
         post_process_on_dictation: false,
+        post_process_skip_short: true,
+        post_process_min_words: default_post_process_min_words(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
         post_process_api_keys: default_post_process_api_keys(),

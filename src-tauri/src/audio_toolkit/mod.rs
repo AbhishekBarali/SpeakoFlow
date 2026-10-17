@@ -14,6 +14,8 @@ pub use audio::{
 };
 pub use replacements::apply_replacements;
 pub use spoken_emojis::expand_spoken_emojis;
-pub use text::{apply_custom_words, filter_transcription_output, is_speechless_transcription};
+pub use text::{
+    apply_custom_words, count_words, filter_transcription_output, is_speechless_transcription,
+};
 pub use utils::get_cpal_host;
 pub use vad::{SileroVad, VoiceActivityDetector};

@@ -2848,6 +2848,16 @@
       "separate": "Vlastní zkratka",
       "dictation": "Stejná jako diktování"
     },
+    "skipShort": {
+      "title": "Nečistit krátká diktování",
+      "info": "Krátká diktování, třeba hledání nebo rychlá odpověď, se napíšou tak, jak jste je řekli, bez čekání na model. Delší se dál čistí.",
+      "limit": "Kratší než",
+      "limitInfo": "Počítá se ve slovech. U jazyků psaných bez mezer, jako je čínština, japonština nebo thajština, se počet slov odhaduje z počtu znaků.",
+      "words_one": "slovo",
+      "words_few": "slova",
+      "words_many": "slova",
+      "words_other": "slov"
+    },
     "shortcutRow": "Zkratka"
   },
   "dictionary": {

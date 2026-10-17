@@ -150,8 +150,14 @@ async fn rerun_entry(
             entry.post_process_prompt.clone(),
         )
     } else {
-        let processed =
-            process_transcription_output(app, &transcription, entry.post_process_requested).await;
+        // A short dictation is left as spoken here exactly as it would have
+        // been when it was dictated, judged on the transcript it has now.
+        let post_process = crate::actions::rerun_runs_cleanup(
+            &crate::settings::get_settings(app),
+            entry.post_process_requested,
+            &transcription,
+        );
+        let processed = process_transcription_output(app, &transcription, post_process).await;
         (processed.post_processed_text, processed.post_process_prompt)
     };
 
@@ -162,6 +168,8 @@ async fn rerun_entry(
                 transcription_text: transcription,
                 post_processed_text,
                 post_process_prompt,
+                // What was asked for, not what ran, so a later retry can still
+                // clean a transcript that comes back longer.
                 post_process_requested: entry.post_process_requested,
                 dismissed: false,
             },
