@@ -26,8 +26,11 @@
 //!   anything sent through a mirror nobody has opened yet is lost.
 //! * A key whose press was withheld has its repeats and release withheld too,
 //!   and nothing else is (see `tracker.rs`).
-//! * Pointers, and keyboards another program created (keyd, ydotool, other
-//!   listeners' mirrors), are only read.
+//! * A mouse is taken over the same way, but only while one of its buttons is
+//!   a shortcut (the middle button; left and right never are), so that click
+//!   can be withheld from the app under the pointer. Otherwise it is only
+//!   read, as are touchpads and anything another program created (keyd,
+//!   ydotool, other listeners' mirrors).
 //! * A node that refuses us is tried again when udev changes it (inotify
 //!   `IN_ATTRIB`) and on a short schedule. A device that goes away is dropped
 //!   alone; the others keep working.
@@ -98,8 +101,8 @@ impl Config {
 }
 
 enum Stage {
-    /// Only read: a [`Role::Listen`] device, or a keyboard that cannot be
-    /// mirrored.
+    /// Only read: a [`Role::Listen`] device, a device that cannot be mirrored,
+    /// or a [`Role::Pointer`] no shortcut needs right now.
     Listening,
     /// A keyboard whose mirror is to be made at `at`.
     NeedsMirror { at: Instant },
@@ -131,6 +134,10 @@ struct Tracked {
     attempts: u32,
     /// Whether "waiting for keys to be released" was logged for this wait.
     told_held: bool,
+    /// A [`Role::Pointer`]: taken over only while a shortcut uses its buttons.
+    pointer: bool,
+    /// False once making its mirror failed for good (no `/dev/uinput`).
+    can_mirror: bool,
 }
 
 struct OpenRetry {
@@ -189,6 +196,7 @@ impl Engine {
     /// device is handed back when the engine is dropped.
     pub(crate) fn run(&mut self) -> io::Result<()> {
         self.scan(Instant::now());
+        self.sync_pointers(Instant::now());
         if self.denied && self.devices.is_empty() && !self.told_access {
             self.told_access = true;
             warn!(
@@ -208,7 +216,12 @@ impl Engine {
                 let (token, flags) = (event.u64, event.events);
                 match token {
                     INOTIFY_TOKEN => self.read_inotify(),
-                    WAKE_TOKEN => self.hub.clear_wake(),
+                    // A listener came or went, or a mouse button stopped or
+                    // started being a shortcut.
+                    WAKE_TOKEN => {
+                        self.hub.clear_wake();
+                        self.sync_pointers(Instant::now());
+                    }
                     id => self.device_ready(id, flags),
                 }
             }
@@ -287,6 +300,7 @@ impl Engine {
         let has = |code: &EV_KEY| device.has(&EventCode::EV_KEY(code.clone()));
         let role = role_for(
             keycode::has_hotkey_key(has),
+            keycode::has_bindable_button(has),
             keycode::has_followed_key(has),
             made_by_uinput,
         );
@@ -304,15 +318,15 @@ impl Engine {
         debug!(
             "handy-keys: reading '{name}' ({}){}",
             path.display(),
-            if role == Role::Grab {
-                " to take it over"
-            } else {
-                ""
+            match role {
+                Role::Grab => " to take it over",
+                Role::Pointer => ", to take over while a shortcut uses its buttons",
+                Role::Listen => "",
             }
         );
         let stage = match role {
             Role::Grab => Stage::NeedsMirror { at: now },
-            Role::Listen => Stage::Listening,
+            Role::Pointer | Role::Listen => Stage::Listening,
         };
         self.by_path.insert(path.clone(), id);
         self.devices.insert(
@@ -326,11 +340,61 @@ impl Engine {
                 mirror: None,
                 attempts: 0,
                 told_held: false,
+                pointer: role == Role::Pointer,
+                can_mirror: true,
             },
         );
-        if role == Role::Grab {
-            self.make_mirror(id, now);
+        match role {
+            Role::Grab => self.make_mirror(id, now),
+            Role::Pointer if self.hub.withholds_buttons() => self.make_mirror(id, now),
+            Role::Pointer | Role::Listen => {}
         }
+    }
+
+    /// Take over the mice with a button a shortcut can use while some shortcut
+    /// uses one, and hand them back once none does. A mouse otherwise goes to
+    /// the compositor directly, with no mirror in between.
+    fn sync_pointers(&mut self, now: Instant) {
+        let wanted = self.hub.withholds_buttons();
+        let pointers: Vec<DeviceId> = self
+            .devices
+            .iter()
+            .filter(|(_, tracked)| tracked.pointer)
+            .map(|(&id, _)| id)
+            .collect();
+        for id in pointers {
+            let Some(tracked) = self.devices.get(&id) else {
+                continue;
+            };
+            let idle = matches!(tracked.stage, Stage::Listening) && tracked.mirror.is_none();
+            if wanted && idle && tracked.can_mirror {
+                self.make_mirror(id, now);
+            } else if !wanted && !idle {
+                self.hand_back(id);
+            }
+        }
+    }
+
+    /// Give a device back to the compositor and only read it from now on.
+    fn hand_back(&mut self, id: DeviceId) {
+        let Some(tracked) = self.devices.get_mut(&id) else {
+            return;
+        };
+        // The device first, then its mirror, as in `drop_device`.
+        if matches!(tracked.stage, Stage::Grabbed) {
+            let _ = tracked.device.grab(GrabMode::Ungrab);
+        }
+        if let Some(mirror) = tracked.mirror.take() {
+            self.mirrors.remove(&mirror.syspath);
+        }
+        tracked.stage = Stage::Listening;
+        tracked.attempts = 0;
+        tracked.told_held = false;
+        debug!(
+            "handy-keys: handed '{}' back; no shortcut uses its buttons",
+            tracked.name
+        );
+        self.tracker.forget_withheld(id);
     }
 
     fn retry_open_later(&mut self, path: PathBuf, now: Instant) {
@@ -363,10 +427,12 @@ impl Engine {
                         tracked.name
                     );
                     tracked.stage = Stage::Listening;
+                    tracked.can_mirror = false;
                 }
             },
             Err(error) if is_denied(&error) || error.kind() == io::ErrorKind::NotFound => {
                 tracked.stage = Stage::Listening;
+                tracked.can_mirror = false;
                 if !self.told_uinput {
                     self.told_uinput = true;
                     warn!(
@@ -512,11 +578,18 @@ impl Engine {
             return verdict;
         }
         if let Some(button) = keycode::button_for(code) {
-            if value != REPEAT {
-                if let Some(event) = self.tracker.button(button, value != RELEASE) {
-                    self.hub.broadcast(event);
-                }
+            let hub = &self.hub;
+            let (verdict, event) = self.tracker.button(
+                id,
+                keycode::code_of(code),
+                button,
+                value,
+                |modifiers, key| grabbed && hub.should_block(modifiers, key),
+            );
+            if let Some(event) = event {
+                self.hub.broadcast(event);
             }
+            return verdict;
         }
         Verdict::Forward
     }
@@ -875,7 +948,7 @@ mod tests {
     use super::*;
     use crate::platform::state::BlockingHotkeys;
     use crate::types::{Hotkey, Key, KeyEvent, Modifiers};
-    use evdev_rs::enums::EV_SYN;
+    use evdev_rs::enums::{EV_REL, EV_SYN};
     use evdev_rs::TimeVal;
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -1088,6 +1161,77 @@ mod tests {
             !is_grabbed(&node),
             "still held after the last listener left"
         );
+    }
+
+    #[test]
+    #[ignore = "needs the input group and /dev/uinput; see the module docs"]
+    fn a_mouse_is_taken_over_only_while_its_middle_button_is_a_shortcut() {
+        let name = format!("hk-probe-pointer-{}", std::process::id());
+        let template = Device::new().expect("libevdev");
+        template.set_name(&name);
+        for code in [EV_KEY::BTN_LEFT, EV_KEY::BTN_MIDDLE] {
+            template
+                .enable(&EventCode::EV_KEY(code))
+                .expect("enable button");
+        }
+        for code in [EV_REL::REL_X, EV_REL::REL_Y] {
+            template
+                .enable(&EventCode::EV_REL(code))
+                .expect("enable axis");
+        }
+        template
+            .enable(&EventCode::EV_SYN(EV_SYN::SYN_REPORT))
+            .expect("enable syn");
+        let mouse = UInputDevice::create_from_device(&template)
+            .expect("create a uinput mouse (needs write access to /dev/uinput)");
+        let node = node_of(&mouse);
+        wait_until(Duration::from_secs(3), || File::open(&node).is_ok());
+
+        let blocking: BlockingHotkeys = Arc::new(Mutex::new(HashSet::new()));
+        let listener = Listener::start(&name, Some(Arc::clone(&blocking)));
+        thread::sleep(Duration::from_millis(600));
+        assert!(!is_grabbed(&node), "a mouse no shortcut needs is only read");
+
+        let middle = Hotkey::new(Modifiers::empty(), Key::MouseMiddle).unwrap();
+        blocking.lock().unwrap().insert(middle);
+        listener.hub.wake();
+        thread::sleep(Duration::from_millis(600));
+        assert!(
+            is_grabbed(&node),
+            "not taken over once its middle button became a shortcut"
+        );
+
+        let mirror = mirror_of(&name, &node);
+        keys_sent_through(&mirror);
+        listener.received();
+        send(&mouse, EV_KEY::BTN_MIDDLE, 1);
+        send(&mouse, EV_KEY::BTN_MIDDLE, 0);
+        let heard: Vec<_> = listener
+            .received()
+            .iter()
+            .map(|event| (event.key, event.is_key_down))
+            .collect();
+        assert_eq!(
+            heard,
+            [
+                (Some(Key::MouseMiddle), true),
+                (Some(Key::MouseMiddle), false)
+            ],
+            "the listener hears the click"
+        );
+        assert!(
+            keys_sent_through(&mirror).is_empty(),
+            "the desktop got the click a shortcut used"
+        );
+
+        blocking.lock().unwrap().clear();
+        listener.hub.wake();
+        thread::sleep(Duration::from_millis(300));
+        assert!(
+            !is_grabbed(&node),
+            "still held once no shortcut used its buttons"
+        );
+        listener.stop();
     }
 
     #[test]

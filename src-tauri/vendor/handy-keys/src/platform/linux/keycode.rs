@@ -148,6 +148,21 @@ pub(crate) fn code_of(code: &EV_KEY) -> u16 {
     code.clone() as u16
 }
 
+/// Whether a mouse button may be withheld from the app under the pointer when
+/// a shortcut uses it: every button the hotkey logic follows but the primary
+/// clicks, which no shortcut may take away from the mouse.
+pub(crate) fn is_withholdable_button(key: Key) -> bool {
+    BUTTONS.iter().any(|&(_, button)| button == key)
+        && !matches!(key, Key::MouseLeft | Key::MouseRight)
+}
+
+/// Whether a device has a mouse button a shortcut can use.
+pub(crate) fn has_bindable_button(has: impl Fn(&EV_KEY) -> bool) -> bool {
+    BUTTONS
+        .iter()
+        .any(|(code, key)| is_withholdable_button(*key) && has(code))
+}
+
 /// Whether a device has a key a hotkey can end in. `has` answers for one code.
 pub(crate) fn has_hotkey_key(has: impl Fn(&EV_KEY) -> bool) -> bool {
     KEYS.iter().any(|(code, _)| has(code))
@@ -221,5 +236,21 @@ mod tests {
         assert!(has_hotkey_key(keyboard) && has_followed_key(keyboard));
         assert!(!has_hotkey_key(mouse) && has_followed_key(mouse));
         assert!(!has_hotkey_key(lid) && !has_followed_key(lid));
+        let wheel_mouse = |code: &EV_KEY| *code == EV_KEY::BTN_LEFT || *code == EV_KEY::BTN_MIDDLE;
+        assert!(has_bindable_button(wheel_mouse));
+        assert!(
+            !has_bindable_button(mouse),
+            "a touchpad's single button is a primary click"
+        );
+    }
+
+    #[test]
+    fn only_the_middle_button_can_be_withheld() {
+        assert!(is_withholdable_button(Key::MouseMiddle));
+        assert!(!is_withholdable_button(Key::MouseLeft));
+        assert!(!is_withholdable_button(Key::MouseRight));
+        // Never read on Linux, so a shortcut on them cannot fire here.
+        assert!(!is_withholdable_button(Key::MouseX1));
+        assert!(!is_withholdable_button(Key::A));
     }
 }
