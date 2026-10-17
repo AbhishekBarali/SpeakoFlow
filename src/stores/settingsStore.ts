@@ -255,6 +255,12 @@ const settingUpdaters: {
     commands.changeMuteWhileRecordingSetting(value as boolean),
   append_trailing_space: (value) =>
     commands.changeAppendTrailingSpaceSetting(value as boolean),
+  smart_spacing: (value) =>
+    commands.changeSmartSpacingSetting(value as boolean),
+  smart_spacing_fix_case: (value) =>
+    commands.changeSmartSpacingFixCaseSetting(value as boolean),
+  smart_spacing_join_sentences: (value) =>
+    commands.changeSmartSpacingJoinSentencesSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),
   app_language: (value) => commands.changeAppLanguageSetting(value as string),
   experimental_enabled: (value) =>

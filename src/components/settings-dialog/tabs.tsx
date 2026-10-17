@@ -57,6 +57,7 @@ import { PasteMethodSetting } from "@/components/settings/PasteMethod";
 import { TypingToolSetting } from "@/components/settings/TypingTool";
 import { ClipboardHandlingSetting } from "@/components/settings/ClipboardHandling";
 import { AppendTrailingSpace } from "@/components/settings/AppendTrailingSpace";
+import { SmartSpacing } from "@/components/settings/SmartSpacing";
 import { AutoSubmit } from "@/components/settings/AutoSubmit";
 import { SpokenEmojiToggle } from "@/components/settings/dictation/SpokenEmojiToggle";
 import { GenerateWithFlowGroup } from "@/components/settings/dictation/GenerateWithFlowGroup";
@@ -257,6 +258,7 @@ export const DictationTab: React.FC = () => {
         <PasteMethodSetting grouped={true} />
         <TypingToolSetting grouped={true} />
         <ClipboardHandlingSetting grouped={true} />
+        <SmartSpacing grouped={true} />
         <AppendTrailingSpace grouped={true} />
         <AutoSubmit grouped={true} />
       </SettingsGroup>

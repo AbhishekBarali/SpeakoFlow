@@ -1459,7 +1459,20 @@
       },
       "appendTrailingSpace": {
         "label": "Dodaj spację na końcu",
-        "description": ""
+        "description": "Dodaje spację po każdym dyktowaniu. Przy włączonych inteligentnych odstępach działa to tylko tam, gdzie nie da się odczytać pola."
+      },
+      "smartSpacing": {
+        "label": "Inteligentne odstępy",
+        "description": "Dopasowuje każde dyktowanie do tekstu, który już jest w polu, aby można było przerwać i kontynuować bez sklejania słów.",
+        "info": "Przed wklejeniem SpeakoFlow sprawdza kilka znaków wokół kursora i dodaje spację tylko tam, gdzie jest potrzebna. Gdy aplikacja ukrywa swój tekst, korzysta zamiast tego z własnego ostatniego dyktowania. Nic nie jest zapisywane ani nigdzie wysyłane. W macOS używa uprawnienia Dostępności, które SpeakoFlow już ma. W Linuksie aplikacje Chrome, Electron i Qt udostępniają tekst tylko wtedy, gdy ułatwienia dostępu pulpitu są włączone."
+      },
+      "smartSpacingFixCase": {
+        "label": "Poprawiaj wielkie litery",
+        "description": "Zaczyna dyktowanie małą literą, gdy kontynuuje zdanie. Imiona, skróty i „I” zachowują wielkie litery."
+      },
+      "smartSpacingJoin": {
+        "label": "Łącz przerwane zdania",
+        "description": "Usuwa kropkę dodaną przez SpeakoFlow, gdy przerwano w połowie zdania, np. „I went to the.”"
       },
       "keyboardImplementation": {
         "title": "Implementacja klawiatury",

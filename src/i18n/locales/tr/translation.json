@@ -1441,7 +1441,20 @@
       },
       "appendTrailingSpace": {
         "label": "Sona boşluk ekle",
-        "description": ""
+        "description": "Her dikteden sonra bir boşluk ekler. Akıllı boşluk açıkken bu yalnızca alanın okunamadığı yerlerde geçerlidir."
+      },
+      "smartSpacing": {
+        "label": "Akıllı boşluk",
+        "description": "Her dikteyi alanda zaten bulunan metne uydurur; böylece durup devam ettiğinizde kelimeler birbirine yapışmaz.",
+        "info": "Yapıştırmadan önce SpeakoFlow imlecin çevresindeki birkaç karaktere bakar ve yalnızca gereken yerde boşluk ekler. Bir uygulama metnini gizliyorsa, bunun yerine kendi son diktesini kullanır. Hiçbir şey kaydedilmez veya bir yere gönderilmez. macOS'ta SpeakoFlow'un zaten sahip olduğu Erişilebilirlik iznini kullanır. Linux'ta Chrome, Electron ve Qt uygulamaları metinlerini yalnızca masaüstünün erişilebilirlik ayarı açıkken paylaşır."
+      },
+      "smartSpacingFixCase": {
+        "label": "Büyük harfleri düzelt",
+        "description": "Bir cümleyi sürdüren dikteyi küçük harfle başlatır. Adlar, kısaltmalar ve \"I\" büyük harfli kalır; Türkçe metin değiştirilmez."
+      },
+      "smartSpacingJoin": {
+        "label": "Yarım kalan cümleleri birleştir",
+        "description": "Cümlenin ortasında durduğunuzda SpeakoFlow'un eklediği noktayı kaldırır, örneğin \"I went to the.\""
       },
       "keyboardImplementation": {
         "title": "Klavye altyapısı",
