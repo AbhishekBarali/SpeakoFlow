@@ -1051,6 +1051,8 @@ pub fn run(cli_args: CliArgs) {
             updates::open_update_installer,
             updates::reveal_update_installer,
             updates::prepare_update_install,
+            updates::download_update,
+            updates::install_downloaded_update,
             updates::take_update_notice,
             feedback::get_feedback_system_info,
             feedback::send_feedback,

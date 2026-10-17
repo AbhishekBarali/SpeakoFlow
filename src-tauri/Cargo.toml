@@ -215,6 +215,10 @@ tauri-plugin-autostart = "2.5.1"
 tauri-plugin-global-shortcut = "2.3.1"
 tauri-plugin-single-instance = "2.3.2"
 tauri-plugin-updater = "2.10.0"
+# Checks the update's signature after `updates.rs` downloads it itself (the
+# plugin only verifies what its own single-connection download fetched). The
+# same crate and version the updater plugin already pulls in.
+minisign-verify = "=0.2.4"
 
 [target.'cfg(windows)'.dependencies]
 transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan", "ort-directml"] }

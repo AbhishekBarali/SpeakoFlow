@@ -6701,6 +6701,7 @@ dependencies = [
  "libc",
  "libloading 0.8.9",
  "log",
+ "minisign-verify",
  "mp3lame-encoder",
  "natural",
  "ndarray",
