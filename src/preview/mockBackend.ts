@@ -1471,6 +1471,11 @@ const handlers: Record<string, (args: Json) => unknown> = {
   get_system_audio_status: () => ({ supported: true, help: null }),
   get_call_detection_status: () => ({ supported: true, enabled: false }),
   get_meeting_indicator: () => liveMeeting,
+  // `?notes=off` previews a meeting page with automatic notes switched off.
+  get_meeting_notes_prefs: () => ({
+    auto_notes: params.get("notes") !== "off",
+    language: params.get("notesLanguage") ?? "auto",
+  }),
   get_auto_learn_status: () => ({
     supported: true,
     enabled: false,

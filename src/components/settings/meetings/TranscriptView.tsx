@@ -10,9 +10,11 @@ import {
   speakerInitial,
   speakerNameResolver,
   speakerTone,
+  transcriptToText,
   type SpeakerTurn,
   type TranscriptItem,
 } from "./speakers";
+import { CopyAction } from "./CopyAction";
 import { useWindowedList } from "./useWindowedList";
 
 interface TranscriptViewProps {
@@ -32,6 +34,11 @@ interface TranscriptViewProps {
   footer?: React.ReactNode;
   /** Discards cached row heights when the underlying list is a different one. */
   resetKey?: string | number;
+  /** Offer a Copy button above the transcript that copies every turn as
+   *  `Name: text`, with the names shown here. */
+  copyable?: boolean;
+  /** Further toolbar buttons, drawn before Copy. */
+  actions?: React.ReactNode;
 }
 
 /** Rows are one line or twenty; this is only the first guess for a row that has
@@ -75,6 +82,8 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
   emptyLabel,
   footer,
   resetKey,
+  copyable = false,
+  actions,
 }) => {
   const { t } = useTranslation();
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -137,40 +146,58 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
     );
   }
 
-  return (
-    <div ref={containerRef} className={`overflow-y-auto ${heightClassName}`}>
-      <div className="px-5 pt-5 pb-2 sm:px-6">
-        {/* The spacer holds the scrollbar at full length; rows are positioned
-            inside it so only the visible ones exist in the DOM. */}
-        <div className="relative" style={{ height: totalHeight }}>
-          {windowed.map(({ index, offset }) => {
-            const turn = turns[index];
-            return (
-              <div
-                key={turn.key}
-                ref={measure(index)}
-                className="absolute inset-x-0"
-                style={{ top: offset }}
-              >
-                <TurnRow
-                  turn={turn}
-                  name={nameFor(turn.speakerKey)}
-                  tone={speakerTone(turn.speakerKey, others)}
-                  editable={Boolean(onRenameSpeaker)}
-                  editing={editingKey === turn.speakerKey}
-                  draft={draft}
-                  onDraftChange={setDraft}
-                  onStartRename={() => startRename(turn.speakerKey)}
-                  onCommitRename={commitRename}
-                  onCancelRename={() => setEditingKey(null)}
-                />
-              </div>
-            );
-          })}
-        </div>
-        {footer}
+  // Outside the scroll area, so Copy stays in reach at minute forty. Built from
+  // the same turns and names drawn below, so what is copied is what is shown.
+  const toolbar =
+    copyable || actions ? (
+      <div className="flex flex-wrap items-center justify-end gap-0.5 border-b border-hairline px-4 py-2 sm:px-5">
+        {actions}
+        {copyable && (
+          <CopyAction
+            text={() => transcriptToText(turns, nameFor)}
+            title={t("meetings.transcript.copyTitle")}
+          />
+        )}
       </div>
-    </div>
+    ) : null;
+
+  return (
+    <>
+      {toolbar}
+      <div ref={containerRef} className={`overflow-y-auto ${heightClassName}`}>
+        <div className="px-5 pt-5 pb-2 sm:px-6">
+          {/* The spacer holds the scrollbar at full length; rows are positioned
+            inside it so only the visible ones exist in the DOM. */}
+          <div className="relative" style={{ height: totalHeight }}>
+            {windowed.map(({ index, offset }) => {
+              const turn = turns[index];
+              return (
+                <div
+                  key={turn.key}
+                  ref={measure(index)}
+                  className="absolute inset-x-0"
+                  style={{ top: offset }}
+                >
+                  <TurnRow
+                    turn={turn}
+                    name={nameFor(turn.speakerKey)}
+                    tone={speakerTone(turn.speakerKey, others)}
+                    editable={Boolean(onRenameSpeaker)}
+                    editing={editingKey === turn.speakerKey}
+                    draft={draft}
+                    onDraftChange={setDraft}
+                    onStartRename={() => startRename(turn.speakerKey)}
+                    onCommitRename={commitRename}
+                    onCancelRename={() => setEditingKey(null)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          {footer}
+        </div>
+      </div>
+    </>
   );
 };
 

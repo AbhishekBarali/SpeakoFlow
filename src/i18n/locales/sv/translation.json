@@ -2012,9 +2012,19 @@
       "hide": "Dölj den flytande indikatorn",
       "show": "Visa den flytande indikatorn"
     },
+    "notesPrefs": {
+      "autoTitle": "Skriv anteckningar när ett samtal slutar",
+      "autoDescription": "Stäng av om du bara behöver transkriptionen. Du kan ändå skriva anteckningar för ett möte från dess transkription.",
+      "languageTitle": "Språk för anteckningar",
+      "languageDescription": "Som standard skrivs anteckningarna på mötets språk. Välj ett språk för att alltid få dem på det.",
+      "auto": "Samma som mötet",
+      "autoHint": "Språket som större delen av mötet hölls på"
+    },
     "pill": {
       "expand": "Öppna transkriptionen live",
       "collapse": "Tillbaka till den lilla rutan",
+      "copy": "Kopiera transkription",
+      "copied": "Transkriptionen kopierades",
       "stop": "Stoppa inspelningen",
       "listening": "Lyssnar. Det som sägs visas här.",
       "micOnly": "Bara din mikrofon spelas in — inget som de andra deltagarna säger kommer med i transkriptionen."
@@ -2092,6 +2102,7 @@
       "empty": "Det här mötet har ingen transkription.",
       "loadingMore": "Laddar mer av transkriptionen…",
       "renameSpeaker": "Byt namn på talaren",
+      "copyTitle": "Kopiera hela transkriptionen med talarnas namn",
       "lowConfidence": "Osäker",
       "lowConfidenceHelp": "Den här talaretiketten är en gissning. Orden är transkriberade som de sades; bara vem som sa dem är osäkert."
     },
@@ -2116,6 +2127,7 @@
     },
     "summary": {
       "template": "Mall",
+      "languageAuto": "Mötets språk",
       "templates": {
         "general": "Allmän",
         "standup": "Standup",

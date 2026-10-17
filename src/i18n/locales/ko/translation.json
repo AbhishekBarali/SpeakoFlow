@@ -2003,9 +2003,19 @@
       "hide": "떠 있는 표시기 숨기기",
       "show": "떠 있는 표시기 보이기"
     },
+    "notesPrefs": {
+      "autoTitle": "통화가 끝나면 노트 작성",
+      "autoDescription": "전사본만 필요하면 끄세요. 꺼도 회의별로 전사본에서 노트를 작성할 수 있습니다.",
+      "languageTitle": "노트 언어",
+      "languageDescription": "기본적으로 노트는 회의에서 사용한 언어로 작성됩니다. 항상 특정 언어로 받으려면 언어를 선택하세요.",
+      "auto": "회의와 같은 언어",
+      "autoHint": "회의 대부분에서 사용한 언어"
+    },
     "pill": {
       "expand": "실시간 전사 열기",
       "collapse": "작은 표시기로 돌아가기",
+      "copy": "전사본 복사",
+      "copied": "전사본을 복사했습니다",
       "stop": "녹음 중지",
       "listening": "듣고 있습니다. 사람들이 말한 내용이 여기에 나타납니다.",
       "micOnly": "내 마이크만 녹음되고 있습니다. 다른 참석자가 말한 내용은 이 전사에 포함되지 않습니다."
@@ -2081,6 +2091,7 @@
       "empty": "이 회의에는 전사 내용이 없습니다.",
       "loadingMore": "전사 내용을 더 불러오는 중…",
       "renameSpeaker": "이 화자 이름 바꾸기",
+      "copyTitle": "화자 이름과 함께 전체 전사본 복사",
       "lowConfidence": "불확실",
       "lowConfidenceHelp": "이 화자 표시는 추측입니다. 말한 내용은 들린 그대로 전사되었고, 누가 말했는지만 확실하지 않습니다."
     },
@@ -2105,6 +2116,7 @@
     },
     "summary": {
       "template": "템플릿",
+      "languageAuto": "회의 언어",
       "templates": {
         "general": "일반",
         "standup": "스탠드업",

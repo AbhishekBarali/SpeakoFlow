@@ -2030,9 +2030,19 @@
       "hide": "Skrýt plovoucí indikátor",
       "show": "Zobrazit plovoucí indikátor"
     },
+    "notesPrefs": {
+      "autoTitle": "Psát poznámky po skončení hovoru",
+      "autoDescription": "Vypněte, pokud potřebujete jen přepis. Poznámky k jedné schůzce můžete i tak napsat z jejího přepisu.",
+      "languageTitle": "Jazyk poznámek",
+      "languageDescription": "Ve výchozím nastavení jsou poznámky v jazyce, kterým se na schůzce mluvilo. Vyberte jazyk, chcete-li je mít vždy v něm.",
+      "auto": "Stejný jako schůzka",
+      "autoHint": "Jazyk, kterým se mluvilo po většinu schůzky"
+    },
     "pill": {
       "expand": "Otevřít živý přepis",
       "collapse": "Zpět na malou pilulku",
+      "copy": "Kopírovat přepis",
+      "copied": "Přepis zkopírován",
       "stop": "Zastavit nahrávání",
       "listening": "Poslouchám. Co lidé říkají, se objeví tady.",
       "micOnly": "Zachytává se jen váš mikrofon — nic z toho, co řeknou ostatní účastníci, v tomto přepisu nebude."
@@ -2114,6 +2124,7 @@
       "empty": "Tato schůzka nemá přepis.",
       "loadingMore": "Načítá se další část přepisu…",
       "renameSpeaker": "Přejmenovat tohoto mluvčího",
+      "copyTitle": "Zkopírovat celý přepis se jmény mluvčích",
       "lowConfidence": "Nejisté",
       "lowConfidenceHelp": "Toto označení mluvčího je odhad. Slova jsou přepsaná tak, jak zazněla; nejisté je jen to, kdo je řekl."
     },
@@ -2138,6 +2149,7 @@
     },
     "summary": {
       "template": "Šablona",
+      "languageAuto": "Jazyk schůzky",
       "templates": {
         "general": "Obecná",
         "standup": "Stand-up",

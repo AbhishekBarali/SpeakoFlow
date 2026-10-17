@@ -3286,9 +3286,9 @@ async setMeetingMyNotes(meetingId: number, notes: string) : Promise<Result<null,
  * calls and one provider hiccup must not discard the eight that worked, so the
  * job continues and reports the hole rather than hiding it.
  */
-async generateMeetingNotes(meetingId: number, template: NotesTemplate | null) : Promise<Result<GeneratedNotes, string>> {
+async generateMeetingNotes(meetingId: number, template: NotesTemplate | null, language: string | null) : Promise<Result<GeneratedNotes, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("generate_meeting_notes", { meetingId, template }) };
+    return { status: "ok", data: await TAURI_INVOKE("generate_meeting_notes", { meetingId, template, language }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3535,6 +3535,38 @@ async getMeetingIndicator() : Promise<Result<boolean, string>> {
 async setMeetingIndicator(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_meeting_indicator", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getMeetingNotesPrefs() : Promise<Result<MeetingNotesPrefs, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_notes_prefs") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether notes are written automatically when a call ends. Takes effect from
+ * the next call; a job already running for one that just ended is left alone.
+ */
+async setMeetingAutoNotes(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_auto_notes", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The default language for meeting notes. Refuses a code this build does not
+ * know rather than storing something that would silently read as auto.
+ */
+async setMeetingNotesLanguage(language: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_notes_language", { language }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3845,6 +3877,22 @@ meeting_show_indicator?: boolean;
  * then never touches them again, so a later opt-in sticks.
  */
 meeting_opt_in_defaults_applied?: boolean; 
+/**
+ * Write notes automatically when a meeting ends.
+ * 
+ * **On by default**, because notes are what most people record a call for.
+ * Off is for people who only want the transcript: the post-call job then
+ * still identifies the speakers but makes no model call, and the meeting
+ * page leads with the transcript. Notes for one meeting can still be
+ * written on demand from its transcript.
+ */
+meeting_auto_notes?: boolean; 
+/**
+ * Language the meeting notes are written in: `"auto"` for the language the
+ * meeting was held in, or a code from
+ * `meetings::summarize::NOTES_LANGUAGES`. An unknown code reads as auto.
+ */
+meeting_notes_language?: string; 
 /**
  * Learn a spelling when the user corrects a dictated word.
  * 
@@ -5138,6 +5186,19 @@ is_me: boolean }
 /**
  * Live recording state, mirrored to the UI.
  */
+/**
+ * The two notes preferences, read together because the Meetings page and a
+ * meeting's own page both need both.
+ */
+export type MeetingNotesPrefs = { 
+/**
+ * Write notes automatically when a call ends.
+ */
+auto_notes: boolean; 
+/**
+ * `"auto"` or a code from `summarize::NOTES_LANGUAGES`.
+ */
+language: string }
 export type MeetingState = { meeting_id: number | null; status: MeetingStatus; paused: boolean; 
 /**
  * Whether system audio is actually being captured. False means the

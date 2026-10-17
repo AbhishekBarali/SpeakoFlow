@@ -200,6 +200,9 @@ export const RecorderCard: React.FC<RecorderCardProps> = ({
             heightClassName="max-h-[26rem]"
             emptyLabel={t("meetings.recorder.transcriptEmpty")}
             resetKey={state.meeting_id ?? "idle"}
+            // Copy during the call, for pasting what was just said into a chat
+            // or a doc without waiting for the meeting to end.
+            copyable
           />
         </div>
       </section>

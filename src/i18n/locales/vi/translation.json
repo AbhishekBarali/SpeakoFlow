@@ -2003,9 +2003,19 @@
       "hide": "Ẩn chỉ báo nổi",
       "show": "Hiện chỉ báo nổi"
     },
+    "notesPrefs": {
+      "autoTitle": "Viết ghi chú khi cuộc gọi kết thúc",
+      "autoDescription": "Tắt nếu bạn chỉ cần bản ghi lời. Bạn vẫn có thể viết ghi chú cho từng cuộc họp từ bản ghi lời của nó.",
+      "languageTitle": "Ngôn ngữ ghi chú",
+      "languageDescription": "Mặc định, ghi chú được viết bằng ngôn ngữ của cuộc họp. Chọn một ngôn ngữ để luôn nhận ghi chú bằng ngôn ngữ đó.",
+      "auto": "Giống cuộc họp",
+      "autoHint": "Ngôn ngữ được dùng trong phần lớn cuộc họp"
+    },
     "pill": {
       "expand": "Mở bản chép lời trực tiếp",
       "collapse": "Trở về viên nhỏ",
+      "copy": "Sao chép bản ghi lời",
+      "copied": "Đã sao chép bản ghi lời",
       "stop": "Dừng ghi âm",
       "listening": "Đang nghe. Lời mọi người nói sẽ hiện ở đây.",
       "micOnly": "Chỉ micrô của bạn đang được ghi — lời của những người tham gia khác sẽ không có trong bản chép lời này."
@@ -2081,6 +2091,7 @@
       "empty": "Cuộc họp này không có bản chép lời.",
       "loadingMore": "Đang tải thêm bản chép lời…",
       "renameSpeaker": "Đổi tên người nói này",
+      "copyTitle": "Sao chép toàn bộ bản ghi lời kèm tên người nói",
       "lowConfidence": "Chưa chắc chắn",
       "lowConfidenceHelp": "Nhãn người nói này chỉ là phỏng đoán. Lời nói được chép đúng như đã nói; chỉ có người nói là chưa chắc chắn."
     },
@@ -2105,6 +2116,7 @@
     },
     "summary": {
       "template": "Mẫu",
+      "languageAuto": "Ngôn ngữ cuộc họp",
       "templates": {
         "general": "Chung",
         "standup": "Họp đứng",

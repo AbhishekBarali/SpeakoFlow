@@ -2012,9 +2012,19 @@
       "hide": "Yüzen göstergeyi gizle",
       "show": "Yüzen göstergeyi göster"
     },
+    "notesPrefs": {
+      "autoTitle": "Arama bitince not yaz",
+      "autoDescription": "Yalnızca dökümü istiyorsanız kapatın. Tek bir toplantının notlarını yine de dökümünden yazabilirsiniz.",
+      "languageTitle": "Not dili",
+      "languageDescription": "Varsayılan olarak notlar toplantının yapıldığı dilde yazılır. Hep aynı dilde almak için bir dil seçin.",
+      "auto": "Toplantıyla aynı",
+      "autoHint": "Toplantının çoğunun yapıldığı dil"
+    },
     "pill": {
       "expand": "Canlı transkripti aç",
       "collapse": "Küçük kapsüle dön",
+      "copy": "Dökümü kopyala",
+      "copied": "Döküm kopyalandı",
       "stop": "Kaydı durdur",
       "listening": "Dinleniyor. Söylenenler burada görünür.",
       "micOnly": "Yalnızca mikrofonunuz kaydediliyor — diğer katılımcıların söyledikleri bu transkriptte yer almayacak."
@@ -2092,6 +2102,7 @@
       "empty": "Bu toplantının transkripti yok.",
       "loadingMore": "Transkriptin devamı yükleniyor…",
       "renameSpeaker": "Bu konuşmacıyı yeniden adlandır",
+      "copyTitle": "Tüm dökümü konuşmacı adlarıyla kopyala",
       "lowConfidence": "Belirsiz",
       "lowConfidenceHelp": "Bu konuşmacı etiketi bir tahmin. Sözcükler söylendiği gibi yazıya döküldü; yalnızca kimin söylediği belirsiz."
     },
@@ -2116,6 +2127,7 @@
     },
     "summary": {
       "template": "Şablon",
+      "languageAuto": "Toplantı dili",
       "templates": {
         "general": "Genel",
         "standup": "Günlük toplantı",
