@@ -85,12 +85,13 @@ Off by default, in Settings → Shortcuts. A held recording, the assistant, a
 call and a meeting are never stopped this way. In the last two seconds a thin
 line on the pill counts down.
 
-**Skip cleanup for short dictations**, on by default at 15 words. A search or a
-two-word reply is pasted as transcribed without waiting for the cleanup model.
+**Skip cleanup for short dictations.** Pick a length, and any dictation shorter
+than that is pasted as transcribed, without waiting for the cleanup model. It
+starts at 15 words, about one spoken sentence, and is on by default.
 
+- Set your own length (2 to 50 words), or turn it off, on the AI cleanup page.
 - Only while cleanup runs on every dictation. The dictate-and-clean-up
   shortcut always cleans, however short.
-- Change the threshold, or turn it off, on the AI cleanup page.
 - Words in Chinese, Japanese and Thai are estimated from the character count.
 
 **Meetings.**
