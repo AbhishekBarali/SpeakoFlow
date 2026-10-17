@@ -1,85 +1,81 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { X } from "lucide-react";
 import { commands } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { useOsType } from "@/hooks/useOsType";
 import { SectionTitle, TextLink } from "@/components/ui/Page";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
+import { KeysPrefix, RowAction } from "@/components/settings/ShortcutRow";
+import { handsFreeInfo } from "@/components/settings/HandsFree";
+import { shortcutInfo } from "@/components/settings/shortcutInfo";
 import { shortcutCombos } from "@/lib/utils/shortcutConflict";
 import { useNavigation, type PageId } from "@/components/shell/navigation";
 import { HANDS_FREE_ID, handsFree } from "@/lib/handsFree";
-import { formatKeyCombination } from "@/lib/utils/keyboard";
 import { LinuxShortcutHelp } from "./LinuxShortcutHelp";
 
 interface ShortcutRow {
   id: string;
   title: string;
   /** What pressing it does, behind the row's (i). */
-  info: string;
+  info?: string;
   /** Where to turn the feature on, when it is off. */
   off?: PageId;
-  /** A key pressed on top of the dictation keys, not a shortcut of its own. */
-  addOn?: boolean;
 }
 
+/** Set once the hands-free hint is closed, so it never comes back. */
+const HINT_CLOSED_KEY = "speakoflow.home.handsFreeHintClosed";
+
+const hintClosed = () => {
+  try {
+    return window.localStorage.getItem(HINT_CLOSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 /**
- * Every shortcut, one line each: a name, an (i) for what it does, and the
- * keys — which are also the button that changes them. Dictate comes first,
- * because it is the one people press all day, and with Hold the hands-free
- * key sits right under it, drawn as what it is: one more key on top of the
- * dictation keys. Whether dictation and the ask are held or tapped is in
- * Settings → Shortcuts (Manage): a Hold · Tap on every row made the card a
- * wall of controls.
+ * Every shortcut, one line each: a name, an (i) for how it is pressed, and the
+ * keys, which are also the button that changes them. Nothing else sits on a
+ * row: Hold to talk is under Manage, and the (i) follows it.
+ *
+ * Hands-free is the one row whose keys need words in front of them, because
+ * its key is pressed while dictating, not on its own: "While dictating, press
+ * [Space]". Where there can be no hands-free key (Linux's Ctrl + Space, the
+ * other keyboard engine), a one-line hint says what to do instead, with a
+ * one-click fix and an X that closes it for good.
  */
 export const ShortcutsCard: React.FC = () => {
   const { t } = useTranslation();
-  const { settings, getSetting } = useSettings();
+  const { settings, getSetting, updateSetting, isUpdating } = useSettings();
   const { navigate, openSettings } = useNavigation();
   const os = useOsType();
-  const dictationHeld = getSetting("push_to_talk") ?? true;
-  const askHeld = getSetting("assistant_push_to_talk") ?? true;
   const cleanupOn = getSetting("post_process_enabled") ?? false;
   // Cleanup that rides on the dictation shortcut has no keys of its own, so
   // the dictation row says "Dictate and clean up" instead of listing both.
   const cleanupOnDictation =
     cleanupOn && (getSetting("post_process_on_dictation") ?? false);
   const assistantOn = getSetting("assistant_enabled") ?? true;
-
   const bindings = getSetting("bindings") ?? {};
-  const keysOf = (id: string) =>
-    formatKeyCombination(bindings[id]?.current_binding ?? "", os);
+  const info = (id: string) => shortcutInfo(t, settings, id);
 
-  // With Hold, also when the key was removed, so it can be set again from
-  // here. With Tap every dictation already is hands-free, and keys or an
-  // engine that cannot have one are Settings' to explain.
   const hands = handsFree(settings);
-  const handsFreeRow: ShortcutRow[] =
-    hands.state === "ready" || hands.state === "taken" || hands.state === "off"
-      ? [
-          {
-            id: HANDS_FREE_ID,
-            title: t("settings.general.shortcut.bindings.hands_free.name"),
-            info:
-              hands.state === "taken"
-                ? t("settings.general.handsFree.taken", {
-                    name: t(
-                      `settings.general.shortcut.bindings.${hands.by}.name`,
-                    ),
-                    keys: formatKeyCombination(hands.keys, os),
-                  })
-                : hands.state === "ready"
-                  ? t("home.shortcuts.handsFree.what", {
-                      keys: keysOf("transcribe"),
-                      key: formatKeyCombination(hands.key, os),
-                    })
-                  : t("settings.general.handsFree.description", {
-                      keys: keysOf("transcribe"),
-                    }),
-            addOn: true,
-          },
-        ]
-      : [];
+  const handsInfo = handsFreeInfo(
+    t,
+    hands,
+    bindings.transcribe?.current_binding,
+    os,
+  );
+  const [hintHidden, setHintHidden] = useState(hintClosed);
+  const closeHint = () => {
+    setHintHidden(true);
+    try {
+      window.localStorage.setItem(HINT_CLOSED_KEY, "1");
+    } catch {
+      // Closed for this session, then.
+    }
+  };
 
   const rows: ShortcutRow[] = [
     {
@@ -87,35 +83,39 @@ export const ShortcutsCard: React.FC = () => {
       title: cleanupOnDictation
         ? t("home.shortcuts.cleanup.title")
         : t("home.shortcuts.dictate.title"),
-      info: cleanupOnDictation
-        ? t("home.shortcuts.cleanup.what")
-        : dictationHeld
-          ? t("home.shortcuts.dictate.whatHold")
-          : t("home.shortcuts.dictate.whatTap"),
+      info: info("transcribe"),
     },
-    ...handsFreeRow,
+    // With Hold to talk off every dictation already is hands-free, and where
+    // there can be no key the hint below takes its place.
+    ...(hands.state === "tapped" || hands.state === "unavailable"
+      ? []
+      : [
+          {
+            id: HANDS_FREE_ID,
+            title: t("settings.general.shortcut.bindings.hands_free.name"),
+            info: handsInfo,
+          },
+        ]),
     ...(cleanupOnDictation
       ? []
       : [
           {
             id: "transcribe_with_post_process",
             title: t("home.shortcuts.cleanup.title"),
-            info: t("home.shortcuts.cleanup.what"),
+            info: info("transcribe_with_post_process"),
             off: cleanupOn ? undefined : ("cleanup" as PageId),
           },
         ]),
     {
       id: "assistant",
       title: t("home.shortcuts.ask.title"),
-      info: askHeld
-        ? t("home.shortcuts.ask.whatHold")
-        : t("home.shortcuts.ask.whatTap"),
+      info: info("assistant"),
       off: assistantOn ? undefined : "assistant",
     },
     {
       id: "assistant_call",
       title: t("home.shortcuts.call.title"),
-      info: t("home.shortcuts.call.what"),
+      info: info("assistant_call"),
       off: assistantOn ? undefined : "assistant",
     },
   ];
@@ -124,7 +124,7 @@ export const ShortcutsCard: React.FC = () => {
     rows.push({
       id: "cancel",
       title: t("home.shortcuts.cancel.title"),
-      info: t("home.shortcuts.cancel.what"),
+      info: info("cancel"),
     });
   }
 
@@ -132,7 +132,9 @@ export const ShortcutsCard: React.FC = () => {
   // do, Cancel included although it has no row there. The hands-free key is
   // not an action a desktop shortcut can run.
   const labels: Record<string, string> = Object.fromEntries([
-    ...rows.filter((row) => !row.addOn).map((row) => [row.id, row.title]),
+    ...rows
+      .filter((row) => row.id !== HANDS_FREE_ID)
+      .map((row) => [row.id, row.title]),
     ["cancel", t("home.shortcuts.cancel.title")],
   ]);
 
@@ -172,6 +174,16 @@ export const ShortcutsCard: React.FC = () => {
     };
   }, [usesGlobe]);
 
+  const hint =
+    hands.state === "unavailable" && !hintHidden
+      ? os === "linux"
+        ? t("home.shortcuts.handsFree.linux")
+        : handsInfo
+      : null;
+
+  const rowClass =
+    "flex min-h-[3.5rem] items-center justify-between gap-3 px-5 py-3";
+
   return (
     <section>
       <SectionTitle
@@ -185,53 +197,63 @@ export const ShortcutsCard: React.FC = () => {
       />
       <ul className="divide-y divide-hairline rounded-2xl border border-hairline bg-surface elev-card">
         {rows.map((row) => (
-          <li
-            key={row.id}
-            className="flex min-h-[3.5rem] items-center justify-between gap-3 px-5 py-3"
-          >
-            <span className="flex min-w-0 items-center gap-1">
-              <span
-                className={`truncate text-[0.9375rem] ${row.off ? "text-muted" : "font-medium text-ink"}`}
-              >
-                {row.title}
+          <React.Fragment key={row.id}>
+            <li className={rowClass}>
+              <span className="flex min-w-0 items-center gap-1">
+                <span
+                  className={`truncate text-[0.9375rem] ${row.off ? "text-muted" : "font-medium text-ink"}`}
+                >
+                  {row.title}
+                </span>
+                {row.info && <InfoTip text={row.info} />}
               </span>
-              <InfoTip text={row.info} />
-            </span>
-            {row.off ? (
-              <button
-                type="button"
-                onClick={() => navigate(row.off as PageId)}
-                className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-[0.8125rem] font-medium text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              >
-                {t("home.shortcuts.turnOn")}
-              </button>
-            ) : (
-              <span className="flex shrink-0 items-center gap-1.5">
-                {row.addOn && hands.state !== "off" && (
-                  <span
-                    aria-hidden="true"
-                    className="text-[0.9375rem] text-muted"
-                  >
-                    +
-                  </span>
-                )}
-                <ShortcutInput shortcutId={row.id} bare size="md" />
-              </span>
+              {row.off ? (
+                <RowAction onClick={() => navigate(row.off as PageId)}>
+                  {t("home.shortcuts.turnOn")}
+                </RowAction>
+              ) : (
+                <span className="flex shrink-0 items-center gap-2">
+                  {row.id === HANDS_FREE_ID && hands.state !== "off" && (
+                    <KeysPrefix>
+                      {t("settings.general.handsFree.whileDictating")}
+                    </KeysPrefix>
+                  )}
+                  <ShortcutInput shortcutId={row.id} bare size="md" />
+                </span>
+              )}
+            </li>
+            {row.id === "transcribe" && hint && (
+              <li className="flex items-center gap-2 px-5 py-2.5">
+                <span className="min-w-0 flex-1 text-[0.8125rem] leading-snug text-muted">
+                  {hint}
+                </span>
+                <RowAction
+                  onClick={() => void updateSetting("push_to_talk", false)}
+                  disabled={isUpdating("push_to_talk")}
+                >
+                  {t("shortcutEditor.turnOff")}
+                </RowAction>
+                <button
+                  type="button"
+                  onClick={closeHint}
+                  aria-label={t("common.close")}
+                  title={t("common.close")}
+                  className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-ink/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </li>
             )}
-          </li>
+          </React.Fragment>
         ))}
         {globeBusy && (
-          <li className="flex min-h-[3.5rem] items-center justify-between gap-3 px-5 py-3">
+          <li className={rowClass}>
             <span className="min-w-0 text-[0.8125rem] text-muted">
               {t("home.shortcuts.globe.hint")}
             </span>
-            <button
-              type="button"
-              onClick={() => void commands.openKeyboardSettings()}
-              className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-[0.8125rem] font-medium text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-            >
+            <RowAction onClick={() => void commands.openKeyboardSettings()}>
               {t("home.shortcuts.globe.open")}
-            </button>
+            </RowAction>
           </li>
         )}
         {os === "linux" && <LinuxShortcutHelp labels={labels} />}

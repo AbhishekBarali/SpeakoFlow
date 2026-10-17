@@ -891,6 +891,33 @@ fn claim_granted(stage: &Stage) -> bool {
     matches!(stage, Stage::Idle)
 }
 
+/// What the pill can say about a dictation's keys: its own keys, which finish
+/// it once it is hands-free, and, while it is held, the hands-free key that
+/// would turn it. Nothing for anything that is not a dictation.
+fn recording_keys(
+    app: &AppHandle,
+    binding_id: &str,
+    mode: RecordingMode,
+) -> crate::overlay::RecordingKeys {
+    if !crate::hands_free::is_dictation_binding(binding_id) {
+        return crate::overlay::RecordingKeys::default();
+    }
+    let finish = crate::settings::get_settings(app)
+        .bindings
+        .get(binding_id)
+        .map(|binding| binding.current_binding.trim().to_string())
+        .filter(|keys| !keys.is_empty());
+    let hands_free_key = if mode == RecordingMode::Hold {
+        crate::shortcut::handy_keys::hands_free_key(app, binding_id)
+    } else {
+        None
+    };
+    crate::overlay::RecordingKeys {
+        finish,
+        hands_free_key,
+    }
+}
+
 fn start(
     app: &AppHandle,
     stage: &mut Stage,
@@ -907,6 +934,7 @@ fn start(
     crate::overlay::set_recording_hands_free(
         mode == RecordingMode::Lock && crate::hands_free::is_dictation_binding(binding_id),
     );
+    crate::overlay::set_recording_keys(recording_keys(app, binding_id, mode));
     action.start(app, binding_id, hotkey_string);
     if app
         .try_state::<Arc<AudioRecordingManager>>()

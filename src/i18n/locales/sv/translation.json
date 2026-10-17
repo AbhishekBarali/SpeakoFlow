@@ -643,7 +643,7 @@
             "description": "Prata med assistenten handsfree och hör dess svar. Tryck igen för att avsluta."
           },
           "hands_free": {
-            "name": "Handsfree-läge",
+            "name": "Handsfree",
             "description": "Tryck på den medan du håller dikteringstangenterna, så fortsätter inspelningen när du släpper. Tryck på dikteringstangenterna igen för att avsluta."
           }
         },
@@ -666,19 +666,20 @@
         "auto": "Automatiskt"
       },
       "pushToTalk": {
-        "label": "Inspelningsbeteende",
-        "dictation": "Håll: inspelningen pågår medan du håller ned dikteringstangenterna. Tryck: en tryckning startar, nästa stoppar.",
-        "assistant": "Håll: lyssnar medan du håller ned frågetangenterna. Tryck: en tryckning startar, nästa skickar.",
-        "hold": "Håll",
-        "tap": "Tryck"
+        "dictation": "På: inspelningen pågår medan du håller ned tangenterna. Av: en tryckning startar, nästa stoppar, så varje diktering blir handsfree.",
+        "assistant": "På: lyssnar medan du håller ned tangenterna. Av: en tryckning startar, nästa skickar.",
+        "dictationLabel": "Håll för att prata",
+        "assistantLabel": "Håll för att fråga"
       },
       "handsFree": {
-        "description": "Medan du håller {{keys}}, tryck på den här tangenten och släpp: dikteringen fortsätter lyssna tills du trycker på {{keys}} igen.",
-        "unavailableKeys": "Kräver ett dikteringskortkommando av bara modifierartangenter. Med {{keys}} kan du använda ”Tryck för att växla” i stället.",
-        "unavailableEngine": "Kräver tangentbordsmotorn SpeakoFlow Keys, under {{where}}.",
+        "unavailableKeys": "Fungerar när diktering bara består av modifierartangenter, som Ctrl + Win. Med {{keys}}, stäng av ”Håll för att prata” i stället: varje diktering fortsätter då tills du trycker på tangenterna igen.",
+        "unavailableEngine": "Kräver tangentbordsmotorn SpeakoFlow Keys ({{where}}). Eller stäng av ”Håll för att prata”: varje diktering fortsätter då tills du trycker på tangenterna igen.",
         "taken": "{{name}} använder redan {{keys}}, så den här tangenten gör ingenting förrän en av dem ändras.",
         "needsKey": "Välj en tangent, till exempel mellanslag eller Enter. En modifierartangent ensam kan inte vara handsfree-tangenten.",
-        "pressKey": "Tryck på en tangent…"
+        "pressKey": "Tryck på en tangent…",
+        "descriptionOff": "Av. Klicka och tryck på en tangent, till exempel mellanslag, för att slå på igen.",
+        "linux": "På Linux, stäng av ”Håll för att prata” i stället: varje diktering fortsätter då tills du trycker på tangenterna igen.",
+        "whileDictating": "Medan du dikterar, tryck på"
       },
       "silenceStop": {
         "label": "Stoppa efter tystnad",
@@ -2237,7 +2238,6 @@
     },
     "listening": "Lyssnar…",
     "locked": "Spelar in handsfree — tryck på kortkommandot igen för att stoppa",
-    "handsFree": "Handsfree",
     "cancel": "Avbryt",
     "copy": "Kopiera transkriptionen",
     "transcript": "Transkription",
@@ -2256,7 +2256,10 @@
       "title": "Talmodellen laddas ner…",
       "percent": "Talmodellen laddas ner · {{percent}}%",
       "hint": "Dikteringen fungerar när den är klar"
-    }
+    },
+    "handsFreeHint": "Tryck {{key}} för handsfree",
+    "lockedKeys": "Spelar in handsfree. Tryck på {{keys}} för att avsluta",
+    "finishKeys": "Avsluta ({{keys}})"
   },
   "reminders": {
     "title": "Påminnelse",
@@ -2547,10 +2550,7 @@
       "dictation": "Diktering",
       "assistant": "Assistent",
       "cleanupOff": "Slå på AI-rensning för att få det här kortkommandot.",
-      "cleanupOnDictation": "Ditt dikteringskortkommando rensar varje diktering, så det här behövs inte.",
-      "openCleanup": "Öppna AI-rensning",
-      "assistantOff": "Assistenten är avstängd, så dess kortkommandon gör ingenting.",
-      "openAssistant": "Öppna Assistent"
+      "assistantOff": "Assistenten är avstängd, så dess kortkommandon gör ingenting."
     },
     "audio": {
       "microphone": "Mikrofon",
@@ -2633,7 +2633,8 @@
         "whatTap": "Tryck, prata, tryck igen. Dina ord skrivs där markören är."
       },
       "handsFree": {
-        "what": "Håll {{keys}}, tryck på {{key}} och släpp: den fortsätter lyssna tills du trycker på {{keys}} igen."
+        "what": "Håll {{keys}}, tryck på {{key}} och släpp: den fortsätter lyssna tills du trycker på {{keys}} igen.",
+        "linux": "För att diktera handsfree på Linux, stäng av ”Håll för att prata”. Då startar en tryckning och nästa stoppar."
       },
       "cleanup": {
         "title": "Diktera och rensa",

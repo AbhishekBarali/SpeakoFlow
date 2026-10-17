@@ -35,7 +35,19 @@ export const bindingKeyLabels = (
     .map((label) => label.replace(/^(Left|Right)\s+/i, ""))
     // The ⊞ key is printed "Win" on the keyboard itself.
     .map((label) => (label === "Windows" ? "Win" : label))
+    // And Escape is printed "Esc".
+    .map((label) => (label === "Escape" ? "Esc" : label))
     .filter(Boolean);
+
+/**
+ * The same keys in a sentence, as the keycaps label them: "Ctrl + Win", not
+ * "Left Ctrl + Left Windows". A sentence that names the keys should name what
+ * the user sees on the row beside it.
+ */
+export const shortKeyCombination = (
+  binding: string | null | undefined,
+  osType: ReturnType<typeof useOsType>,
+): string => (binding ? bindingKeyLabels(binding, osType).join(" + ") : "");
 
 const SIZES: Record<KeycapSize, string> = {
   sm: "h-[1.375rem] min-w-[1.375rem] px-1.5 text-[0.6875rem] rounded-[0.3125rem]",
