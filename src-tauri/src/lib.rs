@@ -1359,6 +1359,12 @@ pub fn run(cli_args: CliArgs) {
         .plugin(
             LogBuilder::new()
                 .level(log::LevelFilter::Trace) // Set to most verbose level globally
+                // tungstenite traces every handshake request verbatim: the
+                // presigned Amazon Transcribe URL with its signature and session
+                // token, and the ElevenLabs / Deepgram key headers. Debug mode
+                // must not write those to a log a user may attach to a report.
+                .level_for("tungstenite", log::LevelFilter::Debug)
+                .level_for("tokio_tungstenite", log::LevelFilter::Debug)
                 .max_file_size(500_000)
                 .rotation_strategy(RotationStrategy::KeepOne)
                 .clear_targets()
