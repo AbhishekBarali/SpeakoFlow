@@ -1446,12 +1446,10 @@ impl TranscriptionManager {
             // one. Resolved here (on the worker thread) so a settings read never
             // happens on the caller's path.
             let settings = get_settings(&this.app_handle);
-            if settings.cloud_stt_streaming {
-                if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
-                    if crate::stt_cloud_stream::supports_streaming(&cfg) {
-                        this.run_cloud_stream_worker(rx, cfg, stream_generation);
-                        return;
-                    }
+            if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
+                if crate::stt_cloud::streams_live(&settings, &cfg) {
+                    this.run_cloud_stream_worker(rx, cfg, stream_generation);
+                    return;
                 }
             }
             this.run_stream_worker(rx, stream_generation);

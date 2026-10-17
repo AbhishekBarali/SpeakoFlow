@@ -416,6 +416,10 @@ pub enum SttEngineMode {
 ///   `Ocp-Apim-Subscription-Key` header and a multipart body of `audio` plus a
 ///   JSON `definition`. The model is not a form field: MAI-Transcribe is chosen
 ///   by `definition.enhancedMode.model`.
+/// - [`AmazonTranscribe`](Self::AmazonTranscribe): Amazon Transcribe's
+///   streaming WebSocket, with a SigV4-presigned URL instead of an auth header
+///   and binary event-stream frames instead of JSON. Streaming only: its batch
+///   API needs an S3 upload and a polled job (see `crate::stt_aws`).
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum CloudSttKind {
@@ -423,6 +427,7 @@ pub enum CloudSttKind {
     OpenAiCompatible,
     Deepgram,
     AzureSpeech,
+    AmazonTranscribe,
 }
 
 /// A configurable cloud speech-to-text endpoint. Seeded from
@@ -512,6 +517,11 @@ pub enum CloudSttUnavailableReason {
     NoModelConfigured,
     /// The provider's endpoint is the user's own resource and none is set.
     MissingEndpoint,
+    /// The provider cannot transcribe the selected language. Amazon Transcribe
+    /// streams a fixed list of languages, and a few of them not in every region;
+    /// sending the audio to another language's model instead would paste a
+    /// confident transcript in the wrong language.
+    UnsupportedLanguage,
 }
 
 /// Whether cloud transcription is ready, for display in Settings.
@@ -534,7 +544,9 @@ pub enum CloudSttReadiness {
 
 /// Fully resolved cloud transcription configuration. Deliberately has no
 /// `Serialize`/`Type`/`Debug` derive because it carries the hydrated API key —
-/// same reasoning as [`ResolvedPostProcessConfig`].
+/// same reasoning as [`ResolvedPostProcessConfig`]. `Clone` is safe, and is
+/// what lets a request move to its own thread.
+#[derive(Clone)]
 pub(crate) struct ResolvedCloudStt {
     pub provider: CloudSttProvider,
     pub model: String,
@@ -561,6 +573,10 @@ pub(crate) struct ResolvedCloudStt {
     /// Ask the provider to drop filler words and false starts server-side.
     pub no_verbatim: bool,
     pub timeout_secs: u64,
+    /// Amazon Transcribe only: the region, the credentials split out of the
+    /// stored key, and the language in the form AWS needs. `None` for every
+    /// other provider.
+    pub amazon: Option<crate::stt_aws::AmazonTranscribeConfig>,
 }
 
 #[derive(Debug)]
@@ -2370,6 +2386,9 @@ pub const CLOUD_STT_ELEVENLABS: &str = "elevenlabs";
 /// Provider id of Azure AI Speech (MAI-Transcribe), called directly.
 pub const CLOUD_STT_AZURE: &str = "azure";
 
+/// Provider id of Amazon Transcribe (streaming).
+pub const CLOUD_STT_AMAZON: &str = "amazon_transcribe";
+
 pub fn default_cloud_stt_provider_id() -> String {
     CLOUD_STT_ELEVENLABS.to_string()
 }
@@ -2570,6 +2589,39 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             // answers "Enhanced mode with model is currently not supported yet".
             api_key_url:
                 "https://learn.microsoft.com/azure/ai-services/speech-service/mai-transcribe"
+                    .to_string(),
+        },
+        // Amazon Transcribe, through its streaming WebSocket only (`stt_aws`):
+        // the batch API wants the audio in an S3 bucket and a polled job, which
+        // is exactly the delay people built middleware to get around.
+        //
+        // Two of the generic slots carry AWS's own shape. The key slot holds
+        // `KEY_ID:SECRET[:SESSION_TOKEN]`, composed by the Settings card from
+        // separate fields, and the editable endpoint slot holds the region,
+        // which ships as us-east-1 so a fresh setup needs only the key. There is
+        // no model to choose; "standard" names the one AWS runs.
+        CloudSttProvider {
+            id: CLOUD_STT_AMAZON.to_string(),
+            label: "Amazon Transcribe".to_string(),
+            base_url: "us-east-1".to_string(),
+            allow_base_url_edit: true,
+            kind: CloudSttKind::AmazonTranscribe,
+            default_model: "standard".to_string(),
+            models: vec!["standard".to_string()],
+            models_endpoint: None,
+            // Biasing at AWS means a custom vocabulary created in the AWS
+            // console beforehand and named in the request; it cannot take a
+            // list of words inline. False keeps the app's own word pass.
+            honors_keyterms: false,
+            supports_streaming: true,
+            // Transcribes in the language spoken; translation is a separate
+            // AWS service.
+            supports_translation: false,
+            key_optional: false,
+            // The page with the IAM permission the key needs, which is the part
+            // that goes wrong: an access key without it fails every request.
+            api_key_url:
+                "https://docs.aws.amazon.com/transcribe/latest/dg/streaming-setting-up.html#streaming-websocket"
                     .to_string(),
         },
         // Custom always comes last, mirroring the post-processing provider list.

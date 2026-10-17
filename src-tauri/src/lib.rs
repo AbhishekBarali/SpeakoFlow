@@ -35,6 +35,7 @@ mod shortcut;
 mod signal_handle;
 mod speech_readiness;
 mod speech_stream;
+mod stt_aws;
 mod stt_cloud;
 #[cfg(test)]
 mod stt_cloud_bench;

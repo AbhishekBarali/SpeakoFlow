@@ -1192,6 +1192,24 @@
           "azureDescription": "Le point de terminaison de votre ressource Azure, indiqué dans Clés et point de terminaison sur le portail Azure. MAI-Transcribe nécessite une ressource dans l'une de ces régions : Central India, Southeast Asia, East US, West US, West US 2 ou North Europe.",
           "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
+        "amazon": {
+          "credentials": {
+            "title": "Clé d'accès AWS",
+            "missing": "Aucune clé enregistrée pour l'instant. Utilisez une clé d'accès d'un utilisateur ou d'un rôle IAM autorisé à appeler transcribe:StartStreamTranscriptionWebSocket.",
+            "keyId": "ID de clé d'accès",
+            "secret": "Clé d'accès secrète",
+            "sessionToken": "Jeton de session (identifiants temporaires uniquement)",
+            "invalid": "Cela ne ressemble pas à une clé AWS. L'ID de clé d'accès ne contient que des lettres et des chiffres, et aucun champ ne peut contenir d'espaces ni de deux-points.",
+            "permission": "Autorisation requise"
+          },
+          "region": {
+            "title": "Région",
+            "description": "L'endroit où Amazon Transcribe s'exécute. La région la plus proche de vous répond le plus vite."
+          },
+          "streaming": "Toujours activé : Amazon Transcribe ne transcrit qu'en direct. Si la connexion coupe pendant l'enregistrement, celui-ci est renvoyé à la vitesse de la parole, et la fin prend donc autant de temps que l'enregistrement.",
+          "language": "Amazon Transcribe doit connaître la langue. Le mode automatique choisit parmi l'anglais, la langue de l'application et quelques autres langues courantes : choisissez la vôtre si vous parlez une autre langue.",
+          "unsupportedLanguage": "Amazon Transcribe ne peut pas transcrire cette langue en direct dans {{region}}. Choisissez une autre langue ou région. D'ici là, la dictée n'utilisera pas Amazon Transcribe."
+        },
         "model": {
           "title": "Modèle",
           "info": "Saisissez n'importe quel modèle proposé par le fournisseur, ou chargez la liste. Pour ElevenLabs, choisissez scribe_v2_realtime pour transcrire pendant que vous parlez, et scribe_v2 pour transcrire une fois que vous avez fini.",
@@ -1204,7 +1222,8 @@
         },
         "keyterms": {
           "label": "Envoyer mes mots personnalisés",
-          "description": "Transmet votre vocabulaire personnalisé au fournisseur pour qu'il privilégie ces orthographes."
+          "description": "Transmet votre vocabulaire personnalisé au fournisseur pour qu'il privilégie ces orthographes.",
+          "unsupported": "{{provider}} ne peut pas recevoir de liste de mots, vos mots personnalisés sont donc corrigés sur cet ordinateur à la place."
         },
         "noVerbatim": {
           "label": "Supprimer les mots parasites",
