@@ -332,6 +332,18 @@ fn total_from_content_range(header: &str) -> Option<u64> {
     (total > 0).then_some(total)
 }
 
+/// Whether a `Content-Range` header names exactly `start..=end`. A cache or
+/// proxy can answer a ranged request with `206` and another range of the same
+/// length; the in-app install would refuse those bytes at the signature check,
+/// but the installer saved to Downloads has no such check.
+fn content_range_is(header: &str, start: u64, end: u64) -> bool {
+    header
+        .trim()
+        .strip_prefix("bytes ")
+        .and_then(|rest| rest.split('/').next())
+        .is_some_and(|range| range.trim() == format!("{start}-{end}"))
+}
+
 /// Where the asset actually lives and how large it is, but only when the
 /// host answers byte ranges with `206`.
 ///
@@ -377,6 +389,14 @@ async fn fetch_chunk(
         .map_err(|e| e.to_string())?;
     if response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
         return Err(format!("HTTP {}", response.status()));
+    }
+    let range_matches = response
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| content_range_is(value, start, end));
+    if !range_matches {
+        return Err("the server answered a different range".to_string());
     }
 
     let mut buffer = Vec::with_capacity(expected);
@@ -1044,6 +1064,24 @@ mod tests {
         );
         assert_eq!(total_from_content_range("bytes 0-0/*"), None);
         assert_eq!(total_from_content_range("bytes 0-0/0"), None);
+    }
+
+    #[test]
+    fn a_chunk_must_be_the_range_it_asked_for() {
+        assert!(content_range_is("bytes 0-3145727/39951234", 0, 3_145_727));
+        assert!(content_range_is(
+            " bytes 3145728-6291455/* ",
+            3_145_728,
+            6_291_455
+        ));
+        // Same length, other bytes.
+        assert!(!content_range_is(
+            "bytes 3145728-6291455/39951234",
+            0,
+            3_145_727
+        ));
+        assert!(!content_range_is("bytes */39951234", 0, 3_145_727));
+        assert!(!content_range_is("", 0, 0));
     }
 
     // Made with `tauri signer sign` and the real SpeakoFlow key over the 16
