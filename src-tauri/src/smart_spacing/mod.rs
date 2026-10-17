@@ -58,8 +58,9 @@ use tauri::AppHandle;
 use crate::settings::get_settings;
 
 /// How long one read may take before it is given up as unknown. It runs while
-/// the user talks, so this bounds wasted work, not felt latency.
-const READ_BUDGET: Duration = Duration::from_millis(300);
+/// the user talks, so this bounds wasted work, not felt latency. Leaves room
+/// for the one retry of an app that was asleep (`windows::RETRY_AFTER`).
+const READ_BUDGET: Duration = Duration::from_millis(500);
 
 /// How long a paste waits for a read still in flight before using the earlier
 /// one (or the memory). Felt by the user only when an app is slow to answer.
@@ -300,7 +301,8 @@ pub fn prepare(app: &AppHandle, transcript: &str, can_erase: bool) -> Option<Fit
         language: &settings.selected_language,
         dictionary: &settings.custom_words,
     };
-    let fitted = rules::fit(transcript, context, &options);
+    let mut fitted = rules::fit(transcript, context, &options);
+    fitted.type_leading_space = fitted.decision.leading_space && snapshot.trims_pasted_spaces;
 
     let source = match context {
         rules::Context::Field { .. } => "field",
@@ -310,11 +312,16 @@ pub fn prepare(app: &AppHandle, transcript: &str, can_erase: bool) -> Option<Fit
     };
     let d = fitted.decision;
     info!(
-        "Smart spacing: from {} ({}): space before {}, space after {}, lowercased {}, \
+        "Smart spacing: from {} ({}): space before {}{}, space after {}, lowercased {}, \
          selection case {}, final mark dropped {}, own period removed {}",
         source,
         snapshot.reading.kind(),
         d.leading_space,
+        if fitted.type_leading_space {
+            " (typed)"
+        } else {
+            ""
+        },
         d.trailing_space,
         d.lowercased,
         d.matched_selection_case,

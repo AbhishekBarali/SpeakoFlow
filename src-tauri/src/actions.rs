@@ -3444,6 +3444,7 @@ fn paste_final(
                     smart_spacing: Some(crate::clipboard::SmartSpacingPaste {
                         known: fitted.known,
                         erase_before: fitted.erase_before,
+                        type_leading_space: fitted.type_leading_space,
                     }),
                     ..Default::default()
                 },
