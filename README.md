@@ -505,12 +505,98 @@ latest version can help.
 
 ## Roadmap
 
-- Code signing for Windows and macOS
-- More one-click local models
-- More community translations
-- Dictation tuned for agentic coding
-- Help writing prompts: describe what you want to build and get a solid prompt back
-- Voice commands that take actions for you
+Where SpeakoFlow is heading, written down here so the project's direction is
+public and dated. These are ideas, not promises: the order isn't a schedule,
+some will change shape, and some will be dropped. If one matters to you, say
+so in an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues).
+
+*Last revised October 2026.*
+
+### Soon
+
+- **Code signing** for Windows and macOS, so installs stop warning.
+- **More one-click local models**, and smaller, faster ones for laptops
+  without a graphics card.
+- **More community translations** of the interface.
+- **Smart spacing and AI cleanup for more languages.** SpeakoFlow Mini handles
+  English today.
+
+### Voice commands and agents
+
+- **Voice commands that take actions.** Say "open the terminal", "switch to
+  Chrome", "mute", "take a screenshot", "turn the volume down" and it happens,
+  instead of ending up in a text field.
+- **Editing by voice.** "New line", "delete that", "select the last
+  sentence", "make that bold", "send it", spoken while you dictate, act on the
+  field you're in instead of being typed out. Cleanup already understands
+  "scratch that"; this extends it to the whole field.
+- **An agent that finishes a task for you.** Describe a job out loud, such as
+  "put these receipts into a spreadsheet" or "reply to everyone from today's
+  meeting", and the assistant works through it on your computer with screen
+  vision, the keyboard, and the mouse. It shows each step, asks before
+  anything it can't undo, and stops the moment you tell it to.
+- **Tools the agent can use.** Browser, files, calendar, email, terminal, and
+  the apps you choose. Every tool is off until you switch it on, each with its
+  own permissions, and you can see what each one did.
+- **Routines.** Several steps under one phrase: "start my standup" opens your
+  notes, starts the meeting recording, and picks the template.
+- **Dictation tuned for agentic coding.** Talking to coding agents and
+  terminals: file paths, symbols, and commands spelled right, and a prompt
+  mode that turns a rambling description into a tidy instruction.
+- **Help writing prompts.** Describe what you want to build and get a solid
+  prompt back, for any model or tool.
+- **Works with other agents.** Use MCP servers as tools, and let other agents
+  on your computer dictate, listen, and speak through SpeakoFlow over a local
+  API.
+
+### Ask and Conversation
+
+- **A memory that lasts.** Longer memory, memory per profile, and a plain
+  view of everything it remembers.
+- **Ask about your files.** Point it at a folder and ask questions about
+  what's in it, with the index kept on your computer.
+- **Watch mode.** A conversation that keeps an eye on the screen while you
+  work and speaks up when you ask it to.
+- **Wake word for the assistant.** "Hey Flow" already starts Generate with
+  Flow; let it start a question or a conversation too, without the keys.
+- **More voices and more languages** for spoken replies, local first.
+
+### Meetings
+
+- **Out of beta**, with calendar awareness, speaker names it can learn, and
+  search across all your meetings.
+- **Live captions and translation** during a call.
+- **Send notes where they go**: Notion, Obsidian, Google Docs, email, or a
+  folder of Markdown.
+
+### A cloud option
+
+Local stays the default, and the app will always work with no account at all.
+The cloud is for people who want it.
+
+- **Sync.** An optional account that keeps your Dictionary, profiles,
+  settings, and history the same on every computer, encrypted so only you can
+  read it.
+- **SpeakoFlow Cloud as a provider.** Transcription, the assistant, and voices
+  from one place with one subscription, for people who'd rather not manage API
+  keys or run models locally. Pick it like any other provider.
+- **Teams.** Shared dictionaries, styles, and profiles for a company, with an
+  admin who sets which providers are allowed.
+- **A phone companion.** Dictate on your phone and have it typed on your
+  computer, or use the assistant on the go.
+
+### Platform
+
+- **More ways to install**: Microsoft Store, Homebrew, Flatpak, and an `.rpm`.
+- **Better Linux**, especially on Wayland.
+- **Faster on more hardware**: NPUs on Windows laptops and the Neural Engine
+  on Macs, with lower latency throughout.
+- **Push-to-talk from other devices**: foot pedals, Bluetooth buttons,
+  headset and earbud controls, Stream Deck.
+- **Fully usable by voice and screen reader**, for people who can't use a
+  keyboard or a mouse.
+- **An extension API**, so others can add tools, providers, cleanup styles,
+  and commands.
 
 ## Contributing
 
