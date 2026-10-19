@@ -45,7 +45,7 @@ jobs:
           # check out, fetch toolchains and run makepkg as a regular user.
           pacman -Syu --noconfirm --needed \
             alsa-lib base-devel clang cmake glslang gtk-layer-shell gtk3 \
-            libappindicator libdrm libglvnd librsvg libx11 libxrandr libxtst \
+            libappindicator libdrm libevdev libglvnd librsvg libx11 libxrandr libxtst \
             openssl patchelf pipewire pkgconf shaderc spirv-headers \
             vulkan-headers vulkan-icd-loader wayland webkit2gtk-4.1 \
             git rustup unzip curl
@@ -106,8 +106,8 @@ jobs:
           license=(MIT)
           provides=(speakoflow)
           conflicts=(speakoflow speakoflow-bin)
-          depends=(alsa-lib gtk-layer-shell gtk3 libappindicator libdrm libglvnd
-                   librsvg libx11 libxrandr libxtst openssl pipewire
+          depends=(alsa-lib gtk-layer-shell gtk3 libappindicator libdrm libevdev
+                   libglvnd librsvg libx11 libxrandr libxtst openssl pipewire
                    vulkan-icd-loader wayland webkit2gtk-4.1)
           # Prebuilt, already laid out by install-arch.sh. Stripping is skipped
           # so the binary and speech-engine libraries are exactly what was built.

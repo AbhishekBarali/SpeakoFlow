@@ -163,9 +163,14 @@ jobs:
 
       - name: install dependencies (ubuntu 24.04 x64)
         if: contains(inputs.platform, 'ubuntu-24.04') && !contains(inputs.platform, 'arm')
+        # autoconf/automake/libtool: the Linux shortcut engine's evdev-sys builds
+        # its bundled libevdev with autogen.sh when no libevdev-dev is installed.
+        # That is deliberate here: libevdev is then linked statically, so the
+        # .deb and AppImage gain no runtime dependency. The arm64 runner image
+        # is not guaranteed to carry autotools, so they are named explicitly.
         run: |
           sudo apt-get update
-          sudo apt-get install -y libappindicator3-dev librsvg2-dev patchelf libasound2-dev libopenblas-dev libx11-dev libxtst-dev libxrandr-dev libgtk-layer-shell0 libgtk-layer-shell-dev libpipewire-0.3-dev libgbm-dev libegl-dev libgl-dev libdrm-dev libwayland-dev \
+          sudo apt-get install -y libappindicator3-dev librsvg2-dev patchelf libasound2-dev libopenblas-dev libx11-dev libxtst-dev libxrandr-dev libgtk-layer-shell0 libgtk-layer-shell-dev libpipewire-0.3-dev libgbm-dev libegl-dev libgl-dev libdrm-dev libwayland-dev autoconf automake libtool \
             libwebkit2gtk-4.1-0=2.44.0-2 \
             libwebkit2gtk-4.1-dev=2.44.0-2 \
             libjavascriptcoregtk-4.1-0=2.44.0-2 \
@@ -177,13 +182,13 @@ jobs:
         if: contains(inputs.platform, 'ubuntu-24.04-arm')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libopenblas-dev libx11-dev libxtst-dev libxrandr-dev libgtk-layer-shell0 libgtk-layer-shell-dev libpipewire-0.3-dev libgbm-dev libegl-dev libgl-dev libdrm-dev libwayland-dev xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libopenblas-dev libx11-dev libxtst-dev libxrandr-dev libgtk-layer-shell0 libgtk-layer-shell-dev libpipewire-0.3-dev libgbm-dev libegl-dev libgl-dev libdrm-dev libwayland-dev autoconf automake libtool xdg-utils
 
       - name: install dependencies (ubuntu 22.04)
         if: contains(inputs.platform, 'ubuntu-22.04') && !contains(inputs.platform, 'arm')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libopenblas-dev libx11-dev libxtst-dev libxrandr-dev libgtk-layer-shell0 libgtk-layer-shell-dev libpipewire-0.3-dev libgbm-dev libegl-dev libgl-dev libdrm-dev libwayland-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libopenblas-dev libx11-dev libxtst-dev libxrandr-dev libgtk-layer-shell0 libgtk-layer-shell-dev libpipewire-0.3-dev libgbm-dev libegl-dev libgl-dev libdrm-dev libwayland-dev autoconf automake libtool
 
       - name: Verify gtk-layer-shell runtime dependency (Ubuntu)
         if: contains(inputs.platform, 'ubuntu')
