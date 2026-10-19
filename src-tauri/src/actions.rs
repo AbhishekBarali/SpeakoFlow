@@ -2955,6 +2955,9 @@ impl ShortcutAction for TranscribeAction {
         // The coordinator runs this straight after this recording's own start,
         // so the current generation is this dictation's.
         let dictation_generation = crate::voice_conversation::dictation_generation();
+        // Taken now, on the hotkey thread, so an Esc that lands before the
+        // task below reaches its batch run still cancels it.
+        let dictation_cancel = tm.dictation_cancel_token();
 
         tauri::async_runtime::spawn(async move {
             let _guard = FinishGuard(ah.clone());
@@ -3022,14 +3025,14 @@ impl ShortcutAction for TranscribeAction {
             // cancelled finalize must not turn into a batch run.
             let transcription_result = match tm.finalize_stream(samples.len()) {
                 Ok(Some(text)) => Ok(text),
-                Ok(None) => tm.transcribe_for_dictation(samples),
+                Ok(None) => tm.transcribe_for_dictation_with(samples, dictation_cancel),
                 Err(e) if crate::managers::transcription::is_cancellation(&e) => Err(e),
                 Err(e) => {
                     warn!(
                         "Live transcription finalize failed ({}); using batch transcription",
                         e
                     );
-                    tm.transcribe_for_dictation(samples)
+                    tm.transcribe_for_dictation_with(samples, dictation_cancel)
                 }
             };
             // Read on this thread, right after `transcribe`, before any await.

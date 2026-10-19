@@ -221,7 +221,7 @@ impl TranscriptionManager {
 
         let Some(mut live) = self.begin_live_chunks() else {
             self.drain_stream_no_model(rx);
-            self.stream_router.clear();
+            self.stream_router.clear(generation);
             return;
         };
         info!(
@@ -258,7 +258,7 @@ impl TranscriptionManager {
 
         let Some((recorded_samples, reply)) = finalize else {
             // Cancelled: no result, and nothing more is decoded.
-            self.stream_router.clear();
+            self.stream_router.clear(generation);
             return;
         };
         let LiveChunks {
@@ -274,7 +274,7 @@ impl TranscriptionManager {
                 text,
                 facts: RunFacts::local(&plan),
             });
-        self.stream_router.clear();
+        self.stream_router.clear(generation);
         let _ = reply.send(result);
     }
 

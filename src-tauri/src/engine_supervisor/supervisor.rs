@@ -279,7 +279,12 @@ type OnProgress = Box<dyn FnMut(StreamProgress) + Send>;
 
 enum Command {
     Load(LoadSpec, Reply<Result<LoadedInfo, EngineError>>),
-    Unload(Reply<()>),
+    /// `now` skips the wait for a live stream (see `Owner::handle`); only
+    /// quitting the app wants that.
+    Unload {
+        reply: Reply<()>,
+        now: bool,
+    },
     Transcribe {
         pcm: Vec<f32>,
         run: RunOptions,
@@ -464,13 +469,27 @@ impl EngineSupervisor {
     /// unload is queued ahead of anything requested later, so a new dictation
     /// queues a fresh load behind it and is never affected by it.
     /// [`Unloading::wait`] returns once the worker has exited.
+    ///
+    /// A live stream (a dictation still recording) keeps the model until it
+    /// ends: the unload waits for it, the way a batch run does.
     pub fn unload(&self) -> Unloading {
+        self.send_unload(false)
+    }
+
+    /// [`unload`](Self::unload), without waiting for a live stream to end. For
+    /// quitting, where the dictation is going away with the app anyway and the
+    /// worker must be gone before an update replaces the executable.
+    pub fn unload_now(&self) -> Unloading {
+        self.send_unload(true)
+    }
+
+    fn send_unload(&self, now: bool) -> Unloading {
         let (reply, exited) = mpsc::channel();
         {
             let mut loaded = lock(&self.shared.loaded);
             self.shared.unloads_requested.fetch_add(1, Ordering::SeqCst);
             *loaded = None;
-            if self.commands.send(Command::Unload(reply)).is_err() {
+            if self.commands.send(Command::Unload { reply, now }).is_err() {
                 return Unloading(None);
             }
         }
@@ -842,10 +861,25 @@ impl Owner {
 
     fn handle(&mut self, command: Command) {
         match command {
+            // A load or an unload stops the worker, and the live stream with
+            // it: the dictation still recording lost its live text and, when
+            // it ended, found no model for its batch fallback ("Model is not
+            // loaded for transcription"). The in-process engine this replaced
+            // was out of reach while a stream had it leased, so a model switch,
+            // a Speech processing change or an "Immediately" unload after
+            // another transcription waited for the dictation. They wait here
+            // too, queued with the batch runs in the order they came. Quitting
+            // (`now`) does not wait.
+            command @ (Command::Load(..) | Command::Unload { now: false, .. })
+                if self.stream.is_some() =>
+            {
+                debug!("A model load or unload is waiting for the live stream to end");
+                self.deferred.push_back(command);
+            }
             Command::Load(spec, reply) => {
                 let _ = reply.send(self.load(spec));
             }
-            Command::Unload(reply) => {
+            Command::Unload { reply, .. } => {
                 self.unload();
                 self.unloads_done += 1;
                 let _ = reply.send(());
@@ -2560,6 +2594,40 @@ mod live_tests {
             .join()
             .unwrap()
             .is_ok_and(|t| !t.text.trim().is_empty()));
+    }
+
+    /// An unload requested while a dictation streams (a model switch, a
+    /// Speech processing change, an "Immediately" unload after another
+    /// transcription) waits for the stream to end instead of killing it.
+    #[test]
+    #[ignore = "needs the built app, a streaming model and a recording"]
+    fn live_an_unload_waits_for_a_stream() {
+        set_fault(None, false);
+        let pcm = recording();
+        let engine = EngineSupervisor::new(true);
+        engine
+            .load(spec(model("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf")))
+            .expect("load");
+        let stream = engine
+            .start_stream(
+                RunOptions::default(),
+                StreamOptions::default(),
+                CancelToken::new(),
+                |_| {},
+            )
+            .expect("stream");
+        let (half, rest) = pcm.split_at(pcm.len() / 2);
+        for chunk in half.chunks(1280) {
+            stream.feed(chunk.to_vec());
+        }
+        let unloading = engine.unload();
+        assert!(engine.loaded().is_none(), "reads as unloaded at once");
+        for chunk in rest.chunks(1280) {
+            stream.feed(chunk.to_vec());
+        }
+        let finalized = stream.finalize(false).expect("finalize").expect("result");
+        assert!(!finalized.text.display().trim().is_empty());
+        assert!(unloading.wait_timeout(Duration::from_secs(10)));
     }
 
     /// (f) The worker exits when the supervisor is dropped (its stdin closes),
