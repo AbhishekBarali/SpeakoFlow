@@ -5065,7 +5065,12 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             for response in responses {
                 let (mut stream, _) = listener.accept().unwrap();
                 let body = read_request_body(&mut stream);
-                sender.send(serde_json::from_str(&body).unwrap()).unwrap();
+                // A client that gave up (its deadline passed) may close before
+                // sending a body; that is what the deadline tests provoke, and
+                // it must not panic the mock and fail the test on a slow host.
+                sender
+                    .send(serde_json::from_str(&body).unwrap_or(serde_json::Value::Null))
+                    .unwrap();
                 if !response.delay.is_zero() {
                     thread::sleep(response.delay);
                 }
