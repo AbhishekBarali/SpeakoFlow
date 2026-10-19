@@ -4083,7 +4083,7 @@ mouse_button_shortcuts?: boolean; show_tray_icon?: boolean;
 tray_icon_color?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; transcribe_accelerator?: TranscribeAcceleratorSetting; 
 /**
  * The GPU chosen for speech, as a stable device key
- * (`managers::transcription::device_key`: the backend's hardware id, or
+ * (`engine_supervisor::device_key`: the backend's hardware id, or
  * its name where it has none). Never a registry index: transcribe.cpp's
  * indices are process-local. `None` is automatic selection.
  */
@@ -5011,8 +5011,7 @@ skipped_windows: number }
  * llama.cpp device pinning (`local_llm`) matches `name` against its own adapter
  * descriptions and treats `kind == "integrated"` as the iGPU to avoid, and
  * onboarding and the assistant catalog size local models from the VRAM.
- * `Deserialize` is needed by the Linux out-of-process probe, which parses this
- * back out of the child's JSON.
+ * `Deserialize` keeps the `--probe-devices` JSON readable by a script.
  */
 export type GpuDeviceOption = { 
 /**
