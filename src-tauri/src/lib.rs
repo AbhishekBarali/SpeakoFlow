@@ -1484,10 +1484,12 @@ pub fn run(cli_args: CliArgs) {
                     // WebView2 args shared identically across every window (see
                     // WEBVIEW2_BROWSER_ARGS). Windows-only effect.
                     .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
-                    // Empty title + a blanked caption icon (see
-                    // tray::update_window_icon) keep the top of the window clear
-                    // — no "SpeakoFlow" text and no logo in the title bar.
-                    .title("")
+                    // The native caption is never drawn (no decorations on
+                    // Windows/Linux, `hidden_title` on macOS), so the title only
+                    // names the window to the OS: the taskbar hover preview,
+                    // Alt+Tab, Task Manager, Linux window lists and screen
+                    // readers. An empty one left all of those blank.
+                    .title("SpeakoFlow")
                     // Open a bit wider/taller so content (max-w-3xl) breathes
                     // next to the sidebar instead of feeling cramped. Min stays
                     // smaller so users on small laptops can shrink it to fit
