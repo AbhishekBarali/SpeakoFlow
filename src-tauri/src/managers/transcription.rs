@@ -522,8 +522,17 @@ impl TranscriptionManager {
         // first's engine.
         let engine = ENGINE
             .get_or_init(|| {
-                let gpu_allowed = !transcribe_gpu_disabled_for_host();
-                if !gpu_allowed {
+                // A CPU without FMA3 cannot run ggml's Vulkan backend at all
+                // (an uncatchable SIGILL), so it never lists a GPU
+                // (`cpu_can_list_gpus`). Letting its model workers register
+                // that backend anyway crashed the first worker of every
+                // session before the CPU-only retry, which is the same
+                // outcome a second slower.
+                let fma_ok = cpu_can_list_gpus();
+                let gpu_allowed = !transcribe_gpu_disabled_for_host() && fma_ok;
+                if !fma_ok {
+                    warn!("This CPU lacks FMA3, which the GPU backend needs; speech runs on the processor");
+                } else if !gpu_allowed {
                     // Every worker is then CPU-only, so the emulated GPU
                     // driver is never loaded at all.
                     warn!(

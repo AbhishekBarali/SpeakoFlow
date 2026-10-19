@@ -330,6 +330,13 @@ struct Shared {
     /// Held for the length of a device probe, so concurrent callers wait for
     /// the one probe instead of starting their own.
     probing: Mutex<()>,
+    /// A model-less device probe failed without crashing (the worker could
+    /// not be started, or refused). Not retried on every call: the GPU list is
+    /// read several times per llama.cpp start and by every settings screen,
+    /// and each call would start (and wait for) another worker that fails the
+    /// same way. A model worker's hello still refreshes the list, and
+    /// [`EngineSupervisor::retry_gpu`] allows one more probe.
+    probe_failed: AtomicBool,
     /// Bumped by every [`EngineSupervisor::unload`] as it is called, so the
     /// model reads as unloaded at once, even while the unload waits its turn.
     unloads_requested: AtomicU64,
@@ -350,6 +357,7 @@ impl Shared {
                     "Could not start a transcription worker to list compute devices: {}",
                     failure
                 );
+                self.probe_failed.store(true, Ordering::Release);
                 if failure.worker_lost() && !cpu_only {
                     self.mark_gpu_unavailable(format!(
                         "a worker with GPU backends {failure} while listing compute devices"
@@ -500,6 +508,7 @@ impl EngineSupervisor {
     /// any, so the next load may use (and list) the GPU again. A new failure
     /// sets the flag again.
     pub fn retry_gpu(&self, reason: &str) {
+        self.shared.probe_failed.store(false, Ordering::Release);
         if self.shared.gpu_unavailable.swap(false, Ordering::AcqRel) {
             info!("Transcription GPU no longer marked unavailable: {}", reason);
         }
@@ -570,10 +579,14 @@ impl EngineSupervisor {
     /// listed them yet, starts a short-lived worker on this thread to list
     /// them. It runs beside any model worker, which it leaves alone. Not while
     /// the GPU is marked unavailable: that probe would crash or hang the same
-    /// way.
+    /// way. Nor after a probe failed for another reason (see
+    /// [`Shared::probe_failed`]).
     pub fn devices(&self) -> Option<Vec<DeviceInfo>> {
         let _probing = lock(&self.shared.probing);
-        if lock(&self.shared.devices).is_none() && !self.shared.gpu_unavailable() {
+        if lock(&self.shared.devices).is_none()
+            && !self.shared.gpu_unavailable()
+            && !self.shared.probe_failed.load(Ordering::Acquire)
+        {
             self.shared.probe_devices();
         }
         lock(&self.shared.devices).clone()
