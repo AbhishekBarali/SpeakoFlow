@@ -1750,6 +1750,11 @@ pub(crate) fn release_before_exit(app: &AppHandle) {
     // quit may still be waiting for the settings writer thread, and a logout or
     // shutdown can end the process before the steps below finish.
     settings::flush_settings();
+    // A dictation pasted in the last second may still hold the clipboard,
+    // waiting for its target to read it; put the user's clipboard back now,
+    // since the transaction's own restore dies with the process. The old
+    // plain paste restored before it returned, so nothing was ever left.
+    paste_tx::settle_before_exit(app);
     // A meeting still recording would otherwise lose its tail and leave its
     // recordings unfinalised and unreferenced. Bounded, because draining a
     // transcription backlog can take minutes.

@@ -83,6 +83,17 @@ pub(crate) const FAILED_INJECTION_TIMEOUT: Duration = Duration::from_millis(500)
 /// auto-submit still goes, as it always did.
 pub(crate) const BLIND_RESTORE_DELAY: Duration = Duration::from_millis(1000);
 
+/// How long after the keystroke the auto-submit Enter goes when the target's
+/// read cannot be seen (a promise read before the keystroke, see
+/// [`BLIND_RESTORE_DELAY`]). Only the clipboard restore needs the long wait;
+/// Enter does not touch the clipboard, and the target handles it after the
+/// paste keystroke it queued first. Holding Enter for the restore's full
+/// second made every auto-submitted dictation feel a second slow on machines
+/// with a clipboard manager or a VM/remote-desktop client, and it could land
+/// while the next shortcut's keys were already held. The plain paste sent it
+/// 50 ms after the keystroke.
+pub(crate) const BLIND_SUBMIT_DELAY: Duration = Duration::from_millis(150);
+
 /// How long the paste waits for the dictation to be published before giving
 /// up and using the plain paste instead. Publishing first snapshots the
 /// clipboard, which can ask another app to render data it promised; a hung
@@ -131,6 +142,9 @@ pub(crate) struct TxState {
     pub cancelled: bool,
     /// The first read that counts has been logged.
     pub logged_receipt: bool,
+    /// The auto-submit Enter has already gone (early, see
+    /// [`blind_submit_due`]), so settling must not send it again.
+    pub submitted: bool,
 }
 
 impl TxState {
@@ -143,6 +157,7 @@ impl TxState {
             ownership_lost: false,
             cancelled: false,
             logged_receipt: false,
+            submitted: false,
         }
     }
 
@@ -263,9 +278,25 @@ pub(crate) fn settlement(
     let delivered = state.any_receipt_after_injection()
         || (state.rendered_before_injection() && !state.injection_failed);
     Settlement {
-        submit: wants_submit && delivered,
+        submit: wants_submit && delivered && !state.submitted,
         clipboard,
     }
+}
+
+/// Whether the auto-submit Enter of a blind paste (the promise was read
+/// before the keystroke) is due now, ahead of the clipboard restore. See
+/// [`BLIND_SUBMIT_DELAY`]. A paste whose target read is seen keeps sending
+/// Enter when it settles, a quiet period after that read.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+pub(crate) fn blind_submit_due(state: &TxState, now: Instant) -> bool {
+    !state.submitted
+        && !state.injection_failed
+        && !state.ownership_lost
+        && !state.any_receipt_after_injection()
+        && state.rendered_before_injection()
+        && state
+            .injected_at
+            .is_some_and(|injected| now.duration_since(injected) >= BLIND_SUBMIT_DELAY)
 }
 
 /// Why a transaction settled, for the log.
@@ -358,13 +389,31 @@ pub(crate) fn paste(
 /// anything else snapshots the clipboard, so it records the user's content
 /// rather than a dictation in flight.
 ///
-/// Windows only: there settling is safe from any thread. On macOS it must run
-/// on the main thread, which a caller here cannot promise, and a pending
-/// transaction settles on its own within [`RESTORE_TIMEOUT`].
+/// Its auto-submit Enter, if still owed, is dropped rather than sent: the
+/// only caller is an ask harvesting the selection, at the moment its keys go
+/// down, so Enter would reach the target with those keys held (Ctrl+Enter,
+/// a page break in Word).
+///
+/// Windows settles on the calling thread. macOS has to settle on the main
+/// thread, so it is queued there and waited for briefly; a pending
+/// transaction would otherwise settle on its own within [`RESTORE_TIMEOUT`],
+/// after the harvest had already taken the dictation for the user's
+/// clipboard and "restored" it.
 pub(crate) fn settle_pending(app_handle: &tauri::AppHandle) {
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     platform::settle_pending(app_handle);
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let _ = app_handle;
+}
+
+/// Settle a pending paste before the app exits, so the user's clipboard is
+/// put back instead of being left holding the dictation (and on Windows, a
+/// promise that dies unrendered with its window). An owed auto-submit still
+/// goes. Bounded: quitting never waits on it for long.
+pub(crate) fn settle_before_exit(app_handle: &tauri::AppHandle) {
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    platform::settle_before_exit(app_handle);
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let _ = app_handle;
 }
 
@@ -547,6 +596,38 @@ mod tests {
                 clipboard: ClipboardSettle::LeaveCopy
             }
         );
+    }
+
+    #[test]
+    fn a_blind_paste_submits_early_and_only_once() {
+        // A clipboard manager took the one read before the keystroke: Enter
+        // goes shortly after the keystroke, not with the restore a second
+        // later, and settling does not send it again.
+        let now = Instant::now();
+        let mut s = published(Duration::from_millis(400));
+        s.receipts.push(now - Duration::from_millis(390));
+        s.injected_at = Some(now - BLIND_SUBMIT_DELAY / 2);
+        assert!(!blind_submit_due(&s, now), "not before the delay");
+        s.injected_at = Some(now - BLIND_SUBMIT_DELAY);
+        assert!(blind_submit_due(&s, now));
+        assert_eq!(evaluate(&s, now), WaitDecision::KeepWaiting);
+        s.submitted = true;
+        assert!(!blind_submit_due(&s, now));
+        assert!(!settlement(&s, true, true, false).submit);
+    }
+
+    #[test]
+    fn a_seen_read_or_a_failed_keystroke_never_submits_early() {
+        let now = Instant::now();
+        // The target's read was seen: Enter waits for the settle.
+        let mut s = read_after_keystroke();
+        assert!(!blind_submit_due(&s, now));
+        // A failed keystroke never submits.
+        s = published(Duration::from_millis(400));
+        s.receipts.push(now - Duration::from_millis(390));
+        s.injected_at = Some(now - BLIND_SUBMIT_DELAY);
+        s.injection_failed = true;
+        assert!(!blind_submit_due(&s, now));
     }
 
     #[test]
