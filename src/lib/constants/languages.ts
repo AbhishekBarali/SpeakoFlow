@@ -138,21 +138,30 @@ function displayNamesFor(uiLanguage: string): Intl.DisplayNames | null {
  * pickers. `Intl.DisplayNames` is in every web view the app ships on; a code it
  * does not know falls back to the English label. `auto` has no language name
  * and is resolved by the caller through its translation key.
+ *
+ * A code outside the list above (a catalog model's `ga`, or the plain `zh` the
+ * Models page filter uses for both Chinese scripts) is named by
+ * `Intl.DisplayNames` in English too, and shown as the code only when even
+ * that does not know it.
  */
 export function languageLabel(code: string, uiLanguage: string): string {
-  const english = LANGUAGES.find((lang) => lang.value === code)?.label ?? code;
-  if (code === "auto" || uiLanguage.toLowerCase().startsWith("en")) {
-    return english;
-  }
+  const known = LANGUAGES.find((lang) => lang.value === code)?.label;
+  if (code === "auto") return known ?? code;
+  if (known && uiLanguage.toLowerCase().startsWith("en")) return known;
   try {
     const name = displayNamesFor(uiLanguage)?.of(DISPLAY_CODE[code] ?? code);
-    if (!name) return english;
+    if (!name) return known ?? code;
     // Many locales write language names in lowercase ("allemand"); a picker
     // entry starts a line, so it takes a capital where the script has one.
     return name.charAt(0).toLocaleUpperCase(uiLanguage) + name.slice(1);
   } catch {
-    return english;
+    return known ?? code;
   }
+}
+
+/** The English name of a language, for matching a search typed in English. */
+function englishLanguageName(code: string): string {
+  return languageLabel(code, "en");
 }
 
 /** Every language, labelled in the UI language (`auto` keeps its English label). */
@@ -171,6 +180,5 @@ export function languageMatches(lang: Language, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   if (lang.label.toLowerCase().includes(q)) return true;
-  const english = LANGUAGES.find((l) => l.value === lang.value)?.label ?? "";
-  return english.toLowerCase().includes(q);
+  return englishLanguageName(lang.value).toLowerCase().includes(q);
 }

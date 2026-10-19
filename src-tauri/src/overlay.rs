@@ -1,4 +1,5 @@
 use crate::input;
+use crate::managers::transcription::TranscriptionManager;
 use crate::overlay_follow::{
     display_under, hop_destination, placement_at, rect_contains, DisplayFollower, Edge,
     MonitorBounds, Point, Side, FOLLOW_POLL, HOP_FADE_OUT,
@@ -7,9 +8,9 @@ use crate::overlay_lifecycle::OverlayLifecycle;
 use crate::settings;
 use crate::settings::OverlayPosition;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, Once};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
+use tauri::{AppHandle, Emitter, Listener, Manager, PhysicalPosition};
 
 /// Bumped on every overlay state change. The delayed hide behind a brief
 /// notice only fires when nothing newer (e.g. a fresh recording) replaced it.
@@ -62,10 +63,10 @@ const OVERLAY_HEIGHT: f64 = 44.0;
 const OVERLAY_LABEL_WIDTH: f64 = 300.0;
 const OVERLAY_LABEL_HEIGHT: f64 = 60.0;
 
-// The opt-in live-transcription window (see `live_transcription_window_enabled`)
-// reuses this same overlay window, resized into a larger card so the running
-// committed + tentative transcript is readable during dictation. Mirrors
-// Handy's 400×120 streaming overlay. When the window setting is off the overlay
+// The Live overlay style reuses this same overlay window, resized into a
+// larger card so the running committed + tentative transcript is readable
+// during dictation. Mirrors
+// Handy's 400×120 streaming overlay. With the Minimal style the overlay
 // stays the compact pill above.
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
@@ -91,15 +92,198 @@ fn is_recovery_state(state: &str) -> bool {
 }
 
 /// States drawn as the compact pill even when the Live card is the overlay
-/// style: a recovery offer, and the "speech model still downloading" notice,
-/// which has no transcript to show and would read as a recording in the card.
+/// style: a recovery offer, and the "speech model still downloading" and
+/// "speech model needs an update" notices, which have no transcript to show
+/// and would read as a recording in the card.
 fn is_pill_only_state(state: &str) -> bool {
-    is_recovery_state(state) || state == "downloading"
+    is_recovery_state(state) || matches!(state, "downloading" | "update")
 }
 
 /// States with a written line, which get the wider two-line frame.
 fn is_labeled_state(state: &str) -> bool {
-    matches!(state, "generating" | "vision" | "notice" | "downloading")
+    matches!(
+        state,
+        "generating" | "vision" | "notice" | "downloading" | "update" | "loading"
+    )
+}
+
+/// What the overlay was last asked to show, so a speech-model load that starts
+/// or ends on its own can change the label without the pipeline's help.
+struct Shown {
+    state: String,
+    epoch: u64,
+    cleanup_next: bool,
+}
+
+static SHOWN: Mutex<Shown> = Mutex::new(Shown {
+    state: String::new(),
+    epoch: 0,
+    cleanup_next: false,
+});
+
+/// A `model-state-changed` "loading_started" has been seen without its
+/// "loading_completed" / "loading_failed". The transcription manager's own
+/// flag is the primary signal, but it is set and cleared a moment apart from
+/// the events, so the watcher reads both (see [`watch_model_load`]).
+static LOAD_EVENT_OPEN: AtomicBool = AtomicBool::new(false);
+/// A [`watch_model_load`] thread is running.
+static LOAD_WATCHING: AtomicBool = AtomicBool::new(false);
+/// How often the watcher checks whether the load has finished. A switch from
+/// "Loading model…" to the transcription fill this late is not noticeable.
+const MODEL_LOAD_POLL: Duration = Duration::from_millis(50);
+/// How long an open "loading_started" alone keeps the watcher going once the
+/// manager says nothing is loading. Covers the flag being set a moment after
+/// the event, without trusting an event whose ending was never sent.
+const MODEL_LOAD_EVENT_GRACE: Duration = Duration::from_secs(2);
+/// The watcher gives up after this, whatever it sees. A load that takes longer
+/// is not a load any more, and the pipeline's own next show replaces the pill.
+const MODEL_LOAD_WATCH_LIMIT: Duration = Duration::from_secs(600);
+
+/// What a speech-model load starting (`loading`) or ending means for what the
+/// overlay shows in `state`.
+#[derive(Debug, PartialEq, Eq)]
+enum LoadChange {
+    /// The dictation is over and waiting on the load: say so, in place of
+    /// "Transcribing…", whose fill would otherwise run for the whole load.
+    ShowLoading,
+    /// The load is done and the transcription itself is the wait now.
+    ShowTranscribing,
+    /// Still recording: the live card mentions a slow load (the webview waits
+    /// ~2 s before it says anything, so a quick load never flashes).
+    TellRecording(bool),
+    Nothing,
+}
+
+fn load_change(state: &str, loading: bool) -> LoadChange {
+    match (state, loading) {
+        ("transcribing", true) => LoadChange::ShowLoading,
+        ("loading", false) => LoadChange::ShowTranscribing,
+        ("recording", loading) => LoadChange::TellRecording(loading),
+        _ => LoadChange::Nothing,
+    }
+}
+
+/// Whether this dictation's speech-to-text runs on the local engine. A
+/// complete cloud setup's wait is the request, whatever the local engine is
+/// doing; an incomplete one falls back to the local engine.
+fn uses_local_speech(app: &AppHandle) -> bool {
+    crate::stt_cloud::resolve_cloud_stt(&settings::get_settings(app)).is_err()
+}
+
+/// Whether the dictation's speech-to-text is waiting on a local model load.
+fn speech_model_loading(app: &AppHandle) -> bool {
+    app.try_state::<Arc<TranscriptionManager>>()
+        .is_some_and(|tm| tm.is_model_loading())
+        && uses_local_speech(app)
+}
+
+/// Apply a load starting or ending to the overlay that is up.
+fn apply_load_change(app: &AppHandle, loading: bool) {
+    let (state, epoch, cleanup_next) = match SHOWN.lock() {
+        Ok(shown) => (shown.state.clone(), shown.epoch, shown.cleanup_next),
+        Err(_) => return,
+    };
+    // Only the show still on screen: a later one already replaced it.
+    if epoch != OVERLAY_LIFECYCLE.current() {
+        return;
+    }
+    match load_change(&state, loading) {
+        LoadChange::ShowLoading => {
+            show_overlay(app, "loading", None, None, cleanup_next);
+        }
+        LoadChange::ShowTranscribing => {
+            show_overlay(app, "transcribing", None, None, cleanup_next);
+        }
+        LoadChange::TellRecording(loading) => {
+            if let Some(window) = app.get_webview_window("recording_overlay") {
+                let _ = window.emit("overlay-model-loading", loading);
+            }
+        }
+        LoadChange::Nothing => {}
+    }
+}
+
+/// Follow a speech-model load to its end, then put the overlay back on the
+/// transcription (or tell a recording card the load is done). One watcher at a
+/// time; it polls, because the load's own events and the manager's flag are a
+/// moment apart and each alone can be stale.
+fn watch_model_load(app: &AppHandle) {
+    if LOAD_WATCHING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    let spawned = std::thread::Builder::new()
+        .name("overlay-model-load".into())
+        .spawn(move || {
+            let started = Instant::now();
+            loop {
+                std::thread::sleep(MODEL_LOAD_POLL);
+                let loading = app
+                    .try_state::<Arc<TranscriptionManager>>()
+                    .is_some_and(|tm| tm.is_model_loading());
+                let event_open = LOAD_EVENT_OPEN.load(Ordering::SeqCst)
+                    && started.elapsed() < MODEL_LOAD_EVENT_GRACE;
+                if !(loading || event_open) || started.elapsed() >= MODEL_LOAD_WATCH_LIMIT {
+                    break;
+                }
+            }
+            LOAD_WATCHING.store(false, Ordering::SeqCst);
+            // A load that started just as this one was seen to end has no
+            // watcher of its own yet.
+            if app
+                .try_state::<Arc<TranscriptionManager>>()
+                .is_some_and(|tm| tm.is_model_loading())
+                && started.elapsed() < MODEL_LOAD_WATCH_LIMIT
+            {
+                watch_model_load(&app);
+                return;
+            }
+            apply_load_change(&app, false);
+        });
+    if spawned.is_err() {
+        LOAD_WATCHING.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Listen for speech-model loads that start while the overlay is up: a model
+/// that was unloaded when the dictation ended loads only once transcription
+/// asks for it, after "Transcribing…" is already on screen.
+fn follow_model_loads(app: &AppHandle) {
+    #[derive(serde::Deserialize)]
+    struct ModelEvent {
+        event_type: String,
+    }
+    let handle = app.clone();
+    app.listen("model-state-changed", move |event| {
+        // Other emitters send this event with no payload; those are not loads.
+        let Ok(parsed) = serde_json::from_str::<ModelEvent>(event.payload()) else {
+            return;
+        };
+        match parsed.event_type.as_str() {
+            "loading_started" => {
+                LOAD_EVENT_OPEN.store(true, Ordering::SeqCst);
+                let on_screen = SHOWN.lock().is_ok_and(|shown| {
+                    shown.epoch == OVERLAY_LIFECYCLE.current()
+                        && load_change(&shown.state, true) != LoadChange::Nothing
+                });
+                if on_screen && uses_local_speech(&handle) {
+                    // Off the emitting thread: the load may have been started
+                    // from the main thread, which redrawing the overlay waits on.
+                    let app = handle.clone();
+                    let _ = std::thread::Builder::new()
+                        .name("overlay-model-load-start".into())
+                        .spawn(move || {
+                            apply_load_change(&app, true);
+                            watch_model_load(&app);
+                        });
+                }
+            }
+            "loading_completed" | "loading_failed" => {
+                LOAD_EVENT_OPEN.store(false, Ordering::SeqCst);
+            }
+            _ => {}
+        }
+    });
 }
 
 /// How long "speech model still downloading" stays up. Longer than a notice,
@@ -318,7 +502,9 @@ fn stt_setup_fingerprint(settings: &settings::AppSettings) -> String {
         ),
         Err(_) => format!(
             "local|{}|{:?}|{:?}",
-            settings.selected_model, settings.whisper_accelerator, settings.ort_accelerator
+            settings.selected_model,
+            settings.transcribe_accelerator,
+            settings.transcribe_gpu_device
         ),
     };
     work_fingerprint(&identity)
@@ -390,6 +576,15 @@ struct ShowOverlayPayload {
     /// with its click (`recover_dictation`), so a click meant for a pill that
     /// has since been replaced can never act on a different dictation.
     epoch: u64,
+    /// For `recording`: the speech model is still loading. The live card says
+    /// so if the load is still going ~2 s later; `overlay-model-loading` events
+    /// update it after this show.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    model_loading: bool,
+    /// For `update`: the name of the selected speech model whose engine is
+    /// gone, which the pill names ("Parakeet V3 needs an update").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model_name: Option<String>,
 }
 
 /// Whether the live card can take the pointer mid-recording without being able
@@ -1191,6 +1386,18 @@ fn show_overlay(
     download: Option<String>,
     cleanup_next: bool,
 ) -> Option<u64> {
+    show_overlay_with(app_handle, state, notice, download, None, cleanup_next)
+}
+
+/// [`show_overlay`], plus the model name only the `update` pill carries.
+fn show_overlay_with(
+    app_handle: &AppHandle,
+    state: &str,
+    notice: Option<String>,
+    download: Option<String>,
+    model_name: Option<String>,
+    cleanup_next: bool,
+) -> Option<u64> {
     let epoch = OVERLAY_LIFECYCLE.advance();
     // Mirrors the webview: a working fill runs exactly while the latest show is
     // one of these, so only then is there a fill for `seal_working_overlay` to
@@ -1295,6 +1502,20 @@ fn show_overlay(
         #[cfg(target_os = "linux")]
         force_overlay_keep_above(&overlay_window);
 
+        static FOLLOWING_LOADS: Once = Once::new();
+        FOLLOWING_LOADS.call_once(|| follow_model_loads(app_handle));
+        let model_loading = state == "recording" && speech_model_loading(app_handle);
+        if let Ok(mut shown) = SHOWN.lock() {
+            *shown = Shown {
+                state: state.to_string(),
+                epoch,
+                cleanup_next,
+            };
+        }
+        if model_loading || state == "loading" {
+            watch_model_load(app_handle);
+        }
+
         let _ = overlay_window.emit(
             "show-overlay",
             ShowOverlayPayload {
@@ -1317,6 +1538,8 @@ fn show_overlay(
                     None
                 },
                 epoch,
+                model_loading,
+                model_name,
             },
         );
         return Some(epoch);
@@ -1331,8 +1554,20 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
 
 /// Shows the transcribing overlay window. `cleanup_next` says AI cleanup follows,
 /// so the working indicator can budget its fill across both waits.
+///
+/// While the speech model is still loading (a cold start, or a load begun at
+/// recording start that has not finished), the wait is the load, so the pill
+/// says "Loading model…" instead (Handy #2227). A forward-only fill paced for a
+/// transcription would otherwise park near its end for the whole load, which
+/// reads as the app hanging, and the load would be learned as transcription
+/// time. [`watch_model_load`] switches to the transcription once it is done.
 pub fn show_transcribing_overlay(app_handle: &AppHandle, cleanup_next: bool) {
-    show_overlay(app_handle, "transcribing", None, None, cleanup_next);
+    let state = if speech_model_loading(app_handle) {
+        "loading"
+    } else {
+        "transcribing"
+    };
+    show_overlay(app_handle, state, None, None, cleanup_next);
 }
 
 /// Shows the processing overlay window
@@ -1375,6 +1610,32 @@ pub fn show_speech_download_overlay(app_handle: &AppHandle, model_id: &str) {
         "downloading",
         None,
         Some(model_id.to_string()),
+        false,
+    ) else {
+        return;
+    };
+    let app = app_handle.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(DOWNLOAD_NOTICE_MS));
+        if OVERLAY_LIFECYCLE.current() == epoch {
+            hide_recording_overlay(&app);
+        }
+    });
+}
+
+/// "<Model> needs an update", with a line saying the new version is on the
+/// Models page, for a voice shortcut pressed while the selected speech model
+/// is one whose engine SpeakoFlow no longer includes (see
+/// `speech_readiness`). Up as long as the download notice, because it is the
+/// only explanation the user gets where they are looking; the main window
+/// opens behind it with the way forward.
+pub fn show_speech_update_overlay(app_handle: &AppHandle, model_name: &str) {
+    let Some(epoch) = show_overlay_with(
+        app_handle,
+        "update",
+        None,
+        None,
+        Some(model_name.to_string()),
         false,
     ) else {
         return;
@@ -1788,5 +2049,58 @@ mod seal_hold_tests {
         // fill out only when the finish arrives, so it needs the full hold.
         assert_eq!(remaining_seal_hold(Some((6, at)), 7, at), FULL);
         assert_eq!(remaining_seal_hold(None, 7, at), FULL);
+    }
+}
+
+#[cfg(test)]
+mod model_load_tests {
+    use super::{is_labeled_state, load_change, LoadChange};
+
+    /// A dictation that ends while its model is still loading says so, and
+    /// goes back to the transcription once the load is done.
+    #[test]
+    fn a_load_replaces_transcribing_until_it_is_done() {
+        assert_eq!(load_change("transcribing", true), LoadChange::ShowLoading);
+        assert_eq!(load_change("loading", false), LoadChange::ShowTranscribing);
+        // A load that ends while "Loading model…" is not up changes nothing.
+        assert_eq!(load_change("transcribing", false), LoadChange::Nothing);
+        assert_eq!(load_change("loading", true), LoadChange::Nothing);
+    }
+
+    #[test]
+    fn a_recording_is_told_about_the_load_both_ways() {
+        assert_eq!(
+            load_change("recording", true),
+            LoadChange::TellRecording(true)
+        );
+        assert_eq!(
+            load_change("recording", false),
+            LoadChange::TellRecording(false)
+        );
+    }
+
+    /// Cleanup, Flow and the notices are not waiting on the speech model.
+    #[test]
+    fn other_states_ignore_speech_model_loads() {
+        for state in ["processing", "generating", "vision", "notice", "dismissed"] {
+            assert_eq!(load_change(state, true), LoadChange::Nothing, "{state}");
+            assert_eq!(load_change(state, false), LoadChange::Nothing, "{state}");
+        }
+    }
+
+    /// "Loading model…" is a written line, so it gets the wider frame.
+    #[test]
+    fn loading_is_a_labeled_state() {
+        assert!(is_labeled_state("loading"));
+        assert!(!is_labeled_state("transcribing"));
+    }
+
+    /// "Needs an update" is two written lines, and has no transcript for the
+    /// Live card to show, so it is always the labelled pill.
+    #[test]
+    fn the_update_notice_is_a_labeled_pill() {
+        assert!(is_labeled_state("update"));
+        assert!(super::is_pill_only_state("update"));
+        assert_eq!(load_change("update", true), LoadChange::Nothing);
     }
 }

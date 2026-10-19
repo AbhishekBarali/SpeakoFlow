@@ -11,6 +11,7 @@ pub mod cli;
 mod clipboard;
 mod commands;
 mod dictation_recovery;
+pub mod engine_supervisor;
 mod feedback;
 mod flow;
 mod hands_free;
@@ -25,6 +26,7 @@ mod native_tts;
 mod overlay;
 mod overlay_follow;
 mod overlay_lifecycle;
+mod paste_tx;
 pub mod portable;
 mod reminders;
 mod screenshot;
@@ -114,6 +116,12 @@ fn level_filter_from_u8(value: u8) -> log::LevelFilter {
     }
 }
 
+/// The level the log file keeps, as the user set it. The transcription worker
+/// is started with it, so it formats no line the file would drop.
+pub(crate) fn file_log_level() -> log::LevelFilter {
+    level_filter_from_u8(FILE_LOG_LEVEL.load(Ordering::Relaxed))
+}
+
 fn build_console_filter() -> env_filter::Filter {
     let mut builder = EnvFilterBuilder::new();
 
@@ -136,7 +144,7 @@ fn build_console_filter() -> env_filter::Filter {
     builder.build()
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_webview_window("main") {
         if let Err(e) = main_window.unminimize() {
             log::error!("Failed to unminimize webview window: {}", e);
@@ -274,13 +282,12 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         .expect("Failed to initialize cleanup LLM manager"),
     );
 
-    // transcribe.cpp (logging + backend modules) initializes lazily, once, at
-    // its first model load or device enumeration — see `init_transcribe_cpp`.
-    // Failures there are logged and swallowed so transcribe-rs engines keep
-    // working (N1).
-
-    // Apply accelerator preferences before any model loads
-    managers::transcription::apply_accelerator_settings(app_handle);
+    // transcribe.cpp never initializes in this process: every model load,
+    // transcription and device listing runs in the transcription worker
+    // (`engine_supervisor`), which starts on first use. A worker that fails or
+    // crashes is logged and recovered from, so the app still starts and cloud
+    // transcription keeps working. The speech-processing choice is read at
+    // every model load, so there is nothing to apply up front.
 
     // Add managers to Tauri's managed state
     app_handle.manage(recording_manager.clone());
@@ -511,10 +518,10 @@ fn initialize_core_logic(app_handle: &AppHandle) {
                     log::warn!("No model is currently loaded.");
                     return;
                 }
-                match transcription_manager.unload_model() {
-                    Ok(()) => log::info!("Model unloaded via tray."),
-                    Err(e) => log::error!("Failed to unload model via tray: {}", e),
-                }
+                // Without waiting: the tray handler runs on the main thread, and
+                // the worker's exit may wait behind a transcription in progress.
+                transcription_manager.request_unload();
+                log::info!("Model unloaded via tray.");
             }
             "cancel" => {
                 use crate::utils::cancel_current_operation;
@@ -706,7 +713,11 @@ pub fn list_transcribe_devices() {
         Vec::new()
     };
 
-    println!("transcribe.cpp compute devices: {}", devices.len());
+    println!(
+        "transcribe.cpp {} compute devices: {}",
+        transcribe_cpp::version(),
+        devices.len()
+    );
     for d in &devices {
         let idx = d
             .index
@@ -719,9 +730,10 @@ pub fn list_transcribe_devices() {
         };
         let mem_mb = d.memory_total / (1024 * 1024);
         println!(
-            "  [{idx}] {name} — {label} (kind={kind}, {mem_mb} MiB)",
+            "  [{idx}] {name} — {label} (kind={kind}, type={device_type:?}, {mem_mb} MiB)",
             name = d.name,
             kind = d.kind,
+            device_type = d.device_type,
         );
     }
 
@@ -743,17 +755,11 @@ pub fn list_transcribe_devices() {
 /// short-lived process and print them as a single line of JSON, then return so
 /// the process exits without launching the GUI.
 ///
-/// This is the child half of the Linux crash-isolated device probe. The running
-/// app spawns itself with this flag instead of loading ggml's Vulkan backend
-/// in-process, because the vendored, statically linked whisper.cpp/ggml is built
-/// with `-march=native` and can raise SIGILL on a machine narrower than the one
-/// that built the package. If that happens the child dies here and the app just
-/// carries on without GPU acceleration.
+/// The machine-readable sibling of `--list-devices`, for scripts and audits.
+/// The app itself no longer spawns it: device listing runs in the
+/// transcription worker on every platform (`engine_supervisor`).
 pub fn print_device_probe_json() {
-    // The backend modules must be loaded before transcribe.cpp can report any
-    // devices; harmless for the whisper probe.
-    managers::transcription::init_transcribe_cpp();
-
+    // `enumerate_devices_in_process` registers the backend modules itself.
     let probe = managers::transcription::enumerate_devices_in_process();
     match serde_json::to_string(&probe) {
         Ok(json) => println!("{json}"),
@@ -1035,8 +1041,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_smart_spacing_fix_case_setting,
             shortcut::change_smart_spacing_join_sentences_setting,
             shortcut::change_lazy_stream_close_setting,
-            shortcut::change_live_transcription_enabled_setting,
-            shortcut::change_live_transcription_window_enabled_setting,
+            shortcut::change_chinese_script_setting,
+            shortcut::change_long_form_chunking_setting,
             shortcut::change_overlay_style_setting,
             shortcut::change_assistant_overlay_style_setting,
             shortcut::change_overlay_linger_setting,
@@ -1051,9 +1057,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_show_tray_icon_setting,
             shortcut::change_tray_icon_color_setting,
             shortcut::change_close_behavior_setting,
-            shortcut::change_whisper_accelerator_setting,
-            shortcut::change_ort_accelerator_setting,
-            shortcut::change_whisper_gpu_device,
+            shortcut::change_transcribe_accelerator_setting,
+            shortcut::change_transcribe_gpu_device,
             shortcut::get_available_accelerators,
             shortcut::handy_keys::start_handy_keys_recording,
             shortcut::handy_keys::stop_handy_keys_recording,
@@ -1615,13 +1620,16 @@ pub fn run(cli_args: CliArgs) {
             // silently swallow an alarm the user is relying on.
             reminders::init(&app_handle);
 
-            // Pre-warm GPU/accelerator enumeration on a background thread.
-            // The first call into transcribe_rs::whisper_cpp::gpu::list_gpu_devices
-            // loads the Metal/Vulkan backend and probes devices, which can take
-            // several seconds. Without this, that cost is paid synchronously the
-            // first time the user opens the Advanced settings page (which calls
-            // the get_available_accelerators command), causing a UI freeze.
-            // Result is cached in a OnceLock inside the transcription manager.
+            // Pre-warm device enumeration on a background thread. The first
+            // call starts a short-lived transcription worker that registers
+            // transcribe.cpp's backends (loading the Vulkan or Metal module)
+            // and probes the GPUs, which can take several seconds, in its own
+            // process so a broken driver costs only the listing. Without this,
+            // that cost is paid synchronously the first time Settings or
+            // onboarding asks for the device list (the get_available_accelerators
+            // command), causing a UI freeze. The list is then kept by the
+            // transcription engine and refreshed by every worker it starts that
+            // may use the GPU.
             std::thread::spawn(|| {
                 let _ = crate::managers::transcription::get_available_accelerators();
             });
@@ -1750,6 +1758,14 @@ pub(crate) fn release_before_exit(app: &AppHandle) {
     }
     if let Some(mgr) = app.try_state::<std::sync::Arc<managers::local_llm::LocalLlmManager>>() {
         mgr.stop();
+    }
+    // The transcription worker runs from this very executable, which a Windows
+    // in-app update is about to overwrite. Bounded: it never waits on a hung
+    // transcription, and the worker ends with this process regardless.
+    if let Some(tm) = app.try_state::<std::sync::Arc<TranscriptionManager>>() {
+        if !tm.stop_engine_before_exit(std::time::Duration::from_secs(2)) {
+            log::warn!("The transcription worker is still busy; leaving it to end with the app");
+        }
     }
     // The cleanup engine is a second process and needs the same teardown, or
     // it outlives the app holding its model in memory.

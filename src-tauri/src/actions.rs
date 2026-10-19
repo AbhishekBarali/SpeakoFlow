@@ -1,12 +1,16 @@
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 use crate::apple_intelligence;
 use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, SoundType};
+use crate::audio_toolkit::vad::VadTail;
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error};
 use crate::dictation_recovery::{
     DictationContext, Offer, OfferKind, PendingPaste, Remaining, RowHandle,
 };
 use crate::managers::audio::{AudioRecordingManager, CancelledRecording};
 use crate::managers::history::{EntryOutcome, HistoryManager};
+use crate::managers::model::ModelManager;
+use crate::managers::transcription::chinese_script;
+use crate::managers::transcription::policy::{self, LiveDecode, ModelTraits};
 use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{
     get_settings, resolve_post_process_config, AppSettings, ModelUnloadTimeout,
@@ -19,7 +23,6 @@ use crate::utils::{
     self, show_processing_overlay, show_recording_overlay, show_transcribing_overlay,
 };
 use crate::TranscriptionCoordinator;
-use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use log::{debug, error, info, warn};
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
@@ -69,8 +72,32 @@ impl Drop for FinishGuard {
         if let Some(tm) = self.0.try_state::<Arc<TranscriptionManager>>() {
             tm.cancel_stream();
         }
+        trim_freed_memory();
     }
 }
+
+/// Hand memory the finished pipeline freed back to the OS (Linux, glibc).
+///
+/// A dictation frees megabytes of transient buffers within seconds (the
+/// captured audio, held twice, once for transcription and once for the
+/// History WAV, plus the engine's scratch). glibc keeps freed arena memory for
+/// reuse, and small live allocations between those buffers pin the pages, so
+/// resident memory grew with every dictation and slowly moved to swap (Handy
+/// #1846, measured there at ~15 MB kept per two-minute dictation).
+/// `malloc_trim(0)` returns whole free pages; it takes about a millisecond and
+/// runs off the main thread, once per pipeline. Other platforms' allocators do
+/// not keep memory this way, and musl has no `malloc_trim`.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn trim_freed_memory() {
+    // SAFETY: no memory arguments; malloc_trim only releases free pages via
+    // madvise and is thread-safe.
+    unsafe {
+        libc::malloc_trim(0);
+    }
+}
+
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn trim_freed_memory() {}
 
 // Shortcut Action Trait
 pub trait ShortcutAction: Send + Sync {
@@ -765,6 +792,10 @@ enum PostProcessFailureKind {
     /// at temperature 0 the same request returns the same copy.
     EchoedPrompt,
     EmptyResponse,
+    /// The model stopped at its output limit (`finish_reason` "length"), so
+    /// its answer ends wherever the limit fell and the rest of what the user
+    /// said is missing. Never pasted; the raw transcript is (Handy #2257).
+    Truncated,
     UnsupportedProvider,
 }
 
@@ -1495,6 +1526,12 @@ fn prompt_echo(system_prompt: &str, transcription: &str, output: &str) -> Option
 /// output probe being rejected, which is an expected step in the fallback ladder
 /// (see [`is_schema_compatibility_error`]) rather than a fault worth alarming on.
 fn classify_chat_error(error: &crate::llm_client::ChatCompletionError) -> PostProcessFailureKind {
+    if matches!(error, crate::llm_client::ChatCompletionError::Truncated) {
+        log::warn!(
+            "Cleanup answer was cut off at the model's output limit; pasting the transcript as dictated"
+        );
+        return PostProcessFailureKind::Truncated;
+    }
     if let Some(rejection) = model_rejection_detail(error) {
         // At warn, and quoting the provider verbatim, because this is the one
         // cleanup failure the user must act on and the app cannot repair. It used
@@ -1534,6 +1571,7 @@ change. Pick a different one in Settings > Dictation cleanup.",
         crate::llm_client::ChatCompletionError::ResponseDecode(_) => {
             PostProcessFailureKind::MalformedResponse
         }
+        crate::llm_client::ChatCompletionError::Truncated => PostProcessFailureKind::Truncated,
         crate::llm_client::ChatCompletionError::RequestBuild(_)
         | crate::llm_client::ChatCompletionError::Transport(_)
         | crate::llm_client::ChatCompletionError::HttpStatus { .. } => {
@@ -1971,7 +2009,7 @@ async fn send_one_post_process_request(
         )
     };
 
-    crate::llm_client::send_chat_completion_with_schema_typed(
+    let completion = crate::llm_client::send_chat_completion_detailed(
         provider.as_ref(),
         config.api_key.clone(),
         &config.model,
@@ -1984,7 +2022,31 @@ async fn send_one_post_process_request(
         max_tokens,
         keep_system_role,
     )
-    .await
+    .await?;
+    cleanup_content(completion)
+}
+
+/// The text of a cleanup answer, or `Truncated` when the model stopped at its
+/// output limit. A cut-off cleanup reads as finished up to where it stops and
+/// silently drops the rest of the dictation, so it is never pasted; the
+/// ordinary fallback pastes the transcript instead. Only cleanup does this:
+/// the assistant shows a long answer even when it was cut off.
+///
+/// A cut-off answer with no visible text stays an empty answer: that is a
+/// reasoning model spending the whole ceiling thinking, and
+/// `run_plain_attempt` recognises it by the empty answer and retries without
+/// the ceiling.
+fn cleanup_content(
+    completion: crate::llm_client::Completion,
+) -> Result<Option<String>, crate::llm_client::ChatCompletionError> {
+    let has_text = completion
+        .content
+        .as_deref()
+        .is_some_and(|text| !text.trim().is_empty());
+    if completion.truncated() && has_text {
+        return Err(crate::llm_client::ChatCompletionError::Truncated);
+    }
+    Ok(completion.content)
 }
 
 fn map_plain_result(
@@ -2340,7 +2402,8 @@ fn fallback_reason_for_failure(failure: PostProcessFailureKind) -> PostProcessFa
         PostProcessFailureKind::ProviderRequest => PostProcessFallbackReason::ProviderError,
         PostProcessFailureKind::StructuredOutputRejected
         | PostProcessFailureKind::MalformedResponse
-        | PostProcessFailureKind::EchoedPrompt => PostProcessFallbackReason::InvalidResponse,
+        | PostProcessFailureKind::EchoedPrompt
+        | PostProcessFailureKind::Truncated => PostProcessFallbackReason::InvalidResponse,
         PostProcessFailureKind::EmptyResponse => PostProcessFallbackReason::EmptyResponse,
     }
 }
@@ -2409,48 +2472,52 @@ fn emit_post_process_result(
         debug!("Could not emit cleanup result event: {}", error);
     }
 }
-async fn maybe_convert_chinese_variant(
+/// The transcript in the script the user writes Chinese in, or `None` to
+/// keep it as it is.
+///
+/// `zh-Hans` / `zh-Hant` as the language always convert, as they always have.
+/// Otherwise the `chinese_script` preference reaches Chinese from a plain
+/// Chinese or Cantonese run, or from one whose language was detected, and
+/// leaves every other language alone (`chinese_script::script_rule`).
+fn maybe_convert_chinese_variant(
+    app: &AppHandle,
     settings: &AppSettings,
     transcription: &str,
 ) -> Option<String> {
-    // Check if language is set to Simplified or Traditional Chinese
-    let is_simplified = settings.selected_language == "zh-Hans";
-    let is_traditional = settings.selected_language == "zh-Hant";
-
-    if !is_simplified && !is_traditional {
-        debug!("selected_language is not Simplified or Traditional Chinese; skipping translation");
-        return None;
-    }
-
-    debug!(
-        "Starting Chinese translation using OpenCC for language: {}",
-        settings.selected_language
-    );
-
-    // Use OpenCC to convert based on selected language
-    let config = if is_simplified {
-        // Convert Traditional Chinese to Simplified Chinese
-        BuiltinConfig::Tw2sp
+    // What the model used for the language, as the transcription path
+    // resolved it: on the cloud, and for a model with no list, the intent
+    // itself.
+    let (effective, languages) = if crate::stt_cloud::cloud_stt_active(settings) {
+        (settings.selected_language.clone(), Vec::new())
     } else {
-        // Convert Simplified Chinese to Traditional Chinese
-        BuiltinConfig::S2tw
+        match app
+            .try_state::<Arc<ModelManager>>()
+            .and_then(|mm| mm.get_model_info(&settings.selected_model))
+        {
+            Some(info) => (
+                crate::managers::language::effective_language(
+                    &settings.selected_language,
+                    &info.supported_languages,
+                    info.supports_language_detection,
+                ),
+                info.supported_languages,
+            ),
+            None => (settings.selected_language.clone(), Vec::new()),
+        }
     };
-
-    match OpenCC::from_config(config) {
-        Ok(converter) => {
-            let converted = converter.convert(transcription);
-            debug!(
-                "OpenCC translation completed. Input length: {}, Output length: {}",
-                transcription.len(),
-                converted.len()
-            );
-            Some(converted)
-        }
-        Err(e) => {
-            error!("Failed to initialize OpenCC converter: {}. Falling back to original transcription.", e);
-            None
-        }
-    }
+    let rule = chinese_script::script_rule(
+        &settings.selected_language,
+        &effective,
+        settings.chinese_script,
+        &languages,
+    );
+    let converted = chinese_script::apply(rule, transcription)?;
+    debug!(
+        "Converted the Chinese script ({:?}); {} characters",
+        rule,
+        converted.chars().count()
+    );
+    Some(converted)
 }
 
 pub(crate) struct ProcessedTranscription {
@@ -2481,7 +2548,7 @@ pub(crate) async fn process_transcription_output(
     let mut post_process_prompt: Option<String> = None;
     let mut post_process_result: Option<PostProcessRuntimeMetadata> = None;
 
-    if let Some(converted_text) = maybe_convert_chinese_variant(&settings, transcription).await {
+    if let Some(converted_text) = maybe_convert_chinese_variant(app, &settings, transcription) {
         final_text = converted_text;
     }
 
@@ -2650,37 +2717,46 @@ impl ShortcutAction for TranscribeAction {
             tm.initiate_model_load();
         }
 
-        // Live/streaming transcription. Start the streaming worker now so it
-        // waits for the model load and begins consuming frames as soon as
-        // recording starts. The batch transcribe() path stays the fallback
-        // (see stop()).
+        // Live decoding. Start the worker now so it waits for the model load
+        // and begins consuming audio as soon as recording starts. The batch
+        // transcribe() path stays the fallback (see stop()).
         //
-        // Streaming is strictly capability-gated: it only ever runs for a model
-        // that natively supports live streaming (e.g. Parakeet, Nemotron). For
-        // such a model it's on automatically — the Auto overlay default already
-        // resolves to Live, so a first-run user gets streaming with no settings
-        // toggle. A model that does not support streaming never starts the
-        // worker (so streaming can't be attempted on it and misbehave), even if
-        // the global live-transcription toggle happens to be on.
+        // How the recording is decoded follows the model, never the overlay
+        // style (`policy::live_decode`): a streaming model (Parakeet, Nemotron)
+        // always streams, so its transcript is ready the moment the user
+        // stops, and the style only decides whether the running text is
+        // shown. The Minimal pill used to switch streaming off for exactly the
+        // models built for it. Any other model, unless it handles long audio
+        // itself (Whisper), gets long-form chunks decoded as the user speaks.
+        // The loaded model is the authority; this is the model list's guess,
+        // and the worker decides again once it has the model.
         //
-        // A cloud provider with a realtime endpoint follows the same rule with
-        // its own capability check: `cloud_stt_streaming` is the user's switch,
-        // and the provider must actually have a realtime model selected.
-        {
+        // A cloud provider with a realtime endpoint follows its own switch,
+        // `cloud_stt_streaming`, and the provider must actually have a realtime
+        // model selected.
+        let vad_tail = {
             let s = get_settings(app);
-            let want_stream = if cloud_stt {
-                crate::stt_cloud::cloud_stt_streaming_active(&s)
+            let (mode, tail) = if cloud_stt {
+                let mode = if crate::stt_cloud::cloud_stt_streaming_active(&s) {
+                    LiveDecode::Stream
+                } else {
+                    LiveDecode::None
+                };
+                (mode, VadTail::Offline)
             } else {
-                let supports_live = crate::overlay::selected_model_supports_live(app);
-                supports_live
-                    && (s.live_transcription_enabled
-                        || crate::settings::resolve_overlay_style(s.overlay_style, supports_live)
-                            == crate::settings::OverlayStyle::Live)
+                let streams = app
+                    .state::<Arc<ModelManager>>()
+                    .get_model_info(&s.selected_model)
+                    .is_some_and(|info| info.supports_streaming);
+                let expected = ModelTraits::expected(streams);
+                (
+                    policy::live_decode(expected, s.long_form_chunking),
+                    policy::vad_tail(expected),
+                )
             };
-            if want_stream {
-                tm.start_stream();
-            }
-        }
+            tm.start_stream(mode);
+            tail
+        };
 
         let rm_clone = Arc::clone(&rm);
         std::thread::spawn(move || {
@@ -2757,7 +2833,7 @@ impl ShortcutAction for TranscribeAction {
                 rm_clone.apply_mute();
             });
 
-            if let Err(e) = rm.try_start_recording(&binding_id) {
+            if let Err(e) = rm.try_start_recording(&binding_id, vad_tail) {
                 debug!("Recording failed: {}", e);
                 recording_error = Some(e);
             }
@@ -2774,7 +2850,7 @@ impl ShortcutAction for TranscribeAction {
             // wait returns as soon as the first real frame arrives.
             debug!("On-demand mode: starting recording, then audio feedback");
             let recording_start_time = Instant::now();
-            match rm.try_start_recording(&binding_id) {
+            match rm.try_start_recording(&binding_id, vad_tail) {
                 Ok(()) => {
                     debug!("Recording started in {:?}", recording_start_time.elapsed());
                     let app_clone = app.clone();
@@ -2897,6 +2973,10 @@ impl ShortcutAction for TranscribeAction {
             crate::voice_conversation::dictation_recorded(&ah, dictation_generation);
             let Some(samples) = stopped else {
                 debug!("No samples retrieved from recording stop");
+                // The model loaded for this recording would otherwise stay
+                // resident with "unload immediately" set (Handy #2106): this
+                // exit never reaches `transcribe`, which is what unloads it.
+                tm.maybe_unload_immediately("recording without audio");
                 finish_idle(&ah);
                 return;
             };
@@ -2907,6 +2987,7 @@ impl ShortcutAction for TranscribeAction {
             );
             if samples.is_empty() {
                 debug!("Recording produced no audio samples; skipping persistence");
+                tm.maybe_unload_immediately("recording without audio");
                 finish_idle(&ah);
                 return;
             }
@@ -2937,15 +3018,18 @@ impl ShortcutAction for TranscribeAction {
             // flag would otherwise still hold whatever an earlier transcription
             // on this worker thread (an assistant ask, say) left in it.
             let _ = crate::managers::transcription::take_cloud_fallback();
-            let transcription_result = match tm.finalize_stream() {
+            // Esc stops either of them promptly (`cancel_transcription`), and a
+            // cancelled finalize must not turn into a batch run.
+            let transcription_result = match tm.finalize_stream(samples.len()) {
                 Ok(Some(text)) => Ok(text),
-                Ok(None) => tm.transcribe(samples),
+                Ok(None) => tm.transcribe_for_dictation(samples),
+                Err(e) if crate::managers::transcription::is_cancellation(&e) => Err(e),
                 Err(e) => {
                     warn!(
                         "Live transcription finalize failed ({}); using batch transcription",
                         e
                     );
-                    tm.transcribe(samples)
+                    tm.transcribe_for_dictation(samples)
                 }
             };
             // Read on this thread, right after `transcribe`, before any await.
@@ -2996,6 +3080,10 @@ impl ShortcutAction for TranscribeAction {
                     // Nothing below needs the audio again.
                     drop(retained);
                     deliver_transcription(dictation, transcription).await;
+                }
+                Err(err) if crate::managers::transcription::is_cancellation(&err) => {
+                    debug!("Dictation transcription cancelled");
+                    transcription_cancelled(dictation, retained.map(Arc::new));
                 }
                 Err(err) => {
                     debug!("Global Shortcut Transcription error: {}", err);
@@ -3532,6 +3620,25 @@ fn dismiss_pending_paste(
     }
 }
 
+/// Esc stopped the transcription itself (`TranscriptionManager::cancel_transcription`).
+/// Like a dictation cancelled while recording: the row is kept, marked
+/// dismissed, and the pill offers to transcribe it after all.
+fn transcription_cancelled(d: Dictation, samples: Option<Arc<Vec<f32>>>) {
+    let samples = match samples {
+        Some(samples) if d.offers_recovery() => samples,
+        _ => {
+            finish_idle(&d.app);
+            return;
+        }
+    };
+    let outcome = EntryOutcome {
+        post_process_requested: d.context.post_process,
+        dismissed: true,
+        ..EntryOutcome::default()
+    };
+    d.dismiss(Remaining::Transcribe(samples), outcome);
+}
+
 /// Transcription failed. The row keeps the audio (History can retry it), and
 /// the pill offers to try again right away.
 fn transcription_failed(d: Dictation, samples: Option<Arc<Vec<f32>>>, err: &anyhow::Error) {
@@ -3744,7 +3851,7 @@ async fn run_recovery(app: AppHandle, offer: Offer) {
             }
             let audio = Arc::clone(&samples);
             let (result, fell_back) = tauri::async_runtime::spawn_blocking(move || {
-                let result = tm.transcribe(audio.to_vec());
+                let result = tm.transcribe_for_dictation(audio.to_vec());
                 (
                     result,
                     crate::managers::transcription::take_cloud_fallback(),
@@ -3766,6 +3873,10 @@ async fn run_recovery(app: AppHandle, offer: Offer) {
                     );
                     drop(samples);
                     deliver_transcription(dictation, transcription).await;
+                }
+                Err(err) if crate::managers::transcription::is_cancellation(&err) => {
+                    debug!("Recovered dictation's transcription cancelled");
+                    transcription_cancelled(dictation, Some(samples));
                 }
                 Err(err) => {
                     debug!("Recovered dictation failed to transcribe: {}", err);
@@ -3927,7 +4038,8 @@ impl ShortcutAction for AssistantAction {
 
         let binding_id = binding_id.to_string();
         let mut recording_error: Option<String> = None;
-        match rm.try_start_recording(&binding_id) {
+        // An ask is transcribed in one batch run when it ends, never streamed.
+        match rm.try_start_recording(&binding_id, VadTail::Offline) {
             Ok(()) => {
                 let app_clone = app.clone();
                 let rm_clone = Arc::clone(&rm);
@@ -4141,16 +4253,77 @@ mod tests {
         PostProcessFailureKind, PostProcessFallbackReason, PostProcessResultEvent,
         PostProcessRuntimeMetadata, APPLE_INTELLIGENCE_PROVIDER_ID, STYLE_NOTICE,
     };
+    use super::{cleanup_content, map_plain_result};
     use super::{
         cleanup_reasoning_options as cleanup_reasoning_options_at,
         cleanup_token_budget as cleanup_token_budget_at, cleanup_unavailable_message, prompt_echo,
         validate_cleaned_output_against_prompt, FOLDED_TRANSCRIPT_BOUNDARY,
     };
     use super::{rerun_runs_cleanup, runs_cleanup, skips_short_cleanup, DictationContext};
+    use crate::llm_client::{ChatCompletionError, Completion};
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessResolutionError, PostProcessTone,
         PostProcessUnavailableReason, ResolvedPostProcessConfig, ThinkingLevel,
     };
+
+    fn completion(content: Option<&str>, finish_reason: Option<&str>) -> Completion {
+        Completion {
+            content: content.map(str::to_string),
+            finish_reason: finish_reason.map(str::to_string),
+        }
+    }
+
+    /// A cleanup the model stopped at its output limit ends mid-sentence with
+    /// the rest of the dictation gone: it must never be pasted (Handy #2257).
+    #[test]
+    fn a_cut_off_cleanup_falls_back_to_the_transcript() {
+        let cut_off = cleanup_content(completion(Some("We should ship the"), Some("length")));
+        assert!(matches!(cut_off, Err(ChatCompletionError::Truncated)));
+
+        let raw = "we should ship the release on friday";
+        let outcome = map_plain_result("Clean it.", raw, true, Ok(cut_off));
+        assert_eq!(
+            outcome,
+            PostProcessAttemptOutcome::Failed(PostProcessFailureKind::Truncated)
+        );
+        let (text, applied, reason) = finalize_post_process_attempt(raw, outcome);
+        assert_eq!(text, raw);
+        assert!(!applied);
+        assert_eq!(reason, Some(PostProcessFallbackReason::InvalidResponse));
+    }
+
+    #[test]
+    fn a_finished_cleanup_is_kept() {
+        let finished = cleanup_content(completion(Some("We ship Friday."), Some("stop")));
+        assert_eq!(finished.unwrap().as_deref(), Some("We ship Friday."));
+        // No finish reason at all reads as finished.
+        let unknown = cleanup_content(completion(Some("We ship Friday."), None));
+        assert_eq!(unknown.unwrap().as_deref(), Some("We ship Friday."));
+    }
+
+    /// A reasoning model that spent the whole ceiling thinking is cut off with
+    /// nothing to show. That stays an empty answer, which is what triggers the
+    /// uncapped retry, instead of turning into a plain failure.
+    #[test]
+    fn a_cut_off_cleanup_with_no_text_stays_an_empty_answer() {
+        assert_eq!(
+            cleanup_content(completion(None, Some("length"))).unwrap(),
+            None
+        );
+        assert_eq!(
+            cleanup_content(completion(Some("  "), Some("length")))
+                .unwrap()
+                .as_deref(),
+            Some("  ")
+        );
+        assert_eq!(
+            classify_chat_error(&ChatCompletionError::Truncated),
+            PostProcessFailureKind::Truncated
+        );
+        assert!(!is_schema_compatibility_error(
+            &ChatCompletionError::Truncated
+        ));
+    }
 
     /// The cleanup reasoning options with the thinking dial at its default.
     fn cleanup_reasoning_options(
@@ -5272,6 +5445,7 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::MalformedResponse),
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EchoedPrompt),
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EmptyResponse),
+            PostProcessAttemptOutcome::Failed(PostProcessFailureKind::Truncated),
             PostProcessAttemptOutcome::Failed(PostProcessFailureKind::UnsupportedProvider),
             PostProcessAttemptOutcome::TimedOut,
         ];

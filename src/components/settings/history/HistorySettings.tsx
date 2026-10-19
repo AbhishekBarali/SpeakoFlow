@@ -51,10 +51,12 @@ import { Tabs } from "../../ui/Tabs";
 import { useNavigation } from "../../shell/navigation";
 import { formatTimeOfDay, groupByDay } from "@/utils/dayGroups";
 import {
+  appendHistoryPage,
   buildFeed,
   cleanMessageContent,
   isFlowHistoryEntry,
   matchesFilter,
+  prependHistoryEntry,
   rowKind,
   visibleFilters,
   type HistoryFilter,
@@ -352,7 +354,7 @@ export const HistorySettings: React.FC = () => {
       if (result.status === "ok") {
         const { entries: newEntries, has_more } = result.data;
         setEntries((prev) =>
-          isFirstPage ? newEntries : [...prev, ...newEntries],
+          isFirstPage ? newEntries : appendHistoryPage(prev, newEntries),
         );
         setHasMore(has_more);
       }
@@ -432,7 +434,7 @@ export const HistorySettings: React.FC = () => {
     const unlisten = events.historyUpdatePayload.listen((event) => {
       const payload: HistoryUpdatePayload = event.payload;
       if (payload.action === "added") {
-        setEntries((prev) => [payload.entry, ...prev]);
+        setEntries((prev) => prependHistoryEntry(prev, payload.entry));
       } else if (payload.action === "updated") {
         setEntries((prev) =>
           prev.map((e) => (e.id === payload.entry.id ? payload.entry : e)),

@@ -34,7 +34,8 @@ pub fn get_model_load_status(
 pub fn unload_model_manually(
     transcription_manager: State<TranscriptionManager>,
 ) -> Result<(), String> {
-    transcription_manager
-        .unload_model()
-        .map_err(|e| format!("Failed to unload model: {}", e))
+    // Without waiting for the transcription worker to exit, which may queue
+    // behind a transcription in progress; the model reads as unloaded at once.
+    transcription_manager.request_unload();
+    Ok(())
 }

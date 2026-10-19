@@ -8,10 +8,79 @@ import {
   RECOMMENDED_SETUP_SPEECH,
   SETUP_MODELS,
   SETUP_SPEECH_OPTIONS,
+  setupStartingModel,
   voiceEngineFor,
   voiceModelId,
   type HardwareFacts,
 } from "./recommend";
+import type { ModelInfo } from "@/bindings";
+
+const speechModel = (
+  overrides: Partial<ModelInfo> & { id: string },
+): ModelInfo => ({
+  name: overrides.id,
+  description: "",
+  filename: `${overrides.id}.gguf`,
+  url: null,
+  sha256: null,
+  size_mb: 100,
+  is_downloaded: false,
+  is_downloading: false,
+  partial_size: 0,
+  is_directory: false,
+  engine_type: "TranscribeCpp",
+  accuracy_score: 0.5,
+  speed_score: 0.5,
+  supports_translation: false,
+  supports_streaming: false,
+  is_recommended: false,
+  recommended_rank: null,
+  supported_languages: ["en"],
+  supports_language_selection: false,
+  is_custom: false,
+  local_path: null,
+  local_folder: null,
+  ...overrides,
+});
+
+describe("where setup starts for someone with a model", () => {
+  const replacement = speechModel({ id: "canary-180m-flash-gguf" });
+  const retired = speechModel({
+    id: "canary-180m-flash",
+    engine_type: "Canary",
+    is_downloaded: true,
+    is_legacy: true,
+    is_retired: true,
+    replacement_id: replacement.id,
+  });
+
+  test("a model that runs is kept and marked in use", () => {
+    const current = speechModel({
+      id: "whisper-small-gguf",
+      is_downloaded: true,
+    });
+    expect(setupStartingModel([current], current.id)).toEqual({
+      model: current,
+      inUse: true,
+    });
+  });
+
+  test("a retired model is never in use; its new version is offered instead", () => {
+    expect(setupStartingModel([retired, replacement], retired.id)).toEqual({
+      model: replacement,
+      inUse: false,
+    });
+  });
+
+  test("a retired model with no listed replacement starts from the recommendation", () => {
+    expect(setupStartingModel([retired], retired.id)).toBeNull();
+  });
+
+  test("nothing chosen, or not downloaded, starts from the recommendation", () => {
+    expect(setupStartingModel([replacement], "")).toBeNull();
+    expect(setupStartingModel([replacement], replacement.id)).toBeNull();
+  });
+});
 
 describe("setup's speech list", () => {
   test("is a short list where no two cards share a name or a model", () => {
@@ -211,6 +280,14 @@ describe("languageNames", () => {
 });
 
 describe("baseLanguages", () => {
+  test("Bokmål and Norwegian are one language, Cantonese is not Chinese", () => {
+    expect(baseLanguages(["nb", "no", "zh", "yue", "fil", "tl"])).toEqual([
+      "no",
+      "zh",
+      "yue",
+      "tl",
+    ]);
+  });
   test("regional variants count once", () => {
     expect(baseLanguages(["en-US", "en-GB", "es-ES", "es-419", "fr"])).toEqual([
       "en",

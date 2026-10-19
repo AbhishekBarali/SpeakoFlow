@@ -1,18 +1,19 @@
-﻿name: "Build"
+name: "Build"
 
 # Reusable build workflow for SpeakoFlow. Ported from upstream Handy's build.yml
 # and adapted for SpeakoFlow's shape-(b) engine posture (see
 # the engine-migration plan, Session 6):
 #
-#   * transcribe-cpp (GGUF/ggml) is the new engine. Windows x86_64 + Linux ship
+#   * transcribe-cpp (GGUF/ggml) is the only speech engine. Windows x86_64 + Linux ship
 #     it in the `dynamic-backends` + `vulkan` posture (loadable ggml backend
 #     DLLs/.so + a Vulkan GPU backend); macOS aarch64 links it statically
 #     (`metal`); macOS x86_64 and Windows-on-ARM link it statically CPU-only
-#     (no DLLs, no GPU backend).
-#   * transcribe-rs 0.3.11 is KEPT AS-IS with its statically-embedded ONNX
-#     Runtime (+ `ort-directml` on Windows). We deliberately do NOT converge to
-#     Handy's shape-(a) dynamically-linked baseline ORT, so â€” unlike Handy â€”
-#     there are NO `ORT_LIB_LOCATION` / `ORT_PREFER_DYNAMIC_LINK` steps and no
+#     (no DLLs, no GPU backend). Legacy whisper.cpp `.bin` models load through
+#     it too; transcribe-rs (whisper-rs + the ONNX engines) is gone.
+#   * ONNX Runtime remains, statically embedded through `ort` (Silero VAD via
+#     vad-rs, and meeting diarization). We deliberately do NOT converge to
+#     Handy's dynamically-linked baseline ORT, so there are NO
+#     `ORT_LIB_LOCATION` / `ORT_PREFER_DYNAMIC_LINK` steps and no
 #     onnxruntime.dll staging/audit here.
 #
 #     ONE EXCEPTION: Intel macOS (x86_64-apple-darwin), where pykeio's `ort`
@@ -156,9 +157,8 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-          # `-ggml-portable`: whisper-rs-sys does not rebuild when GGML_NATIVE
-          # changes, so caches from before the portable-CPU step must not be
-          # reused. Bump the suffix whenever native CMake flags change.
+          # `-ggml-portable`: caches from before the portable-CPU flags must not
+          # be reused. Bump the suffix whenever native CMake flags change.
           key: ${{ inputs.platform }}-${{ inputs.target }}-ggml-portable
 
       - name: install dependencies (ubuntu 24.04 x64)
@@ -293,39 +293,15 @@ jobs:
           fi
           echo "platform=${patched_platform}" >> $GITHUB_OUTPUT
 
-      # Build the statically linked whisper.cpp for a fixed CPU baseline, not for
-      # whatever CPU this runner happens to have.
-      #
-      # whisper-rs-sys never sets GGML_NATIVE, so ggml's default GGML_NATIVE=ON
-      # applies (-march=native; under MSVC, FindSIMD *runs* AVX/AVX2/AVX-512
-      # probes on the runner and enables whatever passes). GitHub's x64 runners
-      # are server parts that often have AVX-512, which most consumer CPUs do not
-      # (Intel 12th-14th gen, Core Ultra, AMD Zen 1-3), and the ARM runners are
-      # Neoverse with SVE2/i8mm, which a Raspberry Pi does not have. The result
-      # transcribes in CI and dies with SIGILL on a user's machine, at launch if
-      # the device listing hits it. Intel macOS hit exactly this and is fixed by
-      # its own step below; this covers every other target.
-      #
-      # whisper-rs-sys forwards every GGML_* environment variable as a CMake
-      # define, so GGML_NATIVE=OFF reaches it directly. With GGML_NATIVE off and
-      # no SOURCE_DATE_EPOCH, ggml picks a fixed baseline: AVX2 + FMA + F16C +
-      # BMI2 on x86-64 (the app refuses Whisper on CPUs below it, see
-      # `whisper_cpu_supported`), plain armv8-a on Linux ARM, and the Apple
-      # Silicon default on macOS. transcribe-cpp is already portable on Linux and
-      # Windows x64 (dynamic-backends picks kernels at run time); its static
-      # macOS arm64 build gets the same override through TRANSCRIBE_CMAKE_ARGS.
-      #
-      # Must run before the first cargo build of the job (the Linux pre-build
-      # below): whisper-rs-sys does not rerun when this variable changes.
-      - name: Build portable whisper.cpp CPU code
-        if: inputs.target != 'x86_64-apple-darwin'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "GGML_NATIVE=OFF" >> "$GITHUB_ENV"
-          if [ "${{ inputs.target }}" = "aarch64-apple-darwin" ]; then
-            echo "TRANSCRIBE_CMAKE_ARGS=-DGGML_NATIVE=OFF" >> "$GITHUB_ENV"
-          fi
+      # No portable-CPU step is needed any more. It existed for the statically
+      # linked whisper.cpp inside transcribe-rs (whisper-rs-sys forwarded GGML_*
+      # environment variables and otherwise built with -march=native). That
+      # engine is gone, and transcribe-cpp-sys reads no GGML_* environment
+      # variable; it pins the CPU floor itself: dynamic-backends builds (Windows
+      # x64, Linux) force GGML_NATIVE=OFF and pick CPU kernels at run time, and
+      # every macOS build sets GGML_NATIVE=OFF in its build script. Windows
+      # ARM64, the one static non-Apple build, gets its override through
+      # TRANSCRIBE_CMAKE_ARGS below.
 
       # transcribe-cpp-sys cmake builds create paths that exceed Windows MAX_PATH
       # (260 chars). Shorten the target dir to keep paths under the limit.
@@ -597,7 +573,7 @@ jobs:
       # Intel macOS is the ONE target where SpeakoFlow links ONNX Runtime
       # dynamically. pykeio's `ort` dropped prebuilt x86_64-apple-darwin binaries
       # ("Support for Intel macOS has been dropped following upstream changes to
-      # ONNX Runtime & Rust"), so transcribe-rs's `onnx` feature has no static ORT
+      # ONNX Runtime & Rust"), so `ort` has no static ORT
       # to embed there â€” the shape-(b) posture that holds on every other target.
       # Homebrew's onnxruntime fills the gap (this is what BUILD.md documents for
       # local Intel builds).
@@ -623,7 +599,7 @@ jobs:
       #
       # ggml's CMake sets GGML_NATIVE_DEFAULT=ON for any native (non-cross)
       # build, and GGML_NATIVE adds -march=native. macOS x86_64 builds
-      # transcribe-cpp AND whisper.cpp statically here, so both would be
+      # transcribe-cpp statically here, so it would be
       # compiled for the runner's exact instruction set. GitHub's Intel macOS
       # runners are server-class parts; a 2017-2020 consumer Intel Mac is not.
       # Comet Lake desktop chips (e.g. the i5-10500 our tester runs) have AVX2
@@ -633,15 +609,14 @@ jobs:
       # build machine, broken everywhere else â€” and would have been the next
       # thing our tester hit after the dylib fix.
       #
-      # Two levers, because the two engines expose different knobs:
-      #   * transcribe-cpp reads TRANSCRIBE_CMAKE_ARGS (same mechanism the
-      #     Windows job already uses), so pass -DGGML_NATIVE=OFF directly.
-      #   * whisper-rs-sys 0.15 never sets GGML_NATIVE itself (it does forward
-      #     GGML_* environment variables as CMake defines; the step near the top
-      #     of this job uses that for every other target). Here, ggml's own
-      #     CMakeLists flips GGML_NATIVE_DEFAULT to OFF when SOURCE_DATE_EPOCH is
-      #     present in the environment, which also turns off its AVX/AVX2
-      #     defaults, so this build keeps the most conservative x86-64 baseline.
+      # Both levers below are belts and braces now that whisper.cpp is gone:
+      #   * transcribe-cpp-sys already sets GGML_NATIVE=OFF (plus an SSE4.2 +
+      #     AVX + F16C floor) for every macOS x86_64 build, and also reads
+      #     TRANSCRIBE_CMAKE_ARGS (same mechanism the Windows ARM job uses), so
+      #     -DGGML_NATIVE=OFF is passed directly as well.
+      #   * ggml's own CMakeLists flips GGML_NATIVE_DEFAULT to OFF when
+      #     SOURCE_DATE_EPOCH is present in the environment. This was the only
+      #     lever for whisper-rs-sys, which never set GGML_NATIVE itself.
       # Never do this for a local dev build: -march=native is the right default
       # when the binary only has to run on the machine that compiled it.
       - name: Build portable CPU code for Intel macOS
@@ -899,8 +874,8 @@ jobs:
       #      This runs on an Intel runner, so it is a genuine native check.
       #
       # ONNX Runtime is NOT optional here, which is why all of this exists: `ort`
-      # is pulled in by vad-rs (Silero VAD, core to every recording) as well as
-      # transcribe-rs (Parakeet). Dropping the Parakeet engine would not remove it.
+      # is pulled in by vad-rs (Silero VAD, core to every recording) and by
+      # meeting diarization.
       - name: Audit Intel macOS bundle
         if: inputs.target == 'x86_64-apple-darwin'
         shell: bash
@@ -1590,8 +1565,10 @@ jobs:
 
           # x64 ships the dynamic transcribe/ggml DLLs; ARM64 is static CPU-only
           # (only the VC++ runtime is staged). SpeakoFlow keeps ONNX Runtime
-          # statically linked via transcribe-rs (shape-(b)), so â€” unlike upstream
-          # Handy â€” onnxruntime.dll is NOT staged or required. GGML_OPENMP is off,
+          # statically linked through `ort`, so, unlike upstream Handy,
+          # onnxruntime.dll is NOT staged or required. (pyke's static ORT links
+          # DirectML.dll, which Windows itself provides; it is not bundled.)
+          # GGML_OPENMP is off,
           # so vcomp140.dll is not required either.
           $requiredStaged = @("msvcp140.dll", "vcruntime140.dll")
           if ("${{ inputs.target }}" -notlike "aarch64*") {
@@ -1622,9 +1599,19 @@ jobs:
               }
             }
 
-            & $exe.FullName --list-devices | Out-Host
+            $deviceOutput = (& $exe.FullName --list-devices | Out-String)
+            $deviceOutput | Write-Host
             if ($LASTEXITCODE -ne 0) {
               throw "$Label speakoflow.exe --list-devices failed"
+            }
+            # The ARM64 build is CPU-only by design (Handy #1731 keeps even the
+            # emulated x64 build off the GPU there), so a GPU here is a broken
+            # build, and so is a missing CPU device.
+            if ("${{ inputs.target }}" -like "aarch64*" -and $deviceOutput -match "type=(Gpu|Igpu)") {
+              throw "$Label Windows ARM64 package unexpectedly exposed a GPU compute device"
+            }
+            if ("${{ inputs.target }}" -like "aarch64*" -and $deviceOutput -notmatch "type=Cpu") {
+              throw "$Label Windows ARM64 package did not expose its CPU compute device"
             }
           }
 
