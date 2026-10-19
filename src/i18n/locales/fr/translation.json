@@ -853,8 +853,7 @@
         "label": "Boutons de la souris comme raccourcis",
         "description": "Utilisez le bouton central, Précédent ou Suivant de votre souris comme raccourci : cliquez sur les touches d'un raccourci, puis appuyez sur le bouton. Tant qu'il sert de raccourci, le bouton ne fait rien d'autre.",
         "linux": "Sous Linux, seul le bouton central fonctionne.",
-        "needsEngine": "Nécessite la gestion du clavier SpeakoFlow Keys.",
-        "reset": "Les raccourcis qui utilisaient un bouton de la souris ont retrouvé leurs touches par défaut."
+        "needsEngine": "Nécessite la gestion du clavier SpeakoFlow Keys."
       },
       "liveTranscription": {
         "label": "Transcription en direct",
@@ -3300,6 +3299,11 @@
     "undo": "Annuler",
     "addAnother": "Ajouter un autre",
     "addAnotherHint": "Donner à ce raccourci une seconde combinaison, par exemple un bouton de la souris",
+    "addButtonOrKeys": "Ajouter un bouton de souris ou des touches",
+    "addButtonOrKeysHint": "Donner à ce raccourci un bouton de la souris ou une seconde combinaison, en plus de ses touches",
+    "mouseAddedAsOther": "{{button}} fonctionne désormais aussi pour {{name}}. {{keys}} fonctionne toujours.",
+    "mouseNeedsOtherSlot": "{{name}} a déjà d'autres touches ({{keys}}). Cliquez dessus pour les remplacer par un bouton de la souris.",
+    "mouseNeedsOwnKeys": "Donnez d'abord des touches à {{name}}. Le bouton de la souris s'ajoute à côté.",
     "remove": "Supprimer",
     "or": "ou",
     "changeOther": "Modifier les autres touches du raccourci {{name}}",

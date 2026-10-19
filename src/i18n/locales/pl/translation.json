@@ -859,8 +859,7 @@
         "label": "Przyciski myszy jako skróty",
         "description": "Używaj środkowego przycisku myszy albo przycisków Wstecz i Dalej jako skrótu: kliknij klawisze skrótu, a potem naciśnij przycisk. Dopóki jest skrótem, przycisk nie robi nic innego.",
         "linux": "W systemie Linux działa tylko środkowy przycisk.",
-        "needsEngine": "Wymaga implementacji klawiatury SpeakoFlow Keys.",
-        "reset": "Skróty, które używały przycisku myszy, wróciły do domyślnych klawiszy."
+        "needsEngine": "Wymaga implementacji klawiatury SpeakoFlow Keys."
       },
       "liveTranscription": {
         "label": "Transkrypcja na bieżąco",
@@ -3329,6 +3328,11 @@
     "undo": "Cofnij",
     "addAnother": "Dodaj kolejny",
     "addAnotherHint": "Przypisz temu skrótowi drugi zestaw klawiszy, np. przycisk myszy",
+    "addButtonOrKeys": "Dodaj przycisk myszy lub klawisze",
+    "addButtonOrKeysHint": "Przypisz temu skrótowi przycisk myszy lub drugi zestaw klawiszy, obok klawiszy, które już ma",
+    "mouseAddedAsOther": "{{button}} działa teraz także dla skrótu {{name}}. {{keys}} nadal działa.",
+    "mouseNeedsOtherSlot": "{{name}} ma już inne klawisze ({{keys}}). Kliknij je, aby ustawić tam przycisk myszy.",
+    "mouseNeedsOwnKeys": "Najpierw przypisz klawisze do skrótu {{name}}. Przycisk myszy zostanie dodany obok nich.",
     "remove": "Usuń",
     "or": "lub",
     "changeOther": "Zmień dodatkowe klawisze skrótu: {{name}}",

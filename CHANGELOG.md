@@ -4,6 +4,19 @@ What changed in each SpeakoFlow release. The release page on GitHub carries the
 highlights; this file has the full list. Versions before 2.0.0 are described on
 their [GitHub releases](https://github.com/AbhishekBarali/SpeakoFlow/releases).
 
+## Unreleased
+
+### Changed
+
+**A mouse button sits next to a shortcut's keys, not in place of them.**
+With mouse buttons on, pressing one in the shortcut editor used to replace the
+keys it had, so Back turned Ctrl + Win into Back alone. Now the shortcut keeps
+its keys and the button is added as its other keys, and either one works. In
+the editor, "Add another" reads "Add mouse button or keys". Turning mouse
+buttons off no longer moves any shortcut back to its default keys: the button
+just stops working until it is turned back on. A shortcut that had a button as
+its only keys gets its keys back on update, with the button kept next to them.
+
 ## 2.1.0
 
 Hands-free dictation, Hold or Tap set per shortcut, smart spacing between

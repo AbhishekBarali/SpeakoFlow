@@ -203,6 +203,9 @@ pub fn change_binding(
     // storing a clash that would only surface later, as a shortcut that does
     // nothing.
     if !removing {
+        if let Some(reason) = combos::own_keys_refusal(&binding) {
+            return Err(reason.to_string());
+        }
         if let Some(reason) = combos::refusal(&settings, &binding, settings.keyboard_implementation)
         {
             return Err(reason.to_string());
@@ -503,27 +506,17 @@ pub fn get_keyboard_implementation(app: AppHandle) -> String {
 
 /// Let mouse buttons be shortcut keys, or stop (Experimental).
 ///
-/// Turned off, a shortcut whose own keys are a mouse button goes back to its
-/// default keys: dictation and the ask always keep a key, and a button nothing
-/// listens for any more is not one. Other keys that are a mouse button are
-/// kept, only not listened for, and work again once this is back on.
+/// A mouse button is only ever a shortcut's other keys
+/// (`combos::own_keys_refusal`), so this changes nothing a shortcut is known
+/// by: turned off, its button is kept but not listened for, the shortcut
+/// carries on with its own keys, and the button works again once this is back
+/// on. Nothing has to be put back on its default keys.
 #[tauri::command]
 #[specta::specta]
 pub fn change_mouse_button_shortcuts_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let before = settings::get_settings(&app);
     let mut settings = before.clone();
     settings.mouse_button_shortcuts = enabled;
-    if !enabled {
-        for binding in settings.bindings.values_mut() {
-            if combos::has_mouse_button(&binding.current_binding) {
-                info!(
-                    "Mouse buttons are off: '{}' goes back to its default keys",
-                    binding.id
-                );
-                binding.current_binding = binding.default_binding.clone();
-            }
-        }
-    }
     settings::write_settings(&app, settings.clone());
 
     // Every shortcut with a mouse button in it starts or stops listening for
