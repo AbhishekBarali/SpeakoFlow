@@ -59,7 +59,6 @@ use super::hub::Hub;
 use super::keycode;
 use super::tracker::{
     open_retry_delay, role_for, takeover_retry_delay, DeviceId, Role, Tracker, Verdict, RELEASE,
-    REPEAT,
 };
 
 /// Where input device nodes live.
@@ -293,10 +292,7 @@ impl Engine {
                 return;
             }
         }
-        let made_by_uinput = !self.config.grab_uinput
-            && sysfs
-                .as_deref()
-                .is_some_and(|dir| dir.starts_with(UINPUT_SYSFS));
+        let made_by_uinput = !self.config.grab_uinput && made_by_uinput(sysfs.as_deref());
         let has = |code: &EV_KEY| device.has(&EventCode::EV_KEY(code.clone()));
         let role = role_for(
             keycode::has_hotkey_key(has),
@@ -558,10 +554,12 @@ impl Engine {
 
     fn key(&mut self, id: DeviceId, code: &EV_KEY, value: i32, grabbed: bool) -> Verdict {
         if let Some(modifier) = keycode::modifier_for(code) {
-            if value != REPEAT {
-                if let Some(event) = self.tracker.modifier(id, modifier, value != RELEASE) {
-                    self.hub.broadcast(event);
-                }
+            // Repeats count as presses, as they did with rdev: a modifier
+            // already held when its device was opened is learned from them.
+            // The tracker reports only a change, so a repeat of a known one
+            // sends nothing.
+            if let Some(event) = self.tracker.modifier(id, modifier, value != RELEASE) {
+                self.hub.broadcast(event);
             }
             // Never withheld: a withheld modifier whose release is then lost
             // (a crash, a hang) would stay pressed in the compositor.
@@ -833,6 +831,15 @@ fn sysfs_dir(node: &Path) -> Option<PathBuf> {
     std::fs::canonicalize(Path::new("/sys/class/input").join(name).join("device")).ok()
 }
 
+/// Whether a device was made through uinput (keyd, ydotool, a mirror, ours
+/// included), so it is only ever read. A device whose sysfs directory cannot
+/// be read counts as one: both checks that keep the engine off its own
+/// mirrors go through sysfs, and without them it would take its own mirror
+/// over, mirror that, and so on.
+fn made_by_uinput(sysfs: Option<&Path>) -> bool {
+    sysfs.is_none_or(|dir| dir.starts_with(UINPUT_SYSFS))
+}
+
 fn canonical(path: &str) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path))
 }
@@ -955,6 +962,16 @@ mod tests {
     use std::sync::mpsc::{self, Receiver};
     use std::sync::Mutex;
     use std::thread::{self, JoinHandle};
+
+    #[test]
+    fn a_device_is_taken_over_only_when_sysfs_shows_it_is_hardware() {
+        let hardware = Path::new("/sys/devices/platform/i8042/serio0/input/input2");
+        let uinput = Path::new("/sys/devices/virtual/input/input31");
+        assert!(!made_by_uinput(Some(hardware)));
+        assert!(made_by_uinput(Some(uinput)));
+        // Unreadable sysfs: it could be one of our own mirrors.
+        assert!(made_by_uinput(None));
+    }
 
     struct Listener {
         hub: Arc<Hub>,
