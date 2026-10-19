@@ -2035,14 +2035,19 @@ async fn send_one_post_process_request(
 /// A cut-off answer with no visible text stays an empty answer: that is a
 /// reasoning model spending the whole ceiling thinking, and
 /// `run_plain_attempt` recognises it by the empty answer and retries without
-/// the ceiling.
+/// the ceiling. "Visible" is judged after reasoning blocks are removed, the
+/// way the answer would be pasted: a model that thinks inline (LM Studio
+/// without its reasoning parser, an older Ollama, a raw vLLM endpoint) is cut
+/// off inside an unclosed `<think>`, and counting that monologue as text made
+/// it a `Truncated` failure, which never gets the uncapped retry, so cleanup
+/// never ran for that model again.
 fn cleanup_content(
     completion: crate::llm_client::Completion,
 ) -> Result<Option<String>, crate::llm_client::ChatCompletionError> {
     let has_text = completion
         .content
         .as_deref()
-        .is_some_and(|text| !text.trim().is_empty());
+        .is_some_and(|text| !crate::flow::strip_reasoning_blocks(text).trim().is_empty());
     if completion.truncated() && has_text {
         return Err(crate::llm_client::ChatCompletionError::Truncated);
     }
@@ -2218,6 +2223,14 @@ async fn run_provider_post_process(
                 }
             }
             Ok(Ok(None)) => PostProcessFailureKind::EmptyResponse,
+            // A structured answer cut off at the output limit is an unfinished
+            // JSON object. Before the truncation check existed it failed to
+            // parse and took the plain request below; it still should, since
+            // the bare text carries no schema overhead and often fits where the
+            // object did not. The plain attempt refuses a cut-off answer too.
+            Ok(Err(crate::llm_client::ChatCompletionError::Truncated)) => {
+                PostProcessFailureKind::Truncated
+            }
             Ok(Err(error)) => {
                 if !is_schema_compatibility_error(&error) {
                     return PostProcessAttemptOutcome::Failed(classify_chat_error(&error));
@@ -4302,6 +4315,37 @@ mod tests {
         // No finish reason at all reads as finished.
         let unknown = cleanup_content(completion(Some("We ship Friday."), None));
         assert_eq!(unknown.unwrap().as_deref(), Some("We ship Friday."));
+    }
+
+    /// A reasoning model is cut off at the output limit inside an unclosed think block.
+    #[test]
+    fn a_cut_off_cleanup_still_thinking_inline_stays_an_empty_answer() {
+        // Cut off inside an unclosed think block: nothing would be pasted, so
+        // it must read as empty (which earns the uncapped retry), not as a
+        // cut-off answer.
+        let thinking = cleanup_content(completion(
+            Some("<think>The user wants me to clean up the transcript. First"),
+            Some("length"),
+        ));
+        let content = thinking.expect("an inline monologue is not a truncated answer");
+        let outcome = map_plain_result(
+            "Clean it.",
+            "we should ship the release on friday",
+            true,
+            Ok(Ok(content)),
+        );
+        assert_eq!(
+            outcome,
+            PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EmptyResponse)
+        );
+        // Text after a closed block is an answer, and a cut-off one.
+        assert!(matches!(
+            cleanup_content(completion(
+                Some("<think>plan</think>We should ship the"),
+                Some("length"),
+            )),
+            Err(ChatCompletionError::Truncated)
+        ));
     }
 
     /// A reasoning model that spent the whole ceiling thinking is cut off with
