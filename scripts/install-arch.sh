@@ -92,6 +92,7 @@ arch_dependencies=(
   gtk3
   libappindicator
   libdrm
+  libevdev
   libglvnd
   librsvg
   libx11
