@@ -70,8 +70,8 @@ jobs:
           #     .deb is built on 24.04 instead.
           #   * .rpm — Tauri's rpm bundler omits libtranscribe.so and the ggml
           #     backends, and an .rpm cannot be unpacked/repacked like a .deb.
-          #   * windows-11-arm — whisper-rs-sys requires VULKAN_SDK; build.yml's
-          #     Vulkan setup is gated to non-aarch64 Windows.
+          #   * windows-11-arm — not yet exercised in CI. Its old blocker
+          #     (whisper-rs-sys required VULKAN_SDK) went with transcribe-rs.
           - platform: "ubuntu-24.04" # AppImage + .deb, x86_64
             args: "--bundles appimage,deb"
             target: "x86_64-unknown-linux-gnu"

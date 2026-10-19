@@ -519,11 +519,13 @@
       "singleLanguage": "Chỉ hỗ trợ ngôn ngữ này",
       "multiLanguage": "Đa ngôn ngữ",
       "languageOnly": "Chỉ {{language}}",
+      "languageList": "Các ngôn ngữ {{model}} hiểu được",
       "translation": "Có thể dịch sang tiếng Anh",
       "translate": "Dịch sang tiếng Anh",
       "streaming": "Trực tiếp",
       "quantization": "Lượng tử hóa",
-      "legacy": "Cũ hơn"
+      "legacy": "Cũ hơn",
+      "retired": "Đã ngừng"
     }
   },
   "settings": {
@@ -663,6 +665,15 @@
         "noResults": "Không tìm thấy ngôn ngữ",
         "auto": "Tự động"
       },
+      "chineseScript": {
+        "title": "Chữ Trung Quốc",
+        "description": "Viết bản chép tiếng Trung bằng chữ giản thể hoặc phồn thể. Các ngôn ngữ khác giữ nguyên.",
+        "options": {
+          "auto": "Như khi chép",
+          "simplified": "Giản thể",
+          "traditional": "Phồn thể"
+        }
+      },
       "pushToTalk": {
         "dictation": "Bật: ghi âm trong khi bạn giữ các phím. Tắt: nhấn một lần để bắt đầu, nhấn lần nữa để dừng, nên mọi lần đọc chính tả đều rảnh tay.",
         "assistant": "Bật: lắng nghe trong khi bạn giữ các phím. Tắt: nhấn một lần để bắt đầu, nhấn lần nữa để gửi.",
@@ -710,14 +721,27 @@
         "all": "Tất cả",
         "multiLanguage": "Đa ngôn ngữ",
         "translation": "Dịch thuật",
-        "allLanguages": "Tất cả ngôn ngữ"
+        "allLanguages": "Tất cả ngôn ngữ",
+        "streamingHint": "Chỉ các mô hình chép lời ngay khi bạn nói",
+        "translate": "Dịch",
+        "translateHint": "Chỉ các mô hình có thể dịch lời nói sang tiếng Anh",
+        "noMatch": "Không có mô hình nào khớp với các bộ lọc này",
+        "clear": "Xóa bộ lọc"
       },
-      "noModelsMatch": "Không có mô hình nào khớp với bộ lọc này.",
       "searchPlaceholder": "Tìm mô hình theo tên…",
       "clearSearch": "Xóa tìm kiếm",
       "noSearchResults": "Không có mô hình nào tên “{{query}}”.",
-      "olderModels": "Mô hình cũ hơn",
-      "olderModelsHint": "Chạy trên công cụ thế hệ trước. Vẫn được hỗ trợ đầy đủ — phần lớn mọi người sẽ không cần đến.",
+      "olderHint": "Định dạng cũ. {{model}} ({{size}}) là phiên bản mới của mô hình này.",
+      "retiredHint": "Dùng công cụ cũ mà SpeakoFlow không còn đi kèm. Hãy tải {{model}} ({{size}}) thay thế.",
+      "retired": {
+        "notice": "Các mô hình này dùng công cụ cũ mà SpeakoFlow không còn đi kèm.",
+        "newVersion": "Phiên bản mới: {{model}} · {{size}}",
+        "getNewVersion": "Tải phiên bản mới",
+        "useNewVersion": "Dùng phiên bản mới",
+        "deleteOld": "Xóa tệp cũ ({{size}})",
+        "deleteTitle": "Xóa tệp cũ",
+        "deleteConfirm": "Xóa tệp cũ của các mô hình này ({{size}})? Các phiên bản mới bạn đã tải vẫn được giữ."
+      },
       "customModel": {
         "addButton": "Tìm trên Hugging Face",
         "searchTitle": "Cần một mô hình khác?",
@@ -844,28 +868,15 @@
         "needsEngine": "Cần cơ chế bàn phím SpeakoFlow Keys.",
         "reset": "Các phím tắt dùng nút chuột đã trở về phím mặc định."
       },
-      "liveTranscription": {
-        "label": "Chuyển đổi trực tiếp",
-        "description": "Chuyển giọng nói thành văn bản ngay khi bạn nói, thay vì chờ đến lúc bạn dừng. Thử nghiệm."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Cửa sổ chuyển đổi trực tiếp",
-        "description": "Khi chuyển đổi trực tiếp đang chạy, hiển thị thẻ lớp phủ lớn hơn kèm văn bản đang chạy thay vì viên nhỏ gọn. Cần bật chuyển đổi trực tiếp."
+      "longFormChunking": {
+        "title": "Chia nhỏ bản ghi dài",
+        "description": "Bản đọc dài được chép thành từng phần tại các chỗ ngắt tự nhiên, giúp các mô hình không dành cho âm thanh dài vẫn chính xác."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Tăng tốc Whisper",
-          "description": "Tự động sẽ dùng GPU khi có sẵn."
-        },
-        "ort": {
-          "title": "Tăng tốc ONNX",
-          "description": "Dành cho các mô hình Parakeet, Canary và Moonshine. DirectML là thử nghiệm."
-        },
-        "gpuDevice": {
-          "title": "Thiết bị GPU",
-          "description": "Tự động sẽ chọn GPU chuyên dụng.",
-          "auto": "Tự động"
-        }
+        "title": "Xử lý giọng nói",
+        "description": "Tự động dùng card đồ họa của bạn, card rời nếu bạn có hai card. Chọn Bộ xử lý nếu đọc chính tả bị treo hoặc trình điều khiển đồ họa gặp sự cố. Chậm hơn nhưng chạy được ở mọi nơi.",
+        "auto": "Tự động",
+        "cpu": "Bộ xử lý (CPU)"
       },
       "startHidden": {
         "label": "Khởi động ẩn",
@@ -2240,6 +2251,7 @@
     "preparing": "Đang chuẩn bị micrô…",
     "recording": "Đang ghi âm",
     "transcribing": "Đang chuyển đổi…",
+    "loading": "Đang tải mô hình…",
     "processing": "Đang dọn dẹp…",
     "generating": "Đang viết bằng Flow…",
     "vision": "Đang xem màn hình của bạn…",
@@ -2273,6 +2285,10 @@
       "title": "Đang tải mô hình giọng nói…",
       "percent": "Đang tải mô hình giọng nói · {{percent}}%",
       "hint": "Đọc chính tả sẽ hoạt động khi tải xong"
+    },
+    "update": {
+      "title": "{{model}} cần được cập nhật",
+      "hint": "Phiên bản mới có trong trang Mô hình"
     },
     "handsFreeHint": "Nhấn {{key}} để rảnh tay",
     "lockedKeys": "Đang ghi âm rảnh tay. Nhấn {{keys}} để kết thúc",
@@ -2532,6 +2548,7 @@
     "status": {
       "label": "Mô hình giọng nói: {{model}}, {{status}}. Mở cài đặt chuyển giọng nói thành văn bản.",
       "setup": "Cần thiết lập",
+      "needsUpdate": "Cần cập nhật",
       "cloud": "Đám mây · {{provider}}",
       "loading": "Đang tải…",
       "error": "Không tải được",
@@ -2707,12 +2724,24 @@
       "today": "Hôm nay"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} dùng công cụ cũ mà SpeakoFlow không còn đi kèm.",
+    "newVersion": "Phiên bản mới của nó là {{model}}.",
+    "ready": "{{model}} đã được tải về và sẵn sàng.",
+    "noVersion": "Hãy chọn mô hình khác để tiếp tục đọc chính tả.",
+    "failed": "Không tải được {{model}}.",
+    "download": "Tải phiên bản mới ({{size}})",
+    "retry": "Thử lại",
+    "chooseAnother": "Chọn mô hình khác",
+    "progressLabel": "Đang tải phiên bản mới"
+  },
   "modelsHub": {
     "description": "Mỗi việc trong SpeakoFlow do một mô hình bạn chọn đảm nhận. Chạy trên máy tính này để riêng tư, hoặc trên đám mây để nhanh hơn.",
     "addLocal": "Thêm tệp mô hình",
     "privacyNote": "Mô hình trên máy tính này không bao giờ gửi giọng nói hay văn bản của bạn đi đâu cả. Mô hình đám mây gửi chúng tới nhà cung cấp bạn đã chọn, bằng khóa API của bạn.",
     "inUse": "Đang dùng",
     "needsSetup": "Cần thiết lập",
+    "needsUpdate": "Cần cập nhật",
     "performance": "Hiệu năng",
     "where": {
       "device": "Trên máy tính này",
@@ -2725,6 +2754,7 @@
       "assistantOff": "Trợ lý đang tắt",
       "noModel": "Chưa chọn mô hình",
       "notDownloaded": "Chưa tải mô hình",
+      "needsUpdate": "{{model}} cần được cập nhật",
       "noKey": "Thêm khóa API",
       "noEndpoint": "Thêm endpoint"
     },

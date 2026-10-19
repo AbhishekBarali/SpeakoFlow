@@ -521,11 +521,13 @@
       "singleLanguage": "Yalnızca bu dili destekler",
       "multiLanguage": "Çok dilli",
       "languageOnly": "Yalnızca {{language}}",
+      "languageList": "{{model}} modelinin anladığı diller",
       "translation": "İngilizce'ye çevirebilir",
       "translate": "İngilizce'ye çevir",
       "streaming": "Akış",
       "quantization": "Niceleme",
-      "legacy": "Daha eski"
+      "legacy": "Daha eski",
+      "retired": "Kullanımdan kalktı"
     }
   },
   "settings": {
@@ -665,6 +667,15 @@
         "noResults": "Dil bulunamadı",
         "auto": "Otomatik"
       },
+      "chineseScript": {
+        "title": "Çince yazı",
+        "description": "Çince dökümleri basitleştirilmiş veya geleneksel karakterlerle yazar. Diğer diller olduğu gibi kalır.",
+        "options": {
+          "auto": "Döküldüğü gibi",
+          "simplified": "Basitleştirilmiş",
+          "traditional": "Geleneksel"
+        }
+      },
       "pushToTalk": {
         "dictation": "Açık: tuşları basılı tuttuğunuz sürece kayıt devam eder. Kapalı: bir basış başlatır, sonraki durdurur; böylece her dikte eller serbest olur.",
         "assistant": "Açık: tuşları basılı tuttuğunuz sürece dinler. Kapalı: bir basış başlatır, sonraki gönderir.",
@@ -712,14 +723,27 @@
         "all": "Tümü",
         "multiLanguage": "Çok dilli",
         "translation": "Çeviri",
-        "allLanguages": "Tüm diller"
+        "allLanguages": "Tüm diller",
+        "streamingHint": "Yalnızca siz konuşurken yazıya döken modeller",
+        "translate": "Çeviri",
+        "translateHint": "Yalnızca konuşmayı İngilizceye çevirebilen modeller",
+        "noMatch": "Bu filtrelere uyan model yok",
+        "clear": "Filtreleri temizle"
       },
-      "noModelsMatch": "Bu filtreyle eşleşen model yok.",
       "searchPlaceholder": "Modelleri ada göre ara…",
       "clearSearch": "Aramayı temizle",
       "noSearchResults": "“{{query}}” adlı model yok.",
-      "olderModels": "Daha eski modeller",
-      "olderModelsHint": "Önceki motorda çalışır. Hâlâ tam olarak destekleniyor — çoğu kişiye gerekmez.",
+      "olderHint": "Eski biçim. {{model}} ({{size}}) bu modelin yeni sürümü.",
+      "retiredHint": "SpeakoFlow'un artık içermediği eski bir motor kullanıyor. Bunun yerine {{model}} ({{size}}) indirin.",
+      "retired": {
+        "notice": "Bu modeller, SpeakoFlow'un artık içermediği eski bir motor kullanıyordu.",
+        "newVersion": "Yeni sürüm: {{model}} · {{size}}",
+        "getNewVersion": "Yeni sürümü indir",
+        "useNewVersion": "Yeni sürümü kullan",
+        "deleteOld": "Eski dosyaları sil ({{size}})",
+        "deleteTitle": "Eski dosyaları sil",
+        "deleteConfirm": "Bu modellerin eski dosyaları silinsin mi ({{size}})? İndirdiğiniz yeni sürümler kalır."
+      },
       "customModel": {
         "addButton": "Hugging Face'te ara",
         "searchTitle": "Farklı bir model mi gerekiyor?",
@@ -850,28 +874,15 @@
         "needsEngine": "SpeakoFlow Keys klavye altyapısını gerektirir.",
         "reset": "Fare düğmesi kullanan kısayollar varsayılan tuşlarına döndü."
       },
-      "liveTranscription": {
-        "label": "Canlı transkripsiyon",
-        "description": "Konuşmayı, siz durduğunuzda hepsini birden değil, konuşurken yazıya döker. Deneysel."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Canlı transkripsiyon penceresi",
-        "description": "Canlı transkripsiyon çalışırken kompakt kapsül yerine, akan metni gösteren daha büyük bir kaplama kartı gösterir. Canlı transkripsiyon gerektirir."
+      "longFormChunking": {
+        "title": "Uzun kayıtları böl",
+        "description": "Uzun dikteler doğal duraklamalarda parçalara bölünerek yazıya dökülür; böylece uzun ses için yapılmamış modeller de doğru kalır."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Whisper hızlandırma",
-          "description": "Otomatik, mevcutsa GPU'yu kullanır."
-        },
-        "ort": {
-          "title": "ONNX hızlandırma",
-          "description": "Parakeet, Canary ve Moonshine modelleri için. DirectML deneyseldir."
-        },
-        "gpuDevice": {
-          "title": "GPU aygıtı",
-          "description": "Otomatik, özel GPU'yu seçer.",
-          "auto": "Otomatik"
-        }
+        "title": "Konuşma işleme",
+        "description": "Otomatik, ekran kartınızı kullanır; iki tane varsa harici olanı. Dikte çöküyorsa veya ekran kartı sürücünüzde sorun varsa İşlemci'yi seçin. Daha yavaştır ama her yerde çalışır.",
+        "auto": "Otomatik",
+        "cpu": "İşlemci (CPU)"
       },
       "startHidden": {
         "label": "Gizli başlat",
@@ -2252,6 +2263,7 @@
     "preparing": "Mikrofon hazırlanıyor…",
     "recording": "Kaydediliyor",
     "transcribing": "Transkribe ediliyor…",
+    "loading": "Model yükleniyor…",
     "processing": "Temizleniyor…",
     "generating": "Flow ile yazılıyor…",
     "vision": "Ekranınıza bakılıyor…",
@@ -2285,6 +2297,10 @@
       "title": "Konuşma modeli indiriliyor…",
       "percent": "Konuşma modeli indiriliyor · %{{percent}}",
       "hint": "İndirme bitince dikte çalışmaya başlar"
+    },
+    "update": {
+      "title": "{{model}} güncellenmeli",
+      "hint": "Yeni sürüm Modeller sayfasında"
     },
     "handsFreeHint": "Eller serbest için {{key}} tuşuna basın",
     "lockedKeys": "Eller serbest kaydediliyor. Bitirmek için {{keys}} tuşlarına basın",
@@ -2550,6 +2566,7 @@
     "status": {
       "label": "Konuşma modeli: {{model}}, {{status}}. Konuşmadan metne ayarlarını açın.",
       "setup": "Kurulum gerekiyor",
+      "needsUpdate": "Güncellenmeli",
       "cloud": "Bulut · {{provider}}",
       "loading": "Yükleniyor…",
       "error": "Yüklenemedi",
@@ -2730,12 +2747,24 @@
       "today": "Bugün"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}}, SpeakoFlow'un artık içermediği eski bir motor kullanıyordu.",
+    "newVersion": "Yeni sürümü {{model}}.",
+    "ready": "{{model}} indirildi ve hazır.",
+    "noVersion": "Dikte etmeye devam etmek için başka bir model seçin.",
+    "failed": "{{model}} indirilemedi.",
+    "download": "Yeni sürümü indir ({{size}})",
+    "retry": "Tekrar dene",
+    "chooseAnother": "Başka bir model seç",
+    "progressLabel": "Yeni sürüm indiriliyor"
+  },
   "modelsHub": {
     "description": "SpeakoFlow'daki her işi sizin seçtiğiniz bir model yapar. Gizlilik için bu bilgisayarda, hız için bulutta çalıştırın.",
     "addLocal": "Model dosyası ekle",
     "privacyNote": "Bu bilgisayardaki modeller sesinizi veya metninizi hiçbir yere göndermez. Bulut modelleri, API anahtarınızı kullanarak bunları seçtiğiniz sağlayıcıya gönderir.",
     "inUse": "Kullanımda",
     "needsSetup": "Kurulum gerekli",
+    "needsUpdate": "Güncellenmeli",
     "performance": "Performans",
     "where": {
       "device": "Bu bilgisayarda",
@@ -2748,6 +2777,7 @@
       "assistantOff": "Asistan kapalı",
       "noModel": "Henüz model seçilmedi",
       "notDownloaded": "Model indirilmedi",
+      "needsUpdate": "{{model}} güncellenmeli",
       "noKey": "API anahtarı ekleyin",
       "noEndpoint": "Uç nokta ekleyin"
     },

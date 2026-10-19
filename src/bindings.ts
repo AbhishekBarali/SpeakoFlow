@@ -629,23 +629,26 @@ async changeLazyStreamCloseSetting(enabled: boolean) : Promise<Result<null, stri
     else return { status: "error", error: e  as any };
 }
 },
-async changeLiveTranscriptionEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+/**
+ * Set the script Chinese transcripts are written in (Auto, Simplified or
+ * Traditional). Only reaches runs whose language is not already one of the
+ * two Chinese scripts.
+ */
+async changeChineseScriptSetting(script: ChineseScript) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_live_transcription_enabled_setting", { enabled }) };
+    return { status: "ok", data: await TAURI_INVOKE("change_chinese_script_setting", { script }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
 /**
- * Toggle the opt-in live-transcription window: when on (and live transcription
- * is enabled), the recording overlay grows into a readable card showing the
- * running committed + tentative transcript; when off, the overlay stays the
- * compact pill. Off by default.
+ * Turn long-form chunking on or off: recordings over 40 seconds on a model
+ * not built for long audio are transcribed in pieces cut at pauses.
  */
-async changeLiveTranscriptionWindowEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+async changeLongFormChunkingSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_live_transcription_window_enabled_setting", { enabled }) };
+    return { status: "ok", data: await TAURI_INVOKE("change_long_form_chunking_setting", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -653,9 +656,9 @@ async changeLiveTranscriptionWindowEnabledSetting(enabled: boolean) : Promise<Re
 },
 /**
  * Set the recording (dictation) overlay style: none / minimal / live (or auto
- * to follow the model). Picking Live also enables streaming transcription so
- * the running transcript can actually appear; Minimal/None turn it back off.
- * `auto` leaves the streaming toggle alone (the show path resolves per model).
+ * to follow the model). The style only decides what is shown: a model that
+ * streams always streams, so the transcript is ready the moment you stop
+ * whichever style you pick.
  */
 async changeOverlayStyleSetting(style: string) : Promise<Result<null, string>> {
     try {
@@ -807,37 +810,38 @@ async changeCloseBehaviorSetting(behavior: string) : Promise<Result<null, string
     else return { status: "error", error: e  as any };
 }
 },
-async changeWhisperAcceleratorSetting(accelerator: WhisperAcceleratorSetting) : Promise<Result<null, string>> {
+/**
+ * Where local speech-to-text runs: `auto`, `cpu`, or `gpu` (the device in
+ * `transcribe_gpu_device`). The frontend saves the device first, so a `gpu`
+ * choice never lands without one.
+ */
+async changeTranscribeAcceleratorSetting(accelerator: TranscribeAcceleratorSetting) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_whisper_accelerator_setting", { accelerator }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async changeOrtAcceleratorSetting(accelerator: OrtAcceleratorSetting) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("change_ort_accelerator_setting", { accelerator }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async changeWhisperGpuDevice(device: number) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("change_whisper_gpu_device", { device }) };
+    return { status: "ok", data: await TAURI_INVOKE("change_transcribe_accelerator_setting", { accelerator }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
 /**
- * Return which accelerators and GPU devices are available for this build.
+ * The GPU chosen for speech, as the stable key from `get_available_accelerators`
+ * (`GpuDeviceOption::id`), or `None` for automatic selection.
+ */
+async changeTranscribeGpuDevice(device: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_transcribe_gpu_device", { device }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Return the speech-processing choices and the GPUs transcribe.cpp can use.
  * 
- * First-call cost is dominated by enumerating GPU devices through the
- * whisper.cpp Metal/Vulkan backend, which loads dynamic libraries and
- * probes hardware. Run it on the blocking pool so the webview thread
- * stays responsive — see also the startup pre-warm in `lib.rs`.
+ * First-call cost is dominated by registering transcribe.cpp's backends and
+ * enumerating devices, which loads the Vulkan/Metal backend and probes
+ * hardware. Run it on the blocking pool so the webview thread stays
+ * responsive — see also the startup pre-warm in `lib.rs`.
  */
 async getAvailableAccelerators() : Promise<AvailableAccelerators> {
     return await TAURI_INVOKE("get_available_accelerators");
@@ -3772,22 +3776,6 @@ assistant_push_to_talk?: boolean;
  */
 dictation_silence_stop_secs?: number; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
 /**
- * Opt-in live/streaming transcription: while recording, feed audio into a
- * streaming transcriber and paste the merged running result at the end
- * (with the batch `transcribe()` path as the fallback). Off by default —
- * when off, dictation behaves exactly as before.
- */
-live_transcription_enabled?: boolean; 
-/**
- * Opt-in live-transcription window: while streaming dictation is running,
- * enlarge the recording overlay into a readable card that shows the
- * running committed + tentative transcript, instead of the compact pill.
- * Off by default. Only takes effect when `live_transcription_enabled` is
- * also on (there's no live text to show otherwise); when off, the overlay
- * stays the compact pill exactly as before.
- */
-live_transcription_window_enabled?: boolean; 
-/**
  * Local model on this machine, or a hosted transcription API. Defaults to
  * `Local`, so an existing install is untouched until the user opts in.
  */
@@ -3848,7 +3836,20 @@ cloud_stt_no_verbatim?: boolean;
 /**
  * Ceiling on a single batch transcription request.
  */
-cloud_stt_timeout_secs?: number; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; 
+cloud_stt_timeout_secs?: number; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; 
+/**
+ * The script Chinese output is written in when `selected_language` does
+ * not already name one (see [`ChineseScript`]).
+ */
+chinese_script?: ChineseScript; 
+/**
+ * Cut recordings over 40 seconds at pauses and transcribe them in pieces
+ * of about 30 seconds, for the models that are not built for long audio
+ * (`managers::transcription::policy`). Whisper and streaming models are
+ * never cut. On by default: without it a long dictation on such a model
+ * loses accuracy, or fails outright past the model's longest input.
+ */
+long_form_chunking?: boolean; overlay_position?: OverlayPosition; 
 /**
  * Recording (dictation) overlay style: Auto/None/Minimal/Live. Auto follows
  * the model's live-streaming support (Live if supported, else Minimal).
@@ -4079,7 +4080,14 @@ mouse_button_shortcuts?: boolean; show_tray_icon?: boolean;
  * reliable way to find out what colour the panel is (see
  * `tray::linux_tray_theme`).
  */
-tray_icon_color?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; 
+tray_icon_color?: boolean; close_behavior?: CloseBehavior; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; transcribe_accelerator?: TranscribeAcceleratorSetting; 
+/**
+ * The GPU chosen for speech, as a stable device key
+ * (`managers::transcription::device_key`: the backend's hardware id, or
+ * its name where it has none). Never a registry index: transcribe.cpp's
+ * indices are process-local. `None` is automatic selection.
+ */
+transcribe_gpu_device?: string | null; extra_recording_buffer_ms?: number; 
 /**
  * Master switch for the assistant experience: the floating panel window,
  * its two hotkeys, spoken replies, profiles and personal memory.
@@ -4580,14 +4588,18 @@ supported: boolean; enabled: boolean;
  */
 learned: string[]; max_learned: number }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
-export type AvailableAccelerators = { whisper: string[]; ort: string[]; gpu_devices: GpuDeviceOption[]; 
+export type AvailableAccelerators = { 
 /**
- * transcribe.cpp compute devices (`transcribe_cpp::devices()`), added in
- * Session 2. Informational for now (proves the GPU is visible to the new
- * engine); the transcribe.cpp backend reuses the existing whisper
- * GPU-device dial, so there is no separate device setting.
+ * The `transcribe_accelerator` values that mean something here: `auto`,
+ * `cpu`, and `gpu` (one exact device from `gpu_devices`). Only `cpu` on a
+ * host whose GPU is off limits.
  */
-transcribe_cpp_devices: GpuDeviceOption[] }
+transcribe: string[]; 
+/**
+ * The GPUs transcribe.cpp can run on, each with its stable key in `id`.
+ * Also read by onboarding and the assistant catalog for the VRAM.
+ */
+gpu_devices: GpuDeviceOption[] }
 /**
  * A neural voice returned by the Azure Speech `voices/list` endpoint.
  */
@@ -4648,6 +4660,17 @@ export type ChatMessage = { role: string; content: string;
  * (and text-only turns) simply have an empty list.
  */
 images?: string[] }
+/**
+ * The script Chinese transcripts are written in, when the language picker
+ * has not already chosen one (`zh-Hans` / `zh-Hant`).
+ * 
+ * `Auto` leaves the text as the model wrote it: most Chinese models write
+ * Simplified, Whisper writes either, and Cantonese usually comes out in
+ * Traditional. The other two rewrite Chinese output from an auto-detected,
+ * plain Chinese or Cantonese run into that script, and leave any other
+ * language alone (`managers::transcription::chinese_script`).
+ */
+export type ChineseScript = "auto" | "simplified" | "traditional"
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 /**
  * What happens when the user closes the main window.
@@ -4981,10 +5004,34 @@ windows: number;
  */
 skipped_windows: number }
 /**
- * One compute device. `Deserialize` is needed by the Linux out-of-process
- * probe, which parses this back out of the child's JSON.
+ * One GPU transcribe.cpp can run a model on.
+ * 
+ * `name`, `kind` and `total_vram_mb` keep the meanings the old whisper.cpp
+ * device list gave them, because more than the speech engine reads them:
+ * llama.cpp device pinning (`local_llm`) matches `name` against its own adapter
+ * descriptions and treats `kind == "integrated"` as the iGPU to avoid, and
+ * onboarding and the assistant catalog size local models from the VRAM.
+ * `Deserialize` is needed by the Linux out-of-process probe, which parses this
+ * back out of the child's JSON.
  */
-export type GpuDeviceOption = { id: number; name: string; kind: string; total_vram_mb: number }
+export type GpuDeviceOption = { 
+/**
+ * Stable identity, saved as `transcribe_gpu_device` (see [`device_key`]).
+ * Never a registry index: those are process-local in transcribe.cpp.
+ */
+id: string; 
+/**
+ * The adapter description, e.g. "NVIDIA GeForce RTX 4070 Ti SUPER".
+ */
+name: string; 
+/**
+ * `"dedicated"`, `"integrated"`, or `"unknown"`.
+ */
+kind: string; 
+/**
+ * Reported device memory, 0 when the backend does not report it.
+ */
+total_vram_mb: number }
 /**
  * A single `.gguf` file inside a repo.
  */
@@ -5351,6 +5398,30 @@ recommended_rank: number | null; supported_languages: string[]; supports_languag
  */
 is_cleanup_specialist?: boolean; 
 /**
+ * One of the speech models from before transcribe.cpp, which the catalog
+ * now lists again as a GGUF (see [`crate::managers::legacy_models`]). An
+ * older model that is not on disk is offered nowhere. Stamped by
+ * [`stamped`], like `is_cleanup_specialist`.
+ */
+is_legacy?: boolean; 
+/**
+ * A legacy model whose engine is gone (the ONNX models). It is kept on
+ * disk if present, never loaded, and offered its replacement. Stamped.
+ */
+is_retired?: boolean; 
+/**
+ * For a legacy model, the id of the catalog model that replaces it.
+ * Stamped.
+ */
+replacement_id?: string | null; 
+/**
+ * Whether the model can work out the spoken language itself, which is
+ * what makes "Auto" a real choice for it. From the catalog's
+ * `lang_detect`, refined by the GGUF header and by the loaded model
+ * ([`ModelManager::set_runtime_language_detection`]).
+ */
+supports_language_detection?: boolean; 
+/**
  * Absolute path to a model the user already had on disk, outside the app's
  * own models directory — either a file they picked or one found in a linked
  * folder. `None` for every managed model, which resolves to
@@ -5404,7 +5475,6 @@ export type NotesTemplate =
  * Nothing but the tasks. The most-used shape after `General`.
  */
 "action_items"
-export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 /**
  * How long the finished live-transcription card stays on screen before it
  * leaves. Only the Live card lingers — the compact pill dismisses as soon as
@@ -5780,6 +5850,15 @@ export type ThinkingLevel =
  */
 "off" | "low" | "medium" | "high"
 /**
+ * Where local speech-to-text runs.
+ * 
+ * `Gpu` names one exact device, saved in `transcribe_gpu_device`; without one
+ * it means `Auto` (upstream Handy's meaning, and settings normalization turns
+ * that pair into `Auto`). `Auto` is transcribe.cpp's own policy: the first GPU
+ * that initializes, dedicated before integrated, else the processor.
+ */
+export type TranscribeAcceleratorSetting = "auto" | "cpu" | "gpu"
+/**
  * A voice option handed to the settings UI for any remote TTS engine, so the
  * user can pick from a loaded list instead of typing an opaque id.
  */
@@ -5926,7 +6005,6 @@ export type WebGpuState =
  * No adapter, it failed to start, or its audio was garbled.
  */
 "unusable"
-export type WhisperAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 
 /** tauri-specta globals **/

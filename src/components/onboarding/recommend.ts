@@ -8,7 +8,9 @@
  * returns; the user can override every choice before anything downloads.
  */
 
+import type { ModelInfo } from "@/bindings";
 import { KITTEN_SIZES, KOKORO_NATIVE_MODEL_ID } from "@/lib/nativeVoices";
+import { uniqueLanguages } from "@/lib/languageCodes";
 
 /** Kitten's middle size: the smallest (44 MB), and still a clear voice. */
 const KITTEN_MICRO_ID =
@@ -110,15 +112,39 @@ export const RECOMMENDED_SETUP_SPEECH: ReadonlySet<string> = new Set([
   SETUP_MODELS.speech.multilingual,
 ]);
 
-/** Distinct languages in a model's list: `en-US` and `en-GB` are one. */
+/**
+ * Where setup starts for someone who already has a speech model selected.
+ *
+ * - A model that runs and is on disk is the one they dictate with: setup
+ *   preselects it and marks it "In use", so Continue keeps it.
+ * - A retired model can still be the selection after an upgrade, files and
+ *   all, but its engine is gone. It is never "In use"; its new version is
+ *   preselected in its place, not marked, since it is not installed yet.
+ * - Anything else (nothing chosen, a model not downloaded) starts from the
+ *   recommendation, which is `null` here.
+ */
+export function setupStartingModel(
+  models: ReadonlyArray<ModelInfo>,
+  currentModel: string,
+): { model: ModelInfo; inUse: boolean } | null {
+  const current = models.find((model) => model.id === currentModel);
+  if (!current) return null;
+  if (current.is_retired) {
+    const replacement = current.replacement_id
+      ? models.find((model) => model.id === current.replacement_id)
+      : undefined;
+    return replacement ? { model: replacement, inUse: false } : null;
+  }
+  return current.is_downloaded ? { model: current, inUse: true } : null;
+}
+
+/**
+ * Distinct languages in a model's list: `en-US` and `en-GB` are one, and so
+ * are `nb` and `no`. The canonical rule in `@/lib/languageCodes`, the one the
+ * Models page and the language picker use too.
+ */
 export function baseLanguages(codes: ReadonlyArray<string>): string[] {
-  return [
-    ...new Set(
-      codes
-        .map((code) => code.trim().split(/[-_]/)[0].toLowerCase())
-        .filter(Boolean),
-    ),
-  ];
+  return uniqueLanguages(codes);
 }
 
 /**

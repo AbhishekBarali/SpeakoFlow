@@ -115,6 +115,13 @@ async fn rerun_entry(
     let transcription = if had_transcript && !retranscribe {
         entry.transcription_text.clone()
     } else {
+        // The engine would refuse a retired model's load, and `transcribe` only
+        // reports that nothing is loaded, which says nothing about why. Give
+        // the sentence that does.
+        if let Some(message) = crate::speech_readiness::retired_selection_message(app) {
+            return Err(message);
+        }
+
         let audio_path = history_manager.get_audio_file_path(&entry.file_name);
         let samples = crate::audio_toolkit::read_wav_samples(&audio_path)
             .map_err(|e| format!("Failed to load audio: {}", e))?;

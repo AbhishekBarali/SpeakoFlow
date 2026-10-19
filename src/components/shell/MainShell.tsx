@@ -11,6 +11,7 @@ import {
 } from "./navigation";
 import { PageStack } from "./PageStack";
 import { useSlotDataSync } from "./slotData";
+import { useSpeechUpdateRequests } from "./speechUpdate";
 import { useAutoSelectDownloadedModel } from "./useSttStatus";
 
 /** Shell-wide effects that must run exactly once. */
@@ -18,6 +19,8 @@ const ShellEffects: React.FC = () => {
   useSlotDataSync();
   // Downloading a speech model switches to it once the file is on disk.
   useAutoSelectDownloadedModel(true);
+  // A dictation refused because its model is retired opens the update prompt.
+  useSpeechUpdateRequests();
   return null;
 };
 

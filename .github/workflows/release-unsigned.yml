@@ -44,8 +44,10 @@ name: "Release (unsigned)"
 #     24.04-era glibc; older distros should use the AppImage.
 #   * .rpm — Tauri's rpm bundler omits the engine libs and an .rpm cannot be
 #     unpacked/repacked the way a .deb can.
-#   * windows-11-arm — whisper-rs-sys requires VULKAN_SDK and build.yml's Vulkan
-#     setup is gated to non-aarch64 Windows.
+#   * windows-11-arm — never set up in CI. Its old blocker (whisper-rs-sys
+#     required VULKAN_SDK, and build.yml's Vulkan setup is gated to
+#     non-aarch64 Windows) went with transcribe-rs, but the static CPU-only
+#     transcribe-cpp build has not been run there yet.
 
 on:
   workflow_dispatch:

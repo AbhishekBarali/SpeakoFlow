@@ -525,11 +525,13 @@
       "singleLanguage": "Obsługuje tylko ten język",
       "multiLanguage": "Wielojęzyczny",
       "languageOnly": "Tylko {{language}}",
+      "languageList": "Języki rozumiane przez {{model}}",
       "translation": "Może tłumaczyć na angielski",
       "translate": "Tłumacz na angielski",
       "streaming": "Strumieniowanie",
       "quantization": "Kwantyzacja",
-      "legacy": "Starszy"
+      "legacy": "Starszy",
+      "retired": "Wycofany"
     }
   },
   "settings": {
@@ -669,6 +671,15 @@
         "noResults": "Nie znaleziono języków",
         "auto": "Automatycznie"
       },
+      "chineseScript": {
+        "title": "Pismo chińskie",
+        "description": "Chińskie transkrypcje są zapisywane znakami uproszczonymi lub tradycyjnymi. Inne języki pozostają bez zmian.",
+        "options": {
+          "auto": "Jak w transkrypcji",
+          "simplified": "Uproszczone",
+          "traditional": "Tradycyjne"
+        }
+      },
       "pushToTalk": {
         "dictation": "Włączone: nagrywanie trwa, dopóki trzymasz klawisze. Wyłączone: jedno naciśnięcie zaczyna, następne kończy, więc każde dyktowanie jest bez trzymania.",
         "assistant": "Włączone: słucha, dopóki trzymasz klawisze. Wyłączone: jedno naciśnięcie zaczyna, następne wysyła.",
@@ -716,14 +727,27 @@
         "all": "Wszystkie",
         "multiLanguage": "Wielojęzyczne",
         "translation": "Tłumaczenie",
-        "allLanguages": "Wszystkie języki"
+        "allLanguages": "Wszystkie języki",
+        "streamingHint": "Tylko modele, które transkrybują w trakcie mówienia",
+        "translate": "Tłumaczenie",
+        "translateHint": "Tylko modele, które potrafią tłumaczyć mowę na angielski",
+        "noMatch": "Żaden model nie pasuje do tych filtrów",
+        "clear": "Wyczyść filtry"
       },
-      "noModelsMatch": "Żadne modele nie pasują do tego filtra.",
       "searchPlaceholder": "Szukaj modeli po nazwie…",
       "clearSearch": "Wyczyść wyszukiwanie",
       "noSearchResults": "Brak modeli o nazwie „{{query}}”.",
-      "olderModels": "Starsze modele",
-      "olderModelsHint": "Działają na poprzednim silniku. Nadal w pełni obsługiwane — większość osób ich nie potrzebuje.",
+      "olderHint": "Starszy format. {{model}} ({{size}}) to nowsza wersja tego modelu.",
+      "retiredHint": "Używa starszego silnika, którego SpeakoFlow już nie zawiera. Pobierz zamiast tego {{model}} ({{size}}).",
+      "retired": {
+        "notice": "Te modele używały starszego silnika, którego SpeakoFlow już nie zawiera.",
+        "newVersion": "Nowa wersja: {{model}} · {{size}}",
+        "getNewVersion": "Pobierz nową wersję",
+        "useNewVersion": "Użyj nowej wersji",
+        "deleteOld": "Usuń stare pliki ({{size}})",
+        "deleteTitle": "Usuń stare pliki",
+        "deleteConfirm": "Usunąć stare pliki tych modeli ({{size}})? Pobrane nowe wersje zostaną."
+      },
       "customModel": {
         "addButton": "Szukaj na Hugging Face",
         "searchTitle": "Potrzebujesz innego modelu?",
@@ -862,28 +886,15 @@
         "needsEngine": "Wymaga implementacji klawiatury SpeakoFlow Keys.",
         "reset": "Skróty, które używały przycisku myszy, wróciły do domyślnych klawiszy."
       },
-      "liveTranscription": {
-        "label": "Transkrypcja na bieżąco",
-        "description": "Transkrybuj mowę w trakcie mówienia, a nie całość po zatrzymaniu. Eksperymentalne."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Okno transkrypcji na bieżąco",
-        "description": "Podczas transkrypcji na bieżąco pokazuj większą kartę nakładki z powstającym tekstem zamiast kompaktowego paska. Wymaga transkrypcji na bieżąco."
+      "longFormChunking": {
+        "title": "Dziel długie nagrania",
+        "description": "Długie dyktowanie jest transkrybowane w częściach przy naturalnych pauzach, dzięki czemu modele nieprzystosowane do długiego dźwięku pozostają dokładne."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Akceleracja Whisper",
-          "description": "Auto używa GPU, gdy jest dostępny."
-        },
-        "ort": {
-          "title": "Akceleracja ONNX",
-          "description": "Dla modeli Parakeet, Canary i Moonshine. DirectML jest eksperymentalne."
-        },
-        "gpuDevice": {
-          "title": "Urządzenie GPU",
-          "description": "Auto wybiera dedykowany GPU.",
-          "auto": "Automatycznie"
-        }
+        "title": "Przetwarzanie mowy",
+        "description": "Automatycznie używa karty graficznej, a jeśli masz dwie, tej dedykowanej. Wybierz Procesor, jeśli dyktowanie się zawiesza albo sterownik grafiki sprawia problemy. Działa wolniej, ale wszędzie.",
+        "auto": "Automatycznie",
+        "cpu": "Procesor (CPU)"
       },
       "startHidden": {
         "label": "Uruchamiaj w tle",
@@ -2276,6 +2287,7 @@
     "preparing": "Przygotowywanie mikrofonu…",
     "recording": "Nagrywanie",
     "transcribing": "Transkrypcja…",
+    "loading": "Wczytywanie modelu…",
     "processing": "Porządkowanie…",
     "generating": "Piszę z Flow…",
     "vision": "Patrzę na Twój ekran…",
@@ -2309,6 +2321,10 @@
       "title": "Pobieranie modelu mowy…",
       "percent": "Pobieranie modelu mowy · {{percent}}%",
       "hint": "Dyktowanie zacznie działać po zakończeniu"
+    },
+    "update": {
+      "title": "{{model}} wymaga aktualizacji",
+      "hint": "Nowa wersja jest na stronie Modele"
     },
     "handsFreeHint": "Naciśnij {{key}}, aby nie trzymać",
     "lockedKeys": "Nagrywanie bez trzymania. Naciśnij {{keys}}, aby zakończyć",
@@ -2586,6 +2602,7 @@
     "status": {
       "label": "Model mowy: {{model}}, {{status}}. Otwórz ustawienia zamiany mowy na tekst.",
       "setup": "Wymaga konfiguracji",
+      "needsUpdate": "Wymaga aktualizacji",
       "cloud": "Chmura · {{provider}}",
       "loading": "Wczytywanie…",
       "error": "Nie udało się wczytać",
@@ -2776,12 +2793,24 @@
       "today": "Dzisiaj"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} używał starszego silnika, którego SpeakoFlow już nie zawiera.",
+    "newVersion": "Jego nowa wersja to {{model}}.",
+    "ready": "{{model}} jest pobrany i gotowy.",
+    "noVersion": "Wybierz inny model, aby dalej dyktować.",
+    "failed": "Nie udało się pobrać {{model}}.",
+    "download": "Pobierz nową wersję ({{size}})",
+    "retry": "Spróbuj ponownie",
+    "chooseAnother": "Wybierz inny model",
+    "progressLabel": "Pobieranie nowej wersji"
+  },
   "modelsHub": {
     "description": "Każde zadanie w SpeakoFlow wykonuje wybrany przez Ciebie model. Uruchom go na tym komputerze dla prywatności albo w chmurze dla szybkości.",
     "addLocal": "Dodaj plik modelu",
     "privacyNote": "Modele na tym komputerze nigdzie nie wysyłają Twojego głosu ani tekstu. Modele w chmurze wysyłają je do wybranego dostawcy przy użyciu Twojego klucza API.",
     "inUse": "W użyciu",
     "needsSetup": "Wymaga konfiguracji",
+    "needsUpdate": "Wymaga aktualizacji",
     "performance": "Wydajność",
     "where": {
       "device": "Na tym komputerze",
@@ -2794,6 +2823,7 @@
       "assistantOff": "Asystent jest wyłączony",
       "noModel": "Nie wybrano jeszcze modelu",
       "notDownloaded": "Model nie jest pobrany",
+      "needsUpdate": "{{model}} wymaga aktualizacji",
       "noKey": "Dodaj klucz API",
       "noEndpoint": "Dodaj adres serwera"
     },

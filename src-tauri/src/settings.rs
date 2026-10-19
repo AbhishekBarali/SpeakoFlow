@@ -1247,35 +1247,36 @@ impl Default for TypingTool {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+/// Where local speech-to-text runs.
+///
+/// `Gpu` names one exact device, saved in `transcribe_gpu_device`; without one
+/// it means `Auto` (upstream Handy's meaning, and settings normalization turns
+/// that pair into `Auto`). `Auto` is transcribe.cpp's own policy: the first GPU
+/// that initializes, dedicated before integrated, else the processor.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum WhisperAcceleratorSetting {
+pub enum TranscribeAcceleratorSetting {
+    #[default]
     Auto,
     Cpu,
     Gpu,
 }
 
-impl Default for WhisperAcceleratorSetting {
-    fn default() -> Self {
-        WhisperAcceleratorSetting::Auto
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+/// The script Chinese transcripts are written in, when the language picker
+/// has not already chosen one (`zh-Hans` / `zh-Hant`).
+///
+/// `Auto` leaves the text as the model wrote it: most Chinese models write
+/// Simplified, Whisper writes either, and Cantonese usually comes out in
+/// Traditional. The other two rewrite Chinese output from an auto-detected,
+/// plain Chinese or Cantonese run into that script, and leave any other
+/// language alone (`managers::transcription::chinese_script`).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum OrtAcceleratorSetting {
+pub enum ChineseScript {
+    #[default]
     Auto,
-    Cpu,
-    Cuda,
-    #[serde(rename = "directml")]
-    DirectMl,
-    Rocm,
-}
-
-impl Default for OrtAcceleratorSetting {
-    fn default() -> Self {
-        OrtAcceleratorSetting::Auto
-    }
+    Simplified,
+    Traditional,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Type)]
@@ -1366,20 +1367,10 @@ pub struct AppSettings {
     pub selected_model: String,
     #[serde(default = "default_always_on_microphone")]
     pub always_on_microphone: bool,
-    /// Opt-in live/streaming transcription: while recording, feed audio into a
-    /// streaming transcriber and paste the merged running result at the end
-    /// (with the batch `transcribe()` path as the fallback). Off by default —
-    /// when off, dictation behaves exactly as before.
-    #[serde(default = "default_live_transcription_enabled")]
-    pub live_transcription_enabled: bool,
-    /// Opt-in live-transcription window: while streaming dictation is running,
-    /// enlarge the recording overlay into a readable card that shows the
-    /// running committed + tentative transcript, instead of the compact pill.
-    /// Off by default. Only takes effect when `live_transcription_enabled` is
-    /// also on (there's no live text to show otherwise); when off, the overlay
-    /// stays the compact pill exactly as before.
-    #[serde(default = "default_live_transcription_window_enabled")]
-    pub live_transcription_window_enabled: bool,
+    // `live_transcription_enabled` and `live_transcription_window_enabled`
+    // used to live here. Streaming now follows the model, and the window
+    // setting was never read, so both are gone; a store that still has them
+    // loads as before, the keys are simply ignored and not written back.
     /// Local model on this machine, or a hosted transcription API. Defaults to
     /// `Local`, so an existing install is untouched until the user opts in.
     #[serde(default)]
@@ -1442,6 +1433,17 @@ pub struct AppSettings {
     pub translate_to_english: bool,
     #[serde(default = "default_selected_language")]
     pub selected_language: String,
+    /// The script Chinese output is written in when `selected_language` does
+    /// not already name one (see [`ChineseScript`]).
+    #[serde(default)]
+    pub chinese_script: ChineseScript,
+    /// Cut recordings over 40 seconds at pauses and transcribe them in pieces
+    /// of about 30 seconds, for the models that are not built for long audio
+    /// (`managers::transcription::policy`). Whisper and streaming models are
+    /// never cut. On by default: without it a long dictation on such a model
+    /// loses accuracy, or fails outright past the model's longest input.
+    #[serde(default = "default_true")]
+    pub long_form_chunking: bool,
     #[serde(default = "default_overlay_position")]
     pub overlay_position: OverlayPosition,
     /// Recording (dictation) overlay style: Auto/None/Minimal/Live. Auto follows
@@ -1708,11 +1710,13 @@ pub struct AppSettings {
     #[serde(default)]
     pub custom_filler_words: Option<Vec<String>>,
     #[serde(default)]
-    pub whisper_accelerator: WhisperAcceleratorSetting,
+    pub transcribe_accelerator: TranscribeAcceleratorSetting,
+    /// The GPU chosen for speech, as a stable device key
+    /// (`engine_supervisor::device_key`: the backend's hardware id, or
+    /// its name where it has none). Never a registry index: transcribe.cpp's
+    /// indices are process-local. `None` is automatic selection.
     #[serde(default)]
-    pub ort_accelerator: OrtAcceleratorSetting,
-    #[serde(default = "default_whisper_gpu_device")]
-    pub whisper_gpu_device: i32,
+    pub transcribe_gpu_device: Option<String>,
     #[serde(default)]
     pub extra_recording_buffer_ms: u64,
     /// Master switch for the assistant experience: the floating panel window,
@@ -1995,14 +1999,6 @@ fn default_dictation_silence_stop_secs() -> u32 {
 }
 
 fn default_always_on_microphone() -> bool {
-    false
-}
-
-fn default_live_transcription_enabled() -> bool {
-    false
-}
-
-fn default_live_transcription_window_enabled() -> bool {
     false
 }
 
@@ -3295,10 +3291,6 @@ fn speakoflow_mini_prompt() -> LLMPrompt {
     }
 }
 
-fn default_whisper_gpu_device() -> i32 {
-    -1 // auto
-}
-
 fn default_typing_tool() -> TypingTool {
     TypingTool::Auto
 }
@@ -4239,8 +4231,6 @@ pub fn get_default_settings() -> AppSettings {
         update_checks_enabled: default_update_checks_enabled(),
         selected_model: "".to_string(),
         always_on_microphone: false,
-        live_transcription_enabled: false,
-        live_transcription_window_enabled: false,
         stt_engine_mode: SttEngineMode::default(),
         cloud_stt_providers: default_cloud_stt_providers(),
         cloud_stt_provider_id: default_cloud_stt_provider_id(),
@@ -4256,6 +4246,8 @@ pub fn get_default_settings() -> AppSettings {
         selected_output_device: None,
         translate_to_english: false,
         selected_language: "auto".to_string(),
+        chinese_script: ChineseScript::default(),
+        long_form_chunking: true,
         overlay_position: default_overlay_position(),
         overlay_style: default_overlay_style(),
         assistant_overlay_style: default_overlay_style(),
@@ -4324,9 +4316,8 @@ pub fn get_default_settings() -> AppSettings {
         typing_tool: default_typing_tool(),
         external_script_path: None,
         custom_filler_words: None,
-        whisper_accelerator: WhisperAcceleratorSetting::default(),
-        ort_accelerator: OrtAcceleratorSetting::default(),
-        whisper_gpu_device: default_whisper_gpu_device(),
+        transcribe_accelerator: TranscribeAcceleratorSetting::default(),
+        transcribe_gpu_device: None,
         extra_recording_buffer_ms: 0,
         assistant_enabled: true,
         assistant_provider_id: default_assistant_provider_id(),
@@ -5224,13 +5215,86 @@ fn hydrate_secrets(settings: &mut AppSettings) {
 ///
 /// Hold or Tap was one setting for every recording shortcut too; see
 /// [`split_recording_modes`].
+///
+/// The speech engine's device choice moved to transcribe.cpp's settings; see
+/// [`migrate_accelerator_settings`].
 fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bool) {
     let Some(settings) = raw.as_object_mut() else {
         return (raw, false);
     };
     let screen = migrate_screen_access(settings);
     let modes = split_recording_modes(settings);
-    (raw, screen || modes)
+    let accelerator = migrate_accelerator_settings(settings);
+    (raw, screen || modes || accelerator)
+}
+
+/// The keys the two retired engines' device choice was stored under.
+const LEGACY_ACCELERATOR_KEYS: [&str; 3] = [
+    "whisper_accelerator",
+    "whisper_gpu_device",
+    "ort_accelerator",
+];
+
+/// Carry the old speech-device choice over to transcribe.cpp's settings, and
+/// keep the new pair consistent.
+///
+/// 2.x stored three: `whisper_accelerator` (`auto` / `cpu` / `gpu`) and a
+/// `whisper_gpu_device` index for whisper.cpp, and `ort_accelerator` for the
+/// ONNX engines. The accelerator keeps its meaning (`cpu` stays the processor,
+/// `auto` stays automatic, `gpu` stays a GPU request). The index does not
+/// survive: it counted whisper.cpp's own device list, which says nothing about
+/// which transcribe.cpp device is which, so it becomes automatic selection, and
+/// a `gpu` with no device is `auto` by definition. `ort_accelerator` belonged
+/// to an engine that no longer exists. Idempotent: once
+/// `transcribe_accelerator` is stored, only the consistency rule below applies.
+///
+/// The consistency rule: `gpu` without a device key is the same as `auto`, and
+/// a key that is not a string (no version ever wrote one, but a hand edit can)
+/// is dropped rather than failing the whole settings object.
+fn migrate_accelerator_settings(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
+    use serde_json::Value;
+
+    let mut changed = false;
+    if !settings.contains_key("transcribe_accelerator") {
+        if let Some(old) = settings
+            .get("whisper_accelerator")
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "auto" | "cpu" | "gpu"))
+        {
+            settings.insert(
+                "transcribe_accelerator".to_string(),
+                Value::String(old.to_string()),
+            );
+            changed = true;
+        }
+    }
+    for key in LEGACY_ACCELERATOR_KEYS {
+        changed |= settings.remove(key).is_some();
+    }
+
+    if settings
+        .get("transcribe_gpu_device")
+        .is_some_and(|device| !device.is_string() && !device.is_null())
+    {
+        settings.remove("transcribe_gpu_device");
+        changed = true;
+    }
+    let has_device = settings
+        .get("transcribe_gpu_device")
+        .is_some_and(Value::is_string);
+    if settings
+        .get("transcribe_accelerator")
+        .and_then(Value::as_str)
+        == Some("gpu")
+        && !has_device
+    {
+        settings.insert(
+            "transcribe_accelerator".to_string(),
+            Value::String("auto".to_string()),
+        );
+        changed = true;
+    }
+    changed
 }
 
 fn migrate_screen_access(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
@@ -7537,6 +7601,8 @@ mod tests {
         }
         map.insert("selected_language".into(), serde_json::json!("de"));
         map.insert("app_language".into(), serde_json::json!("de"));
+        // Speech on the processor rather than the default automatic choice.
+        map.insert("whisper_accelerator".into(), serde_json::json!("cpu"));
         map.insert(
             "custom_words".into(),
             serde_json::json!(["Kubernetes", "SpeakoFlow"]),
@@ -7597,8 +7663,152 @@ mod tests {
         let before = used_2_0_1_store();
         let after = serde_json::to_value(launch_with(before.clone())).unwrap();
         let mut lost = Vec::new();
-        kept(&before, &after, "settings", &mut lost);
+        kept(&as_upgraded(before), &after, "settings", &mut lost);
         assert!(lost.is_empty(), "changed by the upgrade: {lost:#?}");
+    }
+
+    /// `before` with the keys an upgrade renames or retires rewritten the way
+    /// the upgrade rewrites them, so `kept` does not read a rename as a lost
+    /// choice. Each rewrite is also checked on its own below.
+    fn as_upgraded(mut before: serde_json::Value) -> serde_json::Value {
+        let map = before.as_object_mut().unwrap();
+        let accelerator = map.remove("whisper_accelerator").unwrap();
+        map.insert("transcribe_accelerator".into(), accelerator);
+        // -1 was automatic selection, which an unset device means now.
+        assert_eq!(
+            map.remove("whisper_gpu_device"),
+            Some(serde_json::json!(-1))
+        );
+        // It chose a device for the ONNX engines, which are gone.
+        assert!(map.remove("ort_accelerator").is_some());
+        // Streaming follows the model now, and the window switch was never
+        // read; see `old_live_transcription_switches_load_and_are_dropped`.
+        for key in LEGACY_LIVE_TRANSCRIPTION_KEYS {
+            assert!(map.remove(key).is_some(), "a 2.0.1 store has {key}");
+        }
+        before
+    }
+
+    const LEGACY_LIVE_TRANSCRIPTION_KEYS: [&str; 2] = [
+        "live_transcription_enabled",
+        "live_transcription_window_enabled",
+    ];
+
+    #[test]
+    fn old_live_transcription_switches_load_and_are_dropped() {
+        for on in [false, true] {
+            let mut stored = used_2_0_1_store();
+            let map = stored.as_object_mut().unwrap();
+            for key in LEGACY_LIVE_TRANSCRIPTION_KEYS {
+                map.insert(key.into(), serde_json::json!(on));
+            }
+            let (normalized, _) = normalize_settings_json(stored.clone());
+            assert!(
+                serde_json::from_value::<AppSettings>(normalized).is_ok(),
+                "a store with the old switches must parse as a whole"
+            );
+            let after = launch_with(stored);
+            let saved = serde_json::to_value(&after).unwrap();
+            for key in LEGACY_LIVE_TRANSCRIPTION_KEYS {
+                assert!(saved.get(key).is_none(), "{key} is still saved");
+            }
+        }
+    }
+
+    #[test]
+    fn a_store_from_before_chunking_and_chinese_script_gets_their_defaults() {
+        let after = launch_with(used_2_0_1_store());
+        assert!(after.long_form_chunking);
+        assert_eq!(after.chinese_script, ChineseScript::Auto);
+        let defaults = get_default_settings();
+        assert!(defaults.long_form_chunking);
+        assert_eq!(defaults.chinese_script, ChineseScript::Auto);
+    }
+
+    #[test]
+    fn the_new_transcription_settings_round_trip() {
+        let mut stored = serde_json::to_value(get_default_settings()).unwrap();
+        stored["chinese_script"] = serde_json::json!("traditional");
+        stored["long_form_chunking"] = serde_json::json!(false);
+        let (settings, _) = deserialize_settings_value(stored.clone());
+        assert_eq!(settings.chinese_script, ChineseScript::Traditional);
+        assert!(!settings.long_form_chunking);
+        assert_eq!(
+            serde_json::to_value(ChineseScript::Simplified).unwrap(),
+            serde_json::json!("simplified")
+        );
+
+        // A value this version does not know falls back to Auto alone.
+        stored["chinese_script"] = serde_json::json!("hanzi");
+        let (settings, _) = deserialize_settings_value(stored);
+        assert_eq!(settings.chinese_script, ChineseScript::Auto);
+        assert!(
+            !settings.long_form_chunking,
+            "the rest of the store is kept"
+        );
+    }
+
+    #[test]
+    fn upgrading_carries_the_speech_device_choice_over() {
+        use TranscribeAcceleratorSetting::{Auto, Cpu};
+        // (whisper_accelerator, whisper_gpu_device) -> transcribe_accelerator.
+        // An index counted whisper.cpp's devices, so it names no transcribe.cpp
+        // device; a GPU request without one is automatic selection.
+        for (old, index, expected) in [
+            ("auto", -1, Auto),
+            ("cpu", -1, Cpu),
+            ("cpu", 1, Cpu),
+            ("gpu", -1, Auto),
+            ("gpu", 0, Auto),
+            ("gpu", 1, Auto),
+        ] {
+            let mut stored = used_2_0_1_store();
+            let map = stored.as_object_mut().unwrap();
+            map.insert("whisper_accelerator".into(), serde_json::json!(old));
+            map.insert("whisper_gpu_device".into(), serde_json::json!(index));
+            map.insert("ort_accelerator".into(), serde_json::json!("directml"));
+
+            let after = launch_with(stored);
+            assert_eq!(after.transcribe_accelerator, expected, "{old} / {index}");
+            assert_eq!(after.transcribe_gpu_device, None, "{old} / {index}");
+            let saved = serde_json::to_value(&after).unwrap();
+            for key in LEGACY_ACCELERATOR_KEYS {
+                assert!(saved.get(key).is_none(), "{key} is still saved");
+            }
+        }
+    }
+
+    #[test]
+    fn a_saved_gpu_choice_is_kept_and_a_gpu_without_one_reads_as_auto() {
+        let key = r#"["vulkan","id","0000:01:00.0"]"#;
+        let mut stored = serde_json::to_value(get_default_settings()).unwrap();
+        stored["transcribe_accelerator"] = serde_json::json!("gpu");
+        stored["transcribe_gpu_device"] = serde_json::json!(key);
+        let (settings, changed) = deserialize_settings_value(stored.clone());
+        assert!(!changed);
+        assert_eq!(
+            settings.transcribe_accelerator,
+            TranscribeAcceleratorSetting::Gpu
+        );
+        assert_eq!(settings.transcribe_gpu_device.as_deref(), Some(key));
+
+        stored["transcribe_gpu_device"] = serde_json::Value::Null;
+        let (settings, changed) = deserialize_settings_value(stored.clone());
+        assert!(changed);
+        assert_eq!(
+            settings.transcribe_accelerator,
+            TranscribeAcceleratorSetting::Auto
+        );
+
+        // An index where a key belongs (never written, but a hand edit can)
+        // is dropped instead of failing the whole object.
+        stored["transcribe_gpu_device"] = serde_json::json!(2);
+        let (settings, _) = deserialize_settings_value(stored);
+        assert_eq!(settings.transcribe_gpu_device, None);
+        assert_eq!(
+            settings.transcribe_accelerator,
+            TranscribeAcceleratorSetting::Auto
+        );
     }
 
     #[test]
