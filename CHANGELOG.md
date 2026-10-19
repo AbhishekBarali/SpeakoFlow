@@ -104,6 +104,40 @@ still get the correction pass afterwards.
 - **Removing a filler at the start of a sentence lowercased the next word.**
   "Um, so I think" came out as "so I think".
 - **Linux: memory grew with every dictation.**
+- **Switching models or Speech processing during a dictation broke it.** The
+  dictation lost its live text and then failed with "Model is not loaded". The
+  switch now waits until the recording ends. The same goes for a model set to
+  unload immediately after another transcription.
+- **Live text could stop partway through a dictation** that started right
+  after another one was cancelled, and the recording was then transcribed a
+  second time from the start.
+- **Esc pressed just after letting go of the keys** still transcribed the
+  whole recording before dismissing it.
+- **AI cleanup never ran again for some reasoning models** (LM Studio without
+  its reasoning parser, older Ollama) once one answer was cut off while the
+  model was still thinking.
+- **A call opened from History or Meetings with an old ONNX model selected**
+  failed on every turn with "Model is not loaded". It now says the model needs
+  its new version.
+- **"Loading model…" could stay on the pill**, and a "Transcribing…" pill could
+  stay up until the next dictation.
+- **Windows: auto-submit came a second late** on computers with a clipboard
+  manager, remote desktop or VM client, and pasting after copying a large
+  Office selection could stall.
+- **An ask started right after a dictation** could send that dictation's
+  Enter while the ask keys were held (Ctrl+Enter), or on macOS leave the
+  dictation on the clipboard in place of yours.
+- **Quitting right after a dictation** could leave the dictation on the
+  clipboard instead of what you had copied.
+- **A spoken reply could stop with an error** when a sentence held only an
+  ElevenLabs audio tag such as `[laughs]`.
+- **The tray's model menu listed models that cannot be used**: retired ONNX
+  models and the assistant's, cleanup's and voice models.
+- **Removing "Um," before a name like iPhone** capitalised it to "IPhone".
+- **A processor without FMA3** crashed its first speech worker every session
+  before falling back to the processor.
+- **macOS: `pkill -USR2 -n speakoflow` did nothing** while a speech model was
+  loaded, because it reached the speech worker instead of the app.
 - **The main window had no title** in the taskbar preview, Alt+Tab, Task
   Manager and screen readers.
 
