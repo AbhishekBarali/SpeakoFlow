@@ -825,10 +825,23 @@ impl TranscriptionManager {
             },
         );
 
-        let model_info = self
-            .model_manager
-            .get_model_info(model_id)
-            .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+        // Every failure below must end in `loading_failed`: the overlay (and the
+        // Models page) treat `loading_started` as "a load is open" until one of
+        // the two ending events arrives, so an early return that skipped it left
+        // "Loading model…" latched for the next dictation.
+        let Some(model_info) = self.model_manager.get_model_info(model_id) else {
+            let error_msg = format!("Model not found: {}", model_id);
+            let _ = self.app_handle.emit(
+                "model-state-changed",
+                ModelStateEvent {
+                    event_type: "loading_failed".to_string(),
+                    model_id: Some(model_id.to_string()),
+                    model_name: None,
+                    error: Some(error_msg.clone()),
+                },
+            );
+            return Err(anyhow::anyhow!(error_msg));
+        };
 
         // A model of a retired engine stays on disk but is never loaded; say
         // what to do instead of failing on a file the app cannot run. Checked
@@ -865,8 +878,6 @@ impl TranscriptionManager {
             return Err(anyhow::anyhow!(error_msg));
         }
 
-        let model_path = self.model_manager.get_model_path(model_id)?;
-
         let emit_loading_failed = |error_msg: &str| {
             let _ = self.app_handle.emit(
                 "model-state-changed",
@@ -877,6 +888,14 @@ impl TranscriptionManager {
                     error: Some(error_msg.to_string()),
                 },
             );
+        };
+
+        let model_path = match self.model_manager.get_model_path(model_id) {
+            Ok(path) => path,
+            Err(e) => {
+                emit_loading_failed(&e.to_string());
+                return Err(e);
+            }
         };
 
         let loaded = match model_info.engine_type {

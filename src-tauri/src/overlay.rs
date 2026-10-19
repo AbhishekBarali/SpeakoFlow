@@ -121,6 +121,17 @@ static SHOWN: Mutex<Shown> = Mutex::new(Shown {
     cleanup_next: false,
 });
 
+/// The dictation's text is ready (sealed or finished): no load that starts or
+/// ends from here on may redraw the pill. Without this, a load watcher that
+/// saw its load end in the moment between the finish and the pill's delayed
+/// hide put "Transcribing…" back up under a fresh epoch, so the hide (keyed on
+/// the old one) was skipped and the pill stayed until the next dictation.
+fn mark_shown_finished() {
+    if let Ok(mut shown) = SHOWN.lock() {
+        shown.state.clear();
+    }
+}
+
 /// A `model-state-changed` "loading_started" has been seen without its
 /// "loading_completed" / "loading_failed". The transcription manager's own
 /// flag is the primary signal, but it is set and cleared a moment apart from
@@ -462,6 +473,7 @@ pub fn seal_working_overlay(app: &AppHandle) {
     if WORKING_EPOCH.load(Ordering::SeqCst) != epoch {
         return;
     }
+    mark_shown_finished();
     if let Ok(mut started) = SEAL_STARTED.lock() {
         *started = Some((epoch, Instant::now()));
     }
@@ -1779,6 +1791,7 @@ fn place_overlay_on(
 /// A successful dictation leaves its final (including cleaned-up) text available
 /// to copy. Compact mode keeps its immediate dismissal and original footprint.
 pub fn finish_recording_overlay(app: &AppHandle, text: &str, notice: Option<&str>) {
+    mark_shown_finished();
     if !OVERLAY_STREAMING.load(Ordering::SeqCst) || text.trim().is_empty() {
         if let Some(notice) = notice {
             show_overlay_notice(app, notice);
