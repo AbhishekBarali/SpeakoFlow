@@ -847,8 +847,7 @@
         "label": "Mouse buttons as shortcuts",
         "description": "Use your mouse's middle, Back or Forward button as a shortcut: click a shortcut's keys, then press the button. While it is a shortcut, the button does nothing else.",
         "linux": "On Linux only the middle button works.",
-        "needsEngine": "Needs the SpeakoFlow Keys keyboard implementation.",
-        "reset": "Shortcuts that used a mouse button are back on their default keys."
+        "needsEngine": "Needs the SpeakoFlow Keys keyboard implementation."
       },
       "liveTranscription": {
         "label": "Live transcription",
@@ -3271,6 +3270,11 @@
     "undo": "Undo",
     "addAnother": "Add another",
     "addAnotherHint": "Give this shortcut a second set of keys, such as a mouse button",
+    "addButtonOrKeys": "Add mouse button or keys",
+    "addButtonOrKeysHint": "Give this shortcut a mouse button, or a second set of keys, next to the keys it has",
+    "mouseAddedAsOther": "{{button}} now also works for {{name}}. {{keys}} still works too.",
+    "mouseNeedsOtherSlot": "{{name}} already has other keys ({{keys}}). Click them to put a mouse button there instead.",
+    "mouseNeedsOwnKeys": "Give {{name}} keys first. A mouse button is added next to them.",
     "remove": "Remove",
     "or": "or",
     "changeOther": "Change the other keys for the {{name}} shortcut",

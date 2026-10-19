@@ -841,8 +841,7 @@
         "label": "将鼠标按钮用作快捷键",
         "description": "将鼠标中键、后退键或前进键用作快捷键：点击快捷键的按键，然后按下该鼠标按钮。作为快捷键期间，该按钮不再执行其他操作。",
         "linux": "在 Linux 上只有鼠标中键可用。",
-        "needsEngine": "需要使用 SpeakoFlow Keys 键盘实现。",
-        "reset": "使用鼠标按钮的快捷键已恢复为默认按键。"
+        "needsEngine": "需要使用 SpeakoFlow Keys 键盘实现。"
       },
       "liveTranscription": {
         "label": "实时转录",
@@ -3242,6 +3241,11 @@
     "undo": "撤销",
     "addAnother": "添加另一组",
     "addAnotherHint": "为这个快捷键再设一组按键，例如鼠标按钮",
+    "addButtonOrKeys": "添加鼠标按钮或按键",
+    "addButtonOrKeysHint": "在现有按键之外，为这个快捷键再设一个鼠标按钮或一组按键",
+    "mouseAddedAsOther": "{{button}} 现在也可用于{{name}}。{{keys}} 仍然有效。",
+    "mouseNeedsOtherSlot": "{{name}}已有另一组按键（{{keys}}）。点击它们即可改成鼠标按钮。",
+    "mouseNeedsOwnKeys": "请先为{{name}}设置按键。鼠标按钮会添加在它们旁边。",
     "remove": "移除",
     "or": "或",
     "changeOther": "更改“{{name}}”快捷键的另一组按键",

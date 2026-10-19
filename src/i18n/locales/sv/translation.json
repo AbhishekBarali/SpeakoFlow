@@ -847,8 +847,7 @@
         "label": "Musknappar som kortkommandon",
         "description": "Använd musens mittenknapp, Bakåt eller Framåt som kortkommando: klicka på kortkommandots tangenter och tryck sedan på knappen. Så länge den är ett kortkommando gör knappen inget annat.",
         "linux": "På Linux fungerar bara mittenknappen.",
-        "needsEngine": "Kräver tangentbordsimplementeringen SpeakoFlow Keys.",
-        "reset": "Kortkommandon som använde en musknapp har fått tillbaka sina standardtangenter."
+        "needsEngine": "Kräver tangentbordsimplementeringen SpeakoFlow Keys."
       },
       "liveTranscription": {
         "label": "Live-transkribering",
@@ -3271,6 +3270,11 @@
     "undo": "Ångra",
     "addAnother": "Lägg till fler",
     "addAnotherHint": "Ge kortkommandot en andra uppsättning tangenter, till exempel en musknapp",
+    "addButtonOrKeys": "Lägg till musknapp eller tangenter",
+    "addButtonOrKeysHint": "Ge kortkommandot en musknapp eller en andra uppsättning tangenter, utöver de tangenter det har",
+    "mouseAddedAsOther": "{{button}} fungerar nu också för {{name}}. {{keys}} fungerar fortfarande.",
+    "mouseNeedsOtherSlot": "{{name}} har redan andra tangenter ({{keys}}). Klicka på dem för att lägga en musknapp där i stället.",
+    "mouseNeedsOwnKeys": "Ge {{name}} tangenter först. En musknapp läggs till bredvid dem.",
     "remove": "Ta bort",
     "or": "eller",
     "changeOther": "Ändra de andra tangenterna för {{name}}",
