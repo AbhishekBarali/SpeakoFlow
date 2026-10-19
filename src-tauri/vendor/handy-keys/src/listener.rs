@@ -7,8 +7,9 @@
 //!
 //! - **macOS**: Uses CGEventTap. Requires accessibility permissions.
 //! - **Windows**: Uses low-level keyboard hooks. Clean thread shutdown.
-//! - **Linux**: Uses rdev. On Wayland, blocking may not work due to
-//!   compositor restrictions. Thread cleanup is limited.
+//! - **Linux**: Reads the input devices through evdev (`/dev/input`, the
+//!   `input` group) and takes keyboards over to withhold a hotkey's key
+//!   (`/dev/uinput`). See `platform/linux/engine.rs`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -161,9 +162,13 @@ impl Drop for KeyboardListener {
         #[cfg(target_os = "macos")]
         self.run_loop.stop();
 
+        // Linux: the evdev engine belongs to the process, not to a listener.
+        // Waking it lets it see whether any listener is left, and hand every
+        // keyboard back if none is.
+        #[cfg(target_os = "linux")]
+        crate::platform::linux::listener::wake();
+
         // On macOS and Windows, we can join the thread for clean shutdown.
-        // On Linux (rdev), the thread continues running but becomes idle
-        // because rdev::grab() blocks indefinitely.
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         if let Some(handle) = self._thread_handle.take() {
             let _ = handle.join();
