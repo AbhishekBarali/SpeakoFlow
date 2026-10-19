@@ -66,6 +66,58 @@ fn write_transient_clipboard_text(app_handle: &AppHandle, text: &str) -> Result<
     write_clipboard_text(app_handle, text)
 }
 
+/// [`write_transient_clipboard_text`] with a rendered HTML copy beside the text.
+///
+/// An assistant answer is Markdown. Pasted as text alone, a rich editor (Word,
+/// Outlook, Gmail, Google Docs, Teams) showed its `**` and `1.` as literal
+/// characters. With both on the clipboard, each app takes the flavour it
+/// understands: rich editors the HTML, and Notepad, terminals, code editors and
+/// Markdown-aware fields (GitHub, Slack, Discord) the Markdown text. Text is
+/// always written, so nothing that pasted correctly before pastes worse.
+///
+/// Wayland with `wl-copy` keeps the text-only write: `wl-copy` offers one MIME
+/// type per call, and it is the path that gets non-ASCII text right there.
+fn write_transient_clipboard_html(
+    app_handle: &AppHandle,
+    html: &str,
+    text: &str,
+) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if is_wayland() && is_wl_copy_available() {
+        return write_transient_clipboard_text(app_handle, text);
+    }
+
+    #[cfg(target_os = "windows")]
+    match write_html_excluded_from_history(html, text) {
+        Ok(()) => return Ok(()),
+        Err(e) => debug!("History-excluded HTML clipboard write failed, retrying plainly: {e}"),
+    }
+
+    match app_handle.clipboard().write_html(html, Some(text)) {
+        Ok(()) => Ok(()),
+        // HTML is an improvement, never a requirement: fall back to the text
+        // every earlier version pasted.
+        Err(e) => {
+            debug!("HTML clipboard write failed, pasting text only: {e}");
+            write_transient_clipboard_text(app_handle, text)
+        }
+    }
+}
+
+/// `HTML Format` plus `CF_UNICODETEXT`, kept out of Win+V history and cloud
+/// sync. arboard wraps the fragment in the CF_HTML header (byte offsets of the
+/// fragment) that Word and browsers parse, and applies the opt-outs to the
+/// whole write, not only the text.
+#[cfg(target_os = "windows")]
+fn write_html_excluded_from_history(html: &str, text: &str) -> Result<(), arboard::Error> {
+    use arboard::SetExtWindows;
+    arboard::Clipboard::new()?
+        .set()
+        .exclude_from_history()
+        .exclude_from_cloud()
+        .html(html, Some(text))
+}
+
 /// A monotonic counter that changes whenever the clipboard's contents change.
 ///
 /// This is what makes harvesting a text selection safe. A synthetic Ctrl+C that
@@ -132,6 +184,7 @@ pub fn restore_clipboard(app_handle: &AppHandle, snapshot: &ClipboardSnapshot) {
 fn paste_via_clipboard(
     enigo: &mut Enigo,
     text: &str,
+    html: Option<&str>,
     app_handle: &AppHandle,
     paste_method: &PasteMethod,
     paste_delay_ms: u64,
@@ -150,7 +203,10 @@ fn paste_via_clipboard(
     };
 
     // Write text to clipboard first
-    write_transient_clipboard_text(app_handle, text)?;
+    match html {
+        Some(html) => write_transient_clipboard_html(app_handle, html, text)?,
+        None => write_transient_clipboard_text(app_handle, text)?,
+    }
 
     std::thread::sleep(Duration::from_millis(paste_delay_ms));
 
@@ -886,6 +942,20 @@ pub fn paste_with_behavior(
     app_handle: AppHandle,
     behavior: PasteBehavior,
 ) -> Result<(), String> {
+    paste_rich_with_behavior(text, None, app_handle, behavior)
+}
+
+/// [`paste_with_behavior`] that also offers `html` to the target, for an
+/// assistant answer whose Markdown a rich editor should show as formatting.
+///
+/// The HTML only travels on the clipboard paste methods. Direct typing and an
+/// external script receive `text`, as they always have.
+pub fn paste_rich_with_behavior(
+    text: String,
+    html: Option<&str>,
+    app_handle: AppHandle,
+    behavior: PasteBehavior,
+) -> Result<(), String> {
     let settings = get_settings(&app_handle);
     let paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;
@@ -992,6 +1062,7 @@ pub fn paste_with_behavior(
             paste_via_clipboard(
                 &mut enigo,
                 &text,
+                html,
                 &app_handle,
                 &paste_method,
                 paste_delay_ms,
@@ -1100,5 +1171,31 @@ mod tests {
             dotool_script("a\r\n\r\nb\n"),
             "type a\nkey enter\nkey enter\ntype b\nkey enter\n"
         );
+    }
+
+    /// An inserted answer reaches a rich editor as HTML and everything else as
+    /// its Markdown, with the history opt-out still applied. Ignored because it
+    /// replaces the real clipboard: `cargo test --lib rich_insert -- --ignored`.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn rich_insert_puts_html_and_markdown_on_the_clipboard() {
+        let markdown = "1. Open **Settings → Advanced**.";
+        let html = "<ol>\n<li>Open <strong>Settings → Advanced</strong>.</li>\n</ol>";
+        write_html_excluded_from_history(html, markdown).expect("write");
+
+        let mut clipboard = arboard::Clipboard::new().expect("open");
+        assert_eq!(clipboard.get_text().expect("text"), markdown);
+        let cf_html = clipboard.get().html().expect("html");
+        assert!(cf_html.contains("<strong>Settings → Advanced</strong>"));
+
+        // The opt-out formats ride along with the HTML write too.
+        use windows::core::w;
+        use windows::Win32::System::DataExchange::{
+            IsClipboardFormatAvailable, RegisterClipboardFormatW,
+        };
+        let history = unsafe { RegisterClipboardFormatW(w!("CanIncludeInClipboardHistory")) };
+        assert_ne!(history, 0);
+        assert!(unsafe { IsClipboardFormatAvailable(history) }.is_ok());
     }
 }
