@@ -40,8 +40,8 @@ Individually picked files can be removed one at a time.
 
 SpeakoFlow classifies by content, not by filename.
 
-- **`.gguf` files.** The `general.architecture` value is read from the GGUF header. An architecture in the known speech list (whisper, parakeet, canary, moonshine, cohere, voxtral, sensevoice, gigaam, granite speech, and others) is classified as speech-to-text. A `clip` or `mmproj` architecture is a vision projector. Anything else is treated as a chat model (assistant or cleanup).
-- **`.bin` files.** Validated against the ggml magic bytes. If they match, the file is treated as a Whisper model.
+- **`.gguf` files.** The `general.architecture` value is read from the GGUF header. An architecture in the known speech list (whisper, parakeet, canary, moonshine, cohere, voxtral, qwen3_asr, sensevoice, gigaam, granite_speech, funasr_nano, medasr, moss, and others) is classified as speech-to-text. A `clip` or `mmproj` architecture is a vision projector. Anything else is treated as a chat model (assistant or cleanup).
+- **`.bin` files.** Validated against the ggml magic bytes. If they match, the file is treated as a Whisper model. It loads through transcribe.cpp, the same engine as every `.gguf` speech model, so it gets the same GPU support and the same settings.
 - **Vision projectors.** A projector on its own is rejected when picked as a single file, because it cannot run alone. But if it sits beside a chat model in the same folder, it is paired automatically, and the chat model gains vision.
 
 An unknown architecture in a `.gguf` is far more likely to be a new chat model than a broken file, so it defaults to chat. This means your collection of fine-tuned chat models should just work.

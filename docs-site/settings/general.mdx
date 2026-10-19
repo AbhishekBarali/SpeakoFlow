@@ -145,10 +145,12 @@ Starred recordings are always kept. Changes apply right away, and the UI shows h
 
 ### Performance
 
-| Setting               | Default           | What it does                                                                                                                                                                              |
-| --------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model unload timeout  | `After 5 minutes` | How long idle before the local LLM engine (assistant and cleanup) frees its memory. `Never`, `Immediately`, 2/5/10/15 minutes, or 1 hour. See [Acceleration & GPU](/models/acceleration). |
-| Experimental features | Off               | Reveals the Experimental group below.                                                                                                                                                     |
+| Setting               | Default           | What it does                                                                                                                                                                                                                                          |
+| --------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Speech processing     | `Auto`            | Where local speech models run: `Auto` (your graphics card, the dedicated one if you have two), a specific graphics card, or `Processor (CPU)`. See [Acceleration & GPU](/models/acceleration).                                                        |
+| Unload model          | `After 5 minutes` | How long the speech model can sit idle before it frees its memory. `Never`, `Immediately`, 2/5/10/15 minutes, or 1 hour. The assistant and AI cleanup have their own timeouts on the **Models** page. See [Acceleration & GPU](/models/acceleration). |
+| Split long recordings | On                | Cut dictations longer than 40 seconds at pauses and transcribe them in pieces, for models not built for long audio. See [Live transcription](/dictation/live-transcription#long-recordings-on-other-models).                                          |
+| Experimental features | Off               | Reveals the Experimental group below.                                                                                                                                                                                                                 |
 
 ### Experimental
 
@@ -157,7 +159,6 @@ This group appears only when Experimental features is on.
 | Setting                              | Default                                       | What it does                                                                                   |
 | ------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | Keyboard engine                      | `Tauri` on Linux, `SpeakoFlow Keys` elsewhere | Which backend listens for global shortcuts. See [Troubleshooting](/reference/troubleshooting). |
-| Acceleration                         | `Auto`                                        | Which compute device the speech model runs on. See [Acceleration & GPU](/models/acceleration). |
 | Keep mic open between transcriptions | Off                                           | Leaves the audio stream open after recording. Can improve back-to-back dictation speed.        |
 
 ## About

@@ -10,12 +10,14 @@ All overlay settings live in _Settings → Dictation → Dictation overlay_.
 
 ## Overlay style
 
-| Style          | What you see                                                                        | Streaming         |
-| -------------- | ----------------------------------------------------------------------------------- | ----------------- |
-| Auto (default) | Follows the model: Live when it can stream, Minimal when it cannot.                 | Follows the model |
-| Live           | A readable card showing the running transcript. Interactive: scroll, select, copy.  | On                |
-| Minimal        | A compact pill: a waveform while you speak, a working indicator while it processes. | Off               |
-| None           | No overlay.                                                                         | Off               |
+| Style          | What you see                                                                        |
+| -------------- | ----------------------------------------------------------------------------------- |
+| Auto (default) | Follows the model: Live when it can stream, Minimal when it cannot.                 |
+| Live           | A readable card showing the running transcript. Interactive: scroll, select, copy.  |
+| Minimal        | A compact pill: a waveform while you speak, a working indicator while it processes. |
+| None           | No overlay.                                                                         |
+
+The style only changes what you see. A streaming model streams whichever style you pick, so its text is ready the moment you stop.
 
 A fresh install is on Auto, which is why you get the live card without configuring anything. Auto resolves to a concrete option based on the selected model. Picking any option writes that choice and overrides Auto.
 
@@ -55,12 +57,13 @@ When a conversation is active, the recording overlay rises above the conversatio
 | --------------------------- | ------------------------------------------------ |
 | "Getting mic ready..."      | Recording started but no audio has arrived yet.  |
 | Waveform                    | Recording.                                       |
+| "Loading model..."          | Recording stopped, the speech model is loading.  |
 | "Transcribing..."           | Recording stopped, the model is running.         |
 | "Cleaning up..."            | AI cleanup is running.                           |
 | "Writing with Flow..."      | A Generate with Flow command is being generated. |
 | "Looking at your screen..." | A screen capture is being taken for Flow.        |
 
-A short notice appears when something did not work, for example "Flow needs an assistant model, pasted as dictation." It auto-hides after a moment.
+A short notice appears when something did not work, for example "Flow needs an assistant model, pasted as dictation." It auto-hides after a moment. If your speech model ran on the engine SpeakoFlow no longer includes, a voice shortcut shows "_model_ needs an update" instead of recording, and the Models page opens on its new version. See [Models from an earlier version](/models/transcription-models#models-from-an-earlier-version).
 
 <AccordionGroup>
   <Accordion title="Cancelling from the overlay">

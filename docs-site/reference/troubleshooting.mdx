@@ -1,6 +1,6 @@
 ---
 title: "Troubleshooting"
-description: "Fixes for common SpeakoFlow problems: macOS damaged-app message, stale permissions, the globe key, Windows SmartScreen, Linux overlay and hotkey issues, Whisper CPU requirements, model downloads, and more."
+description: "Fixes for common SpeakoFlow problems: macOS damaged-app message, stale permissions, the globe key, Windows SmartScreen, Linux overlay and hotkey issues, speech models that need an update, graphics driver problems, model downloads, and more."
 icon: "life-ring"
 ---
 
@@ -55,14 +55,26 @@ Find your symptom and open it.
   happens once per version.
 </Accordion>
 
-  <Accordion title="Whisper refuses to run or crashes on startup" icon="microchip">
-    The Whisper engine in SpeakoFlow requires a CPU with AVX2, FMA, F16C, and
-    BMI2 support. Most CPUs made after 2013 have these. If your CPU does not,
-    SpeakoFlow shows a message instead of crashing.
+  <Accordion title="Dictation crashes or the graphics card misbehaves" icon="microchip">
+    Speech models run on your graphics card by default, in a process of their
+    own. If a graphics driver crashes it, SpeakoFlow stays open, finishes the
+    dictation on the processor, and keeps speech there until you restart the
+    app or change **Speech processing**. If dictations are slow or the text is
+    garbled, open _Settings → Advanced → Performance_ and set **Speech
+    processing** to **Processor (CPU)**. It is slower, but works on every
+    computer. See [GPU acceleration](/models/acceleration).
 
-    Use a non-Whisper model instead: Parakeet, Canary, or any ONNX-based model
-    in the catalog works on any CPU. You can also use
-    [cloud transcription](/dictation/cloud-transcription).
+    You can also use [cloud transcription](/dictation/cloud-transcription).
+
+  </Accordion>
+
+  <Accordion title="My speech model says it needs an update" icon="rotate">
+    The ONNX versions of Parakeet V2 and V3, Canary, Moonshine, SenseVoice,
+    GigaAM, and Cohere ran on an engine SpeakoFlow no longer includes. If one
+    of them is your speech model, open the **Models** page and choose
+    **Download new version**: you get the same model for the current engine,
+    and it becomes your speech model when the download finishes. See
+    [Models from an earlier version](/models/transcription-models#models-from-an-earlier-version).
 
   </Accordion>
 
