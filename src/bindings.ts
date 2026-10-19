@@ -2068,10 +2068,15 @@ async listAssistantDisplays() : Promise<Result<DisplayChoice[], string>> {
  * Paste behaviour matches Flow's rather than dictation's: no trailing space and
  * no auto-submit, because this is a finished artifact being placed, not speech
  * being typed.
+ * 
+ * `text` is the answer's Markdown. `html` is the same answer rendered, sent by
+ * the panel only when the Markdown has formatting in it; it goes on the
+ * clipboard beside the text so a rich editor pastes bold and lists instead of
+ * `**` and `1.` (see `clipboard::write_transient_clipboard_html`).
  */
-async assistantInsertText(text: string) : Promise<Result<null, string>> {
+async assistantInsertText(text: string, html: string | null) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("assistant_insert_text", { text }) };
+    return { status: "ok", data: await TAURI_INVOKE("assistant_insert_text", { text, html }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

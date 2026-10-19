@@ -315,9 +315,19 @@ pub fn hide_assistant_panel(app: AppHandle) -> Result<(), String> {
 /// Paste behaviour matches Flow's rather than dictation's: no trailing space and
 /// no auto-submit, because this is a finished artifact being placed, not speech
 /// being typed.
+///
+/// `text` is the answer's Markdown. `html` is the same answer rendered, sent by
+/// the panel only when the Markdown has formatting in it; it goes on the
+/// clipboard beside the text so a rich editor pastes bold and lists instead of
+/// `**` and `1.` (see `clipboard::write_transient_clipboard_html`).
 #[tauri::command]
 #[specta::specta]
-pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String> {
+pub fn assistant_insert_text(
+    app: AppHandle,
+    text: String,
+    html: Option<String>,
+) -> Result<(), String> {
+    let html = html.filter(|html| !html.trim().is_empty());
     let text = text.trim().to_string();
     if text.is_empty() {
         return Err("There is nothing to insert".to_string());
@@ -365,8 +375,9 @@ pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String>
         queued
     };
 
-    let result = crate::clipboard::paste_with_behavior(
+    let result = crate::clipboard::paste_rich_with_behavior(
         text,
+        html.as_deref(),
         app.clone(),
         crate::clipboard::PasteBehavior {
             allow_trailing_space: false,

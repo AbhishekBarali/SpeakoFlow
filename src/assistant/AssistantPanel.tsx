@@ -31,6 +31,7 @@ import { syncLanguageFromSettings } from "@/i18n";
 import { FONT_SIZES, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
 import { localTtsActive } from "./localTts";
+import { answerHtml, copyAnswer, loadAnswerRenderer } from "./richAnswer";
 import { parseKokoroDevice, useLocalVoiceStatus } from "./localVoice";
 import { usePanelHitRegion, useSuppressContextMenu } from "./hitRegion";
 import { useVoiceConversation } from "./useVoiceConversation";
@@ -202,7 +203,7 @@ const CopyButton: React.FC<{ content: string; title: string }> = ({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
+    await copyAnswer(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };
@@ -223,7 +224,10 @@ const InsertButton: React.FC<{ content: string; title: string }> = ({
   const [inserted, setInserted] = useState(false);
 
   const handleInsert = async () => {
-    const result = await commands.assistantInsertText(content);
+    const result = await commands.assistantInsertText(
+      content,
+      await answerHtml(content),
+    );
     if (result.status === "ok") {
       setInserted(true);
       setTimeout(() => setInserted(false), 1200);
@@ -1321,6 +1325,11 @@ const AssistantPanel: React.FC = () => {
    */
   usePanelHitRegion(panelVisible);
   useSuppressContextMenu();
+  // Copy and Insert render Markdown to HTML; load that renderer while idle so
+  // a click never waits for it.
+  useEffect(() => {
+    void loadAnswerRenderer();
+  }, []);
 
   const shellClass = `assistant-scope assistant-shell${
     panelVisible && !callEnded ? "" : " native-window-hidden"
@@ -1554,7 +1563,10 @@ const AssistantPanel: React.FC = () => {
             // as a stale frame.
             setPanelVisible(false);
             await new Promise((done) => window.setTimeout(done, 50));
-            const result = await commands.assistantInsertText(text);
+            const result = await commands.assistantInsertText(
+              text,
+              await answerHtml(text),
+            );
             return result.status === "ok";
           }}
           stopDrag={stopDrag}
