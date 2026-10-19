@@ -4140,7 +4140,16 @@ impl ShortcutAction for AssistantAction {
 
             // Whether to look at the screen is the model's call, inside the
             // turn (`capture_screen`), so nothing is decided here.
-            match tm.transcribe(samples) {
+            //
+            // Off the async worker: a local transcription now waits on the
+            // transcription worker process, which can mean a model load (up to
+            // `LOAD_TIMEOUT`) or a crash-and-retry on the CPU, and holding a
+            // Tokio worker for that long starves every other async task (the
+            // call path does the same, in `voice_conversation`).
+            let transcribed = tauri::async_runtime::spawn_blocking(move || tm.transcribe(samples))
+                .await
+                .unwrap_or_else(|e| Err(anyhow::anyhow!("Transcription task panicked: {e}")));
+            match transcribed {
                 Ok(transcription) => {
                     change_tray_icon(&ah, TrayIconState::Idle);
                     // Shared with the STT overlay's Ask-Assistant redirect.
