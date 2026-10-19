@@ -521,6 +521,12 @@ impl HotkeyManager {
             if let Ok(mut blocking) = blocking_hotkeys.lock() {
                 blocking.insert(hotkey);
             }
+            // The Linux engine takes a mouse over only while one of its
+            // buttons is a shortcut; let it look again.
+            #[cfg(target_os = "linux")]
+            if hotkey.key.is_some_and(Key::is_mouse_button) {
+                crate::platform::linux::listener::wake();
+            }
         }
 
         Ok(id)
@@ -543,6 +549,10 @@ impl HotkeyManager {
             if let Some(hotkey) = hotkey {
                 if let Ok(mut blocking) = blocking_hotkeys.lock() {
                     blocking.remove(&hotkey);
+                }
+                #[cfg(target_os = "linux")]
+                if hotkey.key.is_some_and(Key::is_mouse_button) {
+                    crate::platform::linux::listener::wake();
                 }
             }
         }

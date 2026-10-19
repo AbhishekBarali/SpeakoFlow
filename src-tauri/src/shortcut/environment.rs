@@ -10,11 +10,10 @@
 //!   while an X11 window is in front and nothing otherwise. GNOME, KDE Plasma,
 //!   Hyprland, Sway and COSMIC all run Wayland by default.
 //! * **SpeakoFlow keys** (handy-keys) read the keyboard devices directly, which
-//!   works on any desktop, but `rdev`'s grab opens every `/dev/input/event*`
-//!   (normally `root:input 0660`), clones each through `/dev/uinput` (normally
-//!   `root:root 0600`, so the `input` group alone is not enough) and needs an
-//!   X display for key names. When any of that is missing the listener thread
-//!   gave up with one line on stderr, which no log file captured.
+//!   works on any desktop, but reading them needs `/dev/input/event*`
+//!   (normally `root:input 0660`), and withholding a hotkey's key from the
+//!   focused app needs a mirror of each keyboard through `/dev/uinput`
+//!   (normally `root:root 0600`, so the `input` group alone is not enough).
 //!
 //! What always works is a shortcut the desktop itself owns, set to run
 //! `speakoflow --toggle-transcription` and friends. [`shortcut_environment`]
@@ -61,8 +60,6 @@ pub enum KeyboardAccessGap {
     InputDevices,
     /// `/dev/uinput` cannot be opened for writing.
     Uinput,
-    /// No X display (`DISPLAY`), which `rdev` needs for key names.
-    Display,
 }
 
 /// One action and the command a desktop shortcut runs to trigger it.
@@ -192,7 +189,7 @@ pub fn program_name(appimage: Option<&str>, current_exe: Option<&str>) -> String
 /// The terminal command that grants what is missing. The input group gives
 /// read access to the keyboards; a udev rule makes `/dev/uinput` writable by
 /// that group, which no distribution does by default. Both need a fresh login
-/// to apply to the running session. A missing display has no command.
+/// to apply to the running session.
 pub fn access_command_for(missing: &[KeyboardAccessGap]) -> String {
     let mut steps: Vec<&str> = Vec::new();
     if missing.contains(&KeyboardAccessGap::InputDevices)
@@ -217,8 +214,9 @@ pub fn keyboard_access_gaps() -> Vec<KeyboardAccessGap> {
     use std::os::unix::fs::FileTypeExt;
 
     let mut missing = Vec::new();
-    // The same set `rdev` opens: every character device in /dev/input except
-    // the legacy mouse nodes it skips. One it cannot open fails the whole grab.
+    // Every event node, which is what the engine reads (`mice`, `mouse*` and
+    // `js*` are legacy interfaces it never opens). One it cannot open is a
+    // device whose keys never reach a shortcut.
     let devices: Vec<std::path::PathBuf> = std::fs::read_dir("/dev/input")
         .map(|entries| {
             entries
@@ -245,9 +243,6 @@ pub fn keyboard_access_gaps() -> Vec<KeyboardAccessGap> {
         .is_err()
     {
         missing.push(KeyboardAccessGap::Uinput);
-    }
-    if std::env::var_os("DISPLAY").is_none_or(|d| d.is_empty()) {
-        missing.push(KeyboardAccessGap::Display);
     }
     missing
 }
@@ -419,6 +414,5 @@ mod tests {
             access_command_for(&[KeyboardAccessGap::InputDevices, KeyboardAccessGap::Uinput]);
         assert!(both.starts_with("sudo usermod -aG input \"$USER\" && echo 'KERNEL==\"uinput\""));
         assert!(both.ends_with("sudo udevadm trigger /dev/uinput"));
-        assert_eq!(access_command_for(&[KeyboardAccessGap::Display]), "");
     }
 }

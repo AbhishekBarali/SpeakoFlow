@@ -320,11 +320,11 @@ macOS 没有为应用提供直接录制电脑播放声音的方式。Windows 有
 </details>
 
 <details>
-<summary><b>Linux：快捷键没有反应，日志反复出现“Permission denied”</b></summary>
+<summary><b>Linux：快捷键没有反应，日志中出现“permission denied”</b></summary>
 
 <br />
 
-如果日志中满是 `rdev grab error: ... PermissionDenied`，说明应用无法读取你的输入设备。这只影响 **SpeakoFlow Keys** 键盘引擎：它要读取 `/dev/input/event*`（需要你的用户在 `input` 组中），还要通过 `/dev/uinput` 重新发送按键（在包括 Ubuntu 在内的许多发行版上默认只有 root 可写，所以只加入该组还不够）。Linux 上默认使用的是 Tauri 引擎，所以只有手动切换过引擎才会遇到这个问题。主页的“快捷键”卡片会提示这种情况，并给出要运行的命令。
+如果日志中出现 `handy-keys: permission denied reading /dev/input`，说明应用无法读取你的输入设备。这只影响 **SpeakoFlow Keys** 键盘引擎：它要读取 `/dev/input/event*`（需要你的用户在 `input` 组中），还要通过 `/dev/uinput` 重新发送按键（在包括 Ubuntu 在内的许多发行版上默认只有 root 可写，所以只加入该组还不够）。Linux 上默认使用的是 Tauri 引擎，所以只有手动切换过引擎才会遇到这个问题。主页的“快捷键”卡片会提示这种情况，并给出要运行的命令。
 
 - 授予这两项权限，然后注销并重新登录：
   ```bash

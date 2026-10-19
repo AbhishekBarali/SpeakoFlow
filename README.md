@@ -456,12 +456,12 @@ are.
 </details>
 
 <details>
-<summary><b>Linux: shortcuts do nothing and the log repeats "Permission denied"</b></summary>
+<summary><b>Linux: shortcuts do nothing and the log says "permission denied"</b></summary>
 
 <br />
 
-A log full of `rdev grab error: ... PermissionDenied` means the app can't read
-your input devices. This only affects the **SpeakoFlow Keys** keyboard engine,
+A log line `handy-keys: permission denied reading /dev/input` means the app
+can't read your input devices. This only affects the **SpeakoFlow Keys** keyboard engine,
 which reads `/dev/input/event*` (needs your user in the `input` group) and
 re-sends keys through `/dev/uinput` (root-only by default on many
 distributions, Ubuntu included, so the group alone is not enough). Tauri is the default engine on Linux, so you'd only
