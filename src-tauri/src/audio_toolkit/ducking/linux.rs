@@ -27,8 +27,7 @@ const PA_VOLUME_NORM: f32 = 65536.0;
 enum Tool {
     /// A PulseAudio sink name.
     Pactl(String),
-    /// A PipeWire node id, or `@DEFAULT_AUDIO_SINK@` if it could not be
-    /// resolved.
+    /// A PipeWire node id.
     Wpctl(String),
     /// The default card's `Master` control.
     Amixer,
@@ -44,11 +43,12 @@ pub(super) fn default_output() -> Option<Box<dyn OutputVolume>> {
                 .filter(|name| !name.is_empty())
                 .map(Tool::Pactl)
         },
+        // Only with a resolved node: `@DEFAULT_AUDIO_SINK@` would follow a
+        // new default and restore a device that was never lowered.
         || {
-            let node = run("wpctl", &["inspect", "@DEFAULT_AUDIO_SINK@"])
+            run("wpctl", &["inspect", "@DEFAULT_AUDIO_SINK@"])
                 .and_then(|out| parse_wpctl_node_id(&out))
-                .unwrap_or_else(|| "@DEFAULT_AUDIO_SINK@".to_string());
-            Some(Tool::Wpctl(node))
+                .map(Tool::Wpctl)
         },
         || Some(Tool::Amixer),
     ];
