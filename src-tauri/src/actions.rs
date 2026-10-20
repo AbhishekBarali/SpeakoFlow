@@ -2799,7 +2799,7 @@ impl ShortcutAction for TranscribeAction {
                     policy::vad_tail(expected),
                 )
             };
-            tm.start_stream(mode);
+            tm.start_stream(mode, cloud_stt);
             tail
         };
 

@@ -70,12 +70,14 @@ pub fn take_cloud_fallback() -> bool {
 /// NOT a tauri-specta typed Event, so bindings.ts doesn't need regenerating.
 #[derive(Clone, Debug, Serialize)]
 struct StreamTextPayload {
-    /// The append-only, flicker-free committed prefix: `StreamText::committed`,
-    /// the stable prefix the commit policy has locked in. Cloud streaming maps
-    /// its committed segments onto the same field.
+    /// The flicker-free committed prefix: `StreamText::committed`, the stable
+    /// prefix the commit policy has locked in, unless the model has since
+    /// rewritten part of it (see [`live_split`]). Cloud streaming maps its
+    /// committed segments onto the same field.
     committed: String,
-    /// The volatile, not-yet-committed tail (`StreamText::tentative`). Empty for
-    /// cache-aware streaming models (e.g. Parakeet) that only ever commit.
+    /// The volatile, not-yet-committed tail, so that the two read as the
+    /// model's current hypothesis. Empty for cache-aware streaming models (e.g.
+    /// Parakeet) that only ever commit.
     tentative: String,
 }
 
@@ -92,7 +94,8 @@ struct LiveDisplay {
 impl LiveDisplay {
     /// The overlay's committed and tentative text for one stream snapshot.
     fn show(&mut self, text: &transcribe_cpp::StreamText) -> (String, String) {
-        let (committed, tentative) = self.script.apply(&text.committed, &text.tentative);
+        let (committed, tentative) = live_split(text);
+        let (committed, tentative) = self.script.apply(committed, tentative);
         let committed = correct_live_display(
             &committed,
             &self.hints,
@@ -101,6 +104,33 @@ impl LiveDisplay {
         );
         (committed, tentative)
     }
+}
+
+/// A stream snapshot as committed and tentative text that together read as
+/// the model's current hypothesis, `full`.
+///
+/// transcribe.cpp's own `committed` is append-only and never rolled back, but a
+/// model that re-decodes everything it has heard on every feed (Moonshine
+/// Streaming) rewrites words it already committed. Its `committed` then stops
+/// being a prefix of `full`, and its `tentative` is cut from the new hypothesis
+/// at the old committed length, often mid-word, so the preview read as stale
+/// words followed by a fragment. Where they disagree, the committed words that
+/// still agree are kept, up to the last word boundary, and the rest of `full`
+/// is tentative.
+fn live_split(text: &transcribe_cpp::StreamText) -> (&str, &str) {
+    let full = text.full.as_str();
+    if full.starts_with(text.committed.as_str()) {
+        return full.split_at(text.committed.len());
+    }
+    let agreed = full
+        .char_indices()
+        .zip(text.committed.chars())
+        .find(|((_, a), b)| a != b)
+        .map_or(full.len().min(text.committed.len()), |((i, _), _)| i);
+    let boundary = full[..agreed].rfind(char::is_whitespace).map_or(0, |i| {
+        i + full[i..].chars().next().map_or(0, char::len_utf8)
+    });
+    full.split_at(boundary)
 }
 
 fn lock_display(display: &Mutex<LiveDisplay>) -> std::sync::MutexGuard<'_, LiveDisplay> {
@@ -164,8 +194,8 @@ fn sanitize_pcm(pcm: &mut [f32]) -> usize {
 /// Frames and the terminal Finalize/Cancel share the channel, so every fed
 /// frame is guaranteed to be processed before finalization.
 enum StreamCmd {
-    /// A 16 kHz mono frame: every frame for a stream, the kept speech for
-    /// long-form chunks (see [`FeedKind`]).
+    /// 16 kHz mono audio: every frame for a cloud stream, the kept speech for
+    /// a local stream or long-form chunks (see [`FeedKind`]).
     Feed(Vec<f32>),
     /// Flush the tail, merge, and reply with the full transcript (or `None` to
     /// send the caller to the batch path). `recorded_samples` is the length of
@@ -188,12 +218,29 @@ struct LiveResult {
 /// Which of the recorder's two feeds a live session takes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FeedKind {
-    /// Every frame, silence included: a stream decides where speech ends from
-    /// the pauses it hears.
+    /// Every frame, silence included, for a cloud provider's realtime stream:
+    /// the provider's own VAD closes a segment at the pauses it hears.
     Raw,
     /// Only what the VAD keeps, which is exactly the recording the batch path
-    /// would transcribe, so live chunks and a batch run agree.
+    /// would transcribe, so a local stream or live chunks and a batch run
+    /// agree. A local stream keeps the pauses that matter, since a streaming
+    /// model's recording keeps 1650 ms after speech (`VadTail::Streaming`),
+    /// and is spared the room noise before the first word and after the
+    /// last. Fed that noise, Nemotron wrote a 55-second English dictation in
+    /// Devanagari and Moonshine returned nothing for a short one, on
+    /// recordings each transcribed correctly from the kept speech. Upstream
+    /// Handy feeds its streams the same way.
     Speech,
+}
+
+/// The feed a live session takes, `None` when there is none to open. `cloud`
+/// is whether a `Stream` goes to a cloud provider's realtime endpoint.
+fn feed_kind(mode: LiveDecode, cloud: bool) -> Option<FeedKind> {
+    match mode {
+        LiveDecode::Stream if cloud => Some(FeedKind::Raw),
+        LiveDecode::Stream | LiveDecode::Chunked => Some(FeedKind::Speech),
+        LiveDecode::None => None,
+    }
 }
 
 /// What a session's worker gets from [`StreamRouter::open`].
@@ -321,8 +368,9 @@ impl StreamRouter {
         self.enqueue(frame);
     }
 
-    /// Feed audio the VAD kept, for a session that decodes long-form chunks
-    /// while recording. The same no-op and the same bound as [`feed`].
+    /// Feed audio the VAD kept, for a local stream or a session that decodes
+    /// long-form chunks while recording. The same no-op and the same bound as
+    /// [`feed`].
     ///
     /// [`feed`]: Self::feed
     pub fn feed_speech(&self, kept: &[f32]) {
@@ -1478,9 +1526,10 @@ impl TranscriptionManager {
     /// ([`policy::live_decode`]); the worker decides again with the loaded
     /// model and falls back to batch when that one wants something else:
     ///
-    /// - [`LiveDecode::Stream`]: a streaming model, or a cloud provider with a
-    ///   realtime endpoint, decodes every frame as it arrives
-    ///   (`session.stream`→`feed`→`finalize`, real committed+tentative text).
+    /// - [`LiveDecode::Stream`]: a streaming model decodes the kept speech as
+    ///   it arrives (`session.stream`→`feed`→`finalize`, real
+    ///   committed+tentative text), and a cloud provider with a realtime
+    ///   endpoint (`cloud`) gets every frame (see [`FeedKind`]).
     /// - [`LiveDecode::Chunked`]: a model not built for long audio gets the
     ///   kept speech cut at pauses, each chunk decoded once its cut is certain,
     ///   so a long recording has only its tail left when it stops.
@@ -1488,11 +1537,9 @@ impl TranscriptionManager {
     /// No-op for [`LiveDecode::None`], and (with a warning) if a session is
     /// already open. The batch `transcribe()` path remains the fallback (see
     /// [`finalize_stream`](Self::finalize_stream)).
-    pub fn start_stream(&self, mode: LiveDecode) {
-        let kind = match mode {
-            LiveDecode::Stream => FeedKind::Raw,
-            LiveDecode::Chunked => FeedKind::Speech,
-            LiveDecode::None => return,
+    pub fn start_stream(&self, mode: LiveDecode, cloud: bool) {
+        let Some(kind) = feed_kind(mode, cloud) else {
+            return;
         };
         if self.stream_router.is_open() {
             warn!("Live transcription stream already open; ignoring start_stream()");
@@ -1822,10 +1869,17 @@ impl TranscriptionManager {
                     }
                     match stream.finalize(false) {
                         Ok(Some(finalized)) => {
-                            // committed now holds the full result and tentative
-                            // is emptied; reflect it in the overlay, then take
-                            // display() (= committed + tentative) as the final
-                            // transcript.
+                            // The transcript is `full`, the model's final
+                            // hypothesis, never display() (committed +
+                            // tentative). Finalize only extends committed text
+                            // the final hypothesis still starts with; when the
+                            // model revised a committed word, as Moonshine
+                            // Streaming does, committed keeps the stale words
+                            // and nothing after them, and display() pasted
+                            // wrong words with the end of the dictation missing.
+                            // Upstream Handy fixed the same bug the same way
+                            // (09aaf4d3, "fix moonshine streaming giving the
+                            // wrong results").
                             let (committed, tentative) =
                                 lock_display(&display).show(&finalized.text);
                             let _ = self.app_handle.emit(
@@ -1835,7 +1889,7 @@ impl TranscriptionManager {
                                     tentative,
                                 },
                             );
-                            final_text = Some(finalized.text.display());
+                            final_text = Some(finalized.text.full);
                         }
                         // Lost to a worker crash or a failure: batch has the
                         // whole recording.
@@ -2841,6 +2895,66 @@ impl Drop for TranscriptionManager {
 mod tests {
     use super::*;
 
+    fn stream_text(committed: &str, full: &str) -> transcribe_cpp::StreamText {
+        transcribe_cpp::StreamText {
+            full: full.to_string(),
+            committed: committed.to_string(),
+            // What transcribe.cpp hands back: the new hypothesis cut at the
+            // old committed length, whatever falls there.
+            tentative: full.get(committed.len()..).unwrap_or("").to_string(),
+        }
+    }
+
+    fn split(committed: &str, full: &str) -> (String, String) {
+        let text = stream_text(committed, full);
+        let (c, t) = live_split(&text);
+        (c.to_string(), t.to_string())
+    }
+
+    #[test]
+    fn live_text_keeps_a_committed_prefix_the_model_still_agrees_with() {
+        assert_eq!(
+            split("Hello", "Hello there"),
+            ("Hello".into(), " there".into())
+        );
+        assert_eq!(split("", "Hello"), ("".into(), "Hello".into()));
+        assert_eq!(
+            split("Hello there", "Hello there"),
+            ("Hello there".into(), "".into())
+        );
+    }
+
+    #[test]
+    fn live_text_follows_the_model_when_it_rewrites_committed_words() {
+        // Moonshine re-decodes everything on each feed. transcribe.cpp keeps the
+        // stale "went" committed and cuts the tentative at the old length, so
+        // its own pair read "I went to" + "o the store".
+        let text = stream_text("I went to", "I wanna go to the store");
+        assert_eq!(text.display(), "I went too to the store");
+        let (committed, tentative) = live_split(&text);
+        assert_eq!(committed, "I ");
+        assert_eq!(format!("{committed}{tentative}"), "I wanna go to the store");
+
+        // A rewrite of the first word leaves nothing committed.
+        assert_eq!(split("Hi", "Hey there"), ("".into(), "Hey there".into()));
+        // A hypothesis that shrank.
+        assert_eq!(split("Hello there", "Hello"), ("".into(), "Hello".into()));
+        assert_eq!(
+            split("Hello there you", "Hello there"),
+            ("Hello ".into(), "there".into())
+        );
+    }
+
+    #[test]
+    fn live_text_splits_on_character_boundaries() {
+        assert_eq!(split("café au", "café olé"), ("café ".into(), "olé".into()));
+        assert_eq!(
+            split("我们今天", "我们明天去"),
+            ("".into(), "我们明天去".into())
+        );
+        assert_eq!(split("naïve x", "naïve y"), ("naïve ".into(), "y".into()));
+    }
+
     #[test]
     fn optional_text_transform_falls_back_to_raw_text_after_panic() {
         let raw = "原始轉錄。".to_string();
@@ -3074,8 +3188,22 @@ mod tests {
             .is_some_and(|taken| Arc::ptr_eq(&taken.give_up, &second.give_up)));
     }
 
-    /// A session takes one of the recorder's two feeds, never both: a stream
-    /// gets every frame, long-form chunks only the kept speech.
+    /// Only a cloud stream hears every frame; a local stream hears what the
+    /// batch path would transcribe.
+    #[test]
+    fn a_local_stream_takes_the_kept_speech() {
+        assert_eq!(feed_kind(LiveDecode::Stream, false), Some(FeedKind::Speech));
+        assert_eq!(feed_kind(LiveDecode::Stream, true), Some(FeedKind::Raw));
+        assert_eq!(
+            feed_kind(LiveDecode::Chunked, false),
+            Some(FeedKind::Speech)
+        );
+        assert_eq!(feed_kind(LiveDecode::None, false), None);
+        assert_eq!(feed_kind(LiveDecode::None, true), None);
+    }
+
+    /// A session takes one of the recorder's two feeds, never both: a cloud
+    /// stream gets every frame, everything else only the kept speech.
     #[test]
     fn a_session_takes_one_feed() {
         let router = StreamRouter::new();
@@ -3684,7 +3812,7 @@ mod transcribe_cpp_live_tests {
         }
         let fed = started.elapsed();
         stream.finalize().expect("finalize");
-        let text = stream.text().display();
+        let text = stream.text().full;
         eprintln!(
             "{file}: streamed {:.1} s in {} ms (+{} ms finalize), {updates} updates, {} chars",
             pcm.len() as f64 / SAMPLE_RATE as f64,
@@ -3960,7 +4088,7 @@ mod transcribe_cpp_live_tests {
             stream.finalize().expect("finalize");
             eprintln!(
                 "intent {intent}: streamed {} chars",
-                stream.text().display().chars().count()
+                stream.text().full.chars().count()
             );
         }
     }

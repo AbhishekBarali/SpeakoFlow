@@ -121,6 +121,18 @@ made on your computer; nothing is uploaded.
 
 ### Fixed
 
+- **Moonshine Streaming cut dictations short or pasted the wrong words.** A
+  55-second dictation could paste as "So I was thinking of", and "Our
+  surprising is not that bad" as "Are". These models revise earlier words as
+  they hear more, and SpeakoFlow pasted the words they had settled on first,
+  with everything after the first revision missing. It now pastes the model's
+  final transcript, and the live text follows the revisions instead of
+  showing half a word. Parakeet and Nemotron were not affected.
+- **Streaming models heard the silence and room noise around a dictation**,
+  which could send Nemotron off into the wrong script for an English
+  dictation and make Moonshine return nothing. They now hear the same speech
+  the rest of the app transcribes, as in Handy. Pauses between sentences are
+  kept.
 - **Mute while recording could leave the computer muted** after a very short
   dictation, after Esc with the always-on microphone, when a recording failed
   to start, or when you quit mid-dictation. Nothing unmuted it until the next

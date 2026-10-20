@@ -97,7 +97,8 @@ fn create_audio_recorder(
     // Recorder with VAD plus a spectrum-level callback that forwards updates to
     // the frontend, and two callbacks that feed the live-transcription router
     // (cheap no-ops unless a session that takes that kind of audio is open):
-    // every frame for a stream, the kept speech for long-form chunks.
+    // every frame for a cloud stream, the kept speech for a local stream or
+    // long-form chunks.
     let recorder = AudioRecorder::new()
         .map_err(|e| anyhow::anyhow!("Failed to create AudioRecorder: {}", e))?
         .with_vad(Box::new(smoothed_vad))
