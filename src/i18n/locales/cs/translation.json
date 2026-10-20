@@ -3451,6 +3451,7 @@
   "insights": {
     "about": "Jak používáte SpeakoFlow, spočítáno na tomto počítači.",
     "nothingYet": "Přehledy se zobrazí, jakmile začnete diktovat, ptát se asistenta nebo nahrávat schůzky.",
+    "goHome": "Zobrazit zkratky",
     "dictations": "Diktování",
     "today": "Dnes slov: {{words}}",
     "pages_one": "Přibližně {{count}} strana",
@@ -3479,6 +3480,10 @@
     "gridSummaryMeetings_few": "Za posledních 6 měsíců {{time}} schůzek · {{count}} aktivní dny",
     "gridSummaryMeetings_many": "Za posledních 6 měsíců {{time}} schůzek · {{count}} aktivního dne",
     "gridSummaryMeetings_other": "Za posledních 6 měsíců {{time}} schůzek · {{count}} aktivních dní",
+    "gridSummaryAll_one": "Za posledních 6 měsíců {{count}} aktivní den",
+    "gridSummaryAll_few": "Za posledních 6 měsíců {{count}} aktivní dny",
+    "gridSummaryAll_many": "Za posledních 6 měsíců {{count}} aktivního dne",
+    "gridSummaryAll_other": "Za posledních 6 měsíců {{count}} aktivních dní",
     "dayWords_one": "{{formatted}} slovo",
     "dayWords_few": "{{formatted}} slova",
     "dayWords_many": "{{formatted}} slova",
@@ -3487,7 +3492,9 @@
     "dayQuestions_few": "{{formatted}} otázky",
     "dayQuestions_many": "{{formatted}} otázky",
     "dayQuestions_other": "{{formatted}} otázek",
+    "dayMeetings": "{{time}} schůzek",
     "dayNoneFor": {
+      "all": "Žádná aktivita",
       "dictation": "Žádné diktování",
       "assistant": "Žádné otázky",
       "meetings": "Žádné schůzky"
@@ -3502,8 +3509,11 @@
       "assistant": "Ve dny, kdy se ptáte",
       "meetings": "Ve dny se schůzkou"
     },
+    "activeDays": "Aktivní dny",
+    "activeDaysSub": "Za posledních 6 měsíců",
     "activity": {
       "label": "Co zobrazit",
+      "all": "Vše",
       "dictation": "Diktování",
       "assistant": "Asistent",
       "meetings": "Schůzky"
@@ -3586,12 +3596,12 @@
           "lead_other": "slov namluvených",
           "accent": "místo psaní."
         },
-        "assistant": {
-          "lead_one": "otázka položená",
-          "lead_few": "otázky položené",
-          "lead_many": "otázky položené",
-          "lead_other": "otázek položených",
-          "accent": "nahlas."
+        "asks": {
+          "lead_one": "otázka položená,",
+          "lead_few": "otázky položené,",
+          "lead_many": "otázky položené,",
+          "lead_other": "otázek položených,",
+          "accent": "bez přepínání karet."
         },
         "meetings": {
           "lead_one": "schůzka nahraná,",
@@ -3604,10 +3614,10 @@
       "fact": {
         "saved": "ušetřeno oproti psaní",
         "wpm": "slov za minutu",
-        "questions_one": "zodpovězená otázka",
-        "questions_few": "zodpovězené otázky",
-        "questions_many": "zodpovězené otázky",
-        "questions_other": "zodpovězených otázek",
+        "questionsAsked_one": "položená otázka",
+        "questionsAsked_few": "položené otázky",
+        "questionsAsked_many": "položené otázky",
+        "questionsAsked_other": "položených otázek",
         "meetings_one": "schůzka s poznámkami",
         "meetings_few": "schůzky s poznámkami",
         "meetings_many": "schůzky s poznámkami",

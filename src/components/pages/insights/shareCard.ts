@@ -87,37 +87,45 @@ const dotGrid = (
   }
 };
 
-/** The 2.0 launch art: layered bands of lavender with a white edge. */
+/**
+ * The 2.0 launch art: broad bands of lavender and rose, each with a white
+ * rim. They rise from the bottom edge and stay under the headline: on a tall
+ * card they start below it, and on a wide one, whose headline sits on the
+ * left, they climb toward the right, behind the pill and the figures.
+ */
 const contourBands = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-  const bands = 9;
+  const wide = w > h * 1.3;
+  const left = h * (wide ? 0.8 : 0.56);
+  const right = h * (wide ? 0.3 : 0.48);
+  const gap = Math.min(w, h) * 0.075;
   const tints = [
-    "rgba(255, 255, 255, 0.16)",
-    "rgba(206, 196, 246, 0.30)",
-    "rgba(255, 255, 255, 0.12)",
-    "rgba(240, 196, 226, 0.28)",
+    "rgba(255, 255, 255, 0.24)",
+    "rgba(190, 178, 246, 0.40)",
+    "rgba(255, 255, 255, 0.18)",
+    "rgba(240, 186, 222, 0.38)",
   ];
+  const bands = 8;
   for (let i = 0; i < bands; i += 1) {
-    const base = h * (0.34 + i * 0.085);
-    const amp = h * (0.05 + 0.012 * i);
-    const phase = i * 0.55;
+    const amp = w * (0.022 + 0.004 * i);
+    const phase = i * 0.7;
     ctx.beginPath();
     ctx.moveTo(0, h);
-    const steps = 48;
-    for (let s = 0; s <= steps; s += 1) {
-      const x = (s / steps) * w;
-      const u = s / steps;
+    const steps = 64;
+    for (let step = 0; step <= steps; step += 1) {
+      const u = step / steps;
+      const base = left + (right - left) * u + gap * i;
       const y =
         base -
-        amp * Math.sin(u * Math.PI * 1.15 + phase) -
-        amp * 0.35 * Math.sin(u * Math.PI * 2.6 + phase * 1.7);
-      ctx.lineTo(x, y);
+        amp * Math.sin(u * Math.PI * 1.3 + phase) -
+        amp * 0.3 * Math.sin(u * Math.PI * 3.1 + phase * 1.6);
+      ctx.lineTo(u * w, y);
     }
     ctx.lineTo(w, h);
     ctx.closePath();
     ctx.fillStyle = tints[i % tints.length];
     ctx.fill();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.lineWidth = 2.5;
     ctx.stroke();
   }
 };
@@ -147,8 +155,8 @@ const LOOKS: Record<CardLook, Look> = {
     bar: "#ffffff",
     barToday: "#5eead4",
     panel: "#ffffff",
-    panelEdge: "rgba(19, 22, 24, 0.07)",
-    panelShadow: "rgba(19, 22, 24, 0.14)",
+    panelEdge: "rgba(20, 184, 166, 0.45)",
+    panelShadow: "rgba(13, 148, 136, 0.2)",
     rule: "rgba(19, 22, 24, 0.09)",
   },
   graphite: {
@@ -171,10 +179,10 @@ const LOOKS: Record<CardLook, Look> = {
       }
       radial(
         ctx,
-        w * 0.88,
-        h * 0.1,
-        Math.max(w, h) * 0.75,
-        "rgba(12, 111, 101, 0.55)",
+        w * 0.9,
+        h * 0.08,
+        Math.max(w, h) * 0.5,
+        "rgba(12, 111, 101, 0.3)",
       );
       radial(
         ctx,
@@ -260,7 +268,10 @@ export const LOOK_SWATCHES: Record<
   { ground: string; accent: string }
 > = {
   paper: { ground: "#f5f6f4", accent: "#131618" },
-  graphite: { ground: "#0f1315", accent: "#5fe0cd" },
+  graphite: {
+    ground: "radial-gradient(circle at 88% 12%, #12332f, #0f1315 70%)",
+    accent: "#5fe0cd",
+  },
   mint: {
     ground: "linear-gradient(135deg,#d5f4a0,#b0eef6 55%,#86e6a0)",
     accent: "#0a7a70",
@@ -453,6 +464,24 @@ const headline = (
   return y + wordsSize * 0.24 - box.y;
 };
 
+/** Whether a line of the headline's sentence would hold one word alone. */
+const orphaned = (
+  ctx: CanvasRenderingContext2D,
+  content: CardContent,
+  width: number,
+  words: number,
+): boolean => {
+  ctx.font = font(700, words, DISPLAY);
+  setTracking(ctx, -0.035, words);
+  const alone = (text: string) => {
+    const lines = wrap(ctx, text, width);
+    return lines.length > 1 && !/\s/.test(lines[lines.length - 1].trim());
+  };
+  const result = alone(content.lead) || alone(content.accent);
+  setTracking(ctx, 0, 1);
+  return result;
+};
+
 /** Fit the headline into `box`, shrinking from `sizes` until it does, then
  *  draw it with `bias` of the spare room above it. */
 const fitHeadline = (
@@ -463,25 +492,29 @@ const fitHeadline = (
   sizes: { value: number; words: number },
   bias: number,
 ) => {
-  let scale = 1;
-  let height = 0;
-  for (; scale > 0.45; scale -= 0.04) {
+  // The largest size that fits, unless it leaves one word alone on a line
+  // and a size within a fifth of it does not.
+  let fits: number | null = null;
+  let chosen: number | null = null;
+  for (let scale = 1; scale > 0.45; scale -= 0.02) {
     const scaled = { value: sizes.value * scale, words: sizes.words * scale };
     ctx.font = font(720, scaled.value, DISPLAY);
     setTracking(ctx, -0.045, scaled.value);
     const fitsWide = ctx.measureText(content.value).width <= box.w;
-    height = headline(ctx, content, look, box, scaled, false);
-    if (fitsWide && height <= box.h) break;
+    const height = headline(ctx, content, look, box, scaled, false);
+    if (!fitsWide || height > box.h) continue;
+    fits ??= scale;
+    if (!orphaned(ctx, content, box.w, scaled.words)) {
+      chosen = scale;
+      break;
+    }
+    if (scale < fits * 0.8) break;
   }
+  const scale = chosen ?? fits ?? 0.45;
+  const scaled = { value: sizes.value * scale, words: sizes.words * scale };
+  const height = headline(ctx, content, look, box, scaled, false);
   const offset = Math.max(0, (box.h - height) * bias);
-  headline(
-    ctx,
-    content,
-    look,
-    { ...box, y: box.y + offset },
-    { value: sizes.value * scale, words: sizes.words * scale },
-    true,
-  );
+  headline(ctx, content, look, { ...box, y: box.y + offset }, scaled, true);
 };
 
 /** The recording pill, with a bar per day of the voiceprint. */
@@ -588,93 +621,138 @@ const panel = (
   }
 };
 
-/** One figure: the value, and its label under it in up to two lines,
- *  centred in `box` from top to bottom. */
+/** A label at `size`, shrunk by up to a quarter until it takes at most two
+ *  lines of `width`, then cut to two. */
+const fitLabel = (
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  width: number,
+  size: number,
+): { size: number; lines: string[] } => {
+  let fitted = size;
+  for (;;) {
+    ctx.font = font(500, fitted, TEXT);
+    const lines = wrap(ctx, label, width);
+    if (lines.length <= 2 || fitted <= size * 0.75) {
+      return { size: fitted, lines: lines.slice(0, 2) };
+    }
+    fitted -= 1;
+  }
+};
+
+/** The value set at `size`, shrunk until it is no wider than `width`. */
+const fitValue = (
+  ctx: CanvasRenderingContext2D,
+  value: string,
+  width: number,
+  size: number,
+): number => {
+  let fitted = size;
+  for (;;) {
+    ctx.font = font(720, fitted, DISPLAY);
+    setTracking(ctx, -0.02, fitted);
+    if (ctx.measureText(value).width <= width || fitted <= 18) return fitted;
+    fitted -= 2;
+  }
+};
+
+interface FactSizes {
+  value: number;
+  label: number;
+  /** Inset from the panel's sides. */
+  pad: number;
+  /** Inset from a cell's top and bottom; `pad` when left out. */
+  padY?: number;
+  radius: number;
+}
+
+/**
+ * One figure: the value, and its label under it in up to two lines. Every
+ * cell in a row is centred as if it had `rowLines` lines of label, so the
+ * values in a row line up whichever of their labels wraps.
+ */
 const fact = (
   ctx: CanvasRenderingContext2D,
   item: CardFact,
   look: Look,
   box: Box,
-  sizes: { value: number; label: number },
+  sizes: FactSizes,
+  rowLines: number,
 ) => {
-  ctx.font = font(500, sizes.label, TEXT);
-  const lines = wrap(ctx, item.label, box.w).slice(0, 2);
-
-  let valueSize = sizes.value;
-  const fitValue = () => {
-    ctx.font = font(720, valueSize, DISPLAY);
-    setTracking(ctx, -0.02, valueSize);
-  };
-  fitValue();
-  while (ctx.measureText(item.value).width > box.w && valueSize > 18) {
-    valueSize -= 2;
-    fitValue();
-  }
+  const label = fitLabel(ctx, item.label, box.w, sizes.label);
+  const valueSize = fitValue(ctx, item.value, box.w, sizes.value);
   const height =
     valueSize * 0.76 +
-    sizes.label * 1.55 +
-    (lines.length - 1) * sizes.label * 1.25 +
-    sizes.label * 0.25;
+    label.size * 1.55 +
+    (rowLines - 1) * label.size * 1.25 +
+    label.size * 0.25;
   const valueY = box.y + Math.max(0, (box.h - height) / 2) + valueSize * 0.76;
   ctx.fillStyle = look.ink;
   ctx.textAlign = flip("left");
   ctx.fillText(item.value, mx(box.x), valueY);
   setTracking(ctx, 0, 1);
 
-  ctx.font = font(500, sizes.label, TEXT);
+  ctx.font = font(500, label.size, TEXT);
   ctx.fillStyle = look.muted;
-  lines.forEach((line, index) => {
+  label.lines.forEach((line, index) => {
     ctx.fillText(
       line,
       mx(box.x),
-      valueY + sizes.label * 1.55 + index * sizes.label * 1.25,
+      valueY + label.size * 1.55 + index * label.size * 1.25,
     );
   });
   ctx.textAlign = "left";
 };
 
-/** Figures in a row of columns divided by hairlines, inside one panel. */
-const factRow = (
+/**
+ * One figure on a line of its own: the value at the start and its label at
+ * the end, on one baseline, like a line of a receipt. For a single column,
+ * where a label under each value would stack the panel twice as tall.
+ */
+const ledgerLine = (
   ctx: CanvasRenderingContext2D,
-  facts: CardFact[],
+  item: CardFact,
   look: Look,
   box: Box,
-  sizes: { value: number; label: number; pad: number; radius: number },
+  sizes: FactSizes,
 ) => {
-  panel(ctx, look, box, sizes.radius);
-  const columns = facts.length;
-  const width = box.w / columns;
-  facts.forEach((item, index) => {
-    const x = box.x + width * index;
-    if (index > 0) {
-      ctx.fillStyle = look.rule;
-      ctx.fillRect(mx(x, 1.5), box.y + sizes.pad, 1.5, box.h - sizes.pad * 2);
-    }
-    fact(
-      ctx,
-      item,
-      look,
-      {
-        x: x + sizes.pad,
-        y: box.y + sizes.pad,
-        w: width - sizes.pad * 2,
-        h: box.h - sizes.pad * 2,
-      },
-      sizes,
-    );
+  const valueSize = fitValue(ctx, item.value, box.w * 0.55, sizes.value);
+  const valueWidth = ctx.measureText(item.value).width;
+  const room = box.w - valueWidth - sizes.label * 1.2;
+  const label = fitLabel(ctx, item.label, room, sizes.label);
+  const baseline = box.y + box.h / 2 + valueSize * 0.36;
+  ctx.font = font(720, valueSize, DISPLAY);
+  setTracking(ctx, -0.02, valueSize);
+  ctx.fillStyle = look.ink;
+  ctx.textAlign = flip("left");
+  ctx.fillText(item.value, mx(box.x), baseline);
+  setTracking(ctx, 0, 1);
+
+  ctx.font = font(500, label.size, TEXT);
+  ctx.fillStyle = look.muted;
+  ctx.textAlign = flip("right");
+  const step = label.size * 1.2;
+  const first = baseline - (label.lines.length - 1) * step;
+  label.lines.forEach((line, index) => {
+    ctx.fillText(line, mx(box.x + box.w), first + index * step);
   });
+  ctx.textAlign = "left";
 };
 
-/** Figures in a grid of `columns`, inside one panel. */
+/** Figures in a grid of `columns` divided by hairlines, inside one panel, or
+ *  in one column as a list of lines. No figures, no panel: an empty white box
+ *  says something is missing. */
 const factGrid = (
   ctx: CanvasRenderingContext2D,
   facts: CardFact[],
   look: Look,
   box: Box,
   columns: number,
-  sizes: { value: number; label: number; pad: number; radius: number },
+  sizes: FactSizes,
 ) => {
+  if (facts.length === 0) return;
   panel(ctx, look, box, sizes.radius);
+  const padY = sizes.padY ?? sizes.pad;
   const rows = Math.ceil(facts.length / columns);
   const cellW = box.w / columns;
   const cellH = box.h / rows;
@@ -691,26 +769,33 @@ const factGrid = (
     ctx.fillStyle = look.rule;
     ctx.fillRect(
       mx(box.x + cellW * col, 1.5),
-      box.y + sizes.pad,
+      box.y + padY,
       1.5,
-      box.h - sizes.pad * 2,
+      box.h - padY * 2,
     );
   }
-  facts.forEach((item, index) => {
-    const col = index % columns;
-    const row = Math.floor(index / columns);
-    fact(
-      ctx,
-      item,
-      look,
-      {
-        x: box.x + cellW * col + sizes.pad,
-        y: box.y + cellH * row + sizes.pad,
-        w: cellW - sizes.pad * 2,
-        h: cellH - sizes.pad * 2,
-      },
-      sizes,
+  const cell = (index: number): Box => ({
+    x: box.x + cellW * (index % columns) + sizes.pad,
+    y: box.y + cellH * Math.floor(index / columns) + padY,
+    w: cellW - sizes.pad * 2,
+    h: cellH - padY * 2,
+  });
+  if (columns === 1) {
+    facts.forEach((item, index) =>
+      ledgerLine(ctx, item, look, cell(index), sizes),
     );
+    return;
+  }
+  const lines = facts.map(
+    (item, index) =>
+      fitLabel(ctx, item.label, cell(index).w, sizes.label).lines.length,
+  );
+  facts.forEach((item, index) => {
+    const row = Math.floor(index / columns);
+    const rowLines = Math.max(
+      ...lines.slice(row * columns, row * columns + columns),
+    );
+    fact(ctx, item, look, cell(index), sizes, rowLines);
   });
 };
 
@@ -758,12 +843,15 @@ const footer = (
   ctx.fillText(CARD_SITE, mx(x), baseline);
   ctx.textAlign = "left";
   const siteWidth = ctx.measureText(CARD_SITE).width;
-  ctx.font = font(500, size * 0.9, TEXT);
-  if (
-    ctx.measureText(content.tagline).width <
-    right - x - siteWidth - size * 2
-  ) {
-    caption(ctx, content.tagline, look, right, baseline, size * 0.9, "right");
+  // The tagline gives way before the address does: smaller first, and left
+  // out only when even that would run into it.
+  const room = right - x - siteWidth - size * 1.5;
+  for (let tagSize = size * 0.9; tagSize >= size * 0.7; tagSize -= 1) {
+    ctx.font = font(500, tagSize, TEXT);
+    if (ctx.measureText(content.tagline).width <= room) {
+      caption(ctx, content.tagline, look, right, baseline, tagSize, "right");
+      return;
+    }
   }
 };
 
@@ -791,101 +879,119 @@ export const drawCard = (
 
   if (format === "square") {
     const pad = 76;
-    header(ctx, content, look, assets, pad, pad, w - pad, 50, 24);
+    const logo = 54;
+    header(ctx, content, look, assets, pad, pad, w - pad, logo, 28);
     const footBase = h - pad + 6;
-    footer(ctx, content, look, pad, footBase, w - pad, 25);
-    const facts = { x: pad, y: footBase - 58 - 154, w: w - pad * 2, h: 154 };
-    factRow(ctx, content.facts.slice(0, 3), look, facts, {
-      value: 50,
-      label: 21,
+    footer(ctx, content, look, pad, footBase, w - pad, 31);
+    const shown = content.facts.slice(0, 3);
+    const facts = { x: pad, y: footBase - 62 - 192, w: w - pad * 2, h: 192 };
+    factGrid(ctx, shown, look, facts, Math.max(1, shown.length), {
+      value: 58,
+      label: 27,
       pad: 30,
-      radius: 30,
+      radius: 32,
     });
-    const captionY = facts.y - 38;
-    caption(ctx, content.barsCaption, look, pad + 4, captionY, 21);
-    const pill = { x: pad, y: captionY - 30 - 132, w: w - pad * 2, h: 132 };
+    const captionY = (shown.length ? facts.y : footBase - 40) - 40;
+    caption(ctx, content.barsCaption, look, pad + 4, captionY, 26);
+    const pill = {
+      x: pad,
+      y: captionY - 26 - 30 - 128,
+      w: w - pad * 2,
+      h: 128,
+    };
     voiceprint(ctx, content, look, pill);
+    const top = pad + logo + 60;
     fitHeadline(
       ctx,
       content,
       look,
-      {
-        x: pad,
-        y: pad + 50 + 64,
-        w: w - pad * 2,
-        h: pill.y - 52 - (pad + 50 + 64),
-      },
+      { x: pad, y: top, w: w - pad * 2, h: pill.y - 52 - top },
       { value: 192, words: 76 },
       0,
     );
   } else if (format === "story") {
+    // Instagram and Facebook draw their own bars over about the top and
+    // bottom 250 pixels of a story, so the logo and the address stay inside.
     const pad = 88;
-    header(ctx, content, look, assets, pad, pad + 8, w - pad, 58, 28);
-    const footBase = h - pad;
-    footer(ctx, content, look, pad, footBase, w - pad, 29);
-    const facts = { x: pad, y: footBase - 70 - 380, w: w - pad * 2, h: 380 };
-    factGrid(ctx, content.facts.slice(0, 4), look, facts, 2, {
-      value: 66,
-      label: 26,
-      pad: 44,
+    const safeTop = 250;
+    const safeBottom = h - 260;
+    const logo = 62;
+    header(ctx, content, look, assets, pad, safeTop, w - pad, logo, 32);
+    footer(ctx, content, look, pad, safeBottom, w - pad, 36);
+    const shown = content.facts.slice(0, 4);
+    const columns = shown.length === 4 ? 2 : 1;
+    const factsH = shown.length === 4 ? 340 : shown.length * 108 + 24;
+    const facts = {
+      x: pad,
+      y: safeBottom - 70 - factsH,
+      w: w - pad * 2,
+      h: factsH,
+    };
+    factGrid(ctx, shown, look, facts, columns, {
+      value: 74,
+      label: 34,
+      pad: 40,
+      padY: columns === 1 ? 12 : 40,
       radius: 40,
     });
-    const captionY = facts.y - 50;
-    caption(ctx, content.barsCaption, look, pad + 4, captionY, 26);
-    const pill = { x: pad, y: captionY - 38 - 200, w: w - pad * 2, h: 200 };
+    const captionY = (shown.length ? facts.y : safeBottom - 50) - 48;
+    caption(ctx, content.barsCaption, look, pad + 4, captionY, 32);
+    const pill = {
+      x: pad,
+      y: captionY - 32 - 34 - 190,
+      w: w - pad * 2,
+      h: 190,
+    };
     voiceprint(ctx, content, look, pill);
+    const top = safeTop + logo + 80;
     fitHeadline(
       ctx,
       content,
       look,
-      {
-        x: pad,
-        y: pad + 66 + 120,
-        w: w - pad * 2,
-        h: pill.y - 90 - (pad + 66 + 120),
-      },
+      { x: pad, y: top, w: w - pad * 2, h: pill.y - 80 - top },
       { value: 280, words: 112 },
       0.42,
     );
   } else {
     const pad = 80;
-    const split = 880;
-    header(ctx, content, look, assets, pad, pad, w - pad, 50, 24);
+    const split = 860;
+    const logo = 54;
+    header(ctx, content, look, assets, pad, pad, w - pad, logo, 28);
     const footBase = h - pad + 6;
-    footer(ctx, content, look, pad, footBase, w - pad, 25);
+    footer(ctx, content, look, pad, footBase, w - pad, 31);
     const right = { x: split, w: w - pad - split };
-    const pill = { x: right.x, y: pad + 50 + 70, w: right.w, h: 118 };
+    const pill = { x: right.x, y: pad + logo + 66, w: right.w, h: 120 };
     voiceprint(ctx, content, look, pill);
     caption(
       ctx,
       content.barsCaption,
       look,
       right.x + 4,
-      pill.y + pill.h + 44,
-      21,
+      pill.y + pill.h + 46,
+      26,
     );
-    const facts = {
-      x: right.x,
-      y: pill.y + pill.h + 76,
-      w: right.w,
-      h: footBase - 56 - (pill.y + pill.h + 76),
-    };
-    factGrid(ctx, content.facts.slice(0, 4), look, facts, 2, {
-      value: 48,
-      label: 20,
-      pad: 30,
-      radius: 30,
-    });
+    const shown = content.facts.slice(0, 4);
+    const factsY = pill.y + pill.h + 82;
+    factGrid(
+      ctx,
+      shown,
+      look,
+      { x: right.x, y: factsY, w: right.w, h: footBase - 60 - factsY },
+      shown.length === 4 ? 2 : 1,
+      {
+        value: 54,
+        label: 26,
+        pad: 30,
+        padY: shown.length === 4 ? 30 : 8,
+        radius: 30,
+      },
+    );
+    const top = pad + logo + 66;
     fitHeadline(
       ctx,
       content,
       look,
-      {
-        x: pad,
-        y: pad + 50 + 70,
-        w: split - pad - 80,
-        h: footBase - 70 - (pad + 50 + 70),
-      },
+      { x: pad, y: top, w: split - pad - 70, h: footBase - 70 - top },
       { value: 200, words: 80 },
       0.5,
     );

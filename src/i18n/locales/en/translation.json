@@ -3393,6 +3393,7 @@
   "insights": {
     "about": "How you use SpeakoFlow, counted on this computer.",
     "nothingYet": "Your insights appear once you dictate, ask the assistant or record a meeting.",
+    "goHome": "See your shortcuts",
     "dictations": "Dictations",
     "today": "{{words}} words today",
     "pages_one": "About {{count}} page",
@@ -3409,11 +3410,15 @@
     "gridSummaryAssistant_other": "{{questions}} on {{count}} days in the last 6 months",
     "gridSummaryMeetings_one": "{{time}} of meetings on {{count}} day in the last 6 months",
     "gridSummaryMeetings_other": "{{time}} of meetings on {{count}} days in the last 6 months",
+    "gridSummaryAll_one": "Active on {{count}} day in the last 6 months",
+    "gridSummaryAll_other": "Active on {{count}} days in the last 6 months",
     "dayWords_one": "{{formatted}} word",
     "dayWords_other": "{{formatted}} words",
     "dayQuestions_one": "{{formatted}} question",
     "dayQuestions_other": "{{formatted}} questions",
+    "dayMeetings": "{{time}} of meetings",
     "dayNoneFor": {
+      "all": "Nothing that day",
       "dictation": "No dictation",
       "assistant": "No questions",
       "meetings": "No meetings"
@@ -3428,8 +3433,11 @@
       "assistant": "On days you ask",
       "meetings": "On days with a meeting"
     },
+    "activeDays": "Days active",
+    "activeDaysSub": "In the last 6 months",
     "activity": {
       "label": "Activity to show",
+      "all": "All",
       "dictation": "Dictation",
       "assistant": "Assistant",
       "meetings": "Meetings"
@@ -3500,10 +3508,10 @@
           "lead_other": "words spoken,",
           "accent": "not typed."
         },
-        "assistant": {
-          "lead_one": "question asked",
-          "lead_other": "questions asked",
-          "accent": "out loud."
+        "asks": {
+          "lead_one": "question asked,",
+          "lead_other": "questions asked,",
+          "accent": "no tab switching."
         },
         "meetings": {
           "lead_one": "meeting recorded,",
@@ -3514,8 +3522,8 @@
       "fact": {
         "saved": "saved vs. typing",
         "wpm": "words a minute",
-        "questions_one": "question answered",
-        "questions_other": "questions answered",
+        "questionsAsked_one": "question asked",
+        "questionsAsked_other": "questions asked",
         "meetings_one": "meeting written up",
         "meetings_other": "meetings written up",
         "meetingTime": "of meetings recorded",

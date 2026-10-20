@@ -69,7 +69,7 @@ describe("the share card", () => {
     expect(card?.lead).toContain("insights.share.headline.dictation.lead");
     expect(card?.facts.map((fact) => fact.label.split("{")[0])).toEqual([
       "insights.share.fact.saved",
-      "insights.share.fact.questions",
+      "insights.share.fact.questionsAsked",
       "insights.share.fact.meetings",
       "insights.share.fact.wpm",
       "insights.share.fact.streak",
@@ -101,7 +101,7 @@ describe("the share card", () => {
     const card = buildCardContent(data, t, "en", everything, NOW);
     expect(card?.value).toBe("303");
     const labels = card?.facts.map((fact) => fact.label.split("{")[0]) ?? [];
-    expect(labels).not.toContain("insights.share.fact.questions");
+    expect(labels).not.toContain("insights.share.fact.questionsAsked");
     expect(labels).not.toContain("insights.share.fact.saved");
     expect(labels).toContain("insights.share.fact.callTime");
   });

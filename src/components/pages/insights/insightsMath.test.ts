@@ -6,6 +6,7 @@ import {
   bestDay,
   buildHeatmap,
   busiestWeekday,
+  dayParts,
   hasActivity,
   heatLevel,
   localDayKey,
@@ -181,6 +182,33 @@ describe("activities", () => {
     expect(hasActivity(data, "dictation")).toBe(true);
     expect(hasActivity(data, "assistant")).toBe(true);
     expect(hasActivity(data, "meetings")).toBe(false);
+    expect(hasActivity(data, "all")).toBe(true);
+  });
+
+  test("score all of them by each feature's own busiest day", () => {
+    const data = insights();
+    data.dictation.recent_days.push({
+      day: "2026-09-21",
+      dictations: 1,
+      words: 60,
+      audio_seconds: 30,
+    });
+    // Dictation peaks at 120 words and questions at 10, so a day with 60
+    // words and all 10 questions scores a half plus a whole.
+    expect(activitySeries(data, "all")).toEqual([
+      day("2026-09-20", 1),
+      day("2026-09-21", 1.5),
+    ]);
+  });
+
+  test("say what each day held", () => {
+    const parts = dayParts(insights());
+    expect(parts.get("2026-09-20")).toEqual({
+      words: 120,
+      questions: 0,
+      meetingSeconds: 0,
+    });
+    expect(parts.get("2026-09-21")?.questions).toBe(10);
   });
 
   test("give the last days oldest first, zero where nothing happened", () => {

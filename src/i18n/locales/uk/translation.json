@@ -3451,6 +3451,7 @@
   "insights": {
     "about": "Як ви користуєтеся SpeakoFlow, підраховано на цьому комп'ютері.",
     "nothingYet": "Статистика з'явиться, коли ви почнете диктувати, ставити запитання асистентові або записувати зустрічі.",
+    "goHome": "Показати скорочення",
     "dictations": "Диктування",
     "today": "Слів сьогодні: {{words}}",
     "pages_one": "Приблизно {{count}} сторінка",
@@ -3479,6 +3480,10 @@
     "gridSummaryMeetings_few": "Зустрічі: {{time}} за {{count}} дні протягом останніх 6 місяців",
     "gridSummaryMeetings_many": "Зустрічі: {{time}} за {{count}} днів протягом останніх 6 місяців",
     "gridSummaryMeetings_other": "Зустрічі: {{time}} за {{count}} дня протягом останніх 6 місяців",
+    "gridSummaryAll_one": "{{count}} активний день протягом останніх 6 місяців",
+    "gridSummaryAll_few": "{{count}} активні дні протягом останніх 6 місяців",
+    "gridSummaryAll_many": "{{count}} активних днів протягом останніх 6 місяців",
+    "gridSummaryAll_other": "{{count}} активного дня протягом останніх 6 місяців",
     "dayWords_one": "{{formatted}} слово",
     "dayWords_few": "{{formatted}} слова",
     "dayWords_many": "{{formatted}} слів",
@@ -3487,7 +3492,9 @@
     "dayQuestions_few": "{{formatted}} запитання",
     "dayQuestions_many": "{{formatted}} запитань",
     "dayQuestions_other": "{{formatted}} запитання",
+    "dayMeetings": "{{time}} на зустрічах",
     "dayNoneFor": {
+      "all": "Без активності",
       "dictation": "Без диктування",
       "assistant": "Без запитань",
       "meetings": "Без зустрічей"
@@ -3502,8 +3509,11 @@
       "assistant": "У дні, коли ви ставите запитання",
       "meetings": "У дні із зустрічами"
     },
+    "activeDays": "Активні дні",
+    "activeDaysSub": "Протягом останніх 6 місяців",
     "activity": {
       "label": "Що показувати",
+      "all": "Усі",
       "dictation": "Диктування",
       "assistant": "Асистент",
       "meetings": "Зустрічі"
@@ -3586,12 +3596,12 @@
           "lead_other": "слова сказано,",
           "accent": "а не надруковано."
         },
-        "assistant": {
-          "lead_one": "запитання поставлено",
-          "lead_few": "запитання поставлено",
-          "lead_many": "запитань поставлено",
-          "lead_other": "запитання поставлено",
-          "accent": "вголос."
+        "asks": {
+          "lead_one": "запитання поставлено,",
+          "lead_few": "запитання поставлено,",
+          "lead_many": "запитань поставлено,",
+          "lead_other": "запитання поставлено,",
+          "accent": "без перемикання вкладок."
         },
         "meetings": {
           "lead_one": "зустріч записано,",
@@ -3604,10 +3614,10 @@
       "fact": {
         "saved": "заощаджено на наборі",
         "wpm": "слів за хвилину",
-        "questions_one": "запитання з відповіддю",
-        "questions_few": "запитання з відповіддю",
-        "questions_many": "запитань із відповіддю",
-        "questions_other": "запитання з відповіддю",
+        "questionsAsked_one": "поставлене запитання",
+        "questionsAsked_few": "поставлені запитання",
+        "questionsAsked_many": "поставлених запитань",
+        "questionsAsked_other": "поставленого запитання",
         "meetings_one": "зустріч із нотатками",
         "meetings_few": "зустрічі з нотатками",
         "meetings_many": "зустрічей із нотатками",

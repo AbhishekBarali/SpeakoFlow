@@ -3364,6 +3364,7 @@
   "insights": {
     "about": "您使用 SpeakoFlow 的情形，在這台電腦上統計。",
     "nothingYet": "只要使用語音輸入、詢問助理或錄製會議，就會顯示您的使用分析。",
+    "goHome": "查看快捷鍵",
     "dictations": "語音輸入次數",
     "today": "今天 {{words}} 字",
     "pages_other": "約 {{count}} 頁",
@@ -3374,9 +3375,12 @@
     "gridSummary_other": "過去 6 個月內，{{count}} 天共 {{words}} 字",
     "gridSummaryAssistant_other": "過去 6 個月內，{{count}} 天共 {{questions}}",
     "gridSummaryMeetings_other": "過去 6 個月內，{{count}} 天共開會 {{time}}",
+    "gridSummaryAll_other": "過去 6 個月內，活躍 {{count}} 天",
     "dayWords_other": "{{formatted}} 字",
     "dayQuestions_other": "{{formatted}} 個問題",
+    "dayMeetings": "開會 {{time}}",
     "dayNoneFor": {
+      "all": "沒有活動",
       "dictation": "沒有語音輸入",
       "assistant": "沒有提問",
       "meetings": "沒有會議"
@@ -3391,8 +3395,11 @@
       "assistant": "在您有提問的日子",
       "meetings": "在有會議的日子"
     },
+    "activeDays": "活躍天數",
+    "activeDaysSub": "過去 6 個月",
     "activity": {
       "label": "要顯示的活動",
+      "all": "全部",
       "dictation": "語音輸入",
       "assistant": "助理",
       "meetings": "會議"
@@ -3457,9 +3464,9 @@
           "lead_other": "字，用說的，",
           "accent": "不是用打的。"
         },
-        "assistant": {
+        "asks": {
           "lead_other": "個問題，",
-          "accent": "開口就問。"
+          "accent": "不用切換分頁。"
         },
         "meetings": {
           "lead_other": "場會議錄下來，",
@@ -3469,7 +3476,7 @@
       "fact": {
         "saved": "比打字省下的時間",
         "wpm": "每分鐘字數",
-        "questions_other": "個問題得到解答",
+        "questionsAsked_other": "次提問",
         "meetings_other": "場會議整理成筆記",
         "meetingTime": "會議錄製時間",
         "meetingWords_other": "轉錄字數",

@@ -3422,6 +3422,7 @@
   "insights": {
     "about": "Come usi SpeakoFlow, calcolato su questo computer.",
     "nothingYet": "Le tue statistiche compariranno quando detterai, farai una domanda all'assistente o registrerai una riunione.",
+    "goHome": "Vedi le tue scorciatoie",
     "dictations": "Dettature",
     "today": "{{words}} parole oggi",
     "pages_one": "Circa {{count}} pagina",
@@ -3444,13 +3445,18 @@
     "gridSummaryMeetings_one": "{{time}} di riunioni in {{count}} giorno negli ultimi 6 mesi",
     "gridSummaryMeetings_many": "{{time}} di riunioni in {{count}} di giorni negli ultimi 6 mesi",
     "gridSummaryMeetings_other": "{{time}} di riunioni in {{count}} giorni negli ultimi 6 mesi",
+    "gridSummaryAll_one": "{{count}} giorno attivo negli ultimi 6 mesi",
+    "gridSummaryAll_many": "{{count}} di giorni attivi negli ultimi 6 mesi",
+    "gridSummaryAll_other": "{{count}} giorni attivi negli ultimi 6 mesi",
     "dayWords_one": "{{formatted}} parola",
     "dayWords_many": "{{formatted}} di parole",
     "dayWords_other": "{{formatted}} parole",
     "dayQuestions_one": "{{formatted}} domanda",
     "dayQuestions_many": "{{formatted}} di domande",
     "dayQuestions_other": "{{formatted}} domande",
+    "dayMeetings": "{{time}} di riunioni",
     "dayNoneFor": {
+      "all": "Niente quel giorno",
       "dictation": "Nessuna dettatura",
       "assistant": "Nessuna domanda",
       "meetings": "Nessuna riunione"
@@ -3465,8 +3471,11 @@
       "assistant": "Nei giorni in cui fai domande",
       "meetings": "Nei giorni con una riunione"
     },
+    "activeDays": "Giorni attivi",
+    "activeDaysSub": "Negli ultimi 6 mesi",
     "activity": {
       "label": "Attività da mostrare",
+      "all": "Tutto",
       "dictation": "Dettatura",
       "assistant": "Assistente",
       "meetings": "Riunioni"
@@ -3543,11 +3552,11 @@
           "lead_other": "parole dette,",
           "accent": "senza digitare."
         },
-        "assistant": {
-          "lead_one": "domanda fatta",
-          "lead_many": "di domande fatte",
-          "lead_other": "domande fatte",
-          "accent": "ad alta voce."
+        "asks": {
+          "lead_one": "domanda fatta,",
+          "lead_many": "di domande fatte,",
+          "lead_other": "domande fatte,",
+          "accent": "senza cambiare scheda."
         },
         "meetings": {
           "lead_one": "riunione registrata,",
@@ -3559,9 +3568,9 @@
       "fact": {
         "saved": "risparmiato rispetto a digitare",
         "wpm": "parole al minuto",
-        "questions_one": "risposta ricevuta",
-        "questions_many": "di risposte ricevute",
-        "questions_other": "risposte ricevute",
+        "questionsAsked_one": "domanda fatta",
+        "questionsAsked_many": "di domande fatte",
+        "questionsAsked_other": "domande fatte",
         "meetings_one": "riunione riassunta",
         "meetings_many": "di riunioni riassunte",
         "meetings_other": "riunioni riassunte",

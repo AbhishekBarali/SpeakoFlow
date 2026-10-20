@@ -3451,6 +3451,7 @@
   "insights": {
     "about": "Jak używasz SpeakoFlow, liczone na tym komputerze.",
     "nothingYet": "Statystyki pojawią się, gdy zaczniesz dyktować, pytać asystenta lub nagrywać spotkania.",
+    "goHome": "Zobacz swoje skróty",
     "dictations": "Dyktowania",
     "today": "Słowa dzisiaj: {{words}}",
     "pages_one": "Około {{count}} strony",
@@ -3479,6 +3480,10 @@
     "gridSummaryMeetings_few": "Spotkania: {{time}} · {{count}} dni w ostatnich 6 miesiącach",
     "gridSummaryMeetings_many": "Spotkania: {{time}} · {{count}} dni w ostatnich 6 miesiącach",
     "gridSummaryMeetings_other": "Spotkania: {{time}} · {{count}} dnia w ostatnich 6 miesiącach",
+    "gridSummaryAll_one": "{{count}} aktywny dzień w ostatnich 6 miesiącach",
+    "gridSummaryAll_few": "{{count}} aktywne dni w ostatnich 6 miesiącach",
+    "gridSummaryAll_many": "{{count}} aktywnych dni w ostatnich 6 miesiącach",
+    "gridSummaryAll_other": "{{count}} aktywnego dnia w ostatnich 6 miesiącach",
     "dayWords_one": "{{formatted}} słowo",
     "dayWords_few": "{{formatted}} słowa",
     "dayWords_many": "{{formatted}} słów",
@@ -3487,7 +3492,9 @@
     "dayQuestions_few": "{{formatted}} pytania",
     "dayQuestions_many": "{{formatted}} pytań",
     "dayQuestions_other": "{{formatted}} pytania",
+    "dayMeetings": "{{time}} na spotkaniach",
     "dayNoneFor": {
+      "all": "Bez aktywności",
       "dictation": "Bez dyktowania",
       "assistant": "Bez pytań",
       "meetings": "Bez spotkań"
@@ -3502,8 +3509,11 @@
       "assistant": "W dni, w które pytasz",
       "meetings": "W dni ze spotkaniem"
     },
+    "activeDays": "Aktywne dni",
+    "activeDaysSub": "W ostatnich 6 miesiącach",
     "activity": {
       "label": "Co pokazać",
+      "all": "Wszystko",
       "dictation": "Dyktowanie",
       "assistant": "Asystent",
       "meetings": "Spotkania"
@@ -3586,12 +3596,12 @@
           "lead_other": "słowa mówionego",
           "accent": "zamiast pisanych."
         },
-        "assistant": {
-          "lead_one": "pytanie zadane",
-          "lead_few": "pytania zadane",
-          "lead_many": "pytań zadanych",
-          "lead_other": "pytania zadanego",
-          "accent": "na głos."
+        "asks": {
+          "lead_one": "pytanie zadane,",
+          "lead_few": "pytania zadane,",
+          "lead_many": "pytań zadanych,",
+          "lead_other": "pytania zadanego,",
+          "accent": "bez przełączania kart."
         },
         "meetings": {
           "lead_one": "spotkanie nagrane,",
@@ -3604,10 +3614,10 @@
       "fact": {
         "saved": "zaoszczędzone na pisaniu",
         "wpm": "słów na minutę",
-        "questions_one": "pytanie z odpowiedzią",
-        "questions_few": "pytania z odpowiedzią",
-        "questions_many": "pytań z odpowiedzią",
-        "questions_other": "pytania z odpowiedzią",
+        "questionsAsked_one": "zadane pytanie",
+        "questionsAsked_few": "zadane pytania",
+        "questionsAsked_many": "zadanych pytań",
+        "questionsAsked_other": "zadanego pytania",
         "meetings_one": "spotkanie z notatkami",
         "meetings_few": "spotkania z notatkami",
         "meetings_many": "spotkań z notatkami",
