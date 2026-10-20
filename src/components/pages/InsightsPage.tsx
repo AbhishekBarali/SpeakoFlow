@@ -196,8 +196,8 @@ const useDaySaying = (insights: Insights) => {
 };
 
 /**
- * The busiest weekday, best day and typical day of the activity in view, in
- * a row under the grid they are read from. For all of them, the best day
+ * The busiest weekday, best day and typical day of the activity in view,
+ * beside the grid they are read from. For all of them, the best day
  * says what it held and there is no typical day, since an average of a mixed
  * score means nothing.
  */
@@ -262,10 +262,7 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
     });
   }
   return (
-    <dl
-      className="grid gap-x-8 gap-y-4 @lg:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]"
-      style={{ "--cols": rows.length } as React.CSSProperties}
-    >
+    <dl className="grid content-start gap-x-8 gap-y-5 @xl:grid-cols-3 @3xl:grid-cols-1">
       {rows.map((row) => (
         <div key={row.label} className="min-w-0">
           <dt className="text-[0.8125rem] text-muted">{row.label}</dt>
@@ -273,7 +270,7 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
             {row.value}
           </dd>
           {row.sub && (
-            <dd className="mt-0.5 truncate text-[0.8125rem] text-muted">
+            <dd className="mt-0.5 text-[0.8125rem] text-muted text-pretty">
               {row.sub}
             </dd>
           )}
@@ -284,7 +281,8 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
 };
 
 /**
- * Six months, one square per day, darker for more use, as wide as the card.
+ * Six months, one square per day, darker for more use, with the day's
+ * highlights beside it.
  * Once more than one feature has been used it opens on all of them, the days
  * the streak counts, with each feature a switch away.
  */
@@ -370,96 +368,103 @@ const ActivityCard: React.FC<{
         )}
       </div>
 
-      {/* One grid for the weekday labels, the months and the days, so they
-          line up at any width. Each day is a small square in the middle of
-          its slot, which keeps six months light enough to read at a glance
-          across the whole card. */}
-      <div
-        role="img"
-        aria-label={summary}
-        onMouseLeave={() => setHovered(null)}
-        className="mt-5 grid items-center"
-        style={{
-          gridTemplateColumns: `auto repeat(${WEEKS}, minmax(0, 1fr))`,
-          gridTemplateRows: "auto repeat(7, auto)",
-        }}
-      >
-        {map.months.map(({ col, date }) => (
-          <span
-            key={`m-${col}-${date.getMonth()}`}
-            aria-hidden="true"
-            className="pb-1.5 text-[0.6875rem] leading-none whitespace-nowrap text-muted"
-            style={{ gridRow: 1, gridColumn: col + 2 }}
-          >
-            {monthFormat.format(date)}
-          </span>
-        ))}
-        {rowLabels.map((label, row) => (
-          <span
-            key={`d-${row}`}
-            aria-hidden="true"
-            className="pe-3 text-[0.6875rem] leading-none text-muted"
-            style={{ gridRow: row + 2, gridColumn: 1 }}
-          >
-            {label}
-          </span>
-        ))}
-        {map.weeks.map((column, col) =>
-          column.map((cell, row) => (
+      <div className="mt-5 grid gap-x-10 gap-y-6 @3xl:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="min-w-0 overflow-x-auto">
+          <div className="inline-flex flex-col">
+            {/* One grid for the weekday labels, the months and the days, so
+                they line up. The days are small squares set close together,
+                the way every activity calendar people already know is drawn:
+                spread out, the weeks stopped reading as a calendar. */}
             <div
-              key={`${activity}-${cell.key}`}
-              onMouseEnter={() => setHovered(cell.future ? null : cell)}
-              className="grid aspect-square place-items-center"
-              style={{ gridRow: row + 2, gridColumn: col + 2 }}
+              role="img"
+              aria-label={summary}
+              onMouseLeave={() => setHovered(null)}
+              className="grid items-center gap-[4px]"
+              style={{
+                gridTemplateColumns: `auto repeat(${WEEKS}, 1rem)`,
+                gridTemplateRows: "auto repeat(7, 1rem)",
+              }}
             >
-              <div
-                className={`heat-cell aspect-square w-[62%] rounded-[28%] transition-[box-shadow,transform] duration-150 ${
-                  cell.future
-                    ? "bg-transparent"
-                    : `${LEVEL_CLASSES[cell.level]} hover:shadow-[0_0_0_1.5px_var(--color-ink)]`
-                } ${cell.isToday ? "shadow-[0_0_0_1.5px_var(--color-accent)]" : ""}`}
-                style={{ "--col": col, "--row": row } as React.CSSProperties}
-              />
+              {map.months.map(({ col, date }) => (
+                <span
+                  key={`m-${col}-${date.getMonth()}`}
+                  aria-hidden="true"
+                  className="pb-1 text-[0.6875rem] leading-none whitespace-nowrap text-muted"
+                  style={{ gridRow: 1, gridColumn: `${col + 2} / span 3` }}
+                >
+                  {monthFormat.format(date)}
+                </span>
+              ))}
+              {rowLabels.map((label, row) => (
+                <span
+                  key={`d-${row}`}
+                  aria-hidden="true"
+                  className="pe-1.5 text-[0.6875rem] leading-none text-muted"
+                  style={{ gridRow: row + 2, gridColumn: 1 }}
+                >
+                  {label}
+                </span>
+              ))}
+              {map.weeks.map((column, col) =>
+                column.map((cell, row) => (
+                  <div
+                    key={`${activity}-${cell.key}`}
+                    onMouseEnter={() => setHovered(cell.future ? null : cell)}
+                    className={`heat-cell h-4 w-4 rounded-[4px] transition-[box-shadow] duration-150 ${
+                      cell.future
+                        ? "bg-transparent"
+                        : `${LEVEL_CLASSES[cell.level]} hover:shadow-[0_0_0_1.5px_var(--color-ink)]`
+                    } ${cell.isToday ? "shadow-[0_0_0_1.5px_var(--color-accent)]" : ""}`}
+                    style={
+                      {
+                        gridRow: row + 2,
+                        gridColumn: col + 2,
+                        "--col": col,
+                        "--row": row,
+                      } as React.CSSProperties
+                    }
+                  />
+                )),
+              )}
             </div>
-          )),
-        )}
-      </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <p className="min-h-[1.25rem] text-xs text-muted tabular-nums">
-          {hovered ? (
-            <>
-              <span className="font-medium text-ink">
-                {dayFormat.format(hovered.date)}
-              </span>
-              {" · "}
-              {hovered.value > 0
-                ? say(activity, {
-                    day: hovered.key,
-                    value: hovered.value,
-                  })
-                : noneLabel}
-            </>
-          ) : (
-            summary
-          )}
-        </p>
-        <div
-          aria-hidden="true"
-          className="flex items-center gap-1 text-[0.6875rem] text-muted"
-        >
-          <span className="me-1">{t("insights.less")}</span>
-          {([0, 1, 2, 3, 4] as HeatLevel[]).map((level) => (
-            <span
-              key={level}
-              className={`h-2.5 w-2.5 rounded-[3px] ${LEVEL_CLASSES[level]}`}
-            />
-          ))}
-          <span className="ms-1">{t("insights.more")}</span>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <p className="min-h-[1.25rem] text-xs text-muted tabular-nums">
+                {hovered ? (
+                  <>
+                    <span className="font-medium text-ink">
+                      {dayFormat.format(hovered.date)}
+                    </span>
+                    {" · "}
+                    {hovered.value > 0
+                      ? say(activity, {
+                          day: hovered.key,
+                          value: hovered.value,
+                        })
+                      : noneLabel}
+                  </>
+                ) : (
+                  summary
+                )}
+              </p>
+              <div
+                aria-hidden="true"
+                className="flex items-center gap-1 text-[0.6875rem] text-muted"
+              >
+                <span className="me-1">{t("insights.less")}</span>
+                {([0, 1, 2, 3, 4] as HeatLevel[]).map((level) => (
+                  <span
+                    key={level}
+                    className={`h-2.5 w-2.5 rounded-[3px] ${LEVEL_CLASSES[level]}`}
+                  />
+                ))}
+                <span className="ms-1">{t("insights.more")}</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div className="mt-5 border-t border-hairline pt-5">
-        <Highlights insights={insights} activity={activity} />
+        <div className="border-t border-hairline pt-5 @3xl:border-t-0 @3xl:border-s @3xl:ps-10 @3xl:pt-5">
+          <Highlights insights={insights} activity={activity} />
+        </div>
       </div>
     </section>
   );

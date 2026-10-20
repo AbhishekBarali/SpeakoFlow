@@ -7,10 +7,12 @@ import React, {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { save } from "@tauri-apps/plugin-dialog";
+import { downloadDir, join } from "@tauri-apps/api/path";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { type as osType } from "@tauri-apps/plugin-os";
 import { toast } from "sonner";
 import {
+  ArrowUpRight,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -23,6 +25,7 @@ import {
 } from "lucide-react";
 import { commands, type Insights } from "@/bindings";
 import { SocialMark, type SocialSite } from "@/components/icons/SocialLogos";
+import { Button } from "@/components/ui/Button";
 import { Dialog, DialogCloseButton } from "@/components/ui/Dialog";
 import { Segmented } from "@/components/ui/Segmented";
 import {
@@ -38,7 +41,15 @@ import {
   CARD_SIZES,
   type CardFormat,
 } from "./shareContent";
-import { composeUrl, SHARE_TARGETS, TARGET_NAMES } from "./shareTargets";
+import {
+  composeUrl,
+  SHARE_TARGETS,
+  TAKES_PASTED_IMAGE,
+  TARGET_NAMES,
+} from "./shareTargets";
+
+/** The file a card is saved to for a site that cannot take a pasted one. */
+const POST_FILE = "SpeakoFlow insights.png";
 
 /** The size last used, so a second share starts where the first left off.
  *  A convenience: losing it costs nothing. */
@@ -106,8 +117,9 @@ interface Rendered {
 /**
  * Share the Insights numbers as a deck of cards: one insight each, moved
  * through with the arrows, the dots, a swipe or the arrow keys, and shared
- * from the row under it: copied, saved, posted to a site (copied first, so
- * it can be pasted into the new post) or handed to the system's share sheet.
+ * from the row under it: copied, saved, posted to a site (made ready first,
+ * with a line saying how it goes into the post) or handed to the system's
+ * share sheet.
  * Every card is drawn here, on this computer; nothing is uploaded.
  */
 export const ShareDialog: React.FC<{
@@ -123,6 +135,12 @@ export const ShareDialog: React.FC<{
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<"save" | "copy" | "share" | null>(null);
   const [copied, setCopied] = useState(false);
+  /** A post being made: the card is ready, and this says how it goes in. */
+  const [posting, setPosting] = useState<{
+    site: SocialSite;
+    /** Where the card was saved, for a site that takes no pasted image. */
+    path?: string;
+  } | null>(null);
   const swipe = useRef<{ x: number; id: number } | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ w: 0, h: 0 });
@@ -189,6 +207,11 @@ export const ShareDialog: React.FC<{
   useEffect(() => {
     if (!open) setIndex(0);
   }, [open]);
+
+  // What the post guide says is about the card it was made for.
+  useEffect(() => {
+    setPosting(null);
+  }, [open, index, format]);
 
   useEffect(() => {
     if (!copied) return;
@@ -283,29 +306,55 @@ export const ShareDialog: React.FC<{
     }
   };
 
-  /** Copy the card and open a new post on `site`, ready for it to be pasted
-   *  in. */
-  const postTo = async (site: SocialSite) => {
-    if (!card || !slide || busy) return;
+  /**
+   * Get the card ready for a post on `site` and say, here, how it goes in,
+   * before the site opens. No site takes an image from a link, so the
+   * person puts it in themselves, and a toast would be hidden behind the
+   * browser by the time it mattered. X takes a pasted picture, so the card is
+   * copied; LinkedIn takes none, so it is saved to Downloads for the post's
+   * photo button.
+   */
+  const preparePost = async (site: SocialSite) => {
+    if (!card || busy) return;
     setBusy("copy");
     try {
-      const copiedForPost = await writeClipboard(card.blob);
-      try {
-        await openUrl(composeUrl(site, slide.post));
-      } catch (error) {
-        toast.error(
-          t("insights.share.openFailed", { site: TARGET_NAMES[site] }),
-          { description: String(error) },
-        );
+      if (TAKES_PASTED_IMAGE[site]) {
+        if (await writeClipboard(card.blob)) setPosting({ site });
         return;
       }
-      if (copiedForPost) {
-        toast.success(t("insights.share.readyToPaste"), {
-          description: t("insights.share.pasteNow", { keys: PASTE_KEYS }),
+      const path = await join(await downloadDir(), POST_FILE);
+      const result = await commands.saveInsightsCard(
+        path,
+        await blobToBase64(card.blob),
+      );
+      if (result.status === "ok") {
+        setPosting({ site, path });
+      } else {
+        toast.error(t("insights.share.saveFailed"), {
+          description: result.error,
         });
       }
+    } catch (error) {
+      toast.error(t("insights.share.saveFailed"), {
+        description: String(error),
+      });
     } finally {
       setBusy(null);
+    }
+  };
+
+  /** Open a new post on `site` with the card's words filled in. */
+  const openPost = async (site: SocialSite) => {
+    if (!slide) return;
+    try {
+      await openUrl(composeUrl(site, slide.post));
+    } catch (error) {
+      toast.error(
+        t("insights.share.openFailed", { site: TARGET_NAMES[site] }),
+        {
+          description: String(error),
+        },
+      );
     }
   };
 
@@ -535,7 +584,7 @@ export const ShareDialog: React.FC<{
             <button
               key={site}
               type="button"
-              onClick={() => void postTo(site)}
+              onClick={() => void preparePost(site)}
               disabled={disabled}
               className={roundButton}
               aria-label={t("insights.share.postOn", {
@@ -559,9 +608,50 @@ export const ShareDialog: React.FC<{
             </button>
           )}
         </div>
-        <p className="mt-3 text-center text-xs text-muted">
-          {t("insights.share.private")}
-        </p>
+        {posting ? (
+          <div
+            role="status"
+            className="mx-auto mt-4 flex w-full max-w-2xl flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-hairline bg-surface px-4 py-3 elev-card"
+          >
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-canvas">
+              <SocialMark site={posting.site} size={14} />
+            </span>
+            <p className="min-w-0 flex-1 text-sm text-ink text-pretty">
+              {posting.path
+                ? t("insights.share.savedForPost", {
+                    site: TARGET_NAMES[posting.site],
+                  })
+                : t("insights.share.copiedForPost", { keys: PASTE_KEYS })}
+            </p>
+            <div className="flex items-center gap-2">
+              {posting.path && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const path = posting.path;
+                    if (path) void revealItemInDir(path).catch(() => {});
+                  }}
+                >
+                  {t("insights.share.showInFolder")}
+                </Button>
+              )}
+              <Button size="sm" onClick={() => void openPost(posting.site)}>
+                {t("insights.share.openSite", {
+                  site: TARGET_NAMES[posting.site],
+                })}
+                <ArrowUpRight
+                  className="h-3.5 w-3.5 rtl:-scale-x-100"
+                  aria-hidden="true"
+                />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-center text-xs text-muted">
+            {t("insights.share.private")}
+          </p>
+        )}
       </div>
     </Dialog>
   );
