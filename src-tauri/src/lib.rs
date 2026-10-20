@@ -1186,6 +1186,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_ask_display,
             commands::assistant::list_assistant_displays,
             commands::assistant::assistant_insert_text,
+            commands::assistant::assistant_copy_answer,
             commands::assistant::set_assistant_provider,
             commands::assistant::change_assistant_model_setting,
             commands::assistant::change_assistant_system_prompt_setting,

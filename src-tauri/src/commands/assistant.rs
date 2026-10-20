@@ -312,12 +312,50 @@ pub fn hide_assistant_panel(app: AppHandle) -> Result<(), String> {
 /// rewrite. That cannot be detected before pasting, so the destructive version
 /// stays an explicit act the user takes while looking at the answer.
 ///
+/// Copy an answer through the app's own clipboard, not the webview's: HTML
+/// beside the Markdown when `html` is given, the Markdown alone otherwise.
+///
+/// The panel's Copy tries the webview's clipboard first (`richAnswer.ts`) and
+/// falls back to this. WebKit, on macOS and Linux, refuses a webview clipboard
+/// write once the click's user activation has passed or the panel is not the
+/// focused window, and some WebKitGTK builds have no `ClipboardItem`; the
+/// native write needs neither. Unlike Insert's write, this is the user's own
+/// copy, so it is not kept out of clipboard history. HTML that cannot be
+/// written (Wayland without a native HTML path) falls back to the text.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_copy_answer(
+    app: AppHandle,
+    text: String,
+    html: Option<String>,
+) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    let clipboard = app.clipboard();
+    if let Some(html) = html.filter(|html| !html.trim().is_empty()) {
+        match clipboard.write_html(html.as_str(), Some(text.as_str())) {
+            Ok(()) => return Ok(()),
+            Err(e) => log::debug!("Copying the answer as HTML failed, copying text: {e}"),
+        }
+    }
+    clipboard.write_text(text).map_err(|e| e.to_string())
+}
+
 /// Paste behaviour matches Flow's rather than dictation's: no trailing space and
 /// no auto-submit, because this is a finished artifact being placed, not speech
 /// being typed.
+///
+/// `text` is the answer's Markdown. `html` is the same answer rendered, sent by
+/// the panel only when the Markdown has formatting in it; it goes on the
+/// clipboard beside the text so a rich editor pastes bold and lists instead of
+/// `**` and `1.` (see `clipboard::write_transient_clipboard_html`).
 #[tauri::command]
 #[specta::specta]
-pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String> {
+pub fn assistant_insert_text(
+    app: AppHandle,
+    text: String,
+    html: Option<String>,
+) -> Result<(), String> {
+    let html = html.filter(|html| !html.trim().is_empty());
     let text = text.trim().to_string();
     if text.is_empty() {
         return Err("There is nothing to insert".to_string());
@@ -365,8 +403,9 @@ pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String>
         queued
     };
 
-    let result = crate::clipboard::paste_with_behavior(
+    let result = crate::clipboard::paste_rich_with_behavior(
         text,
+        html.as_deref(),
         app.clone(),
         crate::clipboard::PasteBehavior {
             allow_trailing_space: false,
