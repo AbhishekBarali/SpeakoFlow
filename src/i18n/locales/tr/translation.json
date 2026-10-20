@@ -871,8 +871,7 @@
         "label": "Kısayol olarak fare düğmeleri",
         "description": "Farenizin orta, Geri veya İleri düğmesini kısayol olarak kullanın: bir kısayolun tuşlarına tıklayın, ardından düğmeye basın. Kısayol olduğu sürece düğme başka bir şey yapmaz.",
         "linux": "Linux'ta yalnızca orta düğme çalışır.",
-        "needsEngine": "SpeakoFlow Keys klavye altyapısını gerektirir.",
-        "reset": "Fare düğmesi kullanan kısayollar varsayılan tuşlarına döndü."
+        "needsEngine": "SpeakoFlow Keys klavye altyapısını gerektirir."
       },
       "longFormChunking": {
         "title": "Uzun kayıtları böl",
@@ -3304,6 +3303,11 @@
     "undo": "Geri al",
     "addAnother": "Başka ekle",
     "addAnotherHint": "Bu kısayola ikinci bir tuş takımı verin, örneğin bir fare düğmesi",
+    "addButtonOrKeys": "Fare düğmesi veya tuş ekle",
+    "addButtonOrKeysHint": "Bu kısayola, mevcut tuşlarının yanında bir fare düğmesi veya ikinci bir tuş takımı verin",
+    "mouseAddedAsOther": "{{button}} artık {{name}} için de çalışıyor. {{keys}} de çalışmaya devam ediyor.",
+    "mouseNeedsOtherSlot": "{{name}} zaten başka tuşlara sahip ({{keys}}). Yerine fare düğmesi koymak için onlara tıklayın.",
+    "mouseNeedsOwnKeys": "Önce {{name}} için tuş belirleyin. Fare düğmesi onların yanına eklenir.",
     "remove": "Kaldır",
     "or": "veya",
     "changeOther": "{{name}} kısayolunun diğer tuşlarını değiştir",

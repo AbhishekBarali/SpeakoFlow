@@ -877,8 +877,7 @@
         "label": "Tasti del mouse come scorciatoie",
         "description": "Usa il tasto centrale, Indietro o Avanti del mouse come scorciatoia: fai clic sui tasti di una scorciatoia, poi premi il tasto. Finché è una scorciatoia, il tasto non fa nient'altro.",
         "linux": "Su Linux funziona solo il tasto centrale.",
-        "needsEngine": "Richiede l'implementazione della tastiera SpeakoFlow Keys.",
-        "reset": "Le scorciatoie che usavano un tasto del mouse sono tornate ai tasti predefiniti."
+        "needsEngine": "Richiede l'implementazione della tastiera SpeakoFlow Keys."
       },
       "longFormChunking": {
         "title": "Dividi le registrazioni lunghe",
@@ -3333,6 +3332,11 @@
     "undo": "Annulla",
     "addAnother": "Aggiungi un'altra",
     "addAnotherHint": "Assegna a questa scorciatoia una seconda combinazione, ad esempio un tasto del mouse",
+    "addButtonOrKeys": "Aggiungi tasto del mouse o tasti",
+    "addButtonOrKeysHint": "Assegna a questa scorciatoia un tasto del mouse o una seconda combinazione, oltre ai tasti che ha già",
+    "mouseAddedAsOther": "{{button}} ora funziona anche per {{name}}. Anche {{keys}} continua a funzionare.",
+    "mouseNeedsOtherSlot": "{{name}} ha già altri tasti ({{keys}}). Fai clic su di essi per mettere lì un tasto del mouse.",
+    "mouseNeedsOwnKeys": "Prima assegna dei tasti a {{name}}. Il tasto del mouse si aggiunge accanto a quelli.",
     "remove": "Rimuovi",
     "or": "o",
     "changeOther": "Cambia gli altri tasti della scorciatoia {{name}}",

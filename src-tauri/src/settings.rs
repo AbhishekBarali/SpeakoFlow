@@ -2205,6 +2205,45 @@ pub fn migrate_binding_defaults(
     changed
 }
 
+/// Move a mouse button out of a shortcut's own keys, which may no longer hold
+/// one (`shortcut::combos::own_keys_refusal`), into its other keys. Returns
+/// whether anything changed.
+///
+/// The first release with mouse buttons let one replace a shortcut's own keys,
+/// so an install may have dictation on Back alone. Nothing is lost on the way:
+/// the button becomes the other keys and the shortcut gets keys again. Other
+/// keys that are already keyboard keys swap places with the button, so a
+/// shortcut someone gave both keeps both; only when its other keys are already
+/// a button (or it is the hands-free key, which has no other keys) does the
+/// button in its own keys give way to the default.
+pub fn move_mouse_buttons_to_other_keys(stored: &mut HashMap<String, ShortcutBinding>) -> bool {
+    use crate::shortcut::combos::has_mouse_button;
+    let mut changed = false;
+    for (id, binding) in stored.iter_mut() {
+        let own = binding.current_binding.trim().to_string();
+        if !has_mouse_button(&own) {
+            continue;
+        }
+        let other = binding.alternate_binding.trim().to_string();
+        let has_other_keys = id != HANDS_FREE_BINDING_ID;
+        if has_other_keys && !other.is_empty() && !has_mouse_button(&other) {
+            binding.current_binding = other;
+            binding.alternate_binding = own;
+        } else {
+            if has_other_keys && other.is_empty() {
+                binding.alternate_binding = own;
+            }
+            binding.current_binding = binding.default_binding.clone();
+        }
+        info!(
+            "'{id}' had a mouse button as its own keys: now '{}', other keys '{}'",
+            binding.current_binding, binding.alternate_binding
+        );
+        changed = true;
+    }
+    changed
+}
+
 /// An old default an existing install keeps even though new installs ship
 /// something else.
 ///
@@ -5478,6 +5517,9 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         if migrate_binding_defaults(&mut settings.bindings, &default_settings.bindings) {
             updated = true;
         }
+        if move_mouse_buttons_to_other_keys(&mut settings.bindings) {
+            updated = true;
+        }
         // "Offer to record calls" and the meeting indicator became opt-in.
         // See `meeting_opt_in_defaults_applied`.
         if apply_meeting_opt_in_defaults(&mut settings) {
@@ -5787,6 +5829,71 @@ mod tests {
             current_binding: current.to_string(),
             alternate_binding: String::new(),
         }
+    }
+
+    fn with_other(mut b: ShortcutBinding, other: &str) -> ShortcutBinding {
+        b.alternate_binding = other.to_string();
+        b
+    }
+
+    #[test]
+    fn a_mouse_button_in_a_shortcuts_own_keys_moves_to_its_other_keys() {
+        let mut stored = HashMap::from([
+            // Back alone replaced the dictation keys: it becomes the other
+            // keys and the dictation keys come back.
+            (
+                "transcribe".to_string(),
+                binding("transcribe", "ctrl_left+super", "mousex1"),
+            ),
+            // Both sets in use: they swap, so nothing is lost.
+            (
+                "assistant".to_string(),
+                with_other(
+                    binding("assistant", "ctrl_left+alt_left", "ctrl+mousemiddle"),
+                    "ctrl+alt+f12",
+                ),
+            ),
+            // Both buttons: the other keys keep theirs, the own keys go back.
+            (
+                "assistant_call".to_string(),
+                with_other(
+                    binding("assistant_call", "ctrl_left+alt_left+c", "mousex2"),
+                    "mousex1",
+                ),
+            ),
+            // The hands-free key has no other keys to move it to.
+            (
+                HANDS_FREE_BINDING_ID.to_string(),
+                binding(HANDS_FREE_BINDING_ID, "space", "mousemiddle"),
+            ),
+            // Keys are left alone.
+            (
+                "cancel".to_string(),
+                with_other(binding("cancel", "escape", "escape"), "mousex1"),
+            ),
+        ]);
+        assert!(move_mouse_buttons_to_other_keys(&mut stored));
+
+        let own_and_other = |id: &str| {
+            (
+                stored[id].current_binding.as_str(),
+                stored[id].alternate_binding.as_str(),
+            )
+        };
+        assert_eq!(own_and_other("transcribe"), ("ctrl_left+super", "mousex1"));
+        assert_eq!(
+            own_and_other("assistant"),
+            ("ctrl+alt+f12", "ctrl+mousemiddle")
+        );
+        assert_eq!(
+            own_and_other("assistant_call"),
+            ("ctrl_left+alt_left+c", "mousex1")
+        );
+        assert_eq!(own_and_other(HANDS_FREE_BINDING_ID), ("space", ""));
+        assert_eq!(own_and_other("cancel"), ("escape", "mousex1"));
+
+        // A second launch has nothing left to do.
+        assert!(!move_mouse_buttons_to_other_keys(&mut stored));
     }
 
     #[test]

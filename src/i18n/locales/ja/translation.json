@@ -865,8 +865,7 @@
         "label": "マウスボタンをショートカットに使う",
         "description": "マウスの中ボタン、戻るボタン、進むボタンをショートカットとして使えます。ショートカットのキーをクリックしてから、ボタンを押してください。ショートカットに割り当てたボタンは、ほかの動作をしません。",
         "linux": "Linux では中ボタンだけが使えます。",
-        "needsEngine": "キーボード実装が SpeakoFlow Keys の場合のみ使えます。",
-        "reset": "マウスボタンを使っていたショートカットは既定のキーに戻りました。"
+        "needsEngine": "キーボード実装が SpeakoFlow Keys の場合のみ使えます。"
       },
       "longFormChunking": {
         "title": "長い録音を分割する",
@@ -3275,6 +3274,11 @@
     "undo": "元に戻す",
     "addAnother": "別のキーを追加",
     "addAnotherHint": "このショートカットに、マウスボタンなど2つ目のキーを割り当てます",
+    "addButtonOrKeys": "マウスボタンかキーを追加",
+    "addButtonOrKeysHint": "このショートカットに、今のキーに加えてマウスボタンか2つ目のキーを割り当てます",
+    "mouseAddedAsOther": "{{button}} でも {{name}} を使えるようになりました。{{keys}} もそのまま使えます。",
+    "mouseNeedsOtherSlot": "{{name}} にはすでに別のキー（{{keys}}）があります。そこをクリックすると、マウスボタンに変更できます。",
+    "mouseNeedsOwnKeys": "先に {{name}} にキーを割り当ててください。マウスボタンはその横に追加されます。",
     "remove": "削除",
     "or": "または",
     "changeOther": "{{name}}のもう一方のキーを変更",

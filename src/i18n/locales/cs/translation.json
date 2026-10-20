@@ -883,8 +883,7 @@
         "label": "Tlačítka myši jako zkratky",
         "description": "Použijte prostřední tlačítko myši nebo tlačítka Zpět a Vpřed jako zkratku: klikněte na klávesy zkratky a pak stiskněte tlačítko. Dokud je zkratkou, tlačítko nedělá nic jiného.",
         "linux": "V Linuxu funguje jen prostřední tlačítko.",
-        "needsEngine": "Vyžaduje implementaci klávesnice SpeakoFlow Keys.",
-        "reset": "Zkratky, které používaly tlačítko myši, mají zase výchozí klávesy."
+        "needsEngine": "Vyžaduje implementaci klávesnice SpeakoFlow Keys."
       },
       "longFormChunking": {
         "title": "Rozdělovat dlouhé nahrávky",
@@ -3362,6 +3361,11 @@
     "undo": "Zpět",
     "addAnother": "Přidat další",
     "addAnotherHint": "Přiřadit této zkratce druhou sadu kláves, třeba tlačítko myši",
+    "addButtonOrKeys": "Přidat tlačítko myši nebo klávesy",
+    "addButtonOrKeysHint": "Přiřadit této zkratce tlačítko myši nebo druhou sadu kláves, vedle kláves, které už má",
+    "mouseAddedAsOther": "{{button}} teď funguje i pro {{name}}. {{keys}} funguje dál.",
+    "mouseNeedsOtherSlot": "{{name}} už má jiné klávesy ({{keys}}). Klikněte na ně a nastavte tam tlačítko myši.",
+    "mouseNeedsOwnKeys": "Nejdřív zkratce {{name}} přiřaďte klávesy. Tlačítko myši se přidá k nim.",
     "remove": "Odebrat",
     "or": "nebo",
     "changeOther": "Změnit další klávesy zkratky {{name}}",
