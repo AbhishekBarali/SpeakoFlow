@@ -146,9 +146,10 @@ static MIGRATIONS: &[M] = &[
     // One row per meeting ever recorded, deliberately without a foreign key:
     // deleting a meeting frees its hour of audio, and must not also take the
     // meeting out of the user's totals. `seconds` is known once capture ends and
-    // `words` once the meeting is complete (see `MeetingStore::usage`); both are
-    // NULL until then. Meetings that exist today are seeded here; ones deleted
-    // before this migration left nothing to count.
+    // `words` once the meeting is complete or interrupted (see
+    // `MeetingStore::usage`); both are NULL until then. Meetings that exist
+    // today are seeded here; ones deleted before this migration left nothing to
+    // count.
     M::up(
         "CREATE TABLE IF NOT EXISTS meeting_usage (
             meeting_id INTEGER PRIMARY KEY,
@@ -275,8 +276,9 @@ impl MeetingStore {
         started_at: i64,
         language: Option<&str>,
     ) -> Result<i64> {
-        let conn = self.open()?;
-        conn.execute(
+        let mut conn = self.open()?;
+        let tx = conn.transaction()?;
+        tx.execute(
             "INSERT INTO meetings (title, started_at, status, language)
              VALUES (?1, ?2, ?3, ?4)",
             params![
@@ -286,8 +288,8 @@ impl MeetingStore {
                 language
             ],
         )?;
-        let id = conn.last_insert_rowid();
-        conn.execute(
+        let id = tx.last_insert_rowid();
+        tx.execute(
             "INSERT OR IGNORE INTO meeting_usage (meeting_id, started_at) VALUES (?1, ?2)",
             params![id, started_at],
         )?;
@@ -295,13 +297,14 @@ impl MeetingStore {
         // Seed the two channel-derived speakers immediately. Doing it here
         // rather than lazily means the UI always has something to render and
         // rename, even for a meeting that produced no transcript at all.
-        self.ensure_speaker_on(&conn, id, SpeakerSource::Mic.default_speaker_key(), "You")?;
+        self.ensure_speaker_on(&tx, id, SpeakerSource::Mic.default_speaker_key(), "You")?;
         self.ensure_speaker_on(
-            &conn,
+            &tx,
             id,
             SpeakerSource::System.default_speaker_key(),
             "Others",
         )?;
+        tx.commit()?;
 
         info!("Started meeting {id}: {}", crate::utils::redact_text(title));
         Ok(id)
@@ -1020,16 +1023,17 @@ pub struct DiarizedSpan {
 
 /// Copy what a meeting is counted with from the meeting itself into
 /// `meeting_usage`: its length once capture has ended, and the words of its
-/// transcript once it is complete, or in any state when `any_status` is set (a
-/// meeting about to be deleted is as finished as it will ever be). `only`
-/// restricts both to one meeting. Word counts are kept once taken, since a
-/// finished transcript does not change.
+/// transcript once it is complete or interrupted, or in any state when
+/// `any_status` is set (a meeting about to be deleted is as finished as it will
+/// ever be). `only` restricts both to one meeting. Both are kept once taken: a
+/// meeting's end time is set once, and a finished transcript does not change.
 fn snapshot_usage(conn: &Connection, only: Option<i64>, any_status: bool) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE meeting_usage
             SET seconds = (SELECT MAX(0, m.ended_at - m.started_at)
                              FROM meetings m WHERE m.id = meeting_usage.meeting_id)
-          WHERE meeting_id IN (SELECT id FROM meetings WHERE ended_at IS NOT NULL)
+          WHERE seconds IS NULL
+            AND meeting_id IN (SELECT id FROM meetings WHERE ended_at IS NOT NULL)
             AND (?1 IS NULL OR meeting_id = ?1)",
         params![only],
     )?;
@@ -1040,10 +1044,15 @@ fn snapshot_usage(conn: &Connection, only: Option<i64>, any_status: bool) -> rus
                JOIN meetings m ON m.id = u.meeting_id
               WHERE u.words IS NULL
                 AND (?1 IS NULL OR u.meeting_id = ?1)
-                AND (?2 OR m.status = ?3)",
+                AND (?2 OR m.status IN (?3, ?4))",
         )?
         .query_map(
-            params![only, any_status, MeetingStatus::Complete.as_db_str()],
+            params![
+                only,
+                any_status,
+                MeetingStatus::Complete.as_db_str(),
+                MeetingStatus::Interrupted.as_db_str()
+            ],
             |row| row.get(0),
         )?
         .collect::<rusqlite::Result<_>>()?;
@@ -1260,6 +1269,71 @@ mod tests {
                 words: 3
             }]
         );
+    }
+
+    #[test]
+    fn an_interrupted_meeting_counts_its_words() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Crashed", 1_000, None).unwrap();
+        store
+            .append_segments(
+                id,
+                &[segment(SpeakerSource::Mic, 0, 45_000, "one two three")],
+            )
+            .unwrap();
+        store.reconcile_interrupted().unwrap();
+
+        assert_eq!(
+            store.usage().unwrap(),
+            vec![MeetingUsageRow {
+                started_at: 1_000,
+                seconds: 45,
+                words: 3
+            }]
+        );
+    }
+
+    #[test]
+    fn a_meetings_counted_length_is_taken_once() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Sync", 1_000, None).unwrap();
+        store.finish_capture(id, 1_600, None, None).unwrap();
+        assert_eq!(store.usage().unwrap()[0].seconds, 600);
+
+        // A later read leaves a length already taken alone.
+        store
+            .open()
+            .unwrap()
+            .execute(
+                "UPDATE meeting_usage SET seconds = 42 WHERE meeting_id = ?1",
+                params![id],
+            )
+            .unwrap();
+        assert_eq!(store.usage().unwrap()[0].seconds, 42);
+    }
+
+    #[test]
+    fn a_meeting_that_fails_to_be_created_leaves_nothing_behind() {
+        let (store, _dir) = temp_store();
+        store
+            .open()
+            .unwrap()
+            .execute_batch(
+                "CREATE TRIGGER refuse_speakers BEFORE INSERT ON meeting_speakers
+                 BEGIN SELECT RAISE(ABORT, 'refused'); END;",
+            )
+            .unwrap();
+        assert!(store.create_meeting("Sync", 1_000, None).is_err());
+
+        let conn = store.open().unwrap();
+        let count = |table: &str| -> i64 {
+            conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap()
+        };
+        assert_eq!(count("meetings"), 0);
+        assert_eq!(count("meeting_usage"), 0);
     }
 
     #[test]

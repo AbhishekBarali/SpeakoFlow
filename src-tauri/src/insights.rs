@@ -10,15 +10,17 @@
 //! said to the app.
 
 use std::collections::BTreeSet;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use chrono::{Days, Local, NaiveDate};
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::managers::history::{
     compute_streaks, local_day, AssistantUsage, HistoryManager, UsageStats,
@@ -29,6 +31,15 @@ use crate::meetings::store::{MeetingStore, MeetingUsageRow};
 /// A call longer than this was a window left open, not a conversation; it is
 /// counted at this length.
 const MAX_CALL: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// Emitted, with no payload, after a lifetime counter has changed, so an open
+/// Insights page can read its figures again.
+pub const INSIGHTS_UPDATED_EVENT: &str = "insights-updated";
+
+/// Tell an open Insights page that its figures have changed.
+pub fn notify_updated(app: &AppHandle) {
+    let _ = app.emit(INSIGHTS_UPDATED_EVENT, ());
+}
 
 /// One local day of meetings, for the Insights activity grid.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
@@ -153,8 +164,9 @@ pub fn record_question(app: &AppHandle) {
         crate::voice_conversation::note_turn(app);
     }
     if let Some(history) = app.try_state::<Arc<HistoryManager>>() {
-        if let Err(e) = history.record_assistant_question(on_call) {
-            error!("Failed to count an assistant question: {}", e);
+        match history.record_assistant_question(on_call) {
+            Ok(()) => notify_updated(app),
+            Err(e) => error!("Failed to count an assistant question: {}", e),
         }
     }
 }
@@ -163,8 +175,9 @@ pub fn record_question(app: &AppHandle) {
 pub fn record_call(app: &AppHandle, started_at: i64, length: Duration) {
     if let Some(history) = app.try_state::<Arc<HistoryManager>>() {
         let seconds = length.min(MAX_CALL).as_secs_f64();
-        if let Err(e) = history.record_assistant_call(started_at, seconds) {
-            error!("Failed to count an assistant call: {}", e);
+        match history.record_assistant_call(started_at, seconds) {
+            Ok(()) => notify_updated(app),
+            Err(e) => error!("Failed to count an assistant call: {}", e),
         }
     }
 }
@@ -232,6 +245,65 @@ pub fn save_insights_card(path: String, png_base64: String) -> Result<(), String
     std::fs::write(&path, bytes).map_err(|e| format!("Could not save the image: {e}"))
 }
 
+/// The name a share card is saved and shared under.
+const CARD_FILE_STEM: &str = "SpeakoFlow insights";
+
+/// How many numbered names [`write_new_card`] tries before giving up.
+const MAX_CARD_NAME_TRIES: u32 = 10_000;
+
+/// Write `bytes` into `dir` as `SpeakoFlow insights.png`, or the first free
+/// `SpeakoFlow insights (2).png`, `(3)`, ... when that is taken. A file is only
+/// ever created, never overwritten, so an existing one is safe even from a
+/// save racing this one. Returns the path written.
+fn write_new_card(dir: &Path, bytes: &[u8]) -> std::io::Result<PathBuf> {
+    for n in 1..=MAX_CARD_NAME_TRIES {
+        let name = if n == 1 {
+            format!("{CARD_FILE_STEM}.png")
+        } else {
+            format!("{CARD_FILE_STEM} ({n}).png")
+        };
+        let path = dir.join(name);
+        let mut file = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        };
+        if let Err(e) = file.write_all(bytes).and_then(|()| file.sync_all()) {
+            drop(file);
+            let _ = std::fs::remove_file(&path);
+            return Err(e);
+        }
+        return Ok(path);
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "every name for the image is taken",
+    ))
+}
+
+/// Save a share card to the Downloads folder without asking where, under a
+/// name no existing file has. Returns the absolute path written.
+#[tauri::command]
+#[specta::specta]
+pub fn save_insights_card_to_downloads(
+    app: AppHandle,
+    png_base64: String,
+) -> Result<String, String> {
+    let bytes = decode_card(&png_base64)?;
+    let dir = app
+        .path()
+        .download_dir()
+        .map_err(|e| format!("Could not find the Downloads folder: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not save the image: {e}"))?;
+    let path =
+        write_new_card(&dir, &bytes).map_err(|e| format!("Could not save the image: {e}"))?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// Put a share card on the clipboard as an image, for a webview whose own
 /// clipboard refuses images (WebKit without `ClipboardItem`, or a write that
 /// lost its user activation).
@@ -246,10 +318,64 @@ pub fn copy_insights_card(app: AppHandle, png_base64: String) -> Result<(), Stri
         .map_err(|e| format!("Could not copy the image: {e}"))
 }
 
+/// How long a shared card is kept in the cache. The receiving app reads it
+/// once the user has picked it, which is minutes at most, not days.
+const SHARE_KEEP: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// A new, empty folder under `root` for one share, named after `now` in
+/// nanoseconds since the Unix epoch.
+fn new_share_dir(root: &Path, now: SystemTime) -> std::io::Result<PathBuf> {
+    std::fs::create_dir_all(root)?;
+    let mut stamp = now
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    loop {
+        let dir = root.join(stamp.to_string());
+        match std::fs::create_dir(&dir) {
+            Ok(()) => return Ok(dir),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => stamp += 1,
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+/// Remove the share folders under `root` made more than [`SHARE_KEEP`] before
+/// `now`. Best effort: anything else in `root` is left alone, and a folder that
+/// cannot be removed (an app may still hold its file) is tried again next time.
+fn prune_share_dirs(root: &Path, now: SystemTime) {
+    let Some(cutoff) = now
+        .checked_sub(SHARE_KEEP)
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos())
+    else {
+        return;
+    };
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Some(stamp) = entry
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<u128>().ok())
+        else {
+            continue;
+        };
+        if stamp >= cutoff || !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+            continue;
+        }
+        if let Err(e) = std::fs::remove_dir_all(entry.path()) {
+            warn!("Could not remove an old shared image: {e}");
+        }
+    }
+}
+
 /// Hand a share card to the system's share sheet (Windows' Share panel, the
 /// macOS Share menu beside `anchor`). The image is written to the app's cache
 /// first, under a name the receiving app may show, because the sheet passes
-/// files rather than pixels.
+/// files rather than pixels. Each share gets its own folder, so an app that
+/// reads its file late still gets the card it was handed.
 #[tauri::command]
 #[specta::specta]
 pub async fn share_insights_card(
@@ -260,21 +386,16 @@ pub async fn share_insights_card(
     anchor: crate::share_sheet::ShareAnchor,
 ) -> Result<(), String> {
     let bytes = decode_card(&png_base64)?;
-    let dir = app
+    let root = app
         .path()
         .app_cache_dir()
         .map_err(|e| e.to_string())?
         .join("share");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not prepare the image: {e}"))?;
-    let mut file = dir.join("SpeakoFlow insights.png");
-    // An app may still be reading the last one; a fresh name never collides.
-    if std::fs::write(&file, &bytes).is_err() {
-        file = dir.join(format!(
-            "SpeakoFlow insights {}.png",
-            chrono::Local::now().format("%Y-%m-%d %H%M%S")
-        ));
-        std::fs::write(&file, &bytes).map_err(|e| format!("Could not prepare the image: {e}"))?;
-    }
+    let now = SystemTime::now();
+    prune_share_dirs(&root, now);
+    let dir = new_share_dir(&root, now).map_err(|e| format!("Could not prepare the image: {e}"))?;
+    let file = dir.join(format!("{CARD_FILE_STEM}.png"));
+    std::fs::write(&file, &bytes).map_err(|e| format!("Could not prepare the image: {e}"))?;
     tauri::async_runtime::spawn_blocking(move || {
         crate::share_sheet::show(&window, &file, &title, anchor)
     })
@@ -402,5 +523,46 @@ mod tests {
         assert!(decode_card(&engine.encode(b"\x89PNG\r\n\x1a\nrest")).is_ok());
         assert!(decode_card(&engine.encode(b"GIF89a")).is_err());
         assert!(decode_card("not base64!").is_err());
+    }
+
+    #[test]
+    fn a_saved_card_takes_the_first_free_name_and_never_overwrites() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let first = write_new_card(dir.path(), b"one").expect("first save");
+        let second = write_new_card(dir.path(), b"two").expect("second save");
+        assert_eq!(first, dir.path().join("SpeakoFlow insights.png"));
+        assert_eq!(second, dir.path().join("SpeakoFlow insights (2).png"));
+
+        // A gap left by a deleted file is reused; existing files keep their bytes.
+        std::fs::write(dir.path().join("SpeakoFlow insights (4).png"), b"mine").unwrap();
+        let third = write_new_card(dir.path(), b"three").expect("third save");
+        let fifth = write_new_card(dir.path(), b"five").expect("fifth save");
+        assert_eq!(third, dir.path().join("SpeakoFlow insights (3).png"));
+        assert_eq!(fifth, dir.path().join("SpeakoFlow insights (5).png"));
+        assert_eq!(std::fs::read(&first).unwrap(), b"one");
+        assert_eq!(std::fs::read(&second).unwrap(), b"two");
+        assert_eq!(
+            std::fs::read(dir.path().join("SpeakoFlow insights (4).png")).unwrap(),
+            b"mine"
+        );
+    }
+
+    #[test]
+    fn each_share_gets_its_own_folder_and_old_ones_are_pruned() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let now = UNIX_EPOCH + Duration::from_secs(10 * 24 * 60 * 60);
+        let a = new_share_dir(root.path(), now).expect("first share");
+        let b = new_share_dir(root.path(), now).expect("second share, same instant");
+        assert_ne!(a, b);
+
+        let old = new_share_dir(root.path(), now - SHARE_KEEP - Duration::from_secs(1))
+            .expect("old share");
+        std::fs::write(old.join("SpeakoFlow insights.png"), b"old").unwrap();
+        let other = root.path().join("not-a-share");
+        std::fs::create_dir(&other).unwrap();
+
+        prune_share_dirs(root.path(), now);
+        assert!(!old.exists());
+        assert!(a.exists() && b.exists() && other.exists());
     }
 }
