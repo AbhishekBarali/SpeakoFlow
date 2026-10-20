@@ -194,6 +194,38 @@ fn finish_idle(app: &AppHandle) {
     change_tray_icon(app, TrayIconState::Idle);
 }
 
+/// The longest the stop cue waits for other audio to come back up. The fade
+/// takes a fifth of a second; the rest is for a slow volume tool.
+const STOP_CUE_WAIT: Duration = Duration::from_millis(600);
+
+/// Bring other audio back, then play the stop cue once it is back up, so the
+/// cue is heard at full volume rather than at the lowered one. With nothing to
+/// wait for (ducking off, or a recording too short to have lowered anything)
+/// it plays at once, as it always has. Otherwise it waits on a thread of its
+/// own, so the transcription never waits for a fade.
+///
+/// A recording started while it waits (an always-on microphone lets the next
+/// one start at once) has played its own start cue by then, so this stop cue
+/// is dropped rather than played into the new recording.
+fn play_stop_cue_after(app: &AppHandle, rm: &Arc<AudioRecordingManager>) {
+    let restored = rm.restore_other_audio();
+    if restored.is_settled() {
+        play_feedback_sound(app, SoundType::Stop);
+        return;
+    }
+    let started = rm.recordings_started();
+    let app = app.clone();
+    let rm = Arc::clone(rm);
+    std::thread::spawn(move || {
+        restored.wait(STOP_CUE_WAIT);
+        if rm.recordings_started() != started {
+            debug!("A new recording started before the stop cue; skipping it");
+            return;
+        }
+        play_feedback_sound_blocking(&app, SoundType::Stop);
+    });
+}
+
 /// The one field of the structured cleanup answer.
 ///
 /// **It must not be called `transcription`, and that is measured, not taste.**
@@ -2835,24 +2867,34 @@ impl ShortcutAction for TranscribeAction {
 
         let mut recording_error: Option<String> = None;
         if is_always_on {
-            // Always-on mode: Play audio feedback immediately, then apply mute after sound finishes
+            // Always-on mode: play the start cue immediately. Other audio is
+            // quieted once the cue has finished *and* the recording is under
+            // way: with feedback off the cue returns at once, and a quieting
+            // that ran before the recording started would be refused, while
+            // one for a recording that failed to start would never be undone.
             debug!("Always-on mode: Playing audio feedback immediately");
-            let rm_clone = Arc::clone(&rm);
             let app_clone = app.clone();
-            // The blocking helper exits immediately if audio feedback is disabled,
-            // so we can always reuse this thread to ensure mute happens right after playback.
-            std::thread::spawn(move || {
+            // The blocking helper exits immediately if audio feedback is disabled.
+            let cue = std::thread::spawn(move || {
                 play_feedback_sound_blocking(&app_clone, SoundType::Start);
-                rm_clone.apply_mute();
             });
 
-            if let Err(e) = rm.try_start_recording(&binding_id, vad_tail) {
-                debug!("Recording failed: {}", e);
-                recording_error = Some(e);
+            match rm.try_start_recording(&binding_id, vad_tail) {
+                Ok(()) => {
+                    let rm_clone = Arc::clone(&rm);
+                    std::thread::spawn(move || {
+                        let _ = cue.join();
+                        rm_clone.quiet_other_audio();
+                    });
+                }
+                Err(e) => {
+                    debug!("Recording failed: {}", e);
+                    recording_error = Some(e);
+                }
             }
         } else {
             // On-demand mode: open the mic + start capture, then cue the user
-            // and apply mute. The cue is played only once the microphone is
+            // and quiet other audio. The cue is played only once the microphone is
             // genuinely delivering audio (via `wait_for_capture_ready`), so a
             // slow-to-wake device (Bluetooth/USB, or a cold-started stream)
             // can't swallow the user's first words — the cue itself is the
@@ -2869,15 +2911,15 @@ impl ShortcutAction for TranscribeAction {
                     let app_clone = app.clone();
                     let rm_clone = Arc::clone(&rm);
                     // The blocking helper exits immediately when audio feedback
-                    // is disabled, so we always reuse this thread to keep mute
-                    // sequenced right after the (possible) cue.
+                    // is disabled, so we always reuse this thread to keep the
+                    // quieting sequenced right after the (possible) cue.
                     std::thread::spawn(move || {
                         // Bounded so a device that never reports readiness can't
                         // hang the cue; in practice this returns within one
                         // buffer period of the mic going live.
                         rm_clone.wait_for_capture_ready(std::time::Duration::from_millis(1500));
                         play_feedback_sound_blocking(&app_clone, SoundType::Start);
-                        rm_clone.apply_mute();
+                        rm_clone.quiet_other_audio();
                     });
                 }
                 Err(e) => {
@@ -2946,11 +2988,8 @@ impl ShortcutAction for TranscribeAction {
 
         change_tray_icon(app, TrayIconState::Transcribing);
 
-        // Unmute before playing audio feedback so the stop sound is audible
-        rm.remove_mute();
-
-        // Play audio feedback for recording stop
-        play_feedback_sound(app, SoundType::Stop);
+        // Other audio comes back before the stop cue, so the cue is audible.
+        play_stop_cue_after(app, &rm);
 
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
                                                  // Two different questions. Flow listens only on the dictation shortcut,
@@ -4062,7 +4101,7 @@ impl ShortcutAction for AssistantAction {
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                     play_feedback_sound_blocking(&app_clone, SoundType::Start);
-                    rm_clone.apply_mute();
+                    rm_clone.quiet_other_audio();
                 });
             }
             Err(e) => {
@@ -4121,8 +4160,7 @@ impl ShortcutAction for AssistantAction {
         change_tray_icon(app, TrayIconState::Transcribing);
         crate::assistant::emit_state(app, "transcribing");
 
-        rm.remove_mute();
-        play_feedback_sound(app, SoundType::Stop);
+        play_stop_cue_after(app, &rm);
 
         let binding_id = binding_id.to_string();
         tauri::async_runtime::spawn(async move {

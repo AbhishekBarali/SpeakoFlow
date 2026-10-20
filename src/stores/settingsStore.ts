@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AudioDevice,
+  AudioDucking,
   AudioTagIntensity,
   ChineseScript,
   ConversationPace,
@@ -251,8 +252,10 @@ const settingUpdaters: {
     commands.changePostProcessThinkingSetting(value as ThinkingLevel),
   assistant_thinking: (value) =>
     commands.setAssistantThinking(value as ThinkingLevel),
-  mute_while_recording: (value) =>
-    commands.changeMuteWhileRecordingSetting(value as boolean),
+  audio_ducking: (value) =>
+    commands.changeAudioDuckingSetting(value as AudioDucking),
+  audio_ducking_amount: (value) =>
+    commands.changeAudioDuckingAmountSetting(value as number),
   append_trailing_space: (value) =>
     commands.changeAppendTrailingSpaceSetting(value as boolean),
   smart_spacing: (value) =>

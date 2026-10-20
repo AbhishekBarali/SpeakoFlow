@@ -1,7 +1,7 @@
 use crate::audio_feedback;
 use crate::audio_toolkit::audio::{list_input_devices, list_output_devices};
 use crate::managers::audio::{AudioRecordingManager, MicrophoneMode};
-use crate::settings::{get_settings, write_settings};
+use crate::settings::{clamp_audio_ducking_amount, get_settings, write_settings};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -292,6 +292,16 @@ pub async fn play_test_sound(app: AppHandle, sound_type: String) {
         }
     };
     audio_feedback::play_test_sound(&app, sound);
+}
+
+/// Let the user hear "Lower by `amount`%" on whatever is playing: other audio
+/// dips, and comes back by itself a moment after the last call. Ignored while
+/// a recording is under way.
+#[tauri::command]
+#[specta::specta]
+pub fn preview_audio_ducking(app: AppHandle, amount: u8) {
+    app.state::<Arc<AudioRecordingManager>>()
+        .preview_ducking(clamp_audio_ducking_amount(amount));
 }
 
 #[tauri::command]

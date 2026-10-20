@@ -1035,7 +1035,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::import_text_replacements,
             shortcut::suspend_binding,
             shortcut::resume_binding,
-            shortcut::change_mute_while_recording_setting,
+            shortcut::change_audio_ducking_setting,
+            shortcut::change_audio_ducking_amount_setting,
             shortcut::change_append_trailing_space_setting,
             shortcut::change_smart_spacing_setting,
             shortcut::change_smart_spacing_fix_case_setting,
@@ -1132,6 +1133,7 @@ pub fn run(cli_args: CliArgs) {
             commands::audio::set_selected_output_device,
             commands::audio::get_selected_output_device,
             commands::audio::play_test_sound,
+            commands::audio::preview_audio_ducking,
             commands::audio::check_custom_sounds,
             commands::audio::set_clamshell_microphone,
             commands::audio::get_clamshell_microphone,
@@ -1753,6 +1755,12 @@ pub(crate) fn release_before_exit(app: &AppHandle) {
     // quit may still be waiting for the settings writer thread, and a logout or
     // shutdown can end the process before the steps below finish.
     settings::flush_settings();
+    // Other audio a recording (or the ducking preview) lowered or muted comes
+    // back, or quitting mid-dictation would leave the computer quiet. Bounded
+    // to a second; the fade back up takes a fifth of one.
+    if let Some(rm) = app.try_state::<std::sync::Arc<managers::audio::AudioRecordingManager>>() {
+        rm.restore_other_audio_before_exit();
+    }
     // A dictation pasted in the last second may still hold the clipboard,
     // waiting for its target to read it; put the user's clipboard back now,
     // since the transaction's own restore dies with the process. The old
