@@ -581,9 +581,25 @@ async resumeBinding(id: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async changeMuteWhileRecordingSetting(enabled: boolean) : Promise<Result<null, string>> {
+/**
+ * Choose what a recording does to the computer's other audio: leave it,
+ * lower it, or mute it. Read when each recording starts.
+ */
+async changeAudioDuckingSetting(ducking: AudioDucking) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_mute_while_recording_setting", { enabled }) };
+    return { status: "ok", data: await TAURI_INVOKE("change_audio_ducking_setting", { ducking }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set how far Lower turns other audio down, in percent. Kept within the
+ * slider's range.
+ */
+async changeAudioDuckingAmountSetting(amount: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_audio_ducking_amount_setting", { amount }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1542,6 +1558,14 @@ async getSelectedOutputDevice() : Promise<Result<string, string>> {
 },
 async playTestSound(soundType: string) : Promise<void> {
     await TAURI_INVOKE("play_test_sound", { soundType });
+},
+/**
+ * Let the user hear "Lower by `amount`%" on whatever is playing: other audio
+ * dips, and comes back by itself a moment after the last call. Ignored while
+ * a recording is under way.
+ */
+async previewAudioDucking(amount: number) : Promise<void> {
+    await TAURI_INVOKE("preview_audio_ducking", { amount });
 },
 async checkCustomSounds() : Promise<CustomSounds> {
     return await TAURI_INVOKE("check_custom_sounds");
@@ -4071,7 +4095,18 @@ flow_phrase?: string;
  * clearly refers to the screen. Separate from the assistant's screen
  * access mode on purpose — the two features are permissioned independently.
  */
-flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_space?: boolean; 
+flow_screen_access?: boolean; 
+/**
+ * What happens to the computer's other audio while a dictation or an ask
+ * records. Replaces the `mute_while_recording` switch, whose on is
+ * `Mute` (`migrate_mute_while_recording`).
+ */
+audio_ducking?: AudioDucking; 
+/**
+ * How far `AudioDucking::Lower` turns other audio down, in percent of
+ * its volume, from `AUDIO_DUCKING_AMOUNT_MIN` to `AUDIO_DUCKING_AMOUNT_MAX`.
+ */
+audio_ducking_amount?: number; append_trailing_space?: boolean; 
 /**
  * Smart spacing: fit each dictation onto the text already in the field
  * (a space where one is needed, the right case, no stray period from the
@@ -4577,6 +4612,24 @@ export type AssistantSearchDepth =
  */
 "high"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
+/**
+ * What a dictation or an ask does to the computer's other audio (music, a
+ * video, a call) while it records. It comes back when the recording ends.
+ * See `audio_toolkit::ducking`.
+ */
+export type AudioDucking = 
+/**
+ * Leave it as it is. The default.
+ */
+"off" | 
+/**
+ * Turn it down by `audio_ducking_amount` percent ("ducking").
+ */
+"lower" | 
+/**
+ * Mute it. What the "Mute while recording" switch did.
+ */
+"mute"
 /**
  * How much an ElevenLabs v3/v4 voice performs when audio tags are on
  * (`assistant_tts_elevenlabs_audio_tags`). Each level is a different paragraph

@@ -842,6 +842,20 @@
       "volume": {
         "title": "Volume",
         "description": "Ajuster le volume du signal sonore"
+      },
+      "ducking": {
+        "label": "Pendant l'enregistrement",
+        "ariaLabel": "Autres sons pendant l'enregistrement",
+        "description": "Baisse ou coupe les autres sons pendant que vous enregistrez, pour qu'ils ne vous distraient pas et n'atteignent pas le micro. Ils reviennent dès la fin de l'enregistrement. Aussi appelé ducking.",
+        "options": {
+          "off": "Inchangés",
+          "lower": "Baisser",
+          "mute": "Couper"
+        },
+        "amount": {
+          "label": "Baisser de",
+          "description": "De combien les autres sons sont baissés. Faites glisser le curseur pendant qu'un son est diffusé pour l'entendre. Si vous changez le volume vous-même pendant un enregistrement, il reste là où vous l'avez mis."
+        }
       }
     },
     "advanced": {
@@ -1457,10 +1471,6 @@
       "postProcessingToggle": {
         "label": "Nettoyage IA",
         "description": "Nettoyer votre dictée avec l'IA après la transcription"
-      },
-      "muteWhileRecording": {
-        "label": "Muet pendant l'enregistrement",
-        "description": "Couper le son du système pendant l'enregistrement"
       },
       "appendTrailingSpace": {
         "label": "Ajouter une espace finale",
@@ -2617,6 +2627,8 @@
     },
     "audio": {
       "microphone": "Microphone",
+      "otherAudio": "Autres sons",
+      "otherAudioHint": "La musique, les vidéos et les appels en cours sur votre ordinateur pendant que vous dictez ou interrogez l'assistant.",
       "overlayHint": "La petite pastille affichée pendant l'enregistrement."
     },
     "dictation": {
