@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod chunking;
 pub mod constants;
+pub mod ducking;
 pub mod replacements;
 pub mod spoken_emojis;
 pub mod text;

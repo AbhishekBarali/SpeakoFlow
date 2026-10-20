@@ -836,6 +836,20 @@
       "volume": {
         "title": "Ses Seviyesi",
         "description": "Sesli geri bildirimlerin ses seviyesini ayarlayın"
+      },
+      "ducking": {
+        "label": "Kayıt sırasında",
+        "ariaLabel": "Kayıt sırasında diğer sesler",
+        "description": "Kayıt yaparken diğer sesleri kısar veya kapatır; böylece dikkatinizi dağıtmaz ve mikrofona ulaşmaz. Kayıt biter bitmez geri gelir. Ducking olarak da bilinir.",
+        "options": {
+          "off": "Değiştirme",
+          "lower": "Kıs",
+          "mute": "Kapat"
+        },
+        "amount": {
+          "label": "Kısma miktarı",
+          "description": "Diğer seslerin ne kadar kısılacağı. Bir şey çalarken kaydırıcıyı sürükleyerek duyabilirsiniz. Kayıt sırasında sesi kendiniz değiştirirseniz, bıraktığınız yerde kalır."
+        }
       }
     },
     "advanced": {
@@ -1448,10 +1462,6 @@
       "postProcessingToggle": {
         "label": "Yapay zekâ temizleme",
         "description": "Transkripsiyondan sonra diktenizi yapay zekâ ile temizle"
-      },
-      "muteWhileRecording": {
-        "label": "Kayıt sırasında sesi kapat",
-        "description": "Kayıt sırasında sistem sesini kapatır"
       },
       "appendTrailingSpace": {
         "label": "Sona boşluk ekle",
@@ -2599,6 +2609,8 @@
     },
     "audio": {
       "microphone": "Mikrofon",
+      "otherAudio": "Diğer sesler",
+      "otherAudioHint": "Dikte ederken veya asistana soru sorarken bilgisayarınızda çalan müzik, video ve aramalar.",
       "overlayHint": "Kayıt yaparken görünen küçük kapsül."
     },
     "dictation": {
