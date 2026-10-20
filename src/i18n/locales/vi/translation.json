@@ -2733,7 +2733,10 @@
     "download": "Tải phiên bản mới ({{size}})",
     "retry": "Thử lại",
     "chooseAnother": "Chọn mô hình khác",
-    "progressLabel": "Đang tải phiên bản mới"
+    "progressLabel": "Đang tải phiên bản mới",
+    "dialogTitle": "SpeakoFlow có công cụ giọng nói mới",
+    "dialogBody": "Nó nhanh hơn và ổn định hơn, nên bạn sẽ ít gặp sự cố hơn. {{model}} chạy trên công cụ cũ và cần phiên bản mới để tiếp tục hoạt động.",
+    "later": "Để sau"
   },
   "modelsHub": {
     "description": "Mỗi việc trong SpeakoFlow do một mô hình bạn chọn đảm nhận. Chạy trên máy tính này để riêng tư, hoặc trên đám mây để nhanh hơn.",

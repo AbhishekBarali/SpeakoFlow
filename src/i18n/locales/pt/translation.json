@@ -2779,7 +2779,10 @@
     "download": "Baixar versão nova ({{size}})",
     "retry": "Tentar novamente",
     "chooseAnother": "Escolher outro modelo",
-    "progressLabel": "Baixando a versão nova"
+    "progressLabel": "Baixando a versão nova",
+    "dialogTitle": "O SpeakoFlow tem um novo motor de voz",
+    "dialogBody": "É mais rápido e mais estável, por isso você terá menos problemas. {{model}} usava o motor antigo e precisa da nova versão para continuar funcionando.",
+    "later": "Mais tarde"
   },
   "modelsHub": {
     "description": "Cada tarefa no SpeakoFlow é feita por um modelo que você escolhe. Rode neste computador para ter privacidade ou na nuvem para ter velocidade.",

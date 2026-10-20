@@ -14,10 +14,12 @@ recordings are split at pauses, and Chinese transcripts can be written in
 Simplified or Traditional characters even with the language on Auto.
 
 **Using Parakeet V2 or V3, Canary, Moonshine, SenseVoice, GigaAM or Cohere?**
-Those models ran on an engine SpeakoFlow no longer includes. After updating,
-the first dictation tells you so and opens the Models page, where Download new
-version gets the same model for the new engine and switches to it when it
-lands. Until then a meeting or a History retranscription says which model
+Those models ran on an engine SpeakoFlow no longer includes. After updating, a
+pop-up says so when the app opens: Download new version gets the same model for
+the new engine, faster and more stable, and switches to it when it lands, or
+you can choose another model. Nothing downloads until you choose. If you close
+it, the first dictation tells you again and opens the Models page. Until then a
+meeting or a History retranscription says which model
 needs its new version instead of starting. Your old files stay until you
 delete them, which Delete old files on the Models page does in one click.
 

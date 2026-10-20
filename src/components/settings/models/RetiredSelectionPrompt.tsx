@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Download, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { useNavigation } from "@/components/shell/navigation";
 import { useModelSlots } from "@/components/shell/useModelSlots";
 import { useSpeechUpdateReveal } from "@/components/shell/speechUpdate";
@@ -110,6 +111,72 @@ export const RetiredSelectionPrompt: React.FC<{
   );
 };
 
+/**
+ * The pop-up someone sees after updating from a version whose engine ran
+ * their speech model. The prompt above sits on Home and the Models page; this
+ * says the same thing the moment the app opens, so nobody first finds out by
+ * pressing the dictation keys and getting nothing.
+ *
+ * Nothing downloads until they choose to: the new version is a few hundred
+ * megabytes (Cohere's is 1.8 GB), and some people are on a metered connection.
+ * "Download new version" starts it here, with its progress here, and the
+ * model is switched to when it lands, which also closes the pop-up. "Choose
+ * another model" goes to the catalog, and "Later" closes it until the next
+ * launch, or until a dictation is refused for the same reason.
+ */
+export const RetiredSelectionDialog: React.FC = () => {
+  const { t } = useTranslation();
+  const { openModelSlot } = useNavigation();
+  const stt = useModelSlots().stt;
+  const { replace, viewFor, cancel } = useReplaceRetired();
+  const closed = useSpeechUpdateReveal((state) => state.dialogClosed);
+  const close = useSpeechUpdateReveal((state) => state.closeDialog);
+
+  const retired = stt.issue === "needs_update" ? stt.localModel : null;
+  if (!retired) return null;
+
+  const view = viewFor(retired);
+  const modelName = stt.modelLabel ?? getTranslatedModelName(retired, t);
+
+  return (
+    <Dialog
+      open={!closed}
+      onClose={close}
+      size="md"
+      title={t("speechUpdate.dialogTitle")}
+      description={t("speechUpdate.dialogBody", { model: modelName })}
+      closeOnScrim={false}
+      footer={
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={close}>
+            {t("speechUpdate.later")}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              close();
+              openModelSlot("stt");
+            }}
+          >
+            {t("speechUpdate.chooseAnother")}
+          </Button>
+          <Actions
+            view={view}
+            onReplace={() => void replace(retired)}
+            onCancel={(id) => void cancel(id)}
+          />
+        </div>
+      }
+    >
+      <Detail view={view} />
+      {view && isReplacementBusy(view.phase) && (
+        <Progress view={view} inset={false} />
+      )}
+    </Dialog>
+  );
+};
+
 /** The line under the sentence: what the way forward is, or how it went. */
 const Detail: React.FC<{ view: ReplacementView | null }> = ({ view }) => {
   const { t } = useTranslation();
@@ -191,12 +258,16 @@ const Actions: React.FC<{
 };
 
 /** The new version's download, in place. Same bar as a catalog row's. */
-const Progress: React.FC<{ view: ReplacementView }> = ({ view }) => {
+const Progress: React.FC<{
+  view: ReplacementView;
+  /** Line up under the prompt's text, past its dot. */
+  inset?: boolean;
+}> = ({ view, inset = true }) => {
   const { t } = useTranslation();
   const percent = Math.max(0, Math.min(100, view.percent ?? 0));
   const downloading = view.phase === "downloading";
   return (
-    <div className="mt-3 ps-6">
+    <div className={inset ? "mt-3 ps-6" : "mt-3"}>
       <div
         className="h-1.5 w-full overflow-hidden rounded-full bg-surface-strong"
         role="progressbar"
