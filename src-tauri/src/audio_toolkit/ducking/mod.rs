@@ -9,9 +9,8 @@
 //! The worker keeps four rules:
 //!
 //! - **It puts back what it changed, where it changed it.** The device is
-//!   pinned when it is lowered (except on macOS, whose tool only reaches the
-//!   current default), so headphones plugged in mid-recording are not turned
-//!   up to the speakers' volume.
+//!   pinned when it is lowered, so headphones plugged in mid-recording are not
+//!   turned up to the speakers' volume.
 //! - **A volume the user changed meanwhile is theirs.** If the level is no
 //!   longer the one the worker left it at, it stays where the user put it.
 //! - **Output that was already muted or silent is left alone**, and is not
@@ -80,6 +79,61 @@ fn default_output() -> Option<Box<dyn OutputVolume>> {
     return macos::default_output();
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     return None;
+}
+
+/// The longest a volume tool may run. Every change waits on the one worker,
+/// so a tool that hangs would otherwise hold back every restore after it.
+/// Far past a slow start (`osascript` takes well under a second), so only a
+/// tool that has stopped answering is cut off.
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
+const TOOL_DEADLINE: Duration = Duration::from_secs(5);
+
+/// Run `command` (stdout, stdin and stderr already set by the caller) and
+/// return its status and stdout, or `None` if it could not start or ran past
+/// `limit`, in which case it is killed and reaped.
+#[cfg(any(target_os = "linux", target_os = "macos", test))]
+fn output_within(
+    command: &mut std::process::Command,
+    limit: Duration,
+) -> Option<std::process::Output> {
+    use std::io::Read;
+
+    let deadline = Instant::now() + limit;
+    let mut child = command.spawn().ok()?;
+    // Read on another thread, so a tool that writes more than a pipe holds
+    // cannot stall on it.
+    let stdout = child.stdout.take().map(|mut pipe| {
+        let (sent, received) = mpsc::channel();
+        thread::spawn(move || {
+            let mut out = Vec::new();
+            let _ = pipe.read_to_end(&mut out);
+            let _ = sent.send(out);
+        });
+        received
+    });
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(2)),
+            _ => break None,
+        }
+    };
+    let Some(status) = status else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return None;
+    };
+    let stdout = match stdout {
+        Some(received) => received
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            .ok()?,
+        None => Vec::new(),
+    };
+    Some(std::process::Output {
+        status,
+        stdout,
+        stderr: Vec::new(),
+    })
 }
 
 /// Whatever the platform needs on the worker thread before it touches a
@@ -360,7 +414,8 @@ impl Engine {
             (None, _) => self.apply(owner, how, wait),
             // A preview is up: move it to the new amount, or hand it over to
             // the recording that just started. Either way the amount is taken
-            // from the real volume, not from the lowered one.
+            // from the real volume, not from the lowered one, and a volume the
+            // user changed since the preview lowered it is the real one now.
             (
                 Some(Applied {
                     output,
@@ -370,6 +425,11 @@ impl Engine {
                 Quieting::Lower { keep },
             ) => {
                 let from = output.read().level.unwrap_or(left_at);
+                let original = if (from - left_at).abs() > MOVED {
+                    from
+                } else {
+                    original
+                };
                 let (reached, next) = fade(
                     &*output,
                     from,
@@ -913,6 +973,24 @@ mod tests {
     }
 
     #[test]
+    fn a_volume_changed_during_a_preview_is_the_one_a_recording_restores() {
+        let fake = Fake::new(0.8);
+        let mut engine = engine(&fake);
+        quiet(&mut engine, Owner::Preview, Quieting::lower_by(50));
+        assert!(close(fake.level(), 0.4));
+        // The user turns the computer down during the preview's hold.
+        fake.with(|device| device.level = Some(0.25));
+        quiet(&mut engine, Owner::Recording, Quieting::lower_by(60));
+        assert!(
+            close(fake.level(), 0.1),
+            "lowered from 0.25 to {}",
+            fake.level()
+        );
+        engine.release(Some(Owner::Recording));
+        assert!(close(fake.level(), 0.25), "back at {}", fake.level());
+    }
+
+    #[test]
     fn a_muting_recording_after_a_preview_unmutes_to_the_real_volume() {
         let fake = Fake::new(0.8);
         let mut engine = engine(&fake);
@@ -1002,5 +1080,68 @@ mod tests {
         assert!(ducker.restore().is_settled());
         ducker.restore_before_exit();
         assert!(ducker.commands.get().is_none(), "no worker started for it");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_tool_that_finishes_in_time_gives_its_output() {
+        use std::process::{Command, Stdio};
+        let output = output_within(
+            Command::new("printf")
+                .arg("hello")
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null()),
+            Duration::from_secs(10),
+        )
+        .expect("printf ran");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"hello");
+
+        let failed = output_within(
+            Command::new("false").stdout(Stdio::null()),
+            Duration::from_secs(10),
+        )
+        .expect("false ran");
+        assert!(!failed.status.success());
+
+        assert!(output_within(
+            &mut Command::new("speakoflow-no-such-tool"),
+            Duration::from_secs(10)
+        )
+        .is_none());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_tool_that_hangs_is_killed_and_reaped_at_the_deadline() {
+        use std::process::{Command, Stdio};
+        let pid_file = std::env::temp_dir().join(format!(
+            "speakoflow-ducking-hang-{}-{:?}",
+            std::process::id(),
+            thread::current().id()
+        ));
+        let started = Instant::now();
+        let output = output_within(
+            Command::new("sh")
+                .args(["-c", "echo $$ > \"$0\"; exec sleep 10"])
+                .arg(&pid_file)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null()),
+            Duration::from_secs(1),
+        );
+        let took = started.elapsed();
+        assert!(output.is_none(), "ran past its deadline");
+        assert!(took < Duration::from_secs(8), "returned after {took:?}");
+
+        let pid = std::fs::read_to_string(&pid_file).expect("the tool started");
+        let _ = std::fs::remove_file(&pid_file);
+        let pid = pid.trim();
+        // A child that was killed but not reaped stays in /proc as a zombie.
+        assert!(
+            !std::path::Path::new(&format!("/proc/{pid}")).exists(),
+            "process {pid} is still there"
+        );
     }
 }

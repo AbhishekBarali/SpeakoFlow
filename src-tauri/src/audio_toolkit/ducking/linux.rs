@@ -18,7 +18,7 @@
 // Built in tests on every platform, where only the parsers are used.
 #![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 
-use super::{OutputVolume, Reading};
+use super::{output_within, OutputVolume, Reading, TOOL_DEADLINE};
 use std::process::{Command, Stdio};
 
 /// PulseAudio's 100%, in the raw volume `pactl` prints and accepts.
@@ -170,12 +170,9 @@ fn whole_percent(level: f32) -> String {
     format!("{}%", (level * 100.0).round() as u32)
 }
 
-/// Stdout of a tool that succeeded.
+/// Stdout of a tool that succeeded within [`TOOL_DEADLINE`].
 fn run(program: &str, args: &[&str]) -> Option<String> {
-    let output = command(program, args)
-        .stdout(Stdio::piped())
-        .output()
-        .ok()?;
+    let output = output_within(command(program, args).stdout(Stdio::piped()), TOOL_DEADLINE)?;
     output
         .status
         .success()
@@ -183,10 +180,8 @@ fn run(program: &str, args: &[&str]) -> Option<String> {
 }
 
 fn succeeds(program: &str, args: &[&str]) -> bool {
-    command(program, args)
-        .stdout(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+    output_within(command(program, args).stdout(Stdio::null()), TOOL_DEADLINE)
+        .is_some_and(|output| output.status.success())
 }
 
 fn command(program: &str, args: &[&str]) -> Command {
