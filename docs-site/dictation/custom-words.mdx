@@ -18,14 +18,15 @@ Each word appears as a chip you can remove with a click.
 
 ## How custom words reach the model
 
-Which mechanism fires depends on the engine running your speech model.
+Which mechanism fires depends on the speech model you use.
 
-| Engine             | How words are used                                                                                          |
-| ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| Whisper family     | Sent as the decoder's initial prompt, biasing recognition while you speak. Nothing is rewritten afterwards. |
-| Every other engine | A fuzzy correction pass runs over the finished transcript.                                                  |
+| Model                           | How words are used                                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Whisper family                  | Sent as the decoder's initial prompt, biasing recognition while you speak. Nothing is rewritten afterwards. |
+| Models that accept a vocabulary | Sent as vocabulary, biasing recognition the same way. Nothing is rewritten afterwards.                      |
+| Every other model               | A fuzzy correction pass runs over the finished transcript.                                                  |
 
-The Whisper route tends to be more accurate, because the model hears the bias before it decides. Every other engine gets a post-hoc rewrite, which is still good but has to guess.
+Biasing the model tends to be more accurate, because the model hears the bias before it decides. Every other model gets a post-hoc rewrite, which is still good but has to guess.
 
 ### Cloud speech-to-text
 

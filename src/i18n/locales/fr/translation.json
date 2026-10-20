@@ -523,11 +523,13 @@
       "singleLanguage": "Prend en charge uniquement cette langue",
       "multiLanguage": "Multilingue",
       "languageOnly": "{{language}} uniquement",
+      "languageList": "Langues comprises par {{model}}",
       "translation": "Peut traduire en anglais",
       "translate": "Traduire en anglais",
       "streaming": "Streaming",
       "quantization": "Quantification",
-      "legacy": "Ancien"
+      "legacy": "Ancien",
+      "retired": "Retiré"
     }
   },
   "settings": {
@@ -667,6 +669,15 @@
         "noResults": "Aucune langue trouvée",
         "auto": "Auto"
       },
+      "chineseScript": {
+        "title": "Écriture chinoise",
+        "description": "Écrire les transcriptions chinoises en caractères simplifiés ou traditionnels. Les autres langues ne changent pas.",
+        "options": {
+          "auto": "Tel que transcrit",
+          "simplified": "Simplifié",
+          "traditional": "Traditionnel"
+        }
+      },
       "pushToTalk": {
         "dictation": "Activé : l'enregistrement dure tant que vous maintenez les touches. Désactivé : une pression lance, la suivante arrête, donc chaque dictée est mains libres.",
         "assistant": "Activé : écoute tant que vous maintenez les touches. Désactivé : une pression lance, la suivante envoie.",
@@ -714,14 +725,27 @@
         "all": "Tous",
         "multiLanguage": "Multilingue",
         "translation": "Traduction",
-        "allLanguages": "Toutes les langues"
+        "allLanguages": "Toutes les langues",
+        "streamingHint": "Uniquement les modèles qui transcrivent pendant que vous parlez",
+        "translate": "Traduire",
+        "translateHint": "Uniquement les modèles qui peuvent traduire la voix en anglais",
+        "noMatch": "Aucun modèle ne correspond à ces filtres",
+        "clear": "Effacer les filtres"
       },
-      "noModelsMatch": "Aucun modèle ne correspond à ce filtre.",
       "searchPlaceholder": "Rechercher un modèle par nom…",
       "clearSearch": "Effacer la recherche",
       "noSearchResults": "Aucun modèle nommé « {{query}} ».",
-      "olderModels": "Anciens modèles",
-      "olderModelsHint": "Fonctionnent sur le moteur précédent. Toujours entièrement pris en charge — la plupart des utilisateurs n'en ont pas besoin.",
+      "olderHint": "Ancien format. {{model}} ({{size}}) est la nouvelle version de ce modèle.",
+      "retiredHint": "Utilise un ancien moteur que SpeakoFlow n'inclut plus. Téléchargez plutôt {{model}} ({{size}}).",
+      "retired": {
+        "notice": "Ces modèles utilisaient un ancien moteur que SpeakoFlow n'inclut plus.",
+        "newVersion": "Nouvelle version : {{model}} · {{size}}",
+        "getNewVersion": "Obtenir la nouvelle version",
+        "useNewVersion": "Utiliser la nouvelle version",
+        "deleteOld": "Supprimer les anciens fichiers ({{size}})",
+        "deleteTitle": "Supprimer les anciens fichiers",
+        "deleteConfirm": "Supprimer les anciens fichiers de ces modèles ({{size}}) ? Les nouvelles versions téléchargées sont conservées."
+      },
       "customModel": {
         "addButton": "Rechercher sur Hugging Face",
         "searchTitle": "Besoin d'un autre modèle ?",
@@ -856,28 +880,15 @@
         "needsEngine": "Nécessite la gestion du clavier SpeakoFlow Keys.",
         "reset": "Les raccourcis qui utilisaient un bouton de la souris ont retrouvé leurs touches par défaut."
       },
-      "liveTranscription": {
-        "label": "Transcription en direct",
-        "description": "Transcrire au fil de votre parole, au lieu de tout transcrire d'un coup à l'arrêt. Expérimental."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Fenêtre de transcription en direct",
-        "description": "Pendant la transcription en direct, afficher une grande carte avec le texte en cours au lieu de la pastille compacte. Nécessite la transcription en direct."
+      "longFormChunking": {
+        "title": "Découper les longs enregistrements",
+        "description": "Les longues dictées sont transcrites par morceaux, aux pauses naturelles, ce qui garde précis les modèles qui ne sont pas faits pour l'audio long."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Accélération Whisper",
-          "description": "Auto utilise le GPU lorsqu'il est disponible."
-        },
-        "ort": {
-          "title": "Accélération ONNX",
-          "description": "Pour les modèles Parakeet, Canary et Moonshine. DirectML est expérimental."
-        },
-        "gpuDevice": {
-          "title": "Appareil GPU",
-          "description": "Auto choisit le GPU dédié.",
-          "auto": "Auto"
-        }
+        "title": "Traitement de la voix",
+        "description": "Auto utilise votre carte graphique, la dédiée si vous en avez deux. Choisissez Processeur si la dictée plante ou si votre pilote graphique pose problème. C'est plus lent, mais cela fonctionne partout.",
+        "auto": "Auto",
+        "cpu": "Processeur (CPU)"
       },
       "startHidden": {
         "label": "Démarrer masqué",
@@ -2264,6 +2275,7 @@
     "preparing": "Préparation du micro…",
     "recording": "Enregistrement",
     "transcribing": "Transcription…",
+    "loading": "Chargement du modèle…",
     "processing": "Nettoyage…",
     "generating": "Rédaction avec Flow…",
     "vision": "Observation de votre écran…",
@@ -2297,6 +2309,10 @@
       "title": "Téléchargement du modèle vocal…",
       "percent": "Téléchargement du modèle vocal · {{percent}} %",
       "hint": "La dictée fonctionnera une fois le téléchargement terminé"
+    },
+    "update": {
+      "title": "{{model}} doit être mis à jour",
+      "hint": "La nouvelle version est sur la page Modèles"
     },
     "handsFreeHint": "Appuyez sur {{key}} pour passer en mains libres",
     "lockedKeys": "Enregistrement mains libres. Appuyez sur {{keys}} pour terminer",
@@ -2568,6 +2584,7 @@
     "status": {
       "label": "Modèle vocal : {{model}}, {{status}}. Ouvrir les paramètres de reconnaissance vocale.",
       "setup": "À configurer",
+      "needsUpdate": "Mise à jour requise",
       "cloud": "Cloud · {{provider}}",
       "loading": "Chargement…",
       "error": "Échec du chargement",
@@ -2753,12 +2770,27 @@
       "today": "Aujourd'hui"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} utilisait un ancien moteur que SpeakoFlow n'inclut plus.",
+    "newVersion": "Sa nouvelle version est {{model}}.",
+    "ready": "{{model}} est téléchargé et prêt.",
+    "noVersion": "Choisissez un autre modèle pour continuer à dicter.",
+    "failed": "Impossible de télécharger {{model}}.",
+    "download": "Télécharger la nouvelle version ({{size}})",
+    "retry": "Réessayer",
+    "chooseAnother": "Choisir un autre modèle",
+    "progressLabel": "Téléchargement de la nouvelle version",
+    "dialogTitle": "SpeakoFlow a un nouveau moteur vocal",
+    "dialogBody": "Il est plus rapide et plus stable, vous rencontrerez donc moins de problèmes. {{model}} utilisait l'ancien moteur et a besoin de sa nouvelle version pour continuer à fonctionner.",
+    "later": "Plus tard"
+  },
   "modelsHub": {
     "description": "Dans SpeakoFlow, chaque tâche est confiée à un modèle de votre choix. Exécutez-le sur cet ordinateur pour la confidentialité, ou dans le cloud pour la rapidité.",
     "addLocal": "Ajouter un fichier de modèle",
     "privacyNote": "Les modèles sur cet ordinateur n'envoient jamais votre voix ni votre texte ailleurs. Les modèles cloud les envoient au fournisseur choisi, avec votre clé API.",
     "inUse": "Utilisé",
     "needsSetup": "À configurer",
+    "needsUpdate": "Mise à jour requise",
     "performance": "Performances",
     "where": {
       "device": "Sur cet ordinateur",
@@ -2771,6 +2803,7 @@
       "assistantOff": "L'assistant est désactivé",
       "noModel": "Aucun modèle choisi",
       "notDownloaded": "Modèle non téléchargé",
+      "needsUpdate": "{{model}} doit être mis à jour",
       "noKey": "Ajoutez une clé API",
       "noEndpoint": "Ajoutez un point de terminaison"
     },

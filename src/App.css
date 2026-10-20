@@ -953,6 +953,17 @@
   pointer-events: none;
 }
 
+/* Every page scrolls in its own layer, and on Windows/Linux the scrollbar takes
+ * 14px of width (see the custom scrollbar above). Without a reserved gutter a
+ * short page has no bar and a long one does, so the centered column jumped
+ * sideways on every switch between them. macOS bars overlay the content, so
+ * this reserves nothing there. */
+.page-layer-active,
+.page-layer-hidden,
+.settings-scroll {
+  scrollbar-gutter: stable;
+}
+
 /* Tab panels inside a page get the same short settle. */
 .tab-reveal {
   animation: page-reveal 180ms cubic-bezier(0.22, 1, 0.36, 1) both;

@@ -2,9 +2,11 @@ import { expect, test } from "bun:test";
 import type { AssistantHistorySummary, HistoryEntry } from "@/bindings";
 import {
   FLOW_HISTORY_MARKER,
+  appendHistoryPage,
   buildFeed,
   cleanMessageContent,
   matchesFilter,
+  prependHistoryEntry,
   rowKind,
   visibleFilters,
 } from "./historyFeed";
@@ -105,4 +107,27 @@ test("an ordinary message passes through untouched", () => {
     files: [],
     selectionChars: 0,
   });
+});
+
+test("a live addition already listed by the first page is not shown twice", () => {
+  // The first page loaded after the row was saved, then its "added" event
+  // arrived (Handy #2256).
+  const listed = [entry({ id: 2, timestamp: 200 }), entry({ id: 1 })];
+  const added = entry({ id: 2, timestamp: 200, title: "newer copy" });
+  const next = prependHistoryEntry(listed, added);
+  expect(next.map((e) => e.id)).toEqual([2, 1]);
+  expect(next[0].title).toBe("newer copy");
+});
+
+test("a new live addition goes to the top", () => {
+  const next = prependHistoryEntry([entry({ id: 1 })], entry({ id: 3 }));
+  expect(next.map((e) => e.id)).toEqual([3, 1]);
+});
+
+test("an older page skips rows that are already listed", () => {
+  const listed = [entry({ id: 5 }), entry({ id: 4 })];
+  const page = [entry({ id: 4 }), entry({ id: 3 }), entry({ id: 2 })];
+  expect(appendHistoryPage(listed, page).map((e) => e.id)).toEqual([
+    5, 4, 3, 2,
+  ]);
 });

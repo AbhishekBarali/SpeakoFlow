@@ -523,11 +523,13 @@
       "singleLanguage": "תומך רק בשפה הזו",
       "multiLanguage": "רב-לשוני",
       "languageOnly": "{{language}} בלבד",
+      "languageList": "השפות ש-{{model}} מבין",
       "translation": "יכול לתרגם לאנגלית",
       "translate": "תרגם לאנגלית",
       "streaming": "הזרמה",
       "quantization": "קוונטיזציה",
-      "legacy": "מדור קודם"
+      "legacy": "מדור קודם",
+      "retired": "הוצא משימוש"
     }
   },
   "settings": {
@@ -667,6 +669,15 @@
         "noResults": "לא נמצאו שפות",
         "auto": "אוטומטי"
       },
+      "chineseScript": {
+        "title": "כתב סיני",
+        "description": "כתיבת תמלולים בסינית בתווים מפושטים או מסורתיים. שפות אחרות נשארות כפי שהן.",
+        "options": {
+          "auto": "כפי שתומלל",
+          "simplified": "מפושט",
+          "traditional": "מסורתי"
+        }
+      },
       "pushToTalk": {
         "dictation": "מופעל: ההקלטה פועלת כל עוד אתה מחזיק את המקשים. כבוי: לחיצה אחת מתחילה והבאה עוצרת, כך שכל הכתבה היא ללא ידיים.",
         "assistant": "מופעל: מאזין כל עוד אתה מחזיק את המקשים. כבוי: לחיצה אחת מתחילה והבאה שולחת.",
@@ -714,14 +725,27 @@
         "all": "הכול",
         "multiLanguage": "רב-לשוני",
         "translation": "תרגום",
-        "allLanguages": "כל השפות"
+        "allLanguages": "כל השפות",
+        "streamingHint": "רק מודלים שמתמללים תוך כדי דיבור",
+        "translate": "תרגום",
+        "translateHint": "רק מודלים שיכולים לתרגם דיבור לאנגלית",
+        "noMatch": "אין מודלים שתואמים למסננים האלה",
+        "clear": "ניקוי מסננים"
       },
-      "noModelsMatch": "אין מודלים שמתאימים לסינון הזה.",
       "searchPlaceholder": "חפש מודלים לפי שם…",
       "clearSearch": "נקה חיפוש",
       "noSearchResults": "אין מודלים בשם ״{{query}}״.",
-      "olderModels": "מודלים מדור קודם",
-      "olderModelsHint": "פועלים על המנוע הקודם. עדיין נתמכים במלואם — לרוב האנשים לא יהיה צורך בהם.",
+      "olderHint": "פורמט ישן. {{model}} ({{size}}) היא הגרסה החדשה של המודל הזה.",
+      "retiredHint": "משתמש במנוע ישן ש-SpeakoFlow כבר לא כולל. כדאי להוריד במקומו את {{model}} ({{size}}).",
+      "retired": {
+        "notice": "המודלים האלה השתמשו במנוע ישן ש-SpeakoFlow כבר לא כולל.",
+        "newVersion": "גרסה חדשה: {{model}} · {{size}}",
+        "getNewVersion": "הורדת הגרסה החדשה",
+        "useNewVersion": "שימוש בגרסה החדשה",
+        "deleteOld": "מחיקת קבצים ישנים ({{size}})",
+        "deleteTitle": "מחיקת קבצים ישנים",
+        "deleteConfirm": "למחוק את הקבצים הישנים של המודלים האלה ({{size}})? גרסאות חדשות שהורדת יישארו."
+      },
       "customModel": {
         "addButton": "חפש ב-Hugging Face",
         "searchTitle": "צריך מודל אחר?",
@@ -856,28 +880,15 @@
         "needsEngine": "דורש את מימוש המקלדת SpeakoFlow Keys.",
         "reset": "קיצורים שהשתמשו בלחצן עכבר חזרו למקשי ברירת המחדל שלהם."
       },
-      "liveTranscription": {
-        "label": "תמלול חי",
-        "description": "תמלל את הדיבור תוך כדי שאתה מדבר, במקום הכול בבת אחת כשאתה מפסיק. ניסיוני."
-      },
-      "liveTranscriptionWindow": {
-        "label": "חלון תמלול חי",
-        "description": "בזמן שתמלול חי פועל, הצג כרטיס משוב גדול יותר עם הטקסט המתגלגל במקום הגלולה הקומפקטית. דורש תמלול חי."
+      "longFormChunking": {
+        "title": "פיצול הקלטות ארוכות",
+        "description": "הכתבות ארוכות מתומללות בחלקים בהפסקות טבעיות, וכך מודלים שלא נבנו לשמע ארוך נשארים מדויקים."
       },
       "acceleration": {
-        "whisper": {
-          "title": "האצת Whisper",
-          "description": "מצב אוטומטי משתמש ב-GPU כשהוא זמין."
-        },
-        "ort": {
-          "title": "האצת ONNX",
-          "description": "עבור מודלי Parakeet, Canary ו-Moonshine. DirectML הוא ניסיוני."
-        },
-        "gpuDevice": {
-          "title": "התקן GPU",
-          "description": "מצב אוטומטי בוחר את ה-GPU הייעודי.",
-          "auto": "אוטומטי"
-        }
+        "title": "עיבוד דיבור",
+        "description": "מצב אוטומטי משתמש בכרטיס המסך, ובייעודי אם יש לך שניים. בחר „מעבד” אם ההכתבה קורסת או שיש בעיות במנהל ההתקן של הגרפיקה. זה איטי יותר, אבל עובד בכל מקום.",
+        "auto": "אוטומטי",
+        "cpu": "מעבד (CPU)"
       },
       "startHidden": {
         "label": "התחל מוסתר",
@@ -2264,6 +2275,7 @@
     "preparing": "מכין את המיקרופון…",
     "recording": "מקליט",
     "transcribing": "מתמלל…",
+    "loading": "טוען מודל…",
     "processing": "מנקה…",
     "generating": "כותב עם Flow…",
     "vision": "מסתכל על המסך שלך…",
@@ -2297,6 +2309,10 @@
       "title": "מודל הדיבור בהורדה…",
       "percent": "מודל הדיבור בהורדה · {{percent}}%",
       "hint": "ההכתבה תתחיל לעבוד כשזה יסתיים"
+    },
+    "update": {
+      "title": "{{model}} צריך עדכון",
+      "hint": "הגרסה החדשה נמצאת בדף המודלים"
     },
     "handsFreeHint": "לחץ {{key}} למצב ללא ידיים",
     "lockedKeys": "מקליט ללא ידיים. לחץ {{keys}} לסיום",
@@ -2568,6 +2584,7 @@
     "status": {
       "label": "מודל דיבור: {{model}}, {{status}}. פתח את הגדרות הדיבור לטקסט.",
       "setup": "דורש הגדרה",
+      "needsUpdate": "דורש עדכון",
       "cloud": "ענן · {{provider}}",
       "loading": "טוען…",
       "error": "הטעינה נכשלה",
@@ -2753,12 +2770,27 @@
       "today": "היום"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} השתמש במנוע ישן ש-SpeakoFlow כבר לא כולל.",
+    "newVersion": "הגרסה החדשה שלו היא {{model}}.",
+    "ready": "{{model}} הורד ומוכן.",
+    "noVersion": "בחר מודל אחר כדי להמשיך להכתיב.",
+    "failed": "לא ניתן היה להוריד את {{model}}.",
+    "download": "הורדת הגרסה החדשה ({{size}})",
+    "retry": "נסה שוב",
+    "chooseAnother": "בחירת מודל אחר",
+    "progressLabel": "מוריד את הגרסה החדשה",
+    "dialogTitle": "ל-SpeakoFlow יש מנוע דיבור חדש",
+    "dialogBody": "הוא מהיר ויציב יותר, כך שתיתקלו בפחות בעיות. {{model}} רץ על המנוע הישן וצריך את הגרסה החדשה שלו כדי להמשיך לעבוד.",
+    "later": "מאוחר יותר"
+  },
   "modelsHub": {
     "description": "כל משימה ב-SpeakoFlow מבוצעת על ידי מודל שאתה בוחר. הרץ אותו במחשב הזה לפרטיות, או בענן למהירות.",
     "addLocal": "הוסף קובץ מודל",
     "privacyNote": "מודלים במחשב הזה לא שולחים את הקול או הטקסט שלך לשום מקום. מודלי ענן שולחים אותם לספק שבחרת, באמצעות מפתח ה-API שלך.",
     "inUse": "בשימוש",
     "needsSetup": "דורש הגדרה",
+    "needsUpdate": "דורש עדכון",
     "performance": "ביצועים",
     "where": {
       "device": "במחשב הזה",
@@ -2771,6 +2803,7 @@
       "assistantOff": "העוזר כבוי",
       "noModel": "עדיין לא נבחר מודל",
       "notDownloaded": "המודל לא הורד",
+      "needsUpdate": "{{model}} צריך עדכון",
       "noKey": "הוסף מפתח API",
       "noEndpoint": "הוסף נקודת קצה"
     },

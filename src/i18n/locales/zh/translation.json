@@ -519,11 +519,13 @@
       "singleLanguage": "仅支持此语言",
       "multiLanguage": "多语言",
       "languageOnly": "仅 {{language}}",
+      "languageList": "{{model}} 能识别的语言",
       "translation": "可翻译为英语",
       "translate": "翻译为英语",
       "streaming": "流式输出",
       "quantization": "量化",
-      "legacy": "较旧"
+      "legacy": "较旧",
+      "retired": "已停用"
     }
   },
   "settings": {
@@ -663,6 +665,15 @@
         "noResults": "未找到语言",
         "auto": "自动"
       },
+      "chineseScript": {
+        "title": "中文字形",
+        "description": "将中文转写结果写成简体或繁体。其他语言保持不变。",
+        "options": {
+          "auto": "保持原样",
+          "simplified": "简体",
+          "traditional": "繁体"
+        }
+      },
       "pushToTalk": {
         "dictation": "开：按住按键期间持续录制。关：按一下开始，再按一下停止，因此每次听写都是免持的。",
         "assistant": "开：按住按键期间持续聆听。关：按一下开始，再按一下发送。",
@@ -710,14 +721,27 @@
         "all": "全部",
         "multiLanguage": "多语言",
         "translation": "翻译",
-        "allLanguages": "所有语言"
+        "allLanguages": "所有语言",
+        "streamingHint": "只显示边说边转写的模型",
+        "translate": "翻译",
+        "translateHint": "只显示能把语音翻译成英语的模型",
+        "noMatch": "没有符合这些筛选条件的模型",
+        "clear": "清除筛选"
       },
-      "noModelsMatch": "没有符合此筛选条件的模型。",
       "searchPlaceholder": "按名称搜索模型…",
       "clearSearch": "清空搜索",
       "noSearchResults": "没有名为“{{query}}”的模型。",
-      "olderModels": "较旧的模型",
-      "olderModelsHint": "在上一代引擎上运行。仍完全受支持——大多数人不需要用到。",
+      "olderHint": "旧格式。{{model}}（{{size}}）是这个模型的新版本。",
+      "retiredHint": "使用的是 SpeakoFlow 已不再包含的旧引擎。请改为下载 {{model}}（{{size}}）。",
+      "retired": {
+        "notice": "这些模型使用的是 SpeakoFlow 已不再包含的旧引擎。",
+        "newVersion": "新版本：{{model}} · {{size}}",
+        "getNewVersion": "获取新版本",
+        "useNewVersion": "使用新版本",
+        "deleteOld": "删除旧文件（{{size}}）",
+        "deleteTitle": "删除旧文件",
+        "deleteConfirm": "删除这些模型的旧文件（{{size}}）吗？已下载的新版本会保留。"
+      },
       "customModel": {
         "addButton": "搜索 Hugging Face",
         "searchTitle": "需要其他模型？",
@@ -844,28 +868,15 @@
         "needsEngine": "需要使用 SpeakoFlow Keys 键盘实现。",
         "reset": "使用鼠标按钮的快捷键已恢复为默认按键。"
       },
-      "liveTranscription": {
-        "label": "实时转录",
-        "description": "边说边转录，而不是停止后一次性转录。实验性功能。"
-      },
-      "liveTranscriptionWindow": {
-        "label": "实时转录窗口",
-        "description": "实时转录运行时，用较大的悬浮卡片显示正在生成的文字，而不是紧凑的胶囊条。需要开启实时转录。"
+      "longFormChunking": {
+        "title": "拆分长录音",
+        "description": "较长的听写会在自然停顿处分段转写，让不擅长处理长音频的模型保持准确。"
       },
       "acceleration": {
-        "whisper": {
-          "title": "Whisper 加速",
-          "description": "自动会在 GPU 可用时使用 GPU。"
-        },
-        "ort": {
-          "title": "ONNX 加速",
-          "description": "适用于 Parakeet、Canary 和 Moonshine 模型。DirectML 为实验性功能。"
-        },
-        "gpuDevice": {
-          "title": "GPU 设备",
-          "description": "自动会选择独立 GPU。",
-          "auto": "自动"
-        }
+        "title": "语音处理",
+        "description": "“自动”会使用显卡；如果有两块，会使用独立显卡。如果听写崩溃或显卡驱动有问题，请选择“处理器”。速度较慢，但在任何电脑上都能运行。",
+        "auto": "自动",
+        "cpu": "处理器 (CPU)"
       },
       "startHidden": {
         "label": "隐藏启动",
@@ -2240,6 +2251,7 @@
     "preparing": "正在准备麦克风…",
     "recording": "正在录制",
     "transcribing": "正在转录…",
+    "loading": "正在加载模型…",
     "processing": "正在清理…",
     "generating": "正在用 Flow 撰写…",
     "vision": "正在查看您的屏幕…",
@@ -2273,6 +2285,10 @@
       "title": "正在下载语音模型…",
       "percent": "正在下载语音模型 · {{percent}}%",
       "hint": "下载完成后即可开始语音输入"
+    },
+    "update": {
+      "title": "{{model}} 需要更新",
+      "hint": "新版本在“模型”页面"
     },
     "handsFreeHint": "按 {{key}} 进入免持",
     "lockedKeys": "免持录制中。按 {{keys}} 结束",
@@ -2532,6 +2548,7 @@
     "status": {
       "label": "语音模型：{{model}}，{{status}}。打开语音转文字设置。",
       "setup": "需要设置",
+      "needsUpdate": "需要更新",
       "cloud": "云端 · {{provider}}",
       "loading": "加载中…",
       "error": "无法加载",
@@ -2707,12 +2724,27 @@
       "today": "今天"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} 使用的是 SpeakoFlow 已不再包含的旧引擎。",
+    "newVersion": "它的新版本是 {{model}}。",
+    "ready": "{{model}} 已下载，可以使用。",
+    "noVersion": "请选择其他模型以继续听写。",
+    "failed": "无法下载 {{model}}。",
+    "download": "下载新版本（{{size}}）",
+    "retry": "重试",
+    "chooseAnother": "选择其他模型",
+    "progressLabel": "正在下载新版本",
+    "dialogTitle": "SpeakoFlow 换上了新的语音引擎",
+    "dialogBody": "它更快、更稳定，遇到的问题会更少。{{model}} 运行在旧引擎上，需要下载新版本才能继续使用。",
+    "later": "稍后"
+  },
   "modelsHub": {
     "description": "SpeakoFlow 中的每项工作都由您选择的模型完成。在这台电脑上运行更私密，在云端运行更快速。",
     "addLocal": "添加模型文件",
     "privacyNote": "这台电脑上的模型绝不会把您的语音或文字发送到任何地方。云端模型会使用您的 API 密钥，将其发送给您选择的提供商。",
     "inUse": "使用中",
     "needsSetup": "需要设置",
+    "needsUpdate": "需要更新",
     "performance": "性能",
     "where": {
       "device": "在这台电脑上",
@@ -2725,6 +2757,7 @@
       "assistantOff": "助手已关闭",
       "noModel": "尚未选择模型",
       "notDownloaded": "模型尚未下载",
+      "needsUpdate": "{{model}} 需要更新",
       "noKey": "添加 API 密钥",
       "noEndpoint": "添加端点"
     },

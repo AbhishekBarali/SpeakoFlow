@@ -522,6 +522,70 @@ pub(crate) fn repair_removal_seams(text: &str) -> String {
     out
 }
 
+/// Whether a word appended to `kept` would open a sentence: nothing but
+/// whitespace so far, the last visible character ends a sentence, or it is a
+/// Spanish opening `¿` / `¡`, which starts one.
+fn opens_sentence(kept: &str) -> bool {
+    kept.trim_end()
+        .chars()
+        .next_back()
+        .is_none_or(|c| matches!(c, '.' | '!' | '?' | '…' | '¿' | '¡'))
+}
+
+/// Appends `segment` to `kept`. While `capital_owed` is set, the first
+/// alphanumeric character of `segment` is uppercased and the debt is settled,
+/// unless that word already has a capital of its own after its first letter
+/// ("iPhone", "eBay", "macOS"): its casing is deliberate, and "IPhone" is
+/// wrong in a way "iPhone" at a sentence start is not.
+fn push_restoring_capital(kept: &mut String, segment: &str, capital_owed: &mut bool) {
+    if *capital_owed {
+        if let Some((index, first)) = segment.char_indices().find(|(_, c)| c.is_alphanumeric()) {
+            *capital_owed = false;
+            let rest = &segment[index + first.len_utf8()..];
+            let word_rest = rest
+                .split(|c: char| !c.is_alphanumeric())
+                .next()
+                .unwrap_or("");
+            if word_rest.chars().any(char::is_uppercase) {
+                kept.push_str(segment);
+                return;
+            }
+            kept.push_str(&segment[..index]);
+            kept.extend(first.to_uppercase());
+            kept.push_str(rest);
+            return;
+        }
+    }
+    kept.push_str(segment);
+}
+
+/// Deletes every match of one filler pattern. A capitalised filler that opened
+/// a sentence hands its capital to the word that takes its place, so
+/// "Um, so I think" becomes "So I think" rather than "so I think" (Handy
+/// #2157).
+///
+/// The signal is the filler's own capital, not the position alone. The
+/// speech model capitalised it because it heard a sentence start, which is
+/// what makes this safe where [`repair_removal_seams`] is not: it never
+/// capitalises after a bare full stop, since "e.g. foo" must stay as it is,
+/// and a lowercase filler (a continuation, "and then, um, so") hands nothing
+/// over either.
+fn remove_filler_matches(text: &str, pattern: &Regex) -> String {
+    let mut kept = String::with_capacity(text.len());
+    let mut resume = 0;
+    let mut capital_owed = false;
+
+    for filler in pattern.find_iter(text) {
+        push_restoring_capital(&mut kept, &text[resume..filler.start()], &mut capital_owed);
+        let capitalised = filler.as_str().starts_with(char::is_uppercase);
+        capital_owed |= capitalised && opens_sentence(&kept);
+        resume = filler.end();
+    }
+    push_restoring_capital(&mut kept, &text[resume..], &mut capital_owed);
+
+    kept
+}
+
 /// Collapses repeated words (3+ repetitions) to a single instance.
 /// E.g., "wh wh wh wh" -> "wh", "I I I I" -> "I"
 fn collapse_stutters(text: &str) -> String {
@@ -738,7 +802,7 @@ pub fn filter_transcription_output(
     for pattern in &patterns {
         if pattern.is_match(&filtered) {
             removed_any = true;
-            filtered = pattern.replace_all(&filtered, "").to_string();
+            filtered = remove_filler_matches(&filtered, pattern);
         }
     }
 
@@ -925,7 +989,7 @@ mod tests {
     fn test_filter_filler_words_case_insensitive() {
         let text = "UHM this is UH a test";
         let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "this is a test");
+        assert_eq!(result, "This is a test");
     }
 
     #[test]
@@ -953,7 +1017,54 @@ mod tests {
     fn test_filter_combined() {
         let text = "  Uhm, so I was, uh, thinking about this  ";
         let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "so I was, thinking about this");
+        assert_eq!(result, "So I was, thinking about this");
+    }
+
+    /// A capitalised filler that opened a sentence hands its capital to the
+    /// word after it (Handy #2157): "Um, so I think" used to come out as
+    /// "so I think", and "That works. Um, let me check." as "That works. let
+    /// me check.", since a full stop alone is never trusted.
+    #[test]
+    fn a_leading_filler_hands_its_capital_to_the_next_word() {
+        let result = filter_transcription_output("Um, so I think we should ship it.", "en", &None);
+        assert_eq!(result, "So I think we should ship it.");
+
+        let result = filter_transcription_output("That works. Um, let me check.", "en", &None);
+        assert_eq!(result, "That works. Let me check.");
+
+        // Two fillers opening the sentence still hand the capital on.
+        let result = filter_transcription_output("Um, uh, so we ship it.", "en", &None);
+        assert_eq!(result, "So we ship it.");
+    }
+
+    /// Mid-sentence there is no capital to hand over, and a lowercase filler
+    /// hands over nothing even at the start: dictation is often a
+    /// continuation of a sentence already in the document.
+    #[test]
+    fn only_a_capitalised_sentence_opening_filler_hands_over_a_capital() {
+        let result = filter_transcription_output("He said, Um, not today.", "en", &None);
+        assert_eq!(result, "He said, not today.");
+
+        let result = filter_transcription_output("um, so we ship it.", "en", &None);
+        assert_eq!(result, "so we ship it.");
+    }
+
+    /// The filler's own case is the signal, so an abbreviation followed by a
+    /// lowercase filler stays lowercase: "e.g. foo" is never recapitalised.
+    #[test]
+    fn an_abbreviation_before_a_lowercase_filler_is_not_recapitalised() {
+        let result = filter_transcription_output("Use a tool, e.g. uh ripgrep here.", "en", &None);
+        assert_eq!(result, "Use a tool, e.g. ripgrep here.");
+    }
+
+    /// A word with its own internal capital keeps its casing when a filler
+    /// in front of it goes: "IPhone" would be a new mistake.
+    #[test]
+    fn a_handed_over_capital_never_rewrites_a_cased_name() {
+        let result = filter_transcription_output("Um, iPhone sales are up.", "en", &None);
+        assert_eq!(result, "iPhone sales are up.");
+        let result = filter_transcription_output("Um, so the iPhone works.", "en", &None);
+        assert_eq!(result, "So the iPhone works.");
     }
 
     #[test]

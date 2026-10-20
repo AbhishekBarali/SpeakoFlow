@@ -1,24 +1,28 @@
 ---
 title: "Live transcription"
-description: "See your words in the overlay as you speak, with models that support streaming. Cloud streaming is available through ElevenLabs and Deepgram."
+description: "Streaming models transcribe while you speak, so the text is ready the moment you stop. The overlay style only decides whether you see it. Cloud streaming is available through ElevenLabs, Deepgram, and Amazon Transcribe."
 icon: "tower-broadcast"
 ---
 
-Live transcription shows a running transcript in the overlay while you talk. The text is still inserted into your app once, after you stop recording, but the final insert is close to instant because most of the work is already done.
+A streaming model transcribes while you talk. The text is still inserted into your app once, after you stop recording, but that insert is close to instant because the work is already done. If the overlay shows the live card, you see the running transcript as you speak.
 
 ## Which local models stream
 
-Models built for streaming show text as you speak. The rest transcribe in one batch after you stop. The catalog marks this per model, and you can filter by it on the **Models** page.
+Streaming follows the model. There is no switch to turn it on: a model built for streaming always streams, and every other model transcribes after you stop. The catalog marks this per model, and the **Streaming** filter on the **Models** page lists them.
 
-Models that stream include the Parakeet and Nemotron streaming variants and the Moonshine family. Whisper, Canary, Cohere, SenseVoice, GigaAM, and non-streaming Parakeet do not. See [Transcription models](/models/transcription-models) for the full catalog.
+The streaming models are Parakeet Unified EN 0.6B (the default), Nemotron Streaming 3.5, Nemotron Speech Streaming EN, Multitalker Parakeet Streaming EN, Voxtral Mini 4B Realtime, and Moonshine Streaming Tiny, Small, and Medium. Whisper, Canary, Cohere, SenseVoice, GigaAM, the other Parakeet and Moonshine models, and the rest do not stream. See [Transcription models](/models/transcription-models) for the full catalog.
 
-Switching to a non-streaming model moves you back to batch transcription automatically.
+Streaming models keep up to 1.65 seconds of every pause in the recording, where other models keep 0.45 seconds. The longer pause is how a streaming model tells where one sentence ends and the next begins. Stop after silence still counts from the same moment.
+
+### Long recordings on other models
+
+A model that does not stream can still work during the recording. With **Split long recordings** on (the default, in _Settings → Advanced → Performance_), a dictation longer than 40 seconds is cut at pauses into pieces of about 30 seconds, and each piece is transcribed while you keep talking. Most models lose accuracy or fail on long audio in one go, so this keeps them accurate. Whisper handles long audio itself and is never cut. If any piece fails, the whole recording is transcribed again after you stop.
 
 ## Cloud streaming
 
-Two cloud providers support live streaming: **ElevenLabs** (with `scribe_v2_realtime`) and **Deepgram**. Their text arrives while you are still talking, so releasing the keys only flushes the last few words.
+Three cloud providers stream: **ElevenLabs** (with `scribe_v2_realtime`), **Deepgram**, and **Amazon Transcribe**. Their text arrives while you are still talking, so releasing the keys only flushes the last few words.
 
-Turn this on with the **Transcribe as I speak** switch in the cloud transcription settings. For ElevenLabs you need to select a realtime model; the batch model (`scribe_v2`) only transcribes after you stop.
+Turn this on with the **Transcribe as I speak** switch in the cloud transcription settings. For ElevenLabs you need to select a realtime model; the batch model (`scribe_v2`) only transcribes after you stop. Amazon Transcribe always streams, because it has no batch endpoint.
 
 If the live stream fails or produces nothing, SpeakoFlow falls back to transcribing the full recording in one batch request. You never lose your words. The batch and realtime models can produce slightly different wording for the same audio, and the substitution is logged.
 
@@ -26,11 +30,11 @@ See [Cloud transcription](/dictation/cloud-transcription) for setup.
 
 ## How it connects to the overlay
 
-There is no separate streaming switch for local models. It follows the overlay style in _Settings → Dictation → Dictation overlay_.
+The overlay style in _Settings → Dictation → Dictation overlay_ decides what you see, never how the audio is transcribed.
 
-- **Live.** Streaming on. Shows a readable card with the running text.
-- **Minimal.** Streaming off. Shows the compact pill.
-- **None.** No overlay, no streaming.
+- **Live.** A readable card with the running text.
+- **Minimal.** The compact pill. A streaming model still streams behind it.
+- **None.** No overlay. A streaming model still streams.
 
 A fresh install is on **Auto**, which resolves to Live when the selected model streams and Minimal when it does not. Picking any option writes a concrete choice that overrides Auto.
 

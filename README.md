@@ -85,10 +85,11 @@ app that could hear me but couldn't help me, so I made one that does both.
 Hold the keys, talk, and let go. Your words appear wherever the cursor is, and
 the recording pill can show them as you speak. Transcription runs on your
 graphics card or processor with a local model: Parakeet by default for English,
-Nemotron for 28 languages with automatic detection, Whisper for 99, and 65
-speech models in the catalog altogether. If you'd rather use the cloud,
-ElevenLabs, Deepgram, and Amazon Transcribe stream text while you talk, and
-OpenAI, Groq, Mistral, Azure AI Speech, and OpenRouter work too.
+Nemotron for 28 languages with automatic detection, Whisper for 99, and 69
+speech models in the catalog altogether, which you can filter by language. If
+you'd rather use the cloud, ElevenLabs, Deepgram, and Amazon Transcribe stream
+text while you talk, and OpenAI, Groq, Mistral, Azure AI Speech, and
+OpenRouter work too.
 
 - **Undo.** Cancelled a recording by accident? The pill offers Undo for a few
   seconds, and History keeps the recording so you can recover it later. A
@@ -262,7 +263,7 @@ providers use your own API key, stored in your system keychain.
 
 | Job                   | On your computer                                                                                                                                        | In the cloud, with your key                                                                                                                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Speech to text        | Parakeet, Nemotron, Canary, Cohere Transcribe, Whisper, Moonshine, Voxtral, Qwen3-ASR, GigaAM, Granite Speech, SenseVoice, and more (65 in the catalog) | ElevenLabs, Deepgram, OpenAI, Groq, Mistral (Voxtral), Azure AI Speech, Amazon Transcribe, OpenRouter, or any OpenAI-compatible server                                                                    |
+| Speech to text        | Parakeet, Nemotron, Canary, Cohere Transcribe, Whisper, Moonshine, Voxtral, Qwen3-ASR, GigaAM, Granite Speech, SenseVoice, and more (69 in the catalog) | ElevenLabs, Deepgram, OpenAI, Groq, Mistral (Voxtral), Azure AI Speech, Amazon Transcribe, OpenRouter, or any OpenAI-compatible server                                                                    |
 | Assistant and cleanup | Built-in engine (llama.cpp, fully offline), Ollama, LM Studio, SpeakoFlow Mini for cleanup, Apple Intelligence for cleanup on Apple silicon             | OpenAI, Anthropic, Google Gemini, Azure OpenAI, AWS Bedrock, OpenRouter, Groq, Cerebras, xAI, DeepSeek, Mistral, Moonshot, Together AI, Fireworks AI, Perplexity, Z.AI, or any OpenAI-compatible endpoint |
 | Spoken replies        | Kokoro, Kitten, Pocket TTS, Supertonic                                                                                                                  | OpenAI, ElevenLabs, OpenRouter, Deepgram, Cartesia, Google Cloud, Azure AI Speech, Groq, xAI, Mistral, Inworld, or your own server                                                                        |
 | Web search (optional) |                                                                                                                                                         | Serper, Brave, Tavily, Exa, SerpAPI, TinyFish                                                                                                                                                             |
@@ -391,8 +392,9 @@ and installs it under `~/.local` with a desktop entry and a `speak` command.
 [BUILD.md](BUILD.md) has the setup for each platform.
 
 The app is [Tauri 2](https://tauri.app) with a Rust backend and a React and
-TypeScript frontend. Speech runs on transcribe.cpp, whisper.cpp, and ONNX
-Runtime with Silero VAD; the assistant and cleanup on a bundled llama.cpp
+TypeScript frontend. Speech runs on [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp),
+which loads every local model, Whisper `.bin` files included, and voice
+detection on Silero VAD with ONNX Runtime; the assistant and cleanup on a bundled llama.cpp
 engine or any OpenAI-compatible API; local voices on [Kokoro](https://github.com/hexgrad/kokoro)
 in the app's window and [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 on the processor; and meeting speaker labels on WeSpeaker voice embeddings.
@@ -616,7 +618,7 @@ Pais, used under the MIT licence. Thanks to CJ for making it open. The
 assistant, conversations, meetings, screen vision, Generate with Flow,
 translation, spoken replies, and memory are SpeakoFlow's own.
 
-Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, ONNX Runtime,
+Thanks also to [Tauri](https://tauri.app), transcribe.cpp, llama.cpp, ONNX Runtime,
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), Silero VAD, WeSpeaker,
 [Kokoro](https://github.com/hexgrad/kokoro), and Kyutai's Pocket TTS.
 

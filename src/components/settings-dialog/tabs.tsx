@@ -69,6 +69,7 @@ import { ModelUnloadTimeoutSetting } from "@/components/settings/ModelUnloadTime
 import { ExperimentalToggle } from "@/components/settings/ExperimentalToggle";
 import { KeyboardImplementationSelector } from "@/components/settings/debug/KeyboardImplementationSelector";
 import { AccelerationSelector } from "@/components/settings/AccelerationSelector";
+import { LongFormChunking } from "@/components/settings/LongFormChunking";
 import { LazyStreamClose } from "@/components/settings/LazyStreamClose";
 import { MouseButtonShortcuts } from "@/components/settings/MouseButtonShortcuts";
 import { LogLevelSelector } from "@/components/settings/debug/LogLevelSelector";
@@ -326,7 +327,9 @@ export const AdvancedTab: React.FC = () => {
   return (
     <>
       <SettingsGroup title={t("settingsDialog.advanced.performance")}>
+        <AccelerationSelector descriptionMode="tooltip" grouped={true} />
         <ModelUnloadTimeoutSetting descriptionMode="tooltip" grouped={true} />
+        <LongFormChunking descriptionMode="tooltip" grouped={true} />
         <ExperimentalToggle descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
 
@@ -340,7 +343,6 @@ export const AdvancedTab: React.FC = () => {
             grouped={true}
           />
           <MouseButtonShortcuts descriptionMode="tooltip" grouped={true} />
-          <AccelerationSelector descriptionMode="tooltip" grouped={true} />
           <LazyStreamClose descriptionMode="tooltip" grouped={true} />
         </SettingsGroup>
       )}

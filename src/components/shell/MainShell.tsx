@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/Sidebar";
 import UpdateChecker from "@/components/update-checker";
 import { FeedbackHost } from "@/components/feedback/FeedbackDialog";
 import { SettingsDialog } from "@/components/settings-dialog/SettingsDialog";
+import { RetiredSelectionDialog } from "@/components/settings/models/RetiredSelectionPrompt";
 import {
   INITIAL_NAVIGATION,
   NavigationProvider,
@@ -11,6 +12,7 @@ import {
 } from "./navigation";
 import { PageStack } from "./PageStack";
 import { useSlotDataSync } from "./slotData";
+import { useSpeechUpdateRequests } from "./speechUpdate";
 import { useAutoSelectDownloadedModel } from "./useSttStatus";
 
 /** Shell-wide effects that must run exactly once. */
@@ -18,6 +20,8 @@ const ShellEffects: React.FC = () => {
   useSlotDataSync();
   // Downloading a speech model switches to it once the file is on disk.
   useAutoSelectDownloadedModel(true);
+  // A dictation refused because its model is retired opens the update prompt.
+  useSpeechUpdateRequests();
   return null;
 };
 
@@ -49,6 +53,8 @@ export const MainShell: React.FC<{ initialNavigation?: NavigationState }> = ({
       </div>
       <SettingsDialog />
       <FeedbackHost />
+      {/* After an update that retired the selected speech model. */}
+      <RetiredSelectionDialog />
       {/* Background update checks and the tray's "Check for updates…". What
           they find is shown by the sidebar's UpdatePill and Settings → About. */}
       <UpdateChecker />
