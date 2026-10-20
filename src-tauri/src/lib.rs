@@ -297,10 +297,6 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(local_llm_manager.clone());
     app_handle.manage(managers::local_llm::CleanupLlm(cleanup_llm_manager.clone()));
 
-    // An install updated from a version whose engine ran the selected model:
-    // fetch its new version now rather than at the first refused dictation.
-    speech_readiness::start_retired_replacement(app_handle);
-
     // Meetings: its own SQLite store (never joined with dictation history) plus
     // the recorder that owns the dual-stream capture lifecycle.
     //

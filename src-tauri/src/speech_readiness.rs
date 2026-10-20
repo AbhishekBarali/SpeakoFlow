@@ -12,12 +12,9 @@
 //! An upgrade can leave the same dead end behind: a user who dictated with one
 //! of the ONNX models keeps it selected after its engine was removed (see
 //! `managers::legacy_models`), because silently switching to some other model
-//! would hide that their model has a new version. Its new version starts
-//! downloading at launch ([`start_retired_replacement`]) and is switched to
-//! when it lands, so a press meanwhile is refused with the download's progress
-//! on the pill. Only when nothing is on its way (offline, a failed or cancelled
-//! download, no new version) does the pill name the model and the main window
-//! open on the prompt that downloads its new version.
+//! would hide that their model has a new version. That selection is never
+//! ready either; the press is refused, the pill names the model, and the main
+//! window opens on the prompt that downloads its new version.
 //!
 //! The decision is a pure function over a snapshot ([`resolve`]) so every case
 //! is a unit test; [`allow_voice_input`] is the thin part that reads the app's
@@ -170,80 +167,6 @@ pub fn retired_selection_message(app: &AppHandle) -> Option<String> {
     Some(crate::managers::transcription::retired_engine_message(
         &model.name,
     ))
-}
-
-/// Start downloading the selected model's new version when the selection is
-/// retired, and switch to it when it lands. Called once at startup.
-///
-/// Without this, someone who updated the app found dictation refused and had
-/// to find and press "Download new version" first. Now the download is
-/// already running when they first dictate, so the pill shows its progress
-/// (`SpeechReadiness::Downloading`) and dictation works again on its own. It
-/// is the download that button starts (same progress events, mirror fallback
-/// and checksum), so the prompt shows it in place; if it fails (offline, or
-/// cancelled), the prompt offers it again.
-///
-/// Skipped when cloud transcription is set up: the local model is then only
-/// a fallback, which is not worth several hundred megabytes unasked.
-pub fn start_retired_replacement(app: &AppHandle) {
-    if crate::stt_cloud::cloud_stt_active(&get_settings(app)) {
-        return;
-    }
-    let Some(manager) = app.try_state::<Arc<ModelManager>>() else {
-        return;
-    };
-    let manager = Arc::clone(&manager);
-    let Some(retired) = manager.retired_selection() else {
-        return;
-    };
-    let Some(replacement) = retired
-        .replacement_id
-        .as_deref()
-        .and_then(|id| manager.get_model_info(id))
-    else {
-        return;
-    };
-    if replacement.is_downloaded || replacement.is_downloading {
-        return;
-    }
-    log::info!(
-        "Selected speech model '{}' used a removed engine; downloading its new version '{}'",
-        retired.id,
-        replacement.id
-    );
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        match manager.download_model(&replacement.id).await {
-            Ok(()) => {
-                // Unless the user picked something else in the meantime.
-                if get_settings(&app).selected_model != retired.id {
-                    return;
-                }
-                let switched = tauri::async_runtime::spawn_blocking(move || {
-                    crate::commands::models::switch_active_model(&app, &replacement.id)
-                })
-                .await;
-                match switched {
-                    Ok(Ok(())) => log::info!("Switched to the new version of '{}'", retired.id),
-                    Ok(Err(e)) => log::warn!("Could not switch to the new speech model: {e}"),
-                    Err(e) => log::warn!("Could not switch to the new speech model: {e}"),
-                }
-            }
-            Err(e) => {
-                let error = e.to_string();
-                log::warn!(
-                    "Downloading the new version of '{}' failed: {error}",
-                    retired.id
-                );
-                if error != crate::managers::model::DOWNLOAD_CANCELLED_ERROR {
-                    let _ = app.emit(
-                        "model-download-failed",
-                        serde_json::json!({ "model_id": &replacement.id, "error": error }),
-                    );
-                }
-            }
-        }
-    });
 }
 
 /// Bring the main window forward on the update prompt.
