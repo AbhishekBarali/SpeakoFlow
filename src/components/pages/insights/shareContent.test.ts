@@ -1,11 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { Insights } from "@/bindings";
-import {
-  buildCardContent,
-  leadActivity,
-  VOICEPRINT_DAYS,
-} from "./shareContent";
+import { buildCardDeck, NOVEL_WORDS } from "./shareContent";
+import { composeUrl } from "./shareTargets";
 
 /** Echoes the key and the values it was given, so tests can read which
  *  string was asked for without the translation files. */
@@ -60,81 +57,141 @@ const insights = (overrides: Partial<Insights> = {}): Insights => ({
   ...overrides,
 });
 
-const everything = { assistant: true, meetings: true };
+const noDictation = (base: Insights): Insights => ({
+  ...base,
+  dictation: {
+    ...base.dictation,
+    total_dictations: 0,
+    total_words: 0,
+    timed_words: 0,
+    total_audio_seconds: 0,
+    today_words: 0,
+    today_dictations: 0,
+    recent_days: [],
+  },
+});
 
-describe("the share card", () => {
-  test("leads with dictation and shows every feature that was used", () => {
-    const card = buildCardContent(insights(), t, "en", everything, NOW);
-    expect(card?.value).toBe("27,676");
-    expect(card?.lead).toContain("insights.share.headline.dictation.lead");
-    expect(card?.facts.map((fact) => fact.label.split("{")[0])).toEqual([
-      "insights.share.fact.saved",
-      "insights.share.fact.questionsAsked",
-      "insights.share.fact.meetings",
-      "insights.share.fact.wpm",
-      "insights.share.fact.streak",
-      "insights.share.fact.activeDays",
-      "insights.share.fact.dictations",
+const kinds = (data: Insights) =>
+  buildCardDeck(data, t, "en", NOW).slides.map((slide) => slide.kind);
+
+describe("the share deck", () => {
+  test("tells everything that was used, in order", () => {
+    expect(kinds(insights())).toEqual([
+      "highlights",
+      "words",
+      "speed",
+      "saved",
+      "streak",
+      "assistant",
+      "meetings",
+      "activity",
     ]);
-    // Questions are quick asks plus things said on calls.
-    expect(card?.facts[1].value).toBe("303");
   });
 
-  test("leaves out what the user switched off", () => {
-    const card = buildCardContent(
-      insights(),
+  test("never hands over a card that says zero", () => {
+    const deck = kinds(
+      noDictation({
+        ...insights(),
+        meetings: { ...insights().meetings, meetings: 0, seconds: 0, words: 0 },
+        current_streak_days: 1,
+      }),
+    );
+    expect(deck).not.toContain("words");
+    expect(deck).not.toContain("speed");
+    expect(deck).not.toContain("saved");
+    expect(deck).not.toContain("meetings");
+    expect(deck).not.toContain("streak");
+    expect(deck).toContain("assistant");
+  });
+
+  test("the highlights card takes the first four figures there are", () => {
+    const highlights = buildCardDeck(insights(), t, "en", NOW).slides[0];
+    expect(highlights.items?.map((item) => item.label.split("{")[0])).toEqual([
+      "insights.share.cards.highlights.words",
+      "insights.share.cards.highlights.streak",
+      "insights.share.cards.highlights.wpm",
+      "insights.share.cards.highlights.questions",
+    ]);
+  });
+
+  test("the words card shows the number in full and puts it in pages", () => {
+    const words = buildCardDeck(insights(), t, "en", NOW).slides.find(
+      (slide) => slide.kind === "words",
+    );
+    expect(words?.value).toBe("27,676");
+    expect(words?.note).toContain("insights.share.cards.words.pages");
+  });
+
+  test("a novel's worth of words is said as novels", () => {
+    const base = insights();
+    const words = buildCardDeck(
+      {
+        ...base,
+        dictation: { ...base.dictation, total_words: NOVEL_WORDS * 2 + 10 },
+      },
       t,
       "en",
-      { assistant: false, meetings: false },
       NOW,
+    ).slides.find((slide) => slide.kind === "words");
+    expect(words?.note).toContain(
+      'insights.share.cards.words.books{"count":2}',
     );
-    const labels = card?.facts.map((fact) => fact.label) ?? [];
-    expect(labels.some((label) => label.includes("questions"))).toBe(false);
-    expect(labels.some((label) => label.includes("meetings"))).toBe(false);
   });
 
-  test("leads with the assistant when there is no dictation", () => {
-    const data = insights({
-      dictation: { ...insights().dictation, total_words: 0, recent_days: [] },
-    });
-    expect(leadActivity(data, everything)).toBe("assistant");
-    const card = buildCardContent(data, t, "en", everything, NOW);
-    expect(card?.value).toBe("303");
-    const labels = card?.facts.map((fact) => fact.label.split("{")[0]) ?? [];
-    expect(labels).not.toContain("insights.share.fact.questionsAsked");
-    expect(labels).not.toContain("insights.share.fact.saved");
-    expect(labels).toContain("insights.share.fact.callTime");
+  test("the streak card names the longest streak only when it is longer", () => {
+    const streak = (current: number, longest: number) =>
+      buildCardDeck(
+        insights({
+          current_streak_days: current,
+          longest_streak_days: longest,
+        }),
+        t,
+        "en",
+        NOW,
+      ).slides.find((slide) => slide.kind === "streak")?.note;
+    expect(streak(12, 19)).toContain("insights.share.cards.streak.longest");
+    expect(streak(19, 19)).toBe("insights.share.cards.streak.best");
   });
 
-  test("leads with meetings when nothing else was used", () => {
-    const data = insights({
-      dictation: { ...insights().dictation, total_words: 0, recent_days: [] },
-      assistant: { ...insights().assistant, asks: 0, call_turns: 0, calls: 0 },
-    });
-    const card = buildCardContent(data, t, "en", everything, NOW);
-    expect(card?.value).toBe("23");
-    expect(card?.facts[0].label).toBe("insights.share.fact.meetingTime");
+  test("each card's post speaks for the feature it shows", () => {
+    const slides = buildCardDeck(insights(), t, "en", NOW).slides;
+    const post = (kind: string) =>
+      slides.find((slide) => slide.kind === kind)?.post ?? "";
+    expect(post("words")).toContain("insights.share.post.dictation");
+    expect(post("assistant")).toContain("insights.share.post.asks");
+    expect(post("meetings")).toContain("insights.share.post.meetings");
   });
 
-  test("has nothing to show before anything was used", () => {
-    const data = insights({
-      dictation: { ...insights().dictation, total_words: 0, recent_days: [] },
-      assistant: { ...insights().assistant, asks: 0, call_turns: 0, calls: 0 },
-      meetings: { ...insights().meetings, meetings: 0 },
-    });
-    expect(buildCardContent(data, t, "en", everything, NOW)).toBeNull();
+  test("the voice bars follow the last seven days", () => {
+    const { week } = buildCardDeck(insights(), t, "en", NOW);
+    expect(week).toHaveLength(7);
+    expect(Math.max(...week)).toBe(1);
+    expect(week.every((value) => value >= 0 && value <= 1)).toBe(true);
   });
 
-  test("draws twelve weeks of the lead feature, ending today", () => {
-    const card = buildCardContent(insights(), t, "en", everything, NOW);
-    expect(card?.bars).toHaveLength(VOICEPRINT_DAYS);
-    expect(card?.bars[VOICEPRINT_DAYS - 1]).toBe(186);
-    // July 1st is older than twelve weeks.
-    expect(card?.bars.reduce((sum, value) => sum + value, 0)).toBe(186);
+  test("the activity card counts its days and holds six months of weeks", () => {
+    const activity = buildCardDeck(insights(), t, "en", NOW).slides.find(
+      (slide) => slide.kind === "activity",
+    )?.activity;
+    expect(activity?.weeks).toHaveLength(26);
+    const last = activity?.weeks[25] ?? [];
+    // Saturday is the last day of the week, so nothing is still to come.
+    expect(last.filter((level) => level < 0)).toHaveLength(0);
+  });
+});
+
+describe("posting a card", () => {
+  test("opens a new post with the text and the link", () => {
+    const url = composeUrl("x", "I spoke 10 words.");
+    expect(url.startsWith("https://x.com/intent/post?text=")).toBe(true);
+    expect(decodeURIComponent(url.split("text=")[1])).toBe(
+      "I spoke 10 words. https://speakoflow.com",
+    );
   });
 
-  test("says since when, from the first day anything was counted", () => {
-    const card = buildCardContent(insights(), t, "en", everything, NOW);
-    expect(card?.period).toBe('insights.share.since{"date":"April 2026"}');
+  test("Facebook opens on the feed, which takes no text from a link", () => {
+    expect(composeUrl("facebook", "anything")).toBe(
+      "https://www.facebook.com/",
+    );
   });
 });

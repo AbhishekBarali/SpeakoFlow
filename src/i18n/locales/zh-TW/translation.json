@@ -3365,10 +3365,8 @@
     "about": "您使用 SpeakoFlow 的情形，在這台電腦上統計。",
     "nothingYet": "只要使用語音輸入、詢問助理或錄製會議，就會顯示您的使用分析。",
     "goHome": "查看快捷鍵",
-    "dictations": "語音輸入次數",
-    "today": "今天 {{words}} 字",
+    "dictationsSoFar_other": "已語音輸入 {{formatted}} 次",
     "pages_other": "約 {{count}} 頁",
-    "fasterThanTyping": "比打字快 {{times}} 倍",
     "streak_other": "連續 {{count}} 天",
     "longest_other": "最長：{{count}} 天",
     "streakHint": "當天只要使用語音輸入、詢問助理、進行對話或錄製會議，就算一天。",
@@ -3395,8 +3393,6 @@
       "assistant": "在您有提問的日子",
       "meetings": "在有會議的日子"
     },
-    "activeDays": "活躍天數",
-    "activeDaysSub": "過去 6 個月",
     "activity": {
       "label": "要顯示的活動",
       "all": "全部",
@@ -3404,26 +3400,19 @@
       "assistant": "助理",
       "meetings": "會議"
     },
-    "open": "開啟",
     "assistantCard": {
       "info": "快速提問，以及您在對話中說的話。刪除對話後，這些仍會計入。",
       "empty": "向助理問個問題或開始對話，就會計入這裡。",
-      "questions_other": "提問次數",
-      "calls_other": "對話次數",
-      "callTime": "對話時間"
+      "noCalls": "還沒有對話"
     },
     "meetingsCard": {
       "info": "您錄製的會議。刪除會議後，這些仍會計入。",
-      "empty": "錄製一場會議，就會計入這裡。",
-      "meetings_other": "會議場數",
-      "time": "錄製時間",
-      "words_other": "轉錄字數"
+      "empty": "錄製一場會議，就會計入這裡。"
     },
     "share": {
       "button": "分享",
       "nothingYet": "開始使用 SpeakoFlow 後，就有東西可以分享了。",
       "title": "分享您的使用分析",
-      "description": "把您的數據做成圖片，依發布的地方調整尺寸。",
       "private": "在這台電腦上製作，不會上傳任何內容。",
       "size": "尺寸",
       "formats": {
@@ -3436,18 +3425,10 @@
         "story": "1080 × 1920，適合限時動態",
         "wide": "1600 × 900，適合貼文和連結"
       },
-      "look": "風格",
-      "looks": {
-        "paper": "素紙",
-        "graphite": "石墨",
-        "mint": "薄荷",
-        "dusk": "暮色"
-      },
-      "show": "顯示",
-      "include": {
-        "assistant": "在卡片上顯示助理",
-        "meetings": "在卡片上顯示會議"
-      },
+      "previous": "上一張卡片",
+      "next": "下一張卡片",
+      "cardsLabel": "卡片",
+      "position": "第 {{index}} 張，共 {{count}} 張",
       "copy": "複製圖片",
       "copied": "已複製",
       "copyFailed": "無法複製圖片",
@@ -3455,35 +3436,69 @@
       "saved": "圖片已儲存",
       "saveFailed": "無法儲存圖片",
       "showInFolder": "在資料夾中顯示",
+      "postOn": "發佈到 {{site}}",
+      "readyToPaste": "圖片已複製",
+      "pasteNow": "按 {{keys}} 貼到您的貼文中。",
+      "openFailed": "無法開啟 {{site}}",
+      "more": "更多應用程式",
+      "sheetTitle": "我的 SpeakoFlow 使用分析",
+      "shareFailed": "無法開啟分享",
       "drawFailed": "無法繪製卡片。請關閉後再試一次。",
-      "since": "自 {{date}} 起",
-      "barsCaption_other": "最近 {{count}} 週，每一條代表一天",
       "tagline": "免費 · 開放原始碼 · 離線也能用",
-      "headline": {
-        "dictation": {
-          "lead_other": "字，用說的，",
-          "accent": "不是用打的。"
+      "cards": {
+        "highlights": {
+          "title": "我的 SpeakoFlow 精彩紀錄",
+          "words_other": "說出的字",
+          "streak_other": "連續天數",
+          "wpm": "字/分鐘",
+          "questions_other": "次提問",
+          "meetings_other": "場會議錄音",
+          "saved": "比打字省下"
         },
-        "asks": {
-          "lead_other": "個問題，",
-          "accent": "不用切換分頁。"
+        "words": {
+          "title": "動口，不動手",
+          "label_other": "說出的字",
+          "pages_other": "約 {{count}} 頁",
+          "books_other": "相當於 {{count}} 本小說"
+        },
+        "speed": {
+          "title": "我說話有多快",
+          "label": "字/分鐘",
+          "note": "比打字快 {{times}}×",
+          "you": "說話",
+          "typing": "一般打字"
+        },
+        "saved": {
+          "title": "省下的時間",
+          "label": "不必花在打字上",
+          "note": "與每分鐘打 {{wpm}} 字相比"
+        },
+        "streak": {
+          "title": "欲罷不能",
+          "unit_other": "天",
+          "longest_other": "最長連續：{{count}} 天",
+          "best": "這是我的最長紀錄"
+        },
+        "assistant": {
+          "title": "我的助理",
+          "label_other": "次提問",
+          "calls_other": "{{count}} 次對話，聊了 {{time}}"
         },
         "meetings": {
-          "lead_other": "場會議錄下來，",
-          "accent": "筆記幫我寫好。"
+          "title": "我的會議",
+          "label_other": "場會議錄音",
+          "note": "錄了 {{time}}，整理出 {{words}} 字",
+          "time": "錄製並整理了 {{time}}"
+        },
+        "activity": {
+          "title": "六個月，說個不停",
+          "label_other": "活躍天數"
         }
       },
-      "fact": {
-        "saved": "比打字省下的時間",
-        "wpm": "每分鐘字數",
-        "questionsAsked_other": "次提問",
-        "meetings_other": "場會議整理成筆記",
-        "meetingTime": "會議錄製時間",
-        "meetingWords_other": "轉錄字數",
-        "callTime": "與助理對話",
-        "streak_other": "天不間斷",
-        "activeDays_other": "天在跟電腦說話",
-        "dictations_other": "次語音輸入"
+      "post": {
+        "dictation_other": "我用 SpeakoFlow 對著電腦說了 {{formatted}} 個字，一個字都不用打。",
+        "asks_other": "我問了 SpeakoFlow 的助理 {{formatted}} 個問題，完全不用切換分頁。",
+        "meetings_other": "SpeakoFlow 已經幫我錄了 {{formatted}} 場會議，還幫我寫好筆記。"
       }
     }
   },

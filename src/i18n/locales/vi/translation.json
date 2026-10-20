@@ -3365,10 +3365,8 @@
     "about": "Cách bạn dùng SpeakoFlow, được đếm trên máy tính này.",
     "nothingYet": "Thống kê của bạn sẽ hiện ra khi bạn đọc chính tả, hỏi trợ lý hoặc ghi âm một cuộc họp.",
     "goHome": "Xem phím tắt",
-    "dictations": "Lần đọc chính tả",
-    "today": "{{words}} từ hôm nay",
+    "dictationsSoFar_other": "{{formatted}} lần đọc chính tả đến nay",
     "pages_other": "Khoảng {{count}} trang",
-    "fasterThanTyping": "Nhanh hơn gõ phím {{times}}×",
     "streak_other": "Chuỗi {{count}} ngày",
     "longest_other": "Dài nhất: {{count}} ngày",
     "streakHint": "Một ngày được tính khi bạn đọc chính tả, hỏi trợ lý, trò chuyện hoặc ghi âm một cuộc họp.",
@@ -3395,8 +3393,6 @@
       "assistant": "Vào những ngày bạn hỏi",
       "meetings": "Vào những ngày có cuộc họp"
     },
-    "activeDays": "Ngày hoạt động",
-    "activeDaysSub": "Trong 6 tháng qua",
     "activity": {
       "label": "Hoạt động hiển thị",
       "all": "Tất cả",
@@ -3404,26 +3400,19 @@
       "assistant": "Trợ lý",
       "meetings": "Cuộc họp"
     },
-    "open": "Mở",
     "assistantCard": {
       "info": "Các câu hỏi nhanh và những gì bạn nói khi trò chuyện. Vẫn được tính kể cả khi bạn xóa cuộc trò chuyện.",
       "empty": "Hãy hỏi trợ lý điều gì đó hoặc bắt đầu trò chuyện, và nó sẽ được tính ở đây.",
-      "questions_other": "Câu hỏi đã hỏi",
-      "calls_other": "Cuộc trò chuyện",
-      "callTime": "Thời gian trò chuyện"
+      "noCalls": "Chưa có cuộc trò chuyện nào"
     },
     "meetingsCard": {
       "info": "Các cuộc họp bạn đã ghi âm. Vẫn được tính kể cả khi bạn xóa một cuộc họp.",
-      "empty": "Ghi âm một cuộc họp và nó sẽ được tính ở đây.",
-      "meetings_other": "Cuộc họp",
-      "time": "Thời gian ghi âm",
-      "words_other": "Từ đã chép lời"
+      "empty": "Ghi âm một cuộc họp và nó sẽ được tính ở đây."
     },
     "share": {
       "button": "Chia sẻ",
       "nothingYet": "Sẽ có thứ để chia sẻ khi bạn đã dùng SpeakoFlow.",
       "title": "Chia sẻ thống kê của bạn",
-      "description": "Số liệu của bạn dưới dạng ảnh, đúng kích thước cho nơi bạn đăng.",
       "private": "Được tạo trên máy tính này. Không có gì được tải lên.",
       "size": "Kích thước",
       "formats": {
@@ -3436,18 +3425,10 @@
         "story": "1080 × 1920, cho tin (story)",
         "wide": "1600 × 900, cho bài đăng và liên kết"
       },
-      "look": "Phong cách",
-      "looks": {
-        "paper": "Giấy",
-        "graphite": "Than chì",
-        "mint": "Bạc hà",
-        "dusk": "Chạng vạng"
-      },
-      "show": "Hiển thị",
-      "include": {
-        "assistant": "Hiện trợ lý trên thẻ",
-        "meetings": "Hiện cuộc họp trên thẻ"
-      },
+      "previous": "Thẻ trước",
+      "next": "Thẻ tiếp theo",
+      "cardsLabel": "Thẻ",
+      "position": "Thẻ {{index}}/{{count}}",
       "copy": "Sao chép ảnh",
       "copied": "Đã sao chép",
       "copyFailed": "Không sao chép được ảnh",
@@ -3455,35 +3436,69 @@
       "saved": "Đã lưu ảnh",
       "saveFailed": "Không lưu được ảnh",
       "showInFolder": "Hiện trong thư mục",
+      "postOn": "Đăng lên {{site}}",
+      "readyToPaste": "Đã sao chép ảnh",
+      "pasteNow": "Nhấn {{keys}} để dán vào bài đăng của bạn.",
+      "openFailed": "Không mở được {{site}}",
+      "more": "Ứng dụng khác",
+      "sheetTitle": "Thống kê SpeakoFlow của mình",
+      "shareFailed": "Không mở được Chia sẻ",
       "drawFailed": "Không vẽ được thẻ. Hãy đóng lại và thử lại.",
-      "since": "Từ {{date}}",
-      "barsCaption_other": "{{count}} tuần qua, mỗi cột là một ngày",
       "tagline": "Miễn phí · Mã nguồn mở · Chạy ngoại tuyến",
-      "headline": {
-        "dictation": {
-          "lead_other": "từ tôi đã nói,",
-          "accent": "chứ không gõ."
+      "cards": {
+        "highlights": {
+          "title": "Dấu ấn SpeakoFlow của mình",
+          "words_other": "từ đã nói",
+          "streak_other": "ngày liên tiếp",
+          "wpm": "từ mỗi phút",
+          "questions_other": "câu hỏi đã hỏi",
+          "meetings_other": "cuộc họp đã ghi âm",
+          "saved": "tiết kiệm so với gõ"
         },
-        "asks": {
-          "lead_other": "câu hỏi tôi đã hỏi,",
-          "accent": "không cần chuyển tab."
+        "words": {
+          "title": "Cứ nói, khỏi gõ",
+          "label_other": "từ đã nói",
+          "pages_other": "Khoảng {{count}} trang",
+          "books_other": "Dài bằng {{count}} cuốn tiểu thuyết"
+        },
+        "speed": {
+          "title": "Mình nói nhanh cỡ nào",
+          "label": "từ mỗi phút",
+          "note": "Nhanh hơn gõ phím {{times}}×",
+          "you": "Nói",
+          "typing": "Gõ phím thông thường"
+        },
+        "saved": {
+          "title": "Thời gian tiết kiệm",
+          "label": "khỏi phải gõ phím",
+          "note": "So với gõ phím ở tốc độ {{wpm}} từ mỗi phút"
+        },
+        "streak": {
+          "title": "Đang vào guồng",
+          "unit_other": "ngày liên tiếp",
+          "longest_other": "Chuỗi dài nhất: {{count}} ngày",
+          "best": "Chuỗi dài nhất của mình từ trước đến nay"
+        },
+        "assistant": {
+          "title": "Trợ lý của mình",
+          "label_other": "câu hỏi đã hỏi",
+          "calls_other": "{{count}} cuộc trò chuyện, tổng cộng {{time}}"
         },
         "meetings": {
-          "lead_other": "cuộc họp đã ghi âm,",
-          "accent": "ghi chú được viết sẵn."
+          "title": "Các cuộc họp của mình",
+          "label_other": "cuộc họp đã ghi âm",
+          "note": "Đã ghi âm {{time}}, chép lại {{words}} từ",
+          "time": "Đã ghi âm và chép lại {{time}}"
+        },
+        "activity": {
+          "title": "Sáu tháng nói không ngừng",
+          "label_other": "ngày hoạt động"
         }
       },
-      "fact": {
-        "saved": "tiết kiệm so với gõ phím",
-        "wpm": "từ mỗi phút",
-        "questionsAsked_other": "câu hỏi đã hỏi",
-        "meetings_other": "cuộc họp đã có ghi chú",
-        "meetingTime": "thời gian họp đã ghi âm",
-        "meetingWords_other": "từ đã chép lời",
-        "callTime": "trò chuyện với trợ lý",
-        "streak_other": "ngày liên tiếp",
-        "activeDays_other": "ngày trò chuyện với máy tính",
-        "dictations_other": "lần đọc chính tả"
+      "post": {
+        "dictation_other": "Mình đã nói {{formatted}} từ với máy tính thay vì gõ, nhờ SpeakoFlow.",
+        "asks_other": "Mình đã hỏi trợ lý của SpeakoFlow {{formatted}} câu mà không cần chuyển tab.",
+        "meetings_other": "SpeakoFlow đã ghi âm {{formatted}} cuộc họp và viết ghi chú giúp mình."
       }
     }
   },

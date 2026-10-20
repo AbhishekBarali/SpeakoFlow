@@ -67,12 +67,15 @@ away. Home shows the same streak.
 These totals are kept on their own, so deleting conversations or meetings
 does not lower them, and what you already had is counted from the first launch.
 
-**Share your insights.** Share on the Insights page turns your numbers into an
-image in the website's look: Square, Story or Wide, in Paper, Graphite, Mint or
-Dusk, with the last twelve weeks drawn as a waveform. Stories keep clear of
-Instagram's and Facebook's bars, and the text stays readable on a phone. Save
-it or copy it to post anywhere. It is made on your computer; nothing is
-uploaded.
+**Share your insights.** Share on the Insights page turns your numbers into a
+set of cards, one insight each: highlights, words spoken, speaking speed, time
+saved, your streak, the assistant, meetings and six months of activity. Flip
+through them and copy or save the one you like, or post it to X, LinkedIn,
+Facebook or WhatsApp in one click (the card is copied and a new post opens,
+ready to paste into). On Windows and macOS, More apps opens the system's share
+sheet, which reaches WhatsApp, Mail or your phone. Square, Story and Wide
+sizes; stories keep clear of Instagram's and Facebook's bars. The cards are
+made on your computer; nothing is uploaded.
 
 ### Changed
 
