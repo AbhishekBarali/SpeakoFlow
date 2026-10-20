@@ -102,6 +102,21 @@ static MIGRATIONS: &[M] = &[
                 AND json_array_length(messages) > 2
                 AND instr(messages, '<selected_text>') = 0);",
     ),
+    // Lifetime assistant usage, for Insights. Counted as it happens rather than
+    // derived from `assistant_history`, which keeps only the newest
+    // `ASSISTANT_SESSION_CAP` conversations and can be cleared from History, so a
+    // regular user's oldest questions would drop out of their totals. `asks` are
+    // quick asks and `call_turns` what was said on a call; a call itself is
+    // counted once, with its length, when it ends.
+    M::up(
+        "CREATE TABLE IF NOT EXISTS assistant_usage_daily (
+            day TEXT PRIMARY KEY,
+            asks INTEGER NOT NULL DEFAULT 0,
+            call_turns INTEGER NOT NULL DEFAULT 0,
+            calls INTEGER NOT NULL DEFAULT 0,
+            call_seconds REAL NOT NULL DEFAULT 0
+        );",
+    ),
 ];
 
 /// Every `transcription_history` column [`HistoryManager::map_history_entry`]
@@ -382,6 +397,42 @@ pub struct UsageStats {
 /// `usage_daily`, so the backfill runs exactly once per database.
 const USAGE_BACKFILL_KEY: &str = "backfill_v1";
 
+/// The same for the saved conversations folded into `assistant_usage_daily`.
+const ASSISTANT_BACKFILL_KEY: &str = "assistant_backfill_v1";
+
+/// A saved call only records when it was first saved and when its last turn
+/// landed. That span is its length unless it was continued from History later,
+/// which can stretch it across days, so a longer span is not believed and the
+/// call is credited with this much per thing said instead.
+const BACKFILL_MAX_CALL_SPAN_SECS: i64 = 3 * 60 * 60;
+const BACKFILL_SECONDS_PER_CALL_TURN: f64 = 45.0;
+
+/// One local day of assistant use, for the Insights activity grid.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+pub struct AssistantUsageDay {
+    /// Local calendar date, `%Y-%m-%d`.
+    pub day: String,
+    pub asks: i64,
+    pub call_turns: i64,
+    pub calls: i64,
+    pub call_seconds: f64,
+}
+
+/// Lifetime assistant use: quick asks, and calls with what was said on them.
+/// Like [`UsageStats`], these survive conversations being deleted or pruned.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct AssistantUsage {
+    pub asks: i64,
+    pub call_turns: i64,
+    pub calls: i64,
+    pub call_seconds: f64,
+    /// Every day with any assistant use, ascending.
+    pub active_days: Vec<String>,
+    /// Days within the last `USAGE_RECENT_WINDOW_DAYS` local days including
+    /// today, ascending. Days without use are omitted.
+    pub recent_days: Vec<AssistantUsageDay>,
+}
+
 /// The backfill reads WAV headers only for this many of the newest contributing
 /// rows. It bounds startup cost on a large history; older rows still count
 /// words and dictations but are treated as untimed.
@@ -391,7 +442,7 @@ const USAGE_BACKFILL_TIMED_ROWS: usize = 2000;
 /// the Insights activity grid can fill a full year of week columns whatever
 /// weekday today is. `usage_daily` holds one row per active day and is already
 /// read in full for the lifetime totals, so the wider window costs nothing.
-const USAGE_RECENT_WINDOW_DAYS: u64 = 371;
+pub(crate) const USAGE_RECENT_WINDOW_DAYS: u64 = 371;
 
 /// Count the words in a transcript: whitespace-separated tokens containing at
 /// least one alphanumeric character, so a lone em dash or `...` is not a word.
@@ -480,6 +531,29 @@ pub fn apply_usage_delta(
              timed_words = MAX(0, usage_daily.timed_words + ?4),
              audio_seconds = MAX(0.0, usage_daily.audio_seconds + ?5)",
         params![day, d_dictations, d_words, d_timed_words, d_seconds],
+    )?;
+    Ok(())
+}
+
+/// Add deltas to one day's assistant usage, creating the row if needed. Every
+/// column is clamped at zero, like [`apply_usage_delta`].
+pub fn apply_assistant_usage_delta(
+    conn: &Connection,
+    day: &str,
+    d_asks: i64,
+    d_call_turns: i64,
+    d_calls: i64,
+    d_call_seconds: f64,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT INTO assistant_usage_daily (day, asks, call_turns, calls, call_seconds)
+         VALUES (?1, MAX(0, ?2), MAX(0, ?3), MAX(0, ?4), MAX(0.0, ?5))
+         ON CONFLICT(day) DO UPDATE SET
+             asks = MAX(0, assistant_usage_daily.asks + ?2),
+             call_turns = MAX(0, assistant_usage_daily.call_turns + ?3),
+             calls = MAX(0, assistant_usage_daily.calls + ?4),
+             call_seconds = MAX(0.0, assistant_usage_daily.call_seconds + ?5)",
+        params![day, d_asks, d_call_turns, d_calls, d_call_seconds],
     )?;
     Ok(())
 }
@@ -647,6 +721,153 @@ fn backfill_usage(
     Ok(contributing)
 }
 
+/// Fold the saved conversations into `assistant_usage_daily`, once per database.
+///
+/// Guarded by its own meta key and done in one transaction, like
+/// [`backfill_usage`]. A quick ask counts each question in it; a call counts
+/// once, with what was said on it and its length (see
+/// [`BACKFILL_MAX_CALL_SPAN_SECS`]). Conversations already pruned by the cap
+/// are gone and cannot be counted. Returns the conversations counted.
+fn backfill_assistant_usage(conn: &mut Connection) -> Result<usize> {
+    let tx = conn.transaction()?;
+    let done: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM usage_meta WHERE key = ?1)",
+        params![ASSISTANT_BACKFILL_KEY],
+        |row| row.get(0),
+    )?;
+    if done {
+        return Ok(0);
+    }
+
+    // day -> (asks, call_turns, calls, call_seconds)
+    let mut per_day: BTreeMap<String, (i64, i64, i64, f64)> = BTreeMap::new();
+    let mut counted = 0usize;
+    {
+        // Counted in SQL so the messages, screenshots and all, never have to be
+        // parsed here.
+        let mut stmt = tx.prepare(
+            "SELECT timestamp, updated_at, kind,
+                    (SELECT COUNT(*) FROM json_each(assistant_history.messages)
+                      WHERE json_each.type = 'object'
+                        AND json_extract(json_each.value, '$.role') = 'user')
+             FROM assistant_history
+             WHERE json_valid(messages)",
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let timestamp: i64 = row.get(0)?;
+            let updated_at: i64 = row.get(1)?;
+            let kind = ConversationKind::from_db(&row.get::<_, String>(2)?);
+            let questions: i64 = row.get(3)?;
+            if questions <= 0 {
+                continue;
+            }
+            counted += 1;
+            let agg = per_day.entry(local_day(timestamp)).or_default();
+            match kind {
+                ConversationKind::Ask => agg.0 += questions,
+                ConversationKind::Call => {
+                    agg.1 += questions;
+                    agg.2 += 1;
+                    let span = updated_at - timestamp;
+                    agg.3 += if (0..=BACKFILL_MAX_CALL_SPAN_SECS).contains(&span) {
+                        span as f64
+                    } else {
+                        questions as f64 * BACKFILL_SECONDS_PER_CALL_TURN
+                    };
+                }
+            }
+        }
+    }
+
+    for (day, (asks, call_turns, calls, seconds)) in &per_day {
+        apply_assistant_usage_delta(&tx, day, *asks, *call_turns, *calls, *seconds)?;
+    }
+    tx.execute(
+        "INSERT OR REPLACE INTO usage_meta (key, value) VALUES (?1, ?2)",
+        params![ASSISTANT_BACKFILL_KEY, Utc::now().timestamp().to_string()],
+    )?;
+    tx.commit()?;
+    Ok(counted)
+}
+
+/// Run [`backfill_assistant_usage`] at launch, logging the outcome.
+///
+/// A backfill that fails is still marked done. Questions and calls are
+/// counted live from this launch on, so running it again on a later launch
+/// would count every conversation saved in between twice; leaving the old
+/// conversations out of the totals is the smaller error.
+fn run_assistant_backfill(conn: &mut Connection) {
+    match backfill_assistant_usage(conn) {
+        Ok(0) => {}
+        Ok(counted) => info!(
+            "Backfilled assistant usage from {} saved conversations",
+            counted
+        ),
+        Err(e) => {
+            error!("Assistant usage backfill failed, skipping it: {}", e);
+            if let Err(e) = conn.execute(
+                "INSERT OR REPLACE INTO usage_meta (key, value) VALUES (?1, ?2)",
+                params![ASSISTANT_BACKFILL_KEY, Utc::now().timestamp().to_string()],
+            ) {
+                error!("Could not mark the assistant usage backfill done: {}", e);
+            }
+        }
+    }
+}
+
+/// Lifetime assistant use as of the local date `today`.
+pub fn compute_assistant_usage(
+    conn: &Connection,
+    today: NaiveDate,
+) -> rusqlite::Result<AssistantUsage> {
+    let window_start = today
+        .checked_sub_days(Days::new(USAGE_RECENT_WINDOW_DAYS - 1))
+        .unwrap_or(today);
+    let mut usage = AssistantUsage::default();
+    let mut stmt = conn.prepare(
+        "SELECT day, asks, call_turns, calls, call_seconds
+         FROM assistant_usage_daily ORDER BY day ASC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(AssistantUsageDay {
+            day: row.get(0)?,
+            asks: row.get(1)?,
+            call_turns: row.get(2)?,
+            calls: row.get(3)?,
+            call_seconds: row.get(4)?,
+        })
+    })?;
+    for row in rows {
+        let day = row?;
+        usage.asks += day.asks;
+        usage.call_turns += day.call_turns;
+        usage.calls += day.calls;
+        usage.call_seconds += day.call_seconds;
+        if day.asks + day.call_turns + day.calls <= 0 {
+            continue;
+        }
+        let Ok(date) = NaiveDate::parse_from_str(&day.day, "%Y-%m-%d") else {
+            continue;
+        };
+        usage.active_days.push(day.day.clone());
+        if date >= window_start && date <= today {
+            usage.recent_days.push(day);
+        }
+    }
+    Ok(usage)
+}
+
+/// Every day with at least one dictation, ascending, as `%Y-%m-%d`.
+pub fn dictation_active_days(conn: &Connection) -> rusqlite::Result<Vec<String>> {
+    let mut stmt =
+        conn.prepare("SELECT day FROM usage_daily WHERE dictations > 0 ORDER BY day ASC")?;
+    let days = stmt
+        .query_map([], |row| row.get(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()?;
+    Ok(days)
+}
+
 /// Read lifetime usage as of the local date `today`.
 pub fn compute_usage_stats(conn: &Connection, today: NaiveDate) -> rusqlite::Result<UsageStats> {
     let window_start = today
@@ -788,6 +1009,7 @@ impl HistoryManager {
             Ok(counted) => info!("Backfilled usage stats from {} history entries", counted),
             Err(e) => error!("Usage stats backfill failed: {}", e),
         }
+        run_assistant_backfill(&mut conn);
 
         // Cosmetic, so a failure is logged and the launch carries on.
         match Self::repair_assistant_titles(&conn) {
@@ -912,6 +1134,43 @@ impl HistoryManager {
     pub fn get_usage_stats(&self) -> Result<UsageStats> {
         let conn = self.get_connection()?;
         Ok(compute_usage_stats(&conn, Local::now().date_naive())?)
+    }
+
+    /// Dictation and assistant usage as of `today`, plus every day with a
+    /// dictation, read on one connection.
+    pub fn insights_usage(
+        &self,
+        today: NaiveDate,
+    ) -> Result<(UsageStats, AssistantUsage, Vec<String>)> {
+        let conn = self.get_connection()?;
+        Ok((
+            compute_usage_stats(&conn, today)?,
+            compute_assistant_usage(&conn, today)?,
+            dictation_active_days(&conn)?,
+        ))
+    }
+
+    /// Count one question put to the assistant today: a quick ask, or something
+    /// said on a call.
+    pub fn record_assistant_question(&self, on_call: bool) -> Result<()> {
+        let conn = self.get_connection()?;
+        let (asks, call_turns) = if on_call { (0, 1) } else { (1, 0) };
+        apply_assistant_usage_delta(
+            &conn,
+            &local_day(Utc::now().timestamp()),
+            asks,
+            call_turns,
+            0,
+            0.0,
+        )?;
+        Ok(())
+    }
+
+    /// Count a finished call, on the day it started.
+    pub fn record_assistant_call(&self, started_at: i64, seconds: f64) -> Result<()> {
+        let conn = self.get_connection()?;
+        apply_assistant_usage_delta(&conn, &local_day(started_at), 0, 0, 1, seconds)?;
+        Ok(())
     }
 
     /// Save a new history entry to the database.
@@ -2704,6 +2963,155 @@ mod tests {
         assert!(stats.recent_days.is_empty());
     }
 
+    // ---- lifetime assistant usage ----
+
+    fn assistant_row(conn: &Connection, day: &str) -> Option<(i64, i64, i64, f64)> {
+        conn.query_row(
+            "SELECT asks, call_turns, calls, call_seconds FROM assistant_usage_daily WHERE day = ?1",
+            params![day],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()
+        .expect("query assistant usage row")
+    }
+
+    fn insert_kind(conn: &Connection, timestamp: i64, updated_at: i64, kind: &str, messages: &str) {
+        conn.execute(
+            "INSERT INTO assistant_history (timestamp, updated_at, title, messages, kind)
+             VALUES (?1, ?2, 'Chat', ?3, ?4)",
+            params![timestamp, updated_at, messages, kind],
+        )
+        .expect("insert conversation");
+    }
+
+    #[test]
+    fn assistant_backfill_counts_asks_and_calls_once() {
+        let mut conn = migrated_conn();
+        let ask = r#"[{"role":"user","content":"what is this","images":["data:image/jpeg;base64,AAAA"]},{"role":"assistant","content":"A cat."}]"#;
+        let call = r#"[{"role":"user","content":"hi"},{"role":"assistant","content":"hello"},{"role":"user","content":"bye"},{"role":"assistant","content":"bye"}]"#;
+        let d1 = local_noon(2026, 5, 1);
+        let d2 = local_noon(2026, 5, 2);
+        insert_kind(&conn, d1, d1 + 5, "ask", ask);
+        insert_kind(&conn, d1 + 60, d1 + 65, "ask", ask);
+        insert_kind(&conn, d1 + 120, d1 + 120 + 300, "call", call);
+        // Continued from History two days later: the span is not believed.
+        insert_kind(&conn, d2, d2 + 2 * 86_400, "call", call);
+        // Nothing asked, and a row whose messages are not JSON.
+        insert_kind(&conn, d2, d2, "ask", "[]");
+        insert_kind(&conn, d2, d2, "ask", "not json");
+
+        assert_eq!(backfill_assistant_usage(&mut conn).expect("backfill"), 4);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), Some((2, 2, 1, 300.0)));
+        assert_eq!(
+            assistant_row(&conn, "2026-05-02"),
+            Some((0, 2, 1, 2.0 * BACKFILL_SECONDS_PER_CALL_TURN))
+        );
+
+        // Once only: a rerun adds nothing.
+        assert_eq!(backfill_assistant_usage(&mut conn).expect("rerun"), 0);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), Some((2, 2, 1, 300.0)));
+    }
+
+    #[test]
+    fn assistant_backfill_skips_message_list_entries_that_are_not_objects() {
+        let mut conn = migrated_conn();
+        let d1 = local_noon(2026, 5, 1);
+        insert_kind(
+            &conn,
+            d1,
+            d1,
+            "ask",
+            r#"["stray", 7, null, [1], {"role":"user","content":"hi"}]"#,
+        );
+
+        assert_eq!(backfill_assistant_usage(&mut conn).expect("backfill"), 1);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), Some((1, 0, 0, 0.0)));
+    }
+
+    #[test]
+    fn a_failed_assistant_backfill_is_not_run_again() {
+        let mut conn = migrated_conn();
+        let ask = r#"[{"role":"user","content":"hi"},{"role":"assistant","content":"hello"}]"#;
+        let d1 = local_noon(2026, 5, 1);
+        insert_kind(&conn, d1, d1, "ask", ask);
+        conn.execute_batch(
+            "CREATE TRIGGER refuse_usage BEFORE INSERT ON assistant_usage_daily
+             BEGIN SELECT RAISE(ABORT, 'refused'); END;",
+        )
+        .expect("create trigger");
+
+        run_assistant_backfill(&mut conn);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), None, "rolled back");
+
+        // Once writes work again, the next launch must not fold the
+        // conversations in on top of what was counted live meanwhile.
+        conn.execute_batch("DROP TRIGGER refuse_usage;")
+            .expect("drop trigger");
+        apply_assistant_usage_delta(&conn, "2026-05-01", 1, 0, 0, 0.0).unwrap();
+        run_assistant_backfill(&mut conn);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), Some((1, 0, 0, 0.0)));
+    }
+
+    #[test]
+    fn assistant_usage_totals_survive_conversations_being_deleted() {
+        let mut conn = migrated_conn();
+        let ask = r#"[{"role":"user","content":"hi"},{"role":"assistant","content":"hello"}]"#;
+        let d1 = local_noon(2026, 5, 1);
+        insert_kind(&conn, d1, d1, "ask", ask);
+        backfill_assistant_usage(&mut conn).expect("backfill");
+        conn.execute("DELETE FROM assistant_history", [])
+            .expect("clear history");
+
+        let usage = compute_assistant_usage(&conn, date(2026, 5, 3)).expect("usage");
+        assert_eq!(usage.asks, 1);
+        assert_eq!(usage.active_days, vec!["2026-05-01".to_string()]);
+    }
+
+    #[test]
+    fn assistant_usage_sums_days_and_keeps_the_recent_window() {
+        let conn = migrated_conn();
+        let today = date(2026, 3, 15);
+        apply_assistant_usage_delta(&conn, "2026-03-15", 3, 0, 0, 0.0).unwrap();
+        apply_assistant_usage_delta(&conn, "2026-03-15", 0, 4, 1, 120.0).unwrap();
+        apply_assistant_usage_delta(&conn, "2026-03-14", 1, 0, 0, 0.0).unwrap();
+        // Outside the 371-day window, still in the totals.
+        apply_assistant_usage_delta(&conn, "2025-03-09", 2, 0, 0, 0.0).unwrap();
+        // Corrected to nothing: not an active day.
+        apply_assistant_usage_delta(&conn, "2026-03-01", 1, 0, 0, 0.0).unwrap();
+        apply_assistant_usage_delta(&conn, "2026-03-01", -1, 0, 0, 0.0).unwrap();
+
+        let usage = compute_assistant_usage(&conn, today).expect("usage");
+        assert_eq!(usage.asks, 6);
+        assert_eq!(usage.call_turns, 4);
+        assert_eq!(usage.calls, 1);
+        assert!((usage.call_seconds - 120.0).abs() < 1e-9);
+        assert_eq!(
+            usage.active_days,
+            vec!["2025-03-09", "2026-03-14", "2026-03-15"]
+        );
+        assert_eq!(
+            usage
+                .recent_days
+                .iter()
+                .map(|day| day.day.as_str())
+                .collect::<Vec<_>>(),
+            vec!["2026-03-14", "2026-03-15"]
+        );
+    }
+
+    #[test]
+    fn dictation_active_days_skip_days_corrected_to_nothing() {
+        let conn = migrated_conn();
+        apply_usage_delta(&conn, "2026-03-02", 1, 4, 4, 2.0).unwrap();
+        apply_usage_delta(&conn, "2026-03-01", 1, 3, 3, 1.0).unwrap();
+        apply_usage_delta(&conn, "2026-03-03", 1, 3, 3, 1.0).unwrap();
+        apply_usage_delta(&conn, "2026-03-03", -1, -3, -3, -1.0).unwrap();
+        assert_eq!(
+            dictation_active_days(&conn).expect("days"),
+            vec!["2026-03-01", "2026-03-02"]
+        );
+    }
+
     // ---- assistant conversation list ----
 
     fn insert_conversation(conn: &Connection, updated_at: i64, messages: &str) -> i64 {
@@ -3005,7 +3413,8 @@ mod tests {
     #[test]
     fn existing_conversations_are_classified_when_the_kind_column_arrives() {
         let mut conn = Connection::open_in_memory().expect("open db");
-        let before_kind = MIGRATIONS.len() - 1;
+        // The `kind` column is the ninth migration; stop just before it.
+        let before_kind = 8;
         Migrations::new(MIGRATIONS[..before_kind].to_vec())
             .to_latest(&mut conn)
             .expect("migrate to the version before kind");

@@ -280,7 +280,18 @@ windows = { version = "0.61.3", features = [
   # on ARM PC and keep speech off the GPU there (managers/transcription.rs,
   # Handy #1731).
   "Win32_System_LibraryLoader",
+  # The Share panel for an Insights card (see share_sheet.rs): the data
+  # package handed to it, and the image file it carries. Its interop interface
+  # is in Win32_UI_Shell, which tao already enables, so it costs nothing.
+  "Win32_UI_Shell",
+  "ApplicationModel_DataTransfer",
+  "Storage",
+  "Storage_Streams",
 ] }
+# The list and the async operation the Share panel's data takes, at the
+# versions `windows` above already uses (it does not re-export them).
+windows-collections = "=0.2.0"
+windows-future = "=0.2.1"
 winreg = "0.55"
 # Clipboard writes that opt out of Win+V history and cloud clipboard sync
 # (`SetExtWindows`, see clipboard.rs `write_transient_clipboard_text`). Already in
@@ -345,6 +356,27 @@ objc2-core-foundation = { version = "=0.3.2", default-features = false, features
   "CFString",
   "CFNumber",
   "CFArray",
+] }
+# The Share menu for an Insights card (see share_sheet.rs): AirDrop,
+# Messages, Mail and the rest, shown beside the button that asked for it.
+# `objc2-core-foundation` brings the geometry types (NSPoint, NSRect, NSSize)
+# and `NSView::bounds`.
+objc2 = "=0.6.4"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "objc2-core-foundation",
+  "NSArray",
+  "NSGeometry",
+  "NSObject",
+  "NSString",
+  "NSURL",
+] }
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "objc2-core-foundation",
+  "NSResponder",
+  "NSSharingService",
+  "NSView",
 ] }
 # Audio ducking (see audio_toolkit/ducking/macos.rs): reads the default output
 # device id, so a volume is only put back on the device it was lowered on.

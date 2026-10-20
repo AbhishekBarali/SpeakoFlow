@@ -56,6 +56,18 @@ export const formatDuration = (seconds: number, t: TFunction): string => {
   return t("home.stats.duration.hoursMinutes", { hours, minutes });
 };
 
+/**
+ * `formatDuration` where space is short: past ten hours the minutes are
+ * dropped ("15 hr"), since they no longer change what the figure says.
+ */
+export const formatShortDuration = (seconds: number, t: TFunction): string => {
+  const total = Math.max(0, Math.round(seconds));
+  if (total >= 10 * 3600) {
+    return t("home.stats.duration.hours", { hours: Math.round(total / 3600) });
+  }
+  return formatDuration(total, t);
+};
+
 /** "3.6K" for large counts, the plain number below ten thousand. */
 export const formatCount = (value: number, locale: string): string => {
   try {
