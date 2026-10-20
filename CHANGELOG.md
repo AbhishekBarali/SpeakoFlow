@@ -88,6 +88,18 @@ still get the correction pass afterwards.
 
 ### Fixed
 
+- **Moonshine Streaming cut dictations short or pasted the wrong words.** A
+  55-second dictation could paste as "So I was thinking of", and "Our
+  surprising is not that bad" as "Are". These models revise earlier words as
+  they hear more, and SpeakoFlow pasted the words they had settled on first,
+  with everything after the first revision missing. It now pastes the model's
+  final transcript, and the live text follows the revisions instead of
+  showing half a word. Parakeet and Nemotron were not affected.
+- **Streaming models heard the silence and room noise around a dictation**,
+  which could send Nemotron off into the wrong script for an English
+  dictation and make Moonshine return nothing. They now hear the same speech
+  the rest of the app transcribes, as in Handy. Pauses between sentences are
+  kept.
 - **A graphics driver crash could take the whole app down** (#82), or leave a
   dictation stuck on "Transcribing…". Speech models now run in a separate
   process: if it crashes or stops responding, SpeakoFlow switches speech to
