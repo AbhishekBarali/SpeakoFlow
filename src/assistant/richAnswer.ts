@@ -29,10 +29,17 @@ let loading: Promise<Renderer> | null = null;
  * what WebKit's user-gesture rule for clipboard writes needs.
  */
 export function loadAnswerRenderer(): Promise<Renderer> {
-  loading ??= import("./answerMarkup").then((module) => {
-    renderer = module.renderAnswerMarkup;
-    return renderer;
-  });
+  loading ??= import("./answerMarkup").then(
+    (module) => {
+      renderer = module.renderAnswerMarkup;
+      return renderer;
+    },
+    (error: unknown) => {
+      // Not cached: a later Copy or Insert tries the import again.
+      loading = null;
+      throw error;
+    },
+  );
   return loading;
 }
 
@@ -55,10 +62,16 @@ function formattedHtml(render: Renderer, markdown: string): string | null {
 
 /**
  * The answer rendered to HTML, or `null` when it has no formatting worth
- * carrying (plain prose, or nothing at all).
+ * carrying (plain prose, or nothing at all), or when the renderer could not
+ * be loaded: the answer is then copied or inserted as text, as it always was,
+ * rather than not at all.
  */
 export async function answerHtml(markdown: string): Promise<string | null> {
-  return formattedHtml(renderer ?? (await loadAnswerRenderer()), markdown);
+  try {
+    return formattedHtml(renderer ?? (await loadAnswerRenderer()), markdown);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -92,10 +105,7 @@ export async function copyAnswer(
   markdown: string,
   native: NativeCopy = nativeCopy,
 ): Promise<void> {
-  const html = formattedHtml(
-    renderer ?? (await loadAnswerRenderer()),
-    markdown,
-  );
+  const html = await answerHtml(markdown);
   if (
     html &&
     typeof ClipboardItem !== "undefined" &&

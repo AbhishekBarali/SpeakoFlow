@@ -87,13 +87,19 @@ fn write_transient_clipboard_html(
         return write_transient_clipboard_text(app_handle, text);
     }
 
+    // Windows: the history-excluded write only. If it fails, the plain
+    // `write_html` would carry no history or cloud opt-out and the answer
+    // would land in Win+V history, so the text write (which keeps them) is
+    // the fallback instead.
     #[cfg(target_os = "windows")]
-    match write_html_excluded_from_history(html, text) {
-        Ok(()) => return Ok(()),
-        Err(e) => debug!("History-excluded HTML clipboard write failed, retrying plainly: {e}"),
-    }
+    let written = write_html_excluded_from_history(html, text).map_err(|e| e.to_string());
+    #[cfg(not(target_os = "windows"))]
+    let written = app_handle
+        .clipboard()
+        .write_html(html, Some(text))
+        .map_err(|e| e.to_string());
 
-    match app_handle.clipboard().write_html(html, Some(text)) {
+    match written {
         Ok(()) => Ok(()),
         // HTML is an improvement, never a requirement: fall back to the text
         // every earlier version pasted.
