@@ -5299,7 +5299,8 @@ fn hydrate_secrets(settings: &mut AppSettings) {
 /// [`migrate_accelerator_settings`].
 ///
 /// "Mute while recording" became one of three choices for other audio; see
-/// [`migrate_mute_while_recording`].
+/// [`migrate_mute_while_recording`]. A "Lower by" amount outside the slider's
+/// range is held to it; see [`clamp_stored_audio_ducking_amount`].
 fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bool) {
     let Some(settings) = raw.as_object_mut() else {
         return (raw, false);
@@ -5308,7 +5309,32 @@ fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bo
     let modes = split_recording_modes(settings);
     let accelerator = migrate_accelerator_settings(settings);
     let ducking = migrate_mute_while_recording(settings);
-    (raw, screen || modes || accelerator || ducking)
+    let amount = clamp_stored_audio_ducking_amount(settings);
+    (raw, screen || modes || accelerator || ducking || amount)
+}
+
+/// `audio_ducking_amount` held to the slider's range when it is loaded, so a
+/// hand-edited 5 shows and works as 10%, not as a value the slider cannot
+/// reach. A whole number too large or too negative for the field is held to
+/// the nearer end too; anything else is left to the field's own parsing.
+fn clamp_stored_audio_ducking_amount(
+    settings: &mut serde_json::Map<String, serde_json::Value>,
+) -> bool {
+    let Some(stored) = settings
+        .get("audio_ducking_amount")
+        .and_then(|value| value.as_i64().or_else(|| value.as_u64().map(|_| i64::MAX)))
+    else {
+        return false;
+    };
+    let clamped = stored.clamp(
+        i64::from(AUDIO_DUCKING_AMOUNT_MIN),
+        i64::from(AUDIO_DUCKING_AMOUNT_MAX),
+    );
+    if clamped == stored {
+        return false;
+    }
+    settings.insert("audio_ducking_amount".to_string(), clamped.into());
+    true
 }
 
 /// `mute_while_recording` was a switch. `audio_ducking` is a choice of three
@@ -6531,6 +6557,30 @@ mod tests {
             assert_eq!(decoded, ducking);
         }
         assert_eq!(get_default_settings().audio_ducking, AudioDucking::Off);
+    }
+
+    #[test]
+    fn a_stored_ducking_amount_outside_the_range_is_held_to_it_on_load() {
+        for (stored, expected) in [
+            (serde_json::json!(5), 10),
+            (serde_json::json!(0), 10),
+            (serde_json::json!(-3), 10),
+            (serde_json::json!(95), 90),
+            (serde_json::json!(300), 90),
+            (serde_json::json!(u64::MAX), 90),
+        ] {
+            let (normalized, changed) =
+                normalize_settings_json(serde_json::json!({ "audio_ducking_amount": stored }));
+            assert!(changed, "{stored}");
+            let settings: AppSettings = serde_json::from_value(normalized).unwrap();
+            assert_eq!(settings.audio_ducking_amount, expected, "{stored}");
+        }
+        for amount in [10, 70, 90] {
+            let stored = serde_json::json!({ "audio_ducking_amount": amount });
+            let (normalized, changed) = normalize_settings_json(stored.clone());
+            assert!(!changed, "{amount}");
+            assert_eq!(normalized, stored);
+        }
     }
 
     #[test]

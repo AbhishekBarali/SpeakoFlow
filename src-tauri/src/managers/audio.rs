@@ -39,6 +39,32 @@ struct DuckingGate {
     quieted: bool,
 }
 
+impl DuckingGate {
+    /// A recording has started: it may quiet other audio from now on.
+    fn arm(&mut self) {
+        self.armed = true;
+    }
+
+    /// How to quiet other audio now, if the recording under way may and has
+    /// not yet. `how` is asked only then, and a `None` from it (ducking off)
+    /// leaves the gate as it was.
+    fn quiet(&mut self, how: impl FnOnce() -> Option<Quieting>) -> Option<Quieting> {
+        if !self.armed || self.quieted {
+            return None;
+        }
+        let how = how()?;
+        self.quieted = true;
+        Some(how)
+    }
+
+    /// The recording has ended: close the gate. Whether other audio was
+    /// quieted, and so has to be brought back. True at most once per quieting.
+    fn restore(&mut self) -> bool {
+        self.armed = false;
+        std::mem::take(&mut self.quieted)
+    }
+}
+
 /* ──────────────────────────────────────────────────────────────── */
 
 #[derive(Clone, Debug)]
@@ -120,6 +146,9 @@ pub struct AudioRecordingManager {
     /// way (`audio_ducking`).
     ducker: Arc<Ducker>,
     ducking: Arc<Mutex<DuckingGate>>,
+    /// How many recordings have started, so a stop cue still waiting for
+    /// other audio can tell that a newer recording began meanwhile.
+    recordings_started: Arc<AtomicU64>,
     close_generation: Arc<AtomicU64>,
     /// Shared with the `TranscriptionManager`; the recorder's frame callback
     /// feeds raw frames into it while a live-transcription stream is active.
@@ -154,6 +183,7 @@ impl AudioRecordingManager {
             is_recording: Arc::new(Mutex::new(false)),
             ducker: Arc::new(Ducker::new()),
             ducking: Arc::new(Mutex::new(DuckingGate::default())),
+            recordings_started: Arc::new(AtomicU64::new(0)),
             close_generation: Arc::new(AtomicU64::new(0)),
             stream_router,
             speech: Arc::new(SpeechActivity::default()),
@@ -231,15 +261,11 @@ impl AudioRecordingManager {
     /// instead of leaving the computer quiet with nothing to bring it back.
     pub fn quiet_other_audio(&self) {
         let mut gate = self.ducking.lock().unwrap();
-        if !gate.armed || gate.quieted {
-            return;
-        }
-        let Some(how) = quieting(&get_settings(&self.app_handle)) else {
+        let Some(how) = gate.quiet(|| quieting(&get_settings(&self.app_handle))) else {
             return;
         };
         debug!("Quieting other audio while recording: {how:?}");
         self.ducker.quiet(how);
-        gate.quieted = true;
     }
 
     /// Bring other audio back from [`Self::quiet_other_audio`]. Whatever ends
@@ -247,12 +273,17 @@ impl AudioRecordingManager {
     /// settles once the audio is back up, for a cue that should be heard at
     /// full volume.
     pub fn restore_other_audio(&self) -> Restored {
-        let mut gate = self.ducking.lock().unwrap();
-        gate.armed = false;
-        if !std::mem::take(&mut gate.quieted) {
+        if !self.ducking.lock().unwrap().restore() {
             return Restored::settled();
         }
         self.ducker.restore()
+    }
+
+    /// How many recordings have started since the app did. A stop cue
+    /// compares it before and after waiting, to stay out of a newer
+    /// recording.
+    pub fn recordings_started(&self) -> u64 {
+        self.recordings_started.load(Ordering::SeqCst)
     }
 
     /// Let the user hear "Lower by `percent`%" on whatever is playing: it dips
@@ -453,7 +484,8 @@ impl AudioRecordingManager {
                     *self.is_recording.lock().unwrap() = true;
                     // From here the caller may quiet other audio, once its
                     // start cue has played (`quiet_other_audio`).
-                    self.ducking.lock().unwrap().armed = true;
+                    self.ducking.lock().unwrap().arm();
+                    self.recordings_started.fetch_add(1, Ordering::SeqCst);
                     *state = RecordingState::Recording {
                         binding_id: binding_id.to_string(),
                     };
@@ -647,4 +679,52 @@ pub fn pad_short_recording(mut samples: Vec<f32>) -> Vec<f32> {
         samples.resize(WHISPER_SAMPLE_RATE * 5 / 4, 0.0);
     }
     samples
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LOWER: Quieting = Quieting::Lower { keep: 0.3 };
+
+    #[test]
+    fn the_gate_quiets_only_a_recording_that_has_started() {
+        let mut gate = DuckingGate::default();
+        assert_eq!(gate.quiet(|| Some(LOWER)), None, "nothing is recording");
+        gate.arm();
+        assert_eq!(gate.quiet(|| Some(LOWER)), Some(LOWER));
+        assert_eq!(gate.quiet(|| Some(LOWER)), None, "already quiet");
+        assert!(gate.restore());
+    }
+
+    #[test]
+    fn a_quiet_that_lands_after_the_restore_does_nothing() {
+        // A quick tap: the recording ends before its start cue has played.
+        let mut gate = DuckingGate::default();
+        gate.arm();
+        assert!(!gate.restore(), "nothing was quieted yet");
+        assert_eq!(gate.quiet(|| Some(LOWER)), None);
+        assert!(!gate.restore());
+    }
+
+    #[test]
+    fn restoring_twice_brings_the_audio_back_once() {
+        let mut gate = DuckingGate::default();
+        gate.arm();
+        assert_eq!(gate.quiet(|| Some(Quieting::Mute)), Some(Quieting::Mute));
+        assert!(gate.restore());
+        assert!(!gate.restore());
+    }
+
+    #[test]
+    fn ducking_off_leaves_the_gate_open_and_asks_nothing_when_closed() {
+        let mut gate = DuckingGate::default();
+        assert_eq!(
+            gate.quiet(|| panic!("a closed gate does not read the settings")),
+            None
+        );
+        gate.arm();
+        assert_eq!(gate.quiet(|| None), None);
+        assert!(!gate.restore(), "nothing to bring back");
+    }
 }
