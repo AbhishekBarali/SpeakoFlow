@@ -378,58 +378,63 @@ const ActivityCard: React.FC<{
                 they line up. The squares grow to fill the card and the gaps
                 between them stay small: spread apart, the weeks stopped
                 reading as a calendar, and kept small, the calendar sat in
-                half the card with the rest of it empty. */}
-            <div
-              role="img"
-              aria-label={summary}
-              onMouseLeave={() => setHovered(null)}
-              className="grid items-center gap-[5px]"
-              style={{
-                gridTemplateColumns: `auto repeat(${WEEKS}, minmax(0, 1fr))`,
-                gridTemplateRows: "auto repeat(7, auto)",
-              }}
-            >
-              {map.months.map(({ col, date }) => (
-                <span
-                  key={`m-${col}-${date.getMonth()}`}
-                  aria-hidden="true"
-                  className="pb-1 text-[0.6875rem] leading-none whitespace-nowrap text-muted"
-                  style={{ gridRow: 1, gridColumn: `${col + 2} / span 4` }}
-                >
-                  {monthFormat.format(date)}
-                </span>
-              ))}
-              {rowLabels.map((label, row) => (
-                <span
-                  key={`d-${row}`}
-                  aria-hidden="true"
-                  className="pe-2 text-[0.6875rem] leading-none text-muted"
-                  style={{ gridRow: row + 2, gridColumn: 1 }}
-                >
-                  {label}
-                </span>
-              ))}
-              {map.weeks.map((column, col) =>
-                column.map((cell, row) => (
-                  <div
-                    key={`${activity}-${cell.key}`}
-                    onMouseEnter={() => setHovered(cell.future ? null : cell)}
-                    className={`heat-cell aspect-square w-full rounded-[6px] transition-[box-shadow] duration-150 ${
-                      cell.future
-                        ? "bg-transparent"
-                        : `${LEVEL_CLASSES[cell.level]} hover:shadow-[0_0_0_1.5px_var(--color-ink)]`
-                    } ${cell.isToday ? "shadow-[0_0_0_1.5px_var(--color-accent)]" : ""}`}
-                    style={
-                      {
-                        gridRow: row + 2,
-                        gridColumn: col + 2,
-                        "--col": col,
-                        "--row": row,
-                      } as React.CSSProperties
-                    }
-                  />
-                )),
-              )}
+                half the card with the rest of it empty. In a narrow window
+                the squares stop shrinking at 10px and the calendar scrolls
+                sideways; the padding keeps the rings on the edge squares
+                clear of the scroll box's clip. */}
+            <div className="-m-[2px] overflow-x-auto p-[2px]">
+              <div
+                role="img"
+                aria-label={summary}
+                onMouseLeave={() => setHovered(null)}
+                className="grid items-center gap-[5px]"
+                style={{
+                  gridTemplateColumns: `auto repeat(${WEEKS}, minmax(10px, 1fr))`,
+                  gridTemplateRows: "auto repeat(7, auto)",
+                }}
+              >
+                {map.months.map(({ col, date }) => (
+                  <span
+                    key={`m-${col}-${date.getMonth()}`}
+                    aria-hidden="true"
+                    className="pb-1 text-[0.6875rem] leading-none whitespace-nowrap text-muted"
+                    style={{ gridRow: 1, gridColumn: `${col + 2} / span 4` }}
+                  >
+                    {monthFormat.format(date)}
+                  </span>
+                ))}
+                {rowLabels.map((label, row) => (
+                  <span
+                    key={`d-${row}`}
+                    aria-hidden="true"
+                    className="pe-2 text-[0.6875rem] leading-none text-muted"
+                    style={{ gridRow: row + 2, gridColumn: 1 }}
+                  >
+                    {label}
+                  </span>
+                ))}
+                {map.weeks.map((column, col) =>
+                  column.map((cell, row) => (
+                    <div
+                      key={`${activity}-${cell.key}`}
+                      onMouseEnter={() => setHovered(cell.future ? null : cell)}
+                      className={`heat-cell aspect-square w-full rounded-[6px] transition-[box-shadow] duration-150 ${
+                        cell.future
+                          ? "bg-transparent"
+                          : `${LEVEL_CLASSES[cell.level]} hover:shadow-[0_0_0_1.5px_var(--color-ink)]`
+                      } ${cell.isToday ? "shadow-[0_0_0_1.5px_var(--color-accent)]" : ""}`}
+                      style={
+                        {
+                          gridRow: row + 2,
+                          gridColumn: col + 2,
+                          "--col": col,
+                          "--row": row,
+                        } as React.CSSProperties
+                      }
+                    />
+                  )),
+                )}
+              </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <p className="min-h-[1.25rem] text-xs text-muted tabular-nums">
@@ -486,7 +491,7 @@ const ActivityCard: React.FC<{
 export const InsightsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { navigate } = useNavigation();
-  const insights = useInsights();
+  const { insights } = useInsights();
   const [activity, setActivity] = useState<Activity>("all");
   const [sharing, setSharing] = useState(false);
 

@@ -309,6 +309,10 @@
     url = "https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.2.8.tgz";
     hash = "sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==";
   };
+  "@fontsource-variable/plus-jakarta-sans@5.3.0" = fetchurl {
+    url = "https://registry.npmjs.org/@fontsource-variable/plus-jakarta-sans/-/plus-jakarta-sans-5.3.0.tgz";
+    hash = "sha512-/l/4r0yyWK9JzAlmA0LiYgGgmJe/Gswt4jTJEzr5QhJfwMbvJZDmYWyW0M4X7yCK69BajMVlV/Lx8g7WDc1+sw==";
+  };
   "@fontsource/instrument-serif@5.3.0" = fetchurl {
     url = "https://registry.npmjs.org/@fontsource/instrument-serif/-/instrument-serif-5.3.0.tgz";
     hash = "sha512-mDiaIg0u67sYV59fie92Wz4sM8UiVlbL7fLxnFPCKkX15DMASEnQTREbaP5S5/3DCcsoAOcQ0sV9E4AeY4QqYQ==";

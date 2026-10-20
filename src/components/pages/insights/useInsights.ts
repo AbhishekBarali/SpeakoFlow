@@ -11,22 +11,42 @@ const REFRESH_DELAY_MS = 400;
  * Dictation, assistant and meeting usage, kept current.
  *
  * Re-read when a dictation lands, when a conversation is saved, when a meeting
- * changes state, and whenever the user comes back to Home or Insights: pages
- * stay mounted while hidden, so without that last one a meeting finished
- * elsewhere would not show until the next dictation.
+ * changes state, when a usage counter is written (a call hung up, a question
+ * counted), and whenever the user comes back to Home or Insights: pages stay
+ * mounted while hidden, so without that last one a meeting finished elsewhere
+ * would not show until the next dictation.
+ *
+ * `insights` is `null` until the first read lands; `failed` says the last
+ * read failed, so a caller still waiting for figures can stop.
  */
-export const useInsights = (): Insights | null => {
+export const useInsights = (): {
+  insights: Insights | null;
+  failed: boolean;
+} => {
   const [insights, setInsights] = useState<Insights | null>(null);
+  const [failed, setFailed] = useState(false);
   const { page } = useNavigation();
   const timer = useRef<number | null>(null);
+  /** Bumped per read, so a slow answer never replaces a newer one. */
+  const request = useRef(0);
 
   const load = useCallback(() => {
+    const id = ++request.current;
+    const fail = () => {
+      if (id === request.current) setFailed(true);
+    };
     void commands
       .getInsights()
       .then((result) => {
-        if (result.status === "ok") setInsights(result.data);
+        if (id !== request.current) return;
+        if (result.status === "ok") {
+          setInsights(result.data);
+          setFailed(false);
+        } else {
+          fail();
+        }
       })
-      .catch(() => {});
+      .catch(fail);
   }, []);
 
   const loadSoon = useCallback(() => {
@@ -52,13 +72,14 @@ export const useInsights = (): Insights | null => {
     });
     const offAssistant = listen("assistant-history-updated", loadSoon);
     const offMeeting = listen("meeting-state", loadSoon);
+    const offCounters = listen("insights-updated", loadSoon);
     return () => {
       if (timer.current !== null) window.clearTimeout(timer.current);
-      for (const off of [offHistory, offAssistant, offMeeting]) {
+      for (const off of [offHistory, offAssistant, offMeeting, offCounters]) {
         void off.then((unlisten) => unlisten());
       }
     };
   }, [loadSoon]);
 
-  return insights;
+  return { insights, failed };
 };
