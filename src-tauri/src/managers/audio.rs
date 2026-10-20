@@ -1,11 +1,12 @@
 use crate::audio_toolkit::{
+    ducking::{Ducker, Quieting, Restored},
     list_input_devices,
     vad::{SmoothedVad, VadTail},
     AudioRecorder, SileroVad, SpeechActivity,
 };
 use crate::helpers::clamshell;
 use crate::managers::transcription::StreamRouter;
-use crate::settings::{get_settings, AppSettings};
+use crate::settings::{clamp_audio_ducking_amount, get_settings, AppSettings, AudioDucking};
 use crate::utils;
 use log::{debug, error, info, trace, warn};
 use std::path::{Path, PathBuf};
@@ -16,96 +17,53 @@ use tauri::Manager;
 
 const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 
-fn set_mute(mute: bool) {
-    // Expected behavior:
-    // - Windows: works on most systems using standard audio drivers.
-    // - Linux: works on many systems (PipeWire, PulseAudio, ALSA),
-    //   but some distros may lack the tools used.
-    // - macOS: works on most standard setups via AppleScript.
-    // If unsupported, fails silently.
+const WHISPER_SAMPLE_RATE: usize = 16000;
 
-    #[cfg(target_os = "windows")]
-    {
-        unsafe {
-            use windows::Win32::{
-                Media::Audio::{
-                    eMultimedia, eRender, Endpoints::IAudioEndpointVolume, IMMDeviceEnumerator,
-                    MMDeviceEnumerator,
-                },
-                System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED},
-            };
-
-            macro_rules! unwrap_or_return {
-                ($expr:expr) => {
-                    match $expr {
-                        Ok(val) => val,
-                        Err(_) => return,
-                    }
-                };
-            }
-
-            // Initialize the COM library for this thread.
-            // If already initialized (e.g., by another library like Tauri), this does nothing.
-            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-
-            let all_devices: IMMDeviceEnumerator =
-                unwrap_or_return!(CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL));
-            let default_device =
-                unwrap_or_return!(all_devices.GetDefaultAudioEndpoint(eRender, eMultimedia));
-            let volume_interface = unwrap_or_return!(
-                default_device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
-            );
-
-            let _ = volume_interface.SetMute(mute, std::ptr::null());
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        use std::process::Command;
-
-        let mute_val = if mute { "1" } else { "0" };
-        let amixer_state = if mute { "mute" } else { "unmute" };
-
-        // Try multiple backends to increase compatibility
-        // 1. PipeWire (wpctl)
-        if Command::new("wpctl")
-            .args(["set-mute", "@DEFAULT_AUDIO_SINK@", mute_val])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            return;
-        }
-
-        // 2. PulseAudio (pactl)
-        if Command::new("pactl")
-            .args(["set-sink-mute", "@DEFAULT_SINK@", mute_val])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            return;
-        }
-
-        // 3. ALSA (amixer)
-        let _ = Command::new("amixer")
-            .args(["set", "Master", amixer_state])
-            .output();
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-        let script = format!(
-            "set volume output muted {}",
-            if mute { "true" } else { "false" }
-        );
-        let _ = Command::new("osascript").args(["-e", &script]).output();
+/// How `audio_ducking` asks a recording to quiet other audio, if at all.
+fn quieting(settings: &AppSettings) -> Option<Quieting> {
+    match settings.audio_ducking {
+        AudioDucking::Off => None,
+        AudioDucking::Lower => Some(Quieting::lower_by(clamp_audio_ducking_amount(
+            settings.audio_ducking_amount,
+        ))),
+        AudioDucking::Mute => Some(Quieting::Mute),
     }
 }
 
-const WHISPER_SAMPLE_RATE: usize = 16000;
+/// Whether the recording under way may still quiet other audio, and whether
+/// it has. See [`AudioRecordingManager::quiet_other_audio`].
+#[derive(Default)]
+struct DuckingGate {
+    /// Opened when a recording starts, closed the moment it ends.
+    armed: bool,
+    quieted: bool,
+}
+
+impl DuckingGate {
+    /// A recording has started: it may quiet other audio from now on.
+    fn arm(&mut self) {
+        self.armed = true;
+    }
+
+    /// How to quiet other audio now, if the recording under way may and has
+    /// not yet. `how` is asked only then, and a `None` from it (ducking off)
+    /// leaves the gate as it was.
+    fn quiet(&mut self, how: impl FnOnce() -> Option<Quieting>) -> Option<Quieting> {
+        if !self.armed || self.quieted {
+            return None;
+        }
+        let how = how()?;
+        self.quieted = true;
+        Some(how)
+    }
+
+    /// The recording has ended: close the gate. Whether other audio was
+    /// quieted, and so has to be brought back. True at most once per quieting.
+    fn restore(&mut self) -> bool {
+        self.armed = false;
+        std::mem::take(&mut self.quieted)
+    }
+}
 
 /* ──────────────────────────────────────────────────────────────── */
 
@@ -184,7 +142,13 @@ pub struct AudioRecordingManager {
     recorder: Arc<Mutex<Option<AudioRecorder>>>,
     is_open: Arc<Mutex<bool>>,
     is_recording: Arc<Mutex<bool>>,
-    did_mute: Arc<Mutex<bool>>,
+    /// Lowers or mutes the computer's other audio while a recording is under
+    /// way (`audio_ducking`).
+    ducker: Arc<Ducker>,
+    ducking: Arc<Mutex<DuckingGate>>,
+    /// How many recordings have started, so a stop cue still waiting for
+    /// other audio can tell that a newer recording began meanwhile.
+    recordings_started: Arc<AtomicU64>,
     close_generation: Arc<AtomicU64>,
     /// Shared with the `TranscriptionManager`; the recorder's frame callback
     /// feeds raw frames into it while a live-transcription stream is active.
@@ -217,7 +181,9 @@ impl AudioRecordingManager {
             recorder: Arc::new(Mutex::new(None)),
             is_open: Arc::new(Mutex::new(false)),
             is_recording: Arc::new(Mutex::new(false)),
-            did_mute: Arc::new(Mutex::new(false)),
+            ducker: Arc::new(Ducker::new()),
+            ducking: Arc::new(Mutex::new(DuckingGate::default())),
+            recordings_started: Arc::new(AtomicU64::new(0)),
             close_generation: Arc::new(AtomicU64::new(0)),
             stream_router,
             speech: Arc::new(SpeechActivity::default()),
@@ -283,29 +249,69 @@ impl AudioRecordingManager {
         });
     }
 
+    /* ---------- other audio ------------------------------------------------- */
+
+    /// Lower or mute the computer's other audio, as `audio_ducking` asks, for
+    /// the recording under way.
+    ///
+    /// Called once the start cue has played, so the cue is heard at full
+    /// volume, which means it can arrive after a quick tap has already ended
+    /// the recording. The gate stops that: it opens when a recording starts and
+    /// [`Self::restore_other_audio`] closes it, so a late call does nothing
+    /// instead of leaving the computer quiet with nothing to bring it back.
+    pub fn quiet_other_audio(&self) {
+        let mut gate = self.ducking.lock().unwrap();
+        let Some(how) = gate.quiet(|| quieting(&get_settings(&self.app_handle))) else {
+            return;
+        };
+        debug!("Quieting other audio while recording: {how:?}");
+        self.ducker.quiet(how);
+    }
+
+    /// Bring other audio back from [`Self::quiet_other_audio`]. Whatever ends
+    /// a recording calls this; calling it again is harmless. The result
+    /// settles once the audio is back up, for a cue that should be heard at
+    /// full volume.
+    pub fn restore_other_audio(&self) -> Restored {
+        if !self.ducking.lock().unwrap().restore() {
+            return Restored::settled();
+        }
+        self.ducker.restore()
+    }
+
+    /// How many recordings have started since the app did. A stop cue
+    /// compares it before and after waiting, to stay out of a newer
+    /// recording.
+    pub fn recordings_started(&self) -> u64 {
+        self.recordings_started.load(Ordering::SeqCst)
+    }
+
+    /// Let the user hear "Lower by `percent`%" on whatever is playing: it dips
+    /// for a moment and comes back by itself. Not during a recording, which
+    /// has the audio to itself.
+    pub fn preview_ducking(&self, percent: u8) {
+        // Never waits: this is called from the settings window, and a held
+        // state lock is a recording starting or stopping, which is no time for
+        // a preview either.
+        let idle = self
+            .state
+            .try_lock()
+            .is_ok_and(|state| matches!(*state, RecordingState::Idle));
+        if idle {
+            self.ducker.preview(Quieting::lower_by(percent));
+        }
+    }
+
+    /// Put back anything a recording or a preview left quiet, before the app
+    /// quits.
+    pub fn restore_other_audio_before_exit(&self) {
+        // Closes the gate first, so a start cue still playing cannot quiet the
+        // audio again on the way out.
+        let _ = self.restore_other_audio();
+        self.ducker.restore_before_exit();
+    }
+
     /* ---------- microphone life-cycle -------------------------------------- */
-
-    /// Applies mute if mute_while_recording is enabled and stream is open
-    pub fn apply_mute(&self) {
-        let settings = get_settings(&self.app_handle);
-        let mut did_mute_guard = self.did_mute.lock().unwrap();
-
-        if settings.mute_while_recording && *self.is_open.lock().unwrap() {
-            set_mute(true);
-            *did_mute_guard = true;
-            debug!("Mute applied");
-        }
-    }
-
-    /// Removes mute if it was applied
-    pub fn remove_mute(&self) {
-        let mut did_mute_guard = self.did_mute.lock().unwrap();
-        if *did_mute_guard {
-            set_mute(false);
-            *did_mute_guard = false;
-            debug!("Mute removed");
-        }
-    }
 
     pub fn preload_vad(&self) -> Result<(), anyhow::Error> {
         let mut recorder_opt = self.recorder.lock().unwrap();
@@ -351,10 +357,6 @@ impl AudioRecordingManager {
         }
 
         let start_time = Instant::now();
-
-        // Don't mute immediately - caller will handle muting after audio feedback
-        let mut did_mute_guard = self.did_mute.lock().unwrap();
-        *did_mute_guard = false;
 
         // Get the selected device from settings, considering clamshell mode
         let settings = get_settings(&self.app_handle);
@@ -413,11 +415,9 @@ impl AudioRecordingManager {
             return;
         }
 
-        let mut did_mute_guard = self.did_mute.lock().unwrap();
-        if *did_mute_guard {
-            set_mute(false);
-        }
-        *did_mute_guard = false;
+        // A closed microphone is recording nothing, so nothing should still be
+        // quiet for it. Normally already done when the recording ended.
+        let _ = self.restore_other_audio();
 
         if let Some(rec) = self.recorder.lock().unwrap().as_mut() {
             // If still recording, stop first.
@@ -482,6 +482,10 @@ impl AudioRecordingManager {
                 rec.set_vad_tail(tail);
                 if rec.start().is_ok() {
                     *self.is_recording.lock().unwrap() = true;
+                    // From here the caller may quiet other audio, once its
+                    // start cue has played (`quiet_other_audio`).
+                    self.ducking.lock().unwrap().arm();
+                    self.recordings_started.fetch_add(1, Ordering::SeqCst);
                     *state = RecordingState::Recording {
                         binding_id: binding_id.to_string(),
                     };
@@ -549,6 +553,10 @@ impl AudioRecordingManager {
             } if active == binding_id => {
                 *state = RecordingState::Idle;
                 drop(state);
+
+                // The stop paths bring other audio back before their stop cue;
+                // this is for any path that ends a recording without one.
+                let _ = self.restore_other_audio();
 
                 // Optionally keep recording for a bit longer to capture trailing audio
                 let settings = get_settings(&self.app_handle);
@@ -621,6 +629,12 @@ impl AudioRecordingManager {
             *state = RecordingState::Idle;
             drop(state);
 
+            // A cancelled recording gives other audio back too. The old mute
+            // was only undone here when the microphone closed straight away,
+            // so with an always-on or lazily closed microphone, Esc left the
+            // computer muted until the next dictation ended.
+            let _ = self.restore_other_audio();
+
             let samples = match self.recorder.lock().unwrap().as_ref() {
                 Some(rec) => rec.stop().unwrap_or_else(|e| {
                     error!("stop() failed while cancelling: {e}");
@@ -665,4 +679,52 @@ pub fn pad_short_recording(mut samples: Vec<f32>) -> Vec<f32> {
         samples.resize(WHISPER_SAMPLE_RATE * 5 / 4, 0.0);
     }
     samples
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LOWER: Quieting = Quieting::Lower { keep: 0.3 };
+
+    #[test]
+    fn the_gate_quiets_only_a_recording_that_has_started() {
+        let mut gate = DuckingGate::default();
+        assert_eq!(gate.quiet(|| Some(LOWER)), None, "nothing is recording");
+        gate.arm();
+        assert_eq!(gate.quiet(|| Some(LOWER)), Some(LOWER));
+        assert_eq!(gate.quiet(|| Some(LOWER)), None, "already quiet");
+        assert!(gate.restore());
+    }
+
+    #[test]
+    fn a_quiet_that_lands_after_the_restore_does_nothing() {
+        // A quick tap: the recording ends before its start cue has played.
+        let mut gate = DuckingGate::default();
+        gate.arm();
+        assert!(!gate.restore(), "nothing was quieted yet");
+        assert_eq!(gate.quiet(|| Some(LOWER)), None);
+        assert!(!gate.restore());
+    }
+
+    #[test]
+    fn restoring_twice_brings_the_audio_back_once() {
+        let mut gate = DuckingGate::default();
+        gate.arm();
+        assert_eq!(gate.quiet(|| Some(Quieting::Mute)), Some(Quieting::Mute));
+        assert!(gate.restore());
+        assert!(!gate.restore());
+    }
+
+    #[test]
+    fn ducking_off_leaves_the_gate_open_and_asks_nothing_when_closed() {
+        let mut gate = DuckingGate::default();
+        assert_eq!(
+            gate.quiet(|| panic!("a closed gate does not read the settings")),
+            None
+        );
+        gate.arm();
+        assert_eq!(gate.quiet(|| None), None);
+        assert!(!gate.restore(), "nothing to bring back");
+    }
 }

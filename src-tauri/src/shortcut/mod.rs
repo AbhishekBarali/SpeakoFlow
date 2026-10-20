@@ -1893,11 +1893,27 @@ pub fn set_post_process_selected_prompt(app: AppHandle, id: String) -> Result<()
     Ok(())
 }
 
+/// Choose what a recording does to the computer's other audio: leave it,
+/// lower it, or mute it. Read when each recording starts.
 #[tauri::command]
 #[specta::specta]
-pub fn change_mute_while_recording_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+pub fn change_audio_ducking_setting(
+    app: AppHandle,
+    ducking: settings::AudioDucking,
+) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.mute_while_recording = enabled;
+    settings.audio_ducking = ducking;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Set how far Lower turns other audio down, in percent. Kept within the
+/// slider's range.
+#[tauri::command]
+#[specta::specta]
+pub fn change_audio_ducking_amount_setting(app: AppHandle, amount: u8) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.audio_ducking_amount = settings::clamp_audio_ducking_amount(amount);
     settings::write_settings(&app, settings);
     Ok(())
 }

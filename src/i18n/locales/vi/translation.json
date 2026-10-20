@@ -830,6 +830,20 @@
       "volume": {
         "title": "Âm lượng",
         "description": "Điều chỉnh âm lượng của âm thanh phản hồi"
+      },
+      "ducking": {
+        "label": "Khi ghi âm",
+        "ariaLabel": "Âm thanh khác khi ghi âm",
+        "description": "Giảm hoặc tắt tiếng âm thanh khác khi bạn ghi âm, để không làm bạn phân tâm hoặc lọt vào micrô. Âm thanh trở lại ngay khi ghi âm kết thúc. Còn gọi là ducking.",
+        "options": {
+          "off": "Không đổi",
+          "lower": "Giảm",
+          "mute": "Tắt tiếng"
+        },
+        "amount": {
+          "label": "Giảm bớt",
+          "description": "Âm thanh khác nhỏ đi bao nhiêu. Kéo thanh trượt khi đang phát nội dung để nghe thử. Nếu bạn tự thay đổi âm lượng trong lúc ghi âm, âm lượng sẽ giữ nguyên như bạn đặt."
+        }
       }
     },
     "advanced": {
@@ -1439,10 +1453,6 @@
       "postProcessingToggle": {
         "label": "Dọn dẹp bằng AI",
         "description": "Dùng AI dọn dẹp phần đọc chính tả sau khi chép lời"
-      },
-      "muteWhileRecording": {
-        "label": "Tắt tiếng khi ghi âm",
-        "description": "Tắt tiếng âm thanh hệ thống trong khi ghi âm"
       },
       "appendTrailingSpace": {
         "label": "Thêm dấu cách ở cuối",
@@ -2581,6 +2591,8 @@
     },
     "audio": {
       "microphone": "Micrô",
+      "otherAudio": "Âm thanh khác",
+      "otherAudioHint": "Nhạc, video và cuộc gọi đang phát trên máy tính khi bạn đọc chính tả hoặc hỏi trợ lý.",
       "overlayHint": "Viên nhỏ hiện ra trong khi bạn ghi âm."
     },
     "dictation": {

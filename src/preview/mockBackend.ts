@@ -22,6 +22,7 @@
  *            &failDownload=stt|cleanup|assistant|voice|all (comma-separated)
  *            &failOnce=1 (failed downloads succeed on retry) &failLoad=stt
  *            &meeting=live (a meeting recording now) &sysaudio=0 &paused=1
+ *            &ducking=off|lower|mute (other audio while recording)
  *            &notes=writing (the newest meeting's notes still being written)
  *            &pill=collapsed|expanded|offer (only in src/preview/meeting.html)
  */
@@ -676,6 +677,8 @@ const settings: Json = {
   // Each platform's default engine; modifier-only keys need SpeakoFlow Keys.
   keyboard_implementation: previewOs === "linux" ? "tauri" : "handy_keys",
   audio_feedback: false,
+  audio_ducking: params.get("ducking") ?? "off",
+  audio_ducking_amount: 70,
   theme: params.get("theme") ?? "light",
   stt_engine_mode:
     params.get("stt") === "device" || retiredSelected ? "local" : "cloud",
