@@ -112,6 +112,10 @@ pub(crate) const AUTO_SUBMIT_LOCK_WAIT: Duration = Duration::from_millis(500);
 pub(crate) struct PasteRequest<'a> {
     /// What to paste.
     pub text: &'a str,
+    /// The same content as HTML, for an assistant answer whose Markdown a
+    /// rich editor should show as formatting (`clipboard::paste_rich_with_behavior`).
+    /// Promised beside the text; each app reads the one it understands.
+    pub html: Option<&'a str>,
     /// Ctrl+V, Ctrl+Shift+V or Shift+Insert.
     pub paste_method: PasteMethod,
     /// The user's "paste delay": time between publishing and the keystroke,
@@ -417,6 +421,46 @@ pub(crate) fn settle_before_exit(app_handle: &tauri::AppHandle) {
     let _ = app_handle;
 }
 
+/// Windows' `HTML Format` for `fragment`: the header of byte offsets that Word
+/// and browsers parse, then a document holding the fragment between the
+/// `StartFragment` / `EndFragment` markers, NUL-terminated for the clipboard.
+/// What arboard writes for the plain paste, built here because a promised
+/// format is rendered by hand. Shared rather than Windows-only so its offsets
+/// are unit-tested on every platform.
+pub(crate) fn cf_html(fragment: &str) -> Vec<u8> {
+    const START: &str = "<html><body>\r\n<!--StartFragment-->";
+    const END: &str = "<!--EndFragment-->\r\n</body></html>";
+    // Every offset is printed with ten digits, so the header's length is known
+    // before the offsets are.
+    let header_len = format!(
+        "Version:0.9\r\nStartHTML:{0:010}\r\nEndHTML:{0:010}\r\nStartFragment:{0:010}\r\nEndFragment:{0:010}\r\n",
+        0
+    )
+    .len();
+    let start_html = header_len;
+    let start_fragment = start_html + START.len();
+    let end_fragment = start_fragment + fragment.len();
+    let end_html = end_fragment + END.len();
+    let mut out = format!(
+        "Version:0.9\r\nStartHTML:{start_html:010}\r\nEndHTML:{end_html:010}\r\nStartFragment:{start_fragment:010}\r\nEndFragment:{end_fragment:010}\r\n{START}{fragment}{END}"
+    )
+    .into_bytes();
+    out.push(0);
+    out
+}
+
+/// `fragment` as a document that declares UTF-8, for macOS's `public.html`.
+/// The pasteboard holds the string as UTF-8 bytes but says nothing about
+/// their encoding, and Word, Pages and Mail then read them as Latin-1: "→",
+/// "é" or Devanagari come out as mojibake. The same wrapper arboard puts
+/// around the plain paste's HTML (Mozilla #466599, Chromium #11957), so
+/// both paths paste alike.
+pub(crate) fn utf8_html_document(fragment: &str) -> String {
+    format!(
+        r#"<html><head><meta http-equiv="content-type" content="text/html; charset=utf-8"></head><body>{fragment}</body></html>"#
+    )
+}
+
 /// Why a transaction paste did not complete.
 #[derive(Debug)]
 pub(crate) enum PasteTxError {
@@ -638,5 +682,38 @@ mod tests {
         assert_eq!(settle_reason(&s), "the keystroke could not be sent");
         let s = read_after_keystroke();
         assert_eq!(settle_reason(&s), "the target read the dictation");
+    }
+
+    /// The offsets in the header point exactly at the document and at the
+    /// fragment, counted in bytes (UTF-8), which is what Word and browsers
+    /// slice by.
+    #[test]
+    fn cf_html_offsets_point_at_the_fragment() {
+        let fragment = "<ol>\n<li>Open <strong>Settings → Advanced</strong>.</li>\n</ol>";
+        let bytes = cf_html(fragment);
+        assert_eq!(bytes.last(), Some(&0));
+        let doc = std::str::from_utf8(&bytes[..bytes.len() - 1]).unwrap();
+        let offset = |key: &str| -> usize {
+            let at = doc.find(key).unwrap() + key.len();
+            doc[at..at + 10].parse().unwrap()
+        };
+        let (start_html, end_html) = (offset("StartHTML:"), offset("EndHTML:"));
+        let (start, end) = (offset("StartFragment:"), offset("EndFragment:"));
+        assert_eq!(&doc[start..end], fragment);
+        assert!(doc[start_html..].starts_with("<html>"));
+        assert_eq!(end_html, doc.len());
+        assert!(doc[..start].ends_with("<!--StartFragment-->"));
+        assert!(doc[end..].starts_with("<!--EndFragment-->"));
+    }
+
+    /// The macOS document names its encoding, and the answer is in it as it
+    /// was, non-ASCII included.
+    #[test]
+    fn mac_html_declares_utf8() {
+        let fragment = "<p>Open <strong>Settings → Advanced</strong> — नमस्ते</p>";
+        let doc = utf8_html_document(fragment);
+        assert!(doc.contains("charset=utf-8"));
+        assert!(doc.find("charset").unwrap() < doc.find(fragment).unwrap());
+        assert!(doc.contains(fragment));
     }
 }

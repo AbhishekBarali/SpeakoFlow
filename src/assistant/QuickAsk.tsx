@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { voiceEnergy } from "@/components/shared/waveformSignal";
 import { quickAskShape, type QuickAskPhase } from "./quickAskState";
 import MarkdownMessage from "./MarkdownMessage";
+import { copyAnswer } from "./richAnswer";
 
 /**
  * The quick ask: one surface that is a pill while it waits, a bar while you type,
@@ -233,7 +234,7 @@ const QuickAsk: React.FC<QuickAskProps> = ({
   );
 
   const copy = () => {
-    void navigator.clipboard?.writeText(answer).then(flashCopied, () => {});
+    void copyAnswer(answer).then(flashCopied, () => {});
   };
 
   const insert = () => {
