@@ -70,7 +70,12 @@ If you are using a cloud transcription provider, no local model is needed and th
   <Accordion title="Start and stop sounds">
     Turn on audio feedback in _Settings → Audio → Sounds_, then pick a theme: Default, Marimba, Pop, or Click. A Custom option appears if you have supplied your own sound files. Sounds are off by default.
 
-    "Mute while recording" silences system audio for the length of a recording. Also off by default.
+  </Accordion>
+
+  <Accordion title="Lowering music and videos while you dictate">
+    _Settings → Audio → Other audio_ decides what happens to everything else playing on your computer while you record: **Unchanged** (the default), **Lower**, or **Mute**. Lower fades it down when the recording starts and back up when it ends, by the amount set under **Lower by** (70% by default). Drag that slider while something is playing to hear the level.
+
+    If you change the volume yourself during a recording, it stays where you put it. Audio that was already muted stays muted. On Linux this needs `wpctl` (PipeWire), `pactl` (PulseAudio) or `amixer` (ALSA), which nearly every desktop already has.
 
   </Accordion>
 
