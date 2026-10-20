@@ -8,8 +8,14 @@ import type { Insights } from "@/bindings";
 
 export type HeatLevel = 0 | 1 | 2 | 3 | 4;
 
-/** What the activity grid and the highlights can be about. */
-export type Activity = "dictation" | "assistant" | "meetings";
+/** A part of the app whose use is counted. */
+export type Feature = "dictation" | "assistant" | "meetings";
+
+export const FEATURES: Feature[] = ["dictation", "assistant", "meetings"];
+
+/** What the activity grid and the highlights can be about: one feature, or
+ *  all of them, which is what the streak counts. */
+export type Activity = "all" | Feature;
 
 /** One day's figure for one activity. */
 export interface DayValue {
@@ -19,15 +25,15 @@ export interface DayValue {
 }
 
 /**
- * Each day's figure for an activity, as the backend sent it (days without any
+ * Each day's figure for a feature, as the backend sent it (days without any
  * use are left out): words dictated, questions put to the assistant (quick asks
  * and things said on calls), or seconds of meetings.
  */
-export const activitySeries = (
+export const featureSeries = (
   insights: Insights,
-  activity: Activity,
+  feature: Feature,
 ): DayValue[] => {
-  switch (activity) {
+  switch (feature) {
     case "dictation":
       return (insights.dictation.recent_days ?? []).map((day) => ({
         day: day.day,
@@ -46,6 +52,59 @@ export const activitySeries = (
   }
 };
 
+/**
+ * Each day's figure for an activity. For all of them together a day scores
+ * the sum of each feature's share of its own busiest day, so a full day of
+ * meetings does not drown out a day of dictation; only how dark the square
+ * is reads off it.
+ */
+export const activitySeries = (
+  insights: Insights,
+  activity: Activity,
+): DayValue[] => {
+  if (activity !== "all") return featureSeries(insights, activity);
+  const scores = new Map<string, number>();
+  for (const feature of FEATURES) {
+    const series = featureSeries(insights, feature);
+    const max = Math.max(0, ...series.map((day) => day.value));
+    if (max <= 0) continue;
+    for (const day of series) {
+      if (day.value <= 0) continue;
+      scores.set(day.day, (scores.get(day.day) ?? 0) + day.value / max);
+    }
+  }
+  return [...scores]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, value]) => ({ day, value }));
+};
+
+/** What one day held, for saying it in words. */
+export interface DayParts {
+  words: number;
+  questions: number;
+  meetingSeconds: number;
+}
+
+/** Each recent day's dictation, questions and meeting time, by day key. */
+export const dayParts = (insights: Insights): Map<string, DayParts> => {
+  const parts = new Map<string, DayParts>();
+  const entry = (day: string) => {
+    let found = parts.get(day);
+    if (!found) {
+      found = { words: 0, questions: 0, meetingSeconds: 0 };
+      parts.set(day, found);
+    }
+    return found;
+  };
+  for (const day of featureSeries(insights, "dictation"))
+    entry(day.day).words += day.value;
+  for (const day of featureSeries(insights, "assistant"))
+    entry(day.day).questions += day.value;
+  for (const day of featureSeries(insights, "meetings"))
+    entry(day.day).meetingSeconds += day.value;
+  return parts;
+};
+
 /** Questions put to the assistant: quick asks plus things said on calls. */
 export const assistantQuestions = (insights: Insights): number =>
   insights.assistant.asks + insights.assistant.call_turns;
@@ -56,6 +115,8 @@ export const hasActivity = (
   activity: Activity,
 ): boolean => {
   switch (activity) {
+    case "all":
+      return FEATURES.some((feature) => hasActivity(insights, feature));
     case "dictation":
       return insights.dictation.total_words > 0;
     case "assistant":

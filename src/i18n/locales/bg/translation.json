@@ -3393,6 +3393,7 @@
   "insights": {
     "about": "Как използвате SpeakoFlow, изчислено на този компютър.",
     "nothingYet": "Статистиката ще се появи, след като диктувате, попитате асистента или запишете среща.",
+    "goHome": "Показване на бързите клавиши",
     "dictations": "Диктовки",
     "today": "{{words}} думи днес",
     "pages_one": "Около {{count}} страница",
@@ -3409,11 +3410,15 @@
     "gridSummaryAssistant_other": "{{questions}} за {{count}} дни през последните 6 месеца",
     "gridSummaryMeetings_one": "{{time}} в срещи за {{count}} ден през последните 6 месеца",
     "gridSummaryMeetings_other": "{{time}} в срещи за {{count}} дни през последните 6 месеца",
+    "gridSummaryAll_one": "{{count}} активен ден през последните 6 месеца",
+    "gridSummaryAll_other": "{{count}} активни дни през последните 6 месеца",
     "dayWords_one": "{{formatted}} дума",
     "dayWords_other": "{{formatted}} думи",
     "dayQuestions_one": "{{formatted}} въпрос",
     "dayQuestions_other": "{{formatted}} въпроса",
+    "dayMeetings": "{{time}} в срещи",
     "dayNoneFor": {
+      "all": "Няма активност",
       "dictation": "Няма диктовка",
       "assistant": "Няма въпроси",
       "meetings": "Няма срещи"
@@ -3428,8 +3433,11 @@
       "assistant": "В дните, в които питате",
       "meetings": "В дните със среща"
     },
+    "activeDays": "Активни дни",
+    "activeDaysSub": "През последните 6 месеца",
     "activity": {
       "label": "Какво да се показва",
+      "all": "Всички",
       "dictation": "Диктовка",
       "assistant": "Асистент",
       "meetings": "Срещи"
@@ -3500,10 +3508,10 @@
           "lead_other": "изговорени думи,",
           "accent": "без клавиатура."
         },
-        "assistant": {
-          "lead_one": "зададен въпрос",
-          "lead_other": "зададени въпроса",
-          "accent": "на глас."
+        "asks": {
+          "lead_one": "зададен въпрос,",
+          "lead_other": "зададени въпроса,",
+          "accent": "без смяна на раздели."
         },
         "meetings": {
           "lead_one": "записана среща,",
@@ -3514,8 +3522,8 @@
       "fact": {
         "saved": "спестени от писане",
         "wpm": "думи в минута",
-        "questions_one": "въпрос с отговор",
-        "questions_other": "въпроса с отговор",
+        "questionsAsked_one": "зададен въпрос",
+        "questionsAsked_other": "зададени въпроса",
         "meetings_one": "среща с бележки",
         "meetings_other": "срещи с бележки",
         "meetingTime": "записани срещи",

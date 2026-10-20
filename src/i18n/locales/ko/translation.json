@@ -3364,6 +3364,7 @@
   "insights": {
     "about": "SpeakoFlow 사용 현황으로, 이 컴퓨터에서 집계합니다.",
     "nothingYet": "받아쓰기를 하거나, 어시스턴트에게 묻거나, 회의를 녹음하면 인사이트가 표시됩니다.",
+    "goHome": "단축키 보기",
     "dictations": "받아쓰기 횟수",
     "today": "오늘 {{words}}단어",
     "pages_other": "약 {{count}}페이지",
@@ -3374,9 +3375,12 @@
     "gridSummary_other": "최근 6개월 동안 {{count}}일, {{words}}단어",
     "gridSummaryAssistant_other": "최근 6개월 동안 {{count}}일, {{questions}}",
     "gridSummaryMeetings_other": "최근 6개월 동안 {{count}}일, 회의 {{time}}",
+    "gridSummaryAll_other": "최근 6개월 동안 {{count}}일 활동",
     "dayWords_other": "{{formatted}}단어",
     "dayQuestions_other": "질문 {{formatted}}개",
+    "dayMeetings": "회의 {{time}}",
     "dayNoneFor": {
+      "all": "활동 없음",
       "dictation": "받아쓰기 없음",
       "assistant": "질문 없음",
       "meetings": "회의 없음"
@@ -3391,8 +3395,11 @@
       "assistant": "질문한 날 기준",
       "meetings": "회의가 있었던 날 기준"
     },
+    "activeDays": "활동한 날",
+    "activeDaysSub": "최근 6개월",
     "activity": {
       "label": "표시할 활동",
+      "all": "전체",
       "dictation": "받아쓰기",
       "assistant": "어시스턴트",
       "meetings": "회의"
@@ -3457,9 +3464,9 @@
           "lead_other": "단어를 말로 썼다.",
           "accent": "타이핑 없이."
         },
-        "assistant": {
-          "lead_other": "개의 질문을",
-          "accent": "소리 내어 물었다."
+        "asks": {
+          "lead_other": "개의 질문을 했다.",
+          "accent": "탭 전환 없이."
         },
         "meetings": {
           "lead_other": "번의 회의를 녹음하고,",
@@ -3469,7 +3476,7 @@
       "fact": {
         "saved": "타이핑 대비 절약",
         "wpm": "분당 단어 수",
-        "questions_other": "답변받은 질문",
+        "questionsAsked_other": "물어본 질문",
         "meetings_other": "회의록으로 정리한 회의",
         "meetingTime": "회의 녹음 시간",
         "meetingWords_other": "전사한 단어",

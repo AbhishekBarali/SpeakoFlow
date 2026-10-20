@@ -3422,6 +3422,7 @@
   "insights": {
     "about": "השימוש שלך ב-SpeakoFlow, נספר במחשב הזה.",
     "nothingYet": "התובנות שלך יופיעו אחרי שתכתיב, תשאל את העוזר או תקליט פגישה.",
+    "goHome": "הצג את קיצורי המקשים",
     "dictations": "הכתבות",
     "today": "{{words}} מילים היום",
     "pages_one": "בערך עמוד אחד",
@@ -3444,13 +3445,18 @@
     "gridSummaryMeetings_one": "{{time}} של פגישות ביום אחד ב-6 החודשים האחרונים",
     "gridSummaryMeetings_two": "{{time}} של פגישות ביומיים ב-6 החודשים האחרונים",
     "gridSummaryMeetings_other": "{{time}} של פגישות ב-{{count}} ימים ב-6 החודשים האחרונים",
+    "gridSummaryAll_one": "פעילות ביום אחד ב-6 החודשים האחרונים",
+    "gridSummaryAll_two": "פעילות ביומיים ב-6 החודשים האחרונים",
+    "gridSummaryAll_other": "פעילות ב-{{count}} ימים ב-6 החודשים האחרונים",
     "dayWords_one": "{{formatted}} מילה",
     "dayWords_two": "{{formatted}} מילים",
     "dayWords_other": "{{formatted}} מילים",
     "dayQuestions_one": "{{formatted}} שאלה",
     "dayQuestions_two": "{{formatted}} שאלות",
     "dayQuestions_other": "{{formatted}} שאלות",
+    "dayMeetings": "{{time}} של פגישות",
     "dayNoneFor": {
+      "all": "אין פעילות",
       "dictation": "אין הכתבה",
       "assistant": "אין שאלות",
       "meetings": "אין פגישות"
@@ -3465,8 +3471,11 @@
       "assistant": "בימים שבהם אתה שואל",
       "meetings": "בימים עם פגישה"
     },
+    "activeDays": "ימים פעילים",
+    "activeDaysSub": "ב-6 החודשים האחרונים",
     "activity": {
       "label": "פעילות להצגה",
+      "all": "הכול",
       "dictation": "הכתבה",
       "assistant": "עוזר",
       "meetings": "פגישות"
@@ -3543,11 +3552,11 @@
           "lead_other": "מילים שאמרתי,",
           "accent": "לא הקלדתי."
         },
-        "assistant": {
-          "lead_one": "שאלה ששאלתי",
-          "lead_two": "שאלות ששאלתי",
-          "lead_other": "שאלות ששאלתי",
-          "accent": "בקול."
+        "asks": {
+          "lead_one": "שאלה ששאלתי,",
+          "lead_two": "שאלות ששאלתי,",
+          "lead_other": "שאלות ששאלתי,",
+          "accent": "בלי להחליף לשונית."
         },
         "meetings": {
           "lead_one": "פגישה מוקלטת,",
@@ -3559,9 +3568,9 @@
       "fact": {
         "saved": "נחסך לעומת הקלדה",
         "wpm": "מילים לדקה",
-        "questions_one": "שאלה שנענתה",
-        "questions_two": "שאלות שנענו",
-        "questions_other": "שאלות שנענו",
+        "questionsAsked_one": "שאלה שנשאלה",
+        "questionsAsked_two": "שאלות שנשאלו",
+        "questionsAsked_other": "שאלות שנשאלו",
         "meetings_one": "פגישה שסוכמה",
         "meetings_two": "פגישות שסוכמו",
         "meetings_other": "פגישות שסוכמו",

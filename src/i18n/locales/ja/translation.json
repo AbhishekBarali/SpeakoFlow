@@ -3364,6 +3364,7 @@
   "insights": {
     "about": "SpeakoFlowの利用状況です。集計はこのPC上で行われます。",
     "nothingYet": "音声入力、アシスタントへの質問、会議の録音のいずれかを行うと、インサイトが表示されます。",
+    "goHome": "ショートカットを見る",
     "dictations": "音声入力の回数",
     "today": "今日 {{words}} 語",
     "pages_other": "約{{count}}ページ",
@@ -3374,9 +3375,12 @@
     "gridSummary_other": "過去6か月間の{{count}}日で{{words}}語",
     "gridSummaryAssistant_other": "過去6か月間の{{count}}日で{{questions}}",
     "gridSummaryMeetings_other": "過去6か月間の{{count}}日で計{{time}}の会議",
+    "gridSummaryAll_other": "過去6か月間で{{count}}日利用",
     "dayWords_other": "{{formatted}}語",
     "dayQuestions_other": "{{formatted}}件の質問",
+    "dayMeetings": "{{time}}の会議",
     "dayNoneFor": {
+      "all": "アクティビティなし",
       "dictation": "音声入力なし",
       "assistant": "質問なし",
       "meetings": "会議なし"
@@ -3391,8 +3395,11 @@
       "assistant": "質問した日の平均",
       "meetings": "会議があった日の平均"
     },
+    "activeDays": "利用日数",
+    "activeDaysSub": "過去6か月間",
     "activity": {
       "label": "表示するアクティビティ",
+      "all": "すべて",
       "dictation": "音声入力",
       "assistant": "アシスタント",
       "meetings": "会議"
@@ -3457,9 +3464,9 @@
           "lead_other": "語を、声で書いた。",
           "accent": "キーは打たずに。"
         },
-        "assistant": {
+        "asks": {
           "lead_other": "件の質問を、",
-          "accent": "声に出して。"
+          "accent": "タブを切り替えずに。"
         },
         "meetings": {
           "lead_other": "件の会議を録音。",
@@ -3469,7 +3476,7 @@
       "fact": {
         "saved": "タイピングより短縮",
         "wpm": "1分あたりの語数",
-        "questions_other": "件の質問に回答",
+        "questionsAsked_other": "件の質問をした",
         "meetings_other": "件の会議をメモに",
         "meetingTime": "会議の録音時間",
         "meetingWords_other": "語を文字起こし",

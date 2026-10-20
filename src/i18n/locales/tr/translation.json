@@ -3393,6 +3393,7 @@
   "insights": {
     "about": "SpeakoFlow'u nasıl kullandığınız, bu bilgisayarda sayılır.",
     "nothingYet": "Dikte ettiğinizde, asistana sorduğunuzda ya da bir toplantı kaydettiğinizde istatistikleriniz görünür.",
+    "goHome": "Kısayolları göster",
     "dictations": "Dikteler",
     "today": "Bugün {{words}} kelime",
     "pages_one": "Yaklaşık {{count}} sayfa",
@@ -3409,11 +3410,15 @@
     "gridSummaryAssistant_other": "Son 6 ayda {{count}} günde {{questions}}",
     "gridSummaryMeetings_one": "Son 6 ayda {{count}} günde {{time}} toplantı",
     "gridSummaryMeetings_other": "Son 6 ayda {{count}} günde {{time}} toplantı",
+    "gridSummaryAll_one": "Son 6 ayda {{count}} gün aktif",
+    "gridSummaryAll_other": "Son 6 ayda {{count}} gün aktif",
     "dayWords_one": "{{formatted}} kelime",
     "dayWords_other": "{{formatted}} kelime",
     "dayQuestions_one": "{{formatted}} soru",
     "dayQuestions_other": "{{formatted}} soru",
+    "dayMeetings": "{{time}} toplantı",
     "dayNoneFor": {
+      "all": "Etkinlik yok",
       "dictation": "Dikte yok",
       "assistant": "Soru yok",
       "meetings": "Toplantı yok"
@@ -3428,8 +3433,11 @@
       "assistant": "Soru sorduğunuz günlerde",
       "meetings": "Toplantı olan günlerde"
     },
+    "activeDays": "Aktif günler",
+    "activeDaysSub": "Son 6 ayda",
     "activity": {
       "label": "Gösterilecek etkinlik",
+      "all": "Tümü",
       "dictation": "Dikte",
       "assistant": "Asistan",
       "meetings": "Toplantılar"
@@ -3500,10 +3508,10 @@
           "lead_other": "kelime söyledim,",
           "accent": "yazmadım."
         },
-        "assistant": {
+        "asks": {
           "lead_one": "soru sordum,",
           "lead_other": "soru sordum,",
-          "accent": "yüksek sesle."
+          "accent": "sekme değiştirmeden."
         },
         "meetings": {
           "lead_one": "toplantı kaydettim,",
@@ -3514,8 +3522,8 @@
       "fact": {
         "saved": "yazmaya kıyasla kazanıldı",
         "wpm": "dakika başına kelime",
-        "questions_one": "yanıtlanan soru",
-        "questions_other": "yanıtlanan soru",
+        "questionsAsked_one": "sorulan soru",
+        "questionsAsked_other": "sorulan soru",
         "meetings_one": "notu çıkarılan toplantı",
         "meetings_other": "notu çıkarılan toplantı",
         "meetingTime": "kaydedilen toplantı",

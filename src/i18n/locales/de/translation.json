@@ -3393,6 +3393,7 @@
   "insights": {
     "about": "Wie du SpeakoFlow nutzt, gezählt auf diesem Computer.",
     "nothingYet": "Deine Statistiken erscheinen, sobald du diktierst, dem Assistenten eine Frage stellst oder ein Meeting aufnimmst.",
+    "goHome": "Deine Tastenkürzel ansehen",
     "dictations": "Diktate",
     "today": "{{words}} Wörter heute",
     "pages_one": "Etwa {{count}} Seite",
@@ -3409,11 +3410,15 @@
     "gridSummaryAssistant_other": "{{questions}} an {{count}} Tagen in den letzten 6 Monaten",
     "gridSummaryMeetings_one": "{{time}} in Meetings an {{count}} Tag in den letzten 6 Monaten",
     "gridSummaryMeetings_other": "{{time}} in Meetings an {{count}} Tagen in den letzten 6 Monaten",
+    "gridSummaryAll_one": "Aktiv an {{count}} Tag in den letzten 6 Monaten",
+    "gridSummaryAll_other": "Aktiv an {{count}} Tagen in den letzten 6 Monaten",
     "dayWords_one": "{{formatted}} Wort",
     "dayWords_other": "{{formatted}} Wörter",
     "dayQuestions_one": "{{formatted}} Frage",
     "dayQuestions_other": "{{formatted}} Fragen",
+    "dayMeetings": "{{time}} in Meetings",
     "dayNoneFor": {
+      "all": "Nichts an diesem Tag",
       "dictation": "Kein Diktat",
       "assistant": "Keine Fragen",
       "meetings": "Keine Meetings"
@@ -3428,8 +3433,11 @@
       "assistant": "An Tagen, an denen du fragst",
       "meetings": "An Tagen mit einem Meeting"
     },
+    "activeDays": "Aktive Tage",
+    "activeDaysSub": "In den letzten 6 Monaten",
     "activity": {
       "label": "Angezeigte Aktivität",
+      "all": "Alle",
       "dictation": "Diktat",
       "assistant": "Assistent",
       "meetings": "Meetings"
@@ -3500,10 +3508,10 @@
           "lead_other": "Wörter gesprochen,",
           "accent": "nicht getippt."
         },
-        "assistant": {
-          "lead_one": "Frage,",
-          "lead_other": "Fragen,",
-          "accent": "laut gestellt."
+        "asks": {
+          "lead_one": "Frage gestellt,",
+          "lead_other": "Fragen gestellt,",
+          "accent": "ohne Tab-Wechsel."
         },
         "meetings": {
           "lead_one": "Meeting aufgenommen,",
@@ -3514,8 +3522,8 @@
       "fact": {
         "saved": "gespart gegenüber Tippen",
         "wpm": "Wörter pro Minute",
-        "questions_one": "beantwortete Frage",
-        "questions_other": "beantwortete Fragen",
+        "questionsAsked_one": "gestellte Frage",
+        "questionsAsked_other": "gestellte Fragen",
         "meetings_one": "protokolliertes Meeting",
         "meetings_other": "protokollierte Meetings",
         "meetingTime": "Meetings aufgenommen",

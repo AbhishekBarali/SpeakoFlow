@@ -3451,6 +3451,7 @@
   "insights": {
     "about": "Как вы пользуетесь SpeakoFlow. Подсчёт ведётся на этом компьютере.",
     "nothingYet": "Статистика появится, когда вы начнёте диктовать, задавать вопросы ассистенту или записывать встречи.",
+    "goHome": "Показать сочетания клавиш",
     "dictations": "Диктовки",
     "today": "Сегодня слов: {{words}}",
     "pages_one": "Около {{count}} страницы",
@@ -3479,6 +3480,10 @@
     "gridSummaryMeetings_few": "Встречи: {{time}} за {{count}} дня (последние 6 месяцев)",
     "gridSummaryMeetings_many": "Встречи: {{time}} за {{count}} дней (последние 6 месяцев)",
     "gridSummaryMeetings_other": "Встречи: {{time}} за {{count}} дня (последние 6 месяцев)",
+    "gridSummaryAll_one": "{{count}} активный день (последние 6 месяцев)",
+    "gridSummaryAll_few": "{{count}} активных дня (последние 6 месяцев)",
+    "gridSummaryAll_many": "{{count}} активных дней (последние 6 месяцев)",
+    "gridSummaryAll_other": "{{count}} активного дня (последние 6 месяцев)",
     "dayWords_one": "{{formatted}} слово",
     "dayWords_few": "{{formatted}} слова",
     "dayWords_many": "{{formatted}} слов",
@@ -3487,7 +3492,9 @@
     "dayQuestions_few": "{{formatted}} вопроса",
     "dayQuestions_many": "{{formatted}} вопросов",
     "dayQuestions_other": "{{formatted}} вопроса",
+    "dayMeetings": "{{time}} на встречах",
     "dayNoneFor": {
+      "all": "Без активности",
       "dictation": "Без диктовки",
       "assistant": "Без вопросов",
       "meetings": "Без встреч"
@@ -3502,8 +3509,11 @@
       "assistant": "В дни, когда вы задаёте вопросы",
       "meetings": "В дни со встречами"
     },
+    "activeDays": "Активные дни",
+    "activeDaysSub": "За последние 6 месяцев",
     "activity": {
       "label": "Что показывать",
+      "all": "Все",
       "dictation": "Диктовка",
       "assistant": "Ассистент",
       "meetings": "Встречи"
@@ -3586,12 +3596,12 @@
           "lead_other": "слова сказано,",
           "accent": "а не набрано."
         },
-        "assistant": {
-          "lead_one": "вопрос задан",
-          "lead_few": "вопроса задано",
-          "lead_many": "вопросов задано",
-          "lead_other": "вопроса задано",
-          "accent": "вслух."
+        "asks": {
+          "lead_one": "вопрос задан,",
+          "lead_few": "вопроса задано,",
+          "lead_many": "вопросов задано,",
+          "lead_other": "вопроса задано,",
+          "accent": "без переключения вкладок."
         },
         "meetings": {
           "lead_one": "встреча записана,",
@@ -3604,10 +3614,10 @@
       "fact": {
         "saved": "сэкономлено на наборе",
         "wpm": "слов в минуту",
-        "questions_one": "вопрос с ответом",
-        "questions_few": "вопроса с ответом",
-        "questions_many": "вопросов с ответом",
-        "questions_other": "вопроса с ответом",
+        "questionsAsked_one": "заданный вопрос",
+        "questionsAsked_few": "заданных вопроса",
+        "questionsAsked_many": "заданных вопросов",
+        "questionsAsked_other": "заданного вопроса",
         "meetings_one": "встреча с заметками",
         "meetings_few": "встречи с заметками",
         "meetings_many": "встреч с заметками",

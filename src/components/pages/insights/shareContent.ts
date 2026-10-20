@@ -7,10 +7,10 @@ import {
   wordsPerMinute,
 } from "../home/usageMath";
 import {
-  activitySeries,
   assistantQuestions,
+  featureSeries,
   recentValues,
-  type Activity,
+  type Feature,
 } from "./insightsMath";
 
 /**
@@ -84,7 +84,7 @@ const headlineNumber = (value: number, locale: string): string => {
 export const leadActivity = (
   insights: Insights,
   include: CardInclude,
-): Activity | null => {
+): Feature | null => {
   const words = insights.dictation.total_words;
   const questions = include.assistant ? assistantQuestions(insights) : 0;
   const meetings = include.meetings ? insights.meetings.meetings : 0;
@@ -94,6 +94,13 @@ export const leadActivity = (
   if (questions > 0) return "assistant";
   if (meetings > 0) return "meetings";
   return words > 0 ? "dictation" : null;
+};
+
+/** The headline strings for each lead feature. */
+const HEADLINE_KEYS: Record<Feature, string> = {
+  dictation: "dictation",
+  assistant: "asks",
+  meetings: "meetings",
 };
 
 /** Everything the card says, or null when there is nothing to show yet. */
@@ -136,7 +143,7 @@ export const buildCardContent = (
   if (include.assistant && questions > 0 && lead !== "assistant") {
     facts.push({
       value: count(questions),
-      label: t("insights.share.fact.questions", { count: questions }),
+      label: t("insights.share.fact.questionsAsked", { count: questions }),
     });
   }
   if (include.meetings && meetings.meetings > 0 && lead !== "meetings") {
@@ -211,10 +218,11 @@ export const buildCardContent = (
     }
   }
 
+  const key = HEADLINE_KEYS[lead];
   const headline = {
     value: headlineNumber(value, locale),
-    lead: t(`insights.share.headline.${lead}.lead`, { count: value }),
-    accent: t(`insights.share.headline.${lead}.accent`, { count: value }),
+    lead: t(`insights.share.headline.${key}.lead`, { count: value }),
+    accent: t(`insights.share.headline.${key}.accent`, { count: value }),
   };
   const summary = [
     `${headline.value} ${headline.lead} ${headline.accent}`,
@@ -224,7 +232,7 @@ export const buildCardContent = (
   return {
     ...headline,
     facts,
-    bars: recentValues(activitySeries(insights, lead), VOICEPRINT_DAYS, now),
+    bars: recentValues(featureSeries(insights, lead), VOICEPRINT_DAYS, now),
     barsCaption: t("insights.share.barsCaption", {
       count: VOICEPRINT_DAYS / 7,
     }),

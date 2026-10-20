@@ -3393,6 +3393,7 @@
   "insights": {
     "about": "Hur du använder SpeakoFlow, räknat på den här datorn.",
     "nothingYet": "Din statistik visas när du har dikterat, frågat assistenten eller spelat in ett möte.",
+    "goHome": "Visa dina kortkommandon",
     "dictations": "Dikteringar",
     "today": "{{words}} ord i dag",
     "pages_one": "Ungefär {{count}} sida",
@@ -3409,11 +3410,15 @@
     "gridSummaryAssistant_other": "{{questions}} på {{count}} dagar de senaste 6 månaderna",
     "gridSummaryMeetings_one": "{{time}} mötestid på {{count}} dag de senaste 6 månaderna",
     "gridSummaryMeetings_other": "{{time}} mötestid på {{count}} dagar de senaste 6 månaderna",
+    "gridSummaryAll_one": "Aktiv {{count}} dag de senaste 6 månaderna",
+    "gridSummaryAll_other": "Aktiv {{count}} dagar de senaste 6 månaderna",
     "dayWords_one": "{{formatted}} ord",
     "dayWords_other": "{{formatted}} ord",
     "dayQuestions_one": "{{formatted}} fråga",
     "dayQuestions_other": "{{formatted}} frågor",
+    "dayMeetings": "{{time}} mötestid",
     "dayNoneFor": {
+      "all": "Inget den dagen",
       "dictation": "Ingen diktering",
       "assistant": "Inga frågor",
       "meetings": "Inga möten"
@@ -3428,8 +3433,11 @@
       "assistant": "Dagar du frågar",
       "meetings": "Dagar med möte"
     },
+    "activeDays": "Aktiva dagar",
+    "activeDaysSub": "De senaste 6 månaderna",
     "activity": {
       "label": "Aktivitet att visa",
+      "all": "Allt",
       "dictation": "Diktering",
       "assistant": "Assistent",
       "meetings": "Möten"
@@ -3500,10 +3508,10 @@
           "lead_other": "ord jag sa,",
           "accent": "inte skrev."
         },
-        "assistant": {
-          "lead_one": "fråga ställd",
-          "lead_other": "frågor ställda",
-          "accent": "högt."
+        "asks": {
+          "lead_one": "fråga ställd,",
+          "lead_other": "frågor ställda,",
+          "accent": "utan att byta flik."
         },
         "meetings": {
           "lead_one": "möte inspelat,",
@@ -3514,8 +3522,8 @@
       "fact": {
         "saved": "sparat jämfört med att skriva",
         "wpm": "ord i minuten",
-        "questions_one": "fråga besvarad",
-        "questions_other": "frågor besvarade",
+        "questionsAsked_one": "fråga ställd",
+        "questionsAsked_other": "frågor ställda",
         "meetings_one": "möte nedskrivet",
         "meetings_other": "möten nedskrivna",
         "meetingTime": "inspelade möten",

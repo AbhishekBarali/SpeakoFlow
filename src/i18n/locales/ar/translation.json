@@ -3509,6 +3509,7 @@
   "insights": {
     "about": "استخدامك لـ SpeakoFlow، محسوبًا على هذا الجهاز.",
     "nothingYet": "تظهر إحصاءاتك بعد أن تُملي أو تسأل المساعد أو تسجّل اجتماعًا.",
+    "goHome": "عرض اختصاراتك",
     "dictations": "عمليات الإملاء",
     "today": "{{words}} كلمة اليوم",
     "pages_zero": "أقل من صفحة",
@@ -3549,6 +3550,12 @@
     "gridSummaryMeetings_few": "{{time}} من الاجتماعات في {{count}} أيام خلال آخر 6 أشهر",
     "gridSummaryMeetings_many": "{{time}} من الاجتماعات في {{count}} يومًا خلال آخر 6 أشهر",
     "gridSummaryMeetings_other": "{{time}} من الاجتماعات في {{count}} يوم خلال آخر 6 أشهر",
+    "gridSummaryAll_zero": "نشاط في {{count}} يوم خلال آخر 6 أشهر",
+    "gridSummaryAll_one": "نشاط في يوم واحد خلال آخر 6 أشهر",
+    "gridSummaryAll_two": "نشاط في يومين خلال آخر 6 أشهر",
+    "gridSummaryAll_few": "نشاط في {{count}} أيام خلال آخر 6 أشهر",
+    "gridSummaryAll_many": "نشاط في {{count}} يومًا خلال آخر 6 أشهر",
+    "gridSummaryAll_other": "نشاط في {{count}} يوم خلال آخر 6 أشهر",
     "dayWords_zero": "{{formatted}} كلمة",
     "dayWords_one": "{{formatted}} كلمة",
     "dayWords_two": "{{formatted}} كلمة",
@@ -3561,7 +3568,9 @@
     "dayQuestions_few": "{{formatted}} أسئلة",
     "dayQuestions_many": "{{formatted}} سؤالًا",
     "dayQuestions_other": "{{formatted}} سؤال",
+    "dayMeetings": "{{time}} من الاجتماعات",
     "dayNoneFor": {
+      "all": "لا نشاط",
       "dictation": "لا إملاء",
       "assistant": "لا أسئلة",
       "meetings": "لا اجتماعات"
@@ -3576,8 +3585,11 @@
       "assistant": "في الأيام التي تسأل فيها",
       "meetings": "في الأيام التي فيها اجتماع"
     },
+    "activeDays": "أيام النشاط",
+    "activeDaysSub": "خلال آخر 6 أشهر",
     "activity": {
       "label": "النشاط المعروض",
+      "all": "الكل",
       "dictation": "الإملاء",
       "assistant": "المساعد",
       "meetings": "الاجتماعات"
@@ -3672,14 +3684,14 @@
           "lead_other": "كلمة بصوتي،",
           "accent": "لا بلوحة المفاتيح."
         },
-        "assistant": {
-          "lead_zero": "أسئلة طرحتُها",
-          "lead_one": "سؤال طرحتُه",
-          "lead_two": "سؤالان طرحتُهما",
-          "lead_few": "أسئلة طرحتُها",
-          "lead_many": "سؤالًا طرحتُها",
-          "lead_other": "سؤال طرحتُها",
-          "accent": "بصوت عالٍ."
+        "asks": {
+          "lead_zero": "أسئلة طرحتُها،",
+          "lead_one": "سؤال طرحتُه،",
+          "lead_two": "سؤالان طرحتُهما،",
+          "lead_few": "أسئلة طرحتُها،",
+          "lead_many": "سؤالًا طرحتُها،",
+          "lead_other": "سؤال طرحتُها،",
+          "accent": "دون مغادرة نافذتي."
         },
         "meetings": {
           "lead_zero": "اجتماعات مسجَّلة،",
@@ -3694,12 +3706,12 @@
       "fact": {
         "saved": "وُفِّرت مقارنةً بالكتابة",
         "wpm": "كلمة في الدقيقة",
-        "questions_zero": "أسئلة أُجيب عنها",
-        "questions_one": "سؤال أُجيب عنه",
-        "questions_two": "سؤالان أُجيب عنهما",
-        "questions_few": "أسئلة أُجيب عنها",
-        "questions_many": "سؤالًا أُجيب عنها",
-        "questions_other": "سؤال أُجيب عنها",
+        "questionsAsked_zero": "أسئلة مطروحة",
+        "questionsAsked_one": "سؤال مطروح",
+        "questionsAsked_two": "سؤالان مطروحان",
+        "questionsAsked_few": "أسئلة مطروحة",
+        "questionsAsked_many": "سؤالًا مطروحًا",
+        "questionsAsked_other": "سؤال مطروح",
         "meetings_zero": "اجتماعات مدوَّنة",
         "meetings_one": "اجتماع مدوَّن",
         "meetings_two": "اجتماعان مدوَّنان",

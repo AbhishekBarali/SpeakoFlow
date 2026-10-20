@@ -23,10 +23,13 @@ import {
   bestDay,
   buildHeatmap,
   busiestWeekday,
+  dayParts,
+  FEATURES,
   hasActivity,
   pagesFor,
   parseDayKey,
   type Activity,
+  type DayValue,
   type HeatCell,
   type HeatLevel,
 } from "./insights/insightsMath";
@@ -35,8 +38,6 @@ import { ShareDialog } from "./insights/ShareDialog";
 
 /** Weeks in the activity grid: about six months. */
 const WEEKS = 26;
-
-const ACTIVITIES: Activity[] = ["dictation", "assistant", "meetings"];
 
 const LEVEL_CLASSES: Record<HeatLevel, string> = {
   0: "bg-ink/[0.06]",
@@ -65,28 +66,53 @@ const StatCard: React.FC<{
 );
 
 /**
- * How one activity's day is said: words dictated, questions asked, or time in
- * meetings.
+ * How a day of an activity is said: words dictated, questions asked, time in
+ * meetings, or for all of them each of those the day held, in that order.
  */
-const useDayValue = () => {
+const useDaySaying = (insights: Insights) => {
   const { t, i18n } = useTranslation();
-  return (activity: Activity, value: number): string => {
-    const formatted = formatCount(value, i18n.language);
+  const parts = useMemo(() => dayParts(insights), [insights]);
+  const words = (value: number) =>
+    t("insights.dayWords", {
+      count: value,
+      formatted: formatCount(value, i18n.language),
+    });
+  const questions = (value: number) =>
+    t("insights.dayQuestions", {
+      count: value,
+      formatted: formatCount(value, i18n.language),
+    });
+  return (activity: Activity, day: DayValue): string => {
     switch (activity) {
       case "dictation":
-        return t("insights.dayWords", { count: value, formatted });
+        return words(day.value);
       case "assistant":
-        return t("insights.dayQuestions", { count: value, formatted });
+        return questions(day.value);
       case "meetings":
-        return formatDuration(value, t);
+        return formatDuration(day.value, t);
+      case "all": {
+        const held = parts.get(day.day);
+        if (!held) return "";
+        return [
+          held.words > 0 ? words(held.words) : null,
+          held.questions > 0 ? questions(held.questions) : null,
+          held.meetingSeconds > 0
+            ? t("insights.dayMeetings", {
+                time: formatDuration(held.meetingSeconds, t),
+              })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+      }
     }
   };
 };
 
 /**
- * Six months, one square per day, darker for more use. Dictation by default;
- * the assistant and meetings are a switch away once they have been used. The
- * streak above it counts a day when anything was said to the app.
+ * Six months, one square per day, darker for more use. Once more than one
+ * feature has been used it opens on all of them, the days the streak above it
+ * counts, with each feature a switch away.
  */
 const ActivityGrid: React.FC<{
   insights: Insights;
@@ -95,7 +121,7 @@ const ActivityGrid: React.FC<{
   onActivityChange: (activity: Activity) => void;
 }> = ({ insights, activity, activities, onActivityChange }) => {
   const { t, i18n } = useTranslation();
-  const dayValue = useDayValue();
+  const say = useDaySaying(insights);
   const [hovered, setHovered] = useState<HeatCell | null>(null);
   const map = useMemo(
     () => buildHeatmap(activitySeries(insights, activity), WEEKS),
@@ -132,7 +158,7 @@ const ActivityGrid: React.FC<{
         });
       case "assistant":
         return t("insights.gridSummaryAssistant", {
-          questions: dayValue("assistant", map.total),
+          questions: say("assistant", { day: "", value: map.total }),
           count: map.activeDays,
         });
       case "meetings":
@@ -140,6 +166,8 @@ const ActivityGrid: React.FC<{
           time: formatDuration(map.total, t),
           count: map.activeDays,
         });
+      case "all":
+        return t("insights.gridSummaryAll", { count: map.activeDays });
     }
   })();
   const noneLabel = t(`insights.dayNoneFor.${activity}`);
@@ -236,7 +264,7 @@ const ActivityGrid: React.FC<{
               </span>
               {" · "}
               {hovered.value > 0
-                ? dayValue(activity, hovered.value)
+                ? say(activity, { day: hovered.key, value: hovered.value })
                 : noneLabel}
             </>
           ) : (
@@ -275,19 +303,24 @@ const Highlight: React.FC<{ label: string; value: string; sub?: string }> = ({
   </div>
 );
 
-/** The busiest weekday, best day and typical day of the activity in view. */
+/**
+ * The busiest weekday, best day and typical day of the activity in view; for
+ * all of them, the best day says what it held and the third card counts the
+ * days with any use, since an average of a mixed score means nothing.
+ */
 const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
   insights,
   activity,
 }) => {
   const { t, i18n } = useTranslation();
-  const dayValue = useDayValue();
+  const say = useDaySaying(insights);
   const highlights = useMemo(() => {
     const days = activitySeries(insights, activity);
     return {
       weekday: busiestWeekday(days),
       best: bestDay(days),
       average: averageActiveDay(days),
+      activeDays: buildHeatmap(days, WEEKS).activeDays,
     };
   }, [insights, activity]);
 
@@ -317,24 +350,45 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
             : t("home.stats.none")
         }
       />
-      <Highlight
-        label={t("insights.best")}
-        value={
-          highlights.best
-            ? dayValue(activity, highlights.best.value)
-            : t("home.stats.none")
-        }
-        sub={highlights.best ? longDate(highlights.best.day) : undefined}
-      />
-      <Highlight
-        label={t("insights.typical")}
-        value={
-          highlights.average > 0
-            ? dayValue(activity, highlights.average)
-            : t("home.stats.none")
-        }
-        sub={t(`insights.typicalFor.${activity}`)}
-      />
+      {activity === "all" ? (
+        <>
+          <Highlight
+            label={t("insights.best")}
+            value={
+              highlights.best
+                ? longDate(highlights.best.day)
+                : t("home.stats.none")
+            }
+            sub={highlights.best ? say("all", highlights.best) : undefined}
+          />
+          <Highlight
+            label={t("insights.activeDays")}
+            value={formatCount(highlights.activeDays, i18n.language)}
+            sub={t("insights.activeDaysSub")}
+          />
+        </>
+      ) : (
+        <>
+          <Highlight
+            label={t("insights.best")}
+            value={
+              highlights.best
+                ? say(activity, highlights.best)
+                : t("home.stats.none")
+            }
+            sub={highlights.best ? longDate(highlights.best.day) : undefined}
+          />
+          <Highlight
+            label={t("insights.typical")}
+            value={
+              highlights.average > 0
+                ? say(activity, { day: "", value: highlights.average })
+                : t("home.stats.none")
+            }
+            sub={t(`insights.typicalFor.${activity}`)}
+          />
+        </>
+      )}
     </div>
   );
 };
@@ -342,7 +396,8 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
 /**
  * One feature beyond dictation: its name, the way to its page, and three
  * figures side by side. Before it has been used it says how to start instead
- * of showing a row of zeros.
+ * of showing a row of zeros. Each figure takes the room its value needs, so a
+ * long duration ("1 Std. 31 Min.") gets it from a short count beside it.
  */
 const FeatureCard: React.FC<{
   icon: React.ComponentType<{ className?: string }>;
@@ -374,11 +429,11 @@ const FeatureCard: React.FC<{
     {empty ? (
       <p className="mt-4 text-sm text-muted text-pretty">{empty}</p>
     ) : (
-      <dl className="mt-4 grid grid-cols-3 divide-x divide-hairline rtl:divide-x-reverse">
+      <dl className="mt-4 flex divide-x divide-hairline rtl:divide-x-reverse">
         {figures.map((figure) => (
           <div
             key={figure.label}
-            className="flex min-w-0 flex-col-reverse px-3 first:ps-0 last:pe-0 @4xl:px-4"
+            className="flex min-w-0 flex-auto flex-col-reverse px-3 first:ps-0 last:pe-0 @4xl:px-4"
           >
             <dt className="mt-1 truncate text-xs text-muted">{figure.label}</dt>
             <dd className="truncate text-[1.3125rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
@@ -401,21 +456,22 @@ export const InsightsPage: React.FC = () => {
   const { navigate } = useNavigation();
   const { settings } = useSettings();
   const insights = useInsights();
-  const [activity, setActivity] = useState<Activity>("dictation");
+  const [activity, setActivity] = useState<Activity>("all");
   const [sharing, setSharing] = useState(false);
 
   const used = useMemo(
     () =>
       insights
-        ? ACTIVITIES.filter((value) => hasActivity(insights, value))
+        ? FEATURES.filter((feature) => hasActivity(insights, feature))
         : [],
     [insights],
   );
-  // The grid shows dictation unless it was never used; a choice of something
-  // with nothing to show falls back too.
-  const shown: Activity = used.includes(activity)
+  // All of them, then each feature that has been used. With only one used,
+  // "all" would be that feature twice, so the grid just shows it.
+  const views: Activity[] = used.length > 1 ? ["all", ...used] : used;
+  const shown: Activity = views.includes(activity)
     ? activity
-    : (used[0] ?? "dictation");
+    : (views[0] ?? "dictation");
 
   const header = (
     <PageHeader
@@ -450,9 +506,22 @@ export const InsightsPage: React.FC = () => {
     return (
       <Page>
         {header}
-        <p className="rounded-2xl border border-dashed border-hairline-strong px-5 py-8 text-center text-sm text-muted">
-          {t("insights.nothingYet")}
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-hairline-strong px-5 py-10 text-center">
+          <p className="max-w-md text-sm text-muted text-pretty">
+            {t("insights.nothingYet")}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate("home")}
+          >
+            {t("insights.goHome")}
+            <ArrowRight
+              className="h-3.5 w-3.5 rtl:rotate-180"
+              aria-hidden="true"
+            />
+          </Button>
+        </div>
       </Page>
     );
   }
@@ -577,7 +646,7 @@ export const InsightsPage: React.FC = () => {
         <ActivityGrid
           insights={insights}
           activity={shown}
-          activities={used}
+          activities={views}
           onActivityChange={setActivity}
         />
 
