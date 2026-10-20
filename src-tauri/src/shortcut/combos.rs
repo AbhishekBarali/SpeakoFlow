@@ -111,6 +111,22 @@ pub fn refusal(
     None
 }
 
+/// Why `combo` cannot be a shortcut's *own* keys, or `None` when it can.
+///
+/// A mouse button is only ever a shortcut's other keys. Its own keys are the
+/// ones it is known by, that "Use default" restores and that every other
+/// engine has to be able to listen for, so they stay on the keyboard: a mouse
+/// button in their place used to replace a working Ctrl + Win with one button,
+/// and turning mouse buttons off then had to put the default keys back behind
+/// the user's back. Kept as other keys, a button goes quiet with the setting
+/// and the shortcut's keys keep working throughout.
+pub fn own_keys_refusal(combo: &str) -> Option<&'static str> {
+    has_mouse_button(combo).then_some(
+        "A mouse button can't be a shortcut's own keys. Add it next to them with \
+         \"Add another\".",
+    )
+}
+
 /// The keys of `binding` that `engine` should listen for right now, its own
 /// first. Nothing while the shortcut is turned off; other keys that are the
 /// same as its own are not listened for twice; and a mouse button only while
@@ -430,6 +446,16 @@ mod tests {
             refusal(&settings, "f13", KeyboardImplementation::Tauri),
             None
         );
+    }
+
+    #[test]
+    fn a_mouse_button_is_never_a_shortcuts_own_keys() {
+        assert!(own_keys_refusal("mousex1").is_some());
+        assert!(own_keys_refusal("ctrl_left+mousemiddle").is_some());
+        assert!(own_keys_refusal("Back").is_some());
+        assert_eq!(own_keys_refusal("ctrl_left+super"), None);
+        assert_eq!(own_keys_refusal("backspace"), None);
+        assert_eq!(own_keys_refusal(""), None);
     }
 
     #[test]

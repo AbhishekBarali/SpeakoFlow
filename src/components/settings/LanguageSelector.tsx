@@ -5,14 +5,31 @@ import { ResetButton } from "../ui/ResetButton";
 import type { SettingIcon, SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 import {
+  languageLabel,
   languageMatches,
   localizedLanguages,
 } from "../../lib/constants/languages";
+import {
+  AUTO_LANGUAGE,
+  effectiveLanguage,
+  modelSupportsLanguage,
+} from "../../lib/languageCodes";
 
 interface LanguageSelectorProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
+  /**
+   * The current model's languages. Without a list (the cloud engines, a
+   * custom Whisper file) every language is offered and the choice is stored
+   * as it is.
+   */
   supportedLanguages?: string[];
+  /**
+   * Whether the current model can detect the language itself. "Auto" is only
+   * offered when it can; a model that cannot always needs a language. Only
+   * read together with `supportedLanguages`.
+   */
+  supportsLanguageDetection?: boolean;
   icon?: SettingIcon;
   tone?: SettingTone;
   /**
@@ -27,6 +44,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   descriptionMode = "tooltip",
   grouped = false,
   supportedLanguages,
+  supportsLanguageDetection = true,
   icon,
   tone,
   description,
@@ -38,7 +56,17 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedLanguage = getSetting("selected_language") || "auto";
+  // `selected_language` is the user's intent and is never rewritten when the
+  // model changes. What the picker shows is what this model will actually
+  // use for it: the same rule the transcription path applies
+  // (`managers::language::effective_language`), so a Chinese choice on an
+  // English-only model reads "English" here rather than a language the model
+  // cannot hear, and switching back to a Chinese model shows Chinese again.
+  const intent = getSetting("selected_language") || AUTO_LANGUAGE;
+  const selectedLanguage =
+    supportedLanguages && supportedLanguages.length > 0
+      ? effectiveLanguage(intent, supportedLanguages, supportsLanguageDetection)
+      : intent;
 
   // Language names in the UI language; "auto" is a mode, not a language, so it
   // takes its own translated label.
@@ -78,11 +106,14 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const availableLanguages = useMemo(() => {
     if (!supportedLanguages || supportedLanguages.length === 0)
       return languages;
-    return languages.filter(
-      (lang) =>
-        lang.value === "auto" || supportedLanguages.includes(lang.value),
+    // Matched by the canonical rule, so a model that lists `zh` offers both
+    // Chinese scripts and one that lists `nb` offers Norwegian.
+    return languages.filter((lang) =>
+      lang.value === AUTO_LANGUAGE
+        ? supportsLanguageDetection
+        : modelSupportsLanguage(supportedLanguages, lang.value),
     );
-  }, [supportedLanguages, languages]);
+  }, [supportedLanguages, supportsLanguageDetection, languages]);
 
   const filteredLanguages = useMemo(
     () =>
@@ -93,8 +124,10 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   );
 
   const selectedLanguageName =
-    languages.find((lang) => lang.value === selectedLanguage)?.label ||
-    t("settings.general.language.auto");
+    selectedLanguage === AUTO_LANGUAGE
+      ? t("settings.general.language.auto")
+      : (languages.find((lang) => lang.value === selectedLanguage)?.label ??
+        languageLabel(selectedLanguage, i18n.language));
 
   const handleLanguageSelect = async (languageCode: string) => {
     await updateSetting("selected_language", languageCode);

@@ -132,6 +132,10 @@ export const useSlotStatusText = () => {
         return t("modelsHub.status.noModel");
       case "not_downloaded":
         return t("modelsHub.status.notDownloaded");
+      case "needs_update":
+        return t("modelsHub.status.needsUpdate", {
+          model: summary.modelLabel ?? "",
+        });
       case "no_key":
         return t("modelsHub.status.noKey");
       case "no_endpoint":
@@ -154,7 +158,9 @@ export const SlotStateLine: React.FC<{ summary: SlotSummary }> = ({
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-warning">
         <span className="h-1.5 w-1.5 rounded-full bg-warning" />
-        {t("modelsHub.needsSetup")}
+        {summary.issue === "needs_update"
+          ? t("modelsHub.needsUpdate")
+          : t("modelsHub.needsSetup")}
       </span>
     );
   }

@@ -29,6 +29,12 @@ interface ModelsStore {
   extractingModels: Record<string, true>;
   downloadProgress: Record<string, DownloadProgress>;
   downloadStats: Record<string, DownloadStats>;
+  /**
+   * Why a model's last download failed, until the next attempt or a cancel.
+   * The store-wide `error` is overwritten by the next action anywhere; a
+   * prompt that offers Retry beside the reason needs it per model.
+   */
+  downloadErrors: Record<string, string>;
   loading: boolean;
   error: string | null;
   hasAnyModels: boolean;
@@ -83,6 +89,7 @@ export const useModelStore = create<ModelsStore>()(
     extractingModels: {},
     downloadProgress: {},
     downloadStats: {},
+    downloadErrors: {},
     loading: true,
     error: null,
     hasAnyModels: false,
@@ -258,6 +265,7 @@ export const useModelStore = create<ModelsStore>()(
         set(
           produce((state) => {
             state.downloadingModels[modelId] = true;
+            delete state.downloadErrors[modelId];
             state.downloadProgress[modelId] = {
               model_id: modelId,
               downloaded: 0,
@@ -276,11 +284,12 @@ export const useModelStore = create<ModelsStore>()(
               delete state.downloadingModels[modelId];
               delete state.downloadProgress[modelId];
               delete state.downloadStats[modelId];
+              state.downloadErrors[modelId] = String(result.error);
             }),
           );
         }
         return result.status === "ok";
-      } catch {
+      } catch (err) {
         // model-download-failed event won't fire for JS exceptions (e.g. IPC error),
         // so clean up state here to avoid a stuck progress spinner.
         set(
@@ -288,6 +297,7 @@ export const useModelStore = create<ModelsStore>()(
             delete state.downloadingModels[modelId];
             delete state.downloadProgress[modelId];
             delete state.downloadStats[modelId];
+            state.downloadErrors[modelId] = String(err);
           }),
         );
         return false;
@@ -432,6 +442,7 @@ export const useModelStore = create<ModelsStore>()(
             delete state.verifyingModels[modelId];
             delete state.downloadProgress[modelId];
             delete state.downloadStats[modelId];
+            delete state.downloadErrors[modelId];
           }),
         );
         get().loadModels();
@@ -457,6 +468,7 @@ export const useModelStore = create<ModelsStore>()(
               delete state.downloadProgress[modelId];
               delete state.downloadStats[modelId];
               state.error = error;
+              state.downloadErrors[modelId] = error;
               // A failed download can never be selected — drop any pending
               // onboarding selection so we don't try to activate it.
               if (state.pendingSttSelection === modelId) {
@@ -529,6 +541,7 @@ export const useModelStore = create<ModelsStore>()(
               state.error = i18n.t("errors.extractModelFailed", {
                 error: String(event.payload.error),
               });
+              state.downloadErrors[modelId] = String(event.payload.error);
               if (state.pendingSttSelection === modelId) {
                 state.pendingSttSelection = null;
               }
@@ -553,6 +566,7 @@ export const useModelStore = create<ModelsStore>()(
             delete state.verifyingModels[modelId];
             delete state.downloadProgress[modelId];
             delete state.downloadStats[modelId];
+            delete state.downloadErrors[modelId];
             if (state.pendingSttSelection === modelId) {
               state.pendingSttSelection = null;
             }

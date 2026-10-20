@@ -1706,13 +1706,20 @@ impl LocalLlmManager {
             None => {
                 // Nothing to correct on this machine's device mix, so leave
                 // selection to the engine and keep the historical hint (which
-                // still matters for `--split-mode none`/`row`).
-                if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
+                // still matters for `--split-mode none`/`row`). The hint is the
+                // device's position among the GPUs, the count the old whisper.cpp
+                // list used for its ids; the device key is not a number.
+                let gpus = crate::managers::transcription::gpu_devices();
+                let preferred = crate::managers::transcription::preferred_gpu_device();
+                let ordinal = preferred
+                    .as_ref()
+                    .and_then(|device| gpus.iter().position(|gpu| gpu.id == device.id));
+                if let Some((ordinal, device)) = ordinal.zip(preferred) {
                     info!(
                         "llama.cpp main-GPU hint {}: {} ({}, {} MiB)",
-                        device.id, device.name, device.kind, device.total_vram_mb
+                        ordinal, device.name, device.kind, device.total_vram_mb
                     );
-                    cmd.arg("--main-gpu").arg(device.id.to_string());
+                    cmd.arg("--main-gpu").arg(ordinal.to_string());
                 }
             }
         }
@@ -1815,7 +1822,7 @@ impl LocalLlmManager {
         // The graceful quit path additionally calls `stop()` via `RunEvent::Exit`
         // in `lib.rs`.
         #[cfg(windows)]
-        assign_child_to_kill_on_close_job(&child);
+        crate::utils::assign_child_to_kill_on_close_job(&child);
         // macOS and Linux have no equivalent that survives a hard kill of this
         // process (PR_SET_PDEATHSIG tracks the spawning *thread*, and this runs
         // on runtime threads that come and go), so the engine is recorded
@@ -2351,72 +2358,6 @@ mod orphan_engine {
     }
 }
 
-/// Assign a spawned engine child to a process-wide Job Object configured with
-/// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. The job handle is created once and kept
-/// open for the entire process lifetime (stored as a raw `isize` in a
-/// `OnceLock`), so the only event that closes the job's last handle is THIS
-/// process terminating — at which point Windows kills every process in the job,
-/// including `llama-server.exe`.
-///
-/// This is the crash / force-kill backstop for orphaned engine processes (the
-/// root cause of the "memory keeps climbing, disk hits 100%, PC freezes"
-/// reports). The normal quit path also calls `stop()` via `RunEvent::Exit`, but
-/// that — like `Drop` — never runs when the process is killed hard (panic,
-/// crash, or the OS reaping us during a low-memory freeze).
-#[cfg(windows)]
-fn assign_child_to_kill_on_close_job(child: &Child) {
-    use std::os::windows::io::AsRawHandle;
-    use std::sync::OnceLock;
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
-        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    };
-
-    // Raw job handle value (stored as isize so it is Send + Sync for the
-    // OnceLock). 0 means creation failed; we then skip assignment so a failure
-    // here only disables cleanup rather than breaking engine startup.
-    static JOB: OnceLock<isize> = OnceLock::new();
-
-    let job_raw = *JOB.get_or_init(|| unsafe {
-        match CreateJobObjectW(None, PCWSTR::null()) {
-            Ok(job) => {
-                let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-                if let Err(e) = SetInformationJobObject(
-                    job,
-                    JobObjectExtendedLimitInformation,
-                    &info as *const _ as *const core::ffi::c_void,
-                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-                ) {
-                    warn!("Failed to configure engine Job Object (orphan cleanup disabled): {e}");
-                }
-                job.0 as isize
-            }
-            Err(e) => {
-                warn!("Failed to create engine Job Object (orphan cleanup disabled): {e}");
-                0
-            }
-        }
-    });
-
-    if job_raw == 0 {
-        return;
-    }
-
-    let job = HANDLE(job_raw as *mut core::ffi::c_void);
-    let child_handle = HANDLE(child.as_raw_handle() as *mut core::ffi::c_void);
-    // SAFETY: `job` is a valid job handle kept open for the process lifetime and
-    // `child_handle` is the live child's process handle owned by `child`.
-    unsafe {
-        if let Err(e) = AssignProcessToJobObject(job, child_handle) {
-            warn!("Failed to assign engine process to Job Object: {e}");
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2563,7 +2504,7 @@ mod tests {
 
     fn gpu(id: i32, name: &str, kind: &str, vram_mb: usize) -> GpuDeviceOption {
         GpuDeviceOption {
-            id,
+            id: id.to_string(),
             name: name.to_string(),
             kind: kind.to_string(),
             total_vram_mb: vram_mb,

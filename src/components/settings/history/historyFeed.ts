@@ -19,6 +19,32 @@ export const isFlowHistoryEntry = (entry: HistoryEntry): boolean =>
   entry.post_process_prompt === FLOW_HISTORY_MARKER;
 
 /**
+ * A row the pipeline just added, put at the top. The same row can already be
+ * listed: the first page can load after the row was saved but before its
+ * "added" event arrives, and then both put it in. One row per id, the newest
+ * copy at the top.
+ */
+export const prependHistoryEntry = (
+  entries: readonly HistoryEntry[],
+  added: HistoryEntry,
+): HistoryEntry[] => [
+  added,
+  ...entries.filter((entry) => entry.id !== added.id),
+];
+
+/**
+ * A further page of older rows, appended. Rows already listed (a live
+ * addition that the page also returns) are left where they are.
+ */
+export const appendHistoryPage = (
+  entries: readonly HistoryEntry[],
+  page: readonly HistoryEntry[],
+): HistoryEntry[] => {
+  const listed = new Set(entries.map((entry) => entry.id));
+  return [...entries, ...page.filter((entry) => !listed.has(entry.id))];
+};
+
+/**
  * One item in the merged history feed. Transcriptions and assistant
  * conversations are interleaved by time; `sortTime` is the seconds-epoch used
  * for ordering (last activity for conversations, recording time otherwise).

@@ -485,6 +485,12 @@ impl MeetingRecorder {
                 "The last meeting is still being transcribed. Try again in a moment."
             ));
         }
+        // A selected model whose engine is gone would fail every chunk of the
+        // meeting, 30 seconds in and every 30 seconds after, while the user
+        // believes it is being transcribed. Say so before anything records.
+        if let Some(message) = crate::speech_readiness::retired_selection_message(&self.app) {
+            return Err(anyhow!(message));
+        }
 
         let started_at = chrono::Utc::now().timestamp();
         let meeting_id = self.store.create_meeting(title, started_at, language)?;

@@ -523,11 +523,13 @@
       "singleLanguage": "Supporta solo questa lingua",
       "multiLanguage": "Multilingua",
       "languageOnly": "Solo {{language}}",
+      "languageList": "Lingue comprese da {{model}}",
       "translation": "Può tradurre in inglese",
       "translate": "Traduci in inglese",
       "streaming": "Streaming",
       "quantization": "Quantizzazione",
-      "legacy": "Meno recente"
+      "legacy": "Meno recente",
+      "retired": "Dismesso"
     }
   },
   "settings": {
@@ -667,6 +669,15 @@
         "noResults": "Nessuna lingua trovata",
         "auto": "Automatico"
       },
+      "chineseScript": {
+        "title": "Scrittura cinese",
+        "description": "Scrive le trascrizioni in cinese con caratteri semplificati o tradizionali. Le altre lingue restano invariate.",
+        "options": {
+          "auto": "Come trascritto",
+          "simplified": "Semplificato",
+          "traditional": "Tradizionale"
+        }
+      },
       "pushToTalk": {
         "dictation": "Attivo: registri finché tieni premuti i tasti. Disattivo: una pressione avvia, la successiva ferma, quindi ogni dettatura è a mani libere.",
         "assistant": "Attivo: ascolta finché tieni premuti i tasti. Disattivo: una pressione avvia, la successiva invia.",
@@ -714,14 +725,27 @@
         "all": "Tutti",
         "multiLanguage": "Multilingua",
         "translation": "Traduzione",
-        "allLanguages": "Tutte le lingue"
+        "allLanguages": "Tutte le lingue",
+        "streamingHint": "Solo i modelli che trascrivono mentre parli",
+        "translate": "Traduci",
+        "translateHint": "Solo i modelli che sanno tradurre il parlato in inglese",
+        "noMatch": "Nessun modello corrisponde a questi filtri",
+        "clear": "Azzera filtri"
       },
-      "noModelsMatch": "Nessun modello corrisponde a questo filtro.",
       "searchPlaceholder": "Cerca modelli per nome…",
       "clearSearch": "Cancella ricerca",
       "noSearchResults": "Nessun modello di nome «{{query}}».",
-      "olderModels": "Modelli meno recenti",
-      "olderModelsHint": "Funzionano sul motore precedente. Sono ancora del tutto supportati: alla maggior parte delle persone non serviranno.",
+      "olderHint": "Formato precedente. {{model}} ({{size}}) è la versione nuova di questo modello.",
+      "retiredHint": "Usa un motore precedente che SpeakoFlow non include più. Scarica invece {{model}} ({{size}}).",
+      "retired": {
+        "notice": "Questi modelli usavano un motore precedente che SpeakoFlow non include più.",
+        "newVersion": "Versione nuova: {{model}} · {{size}}",
+        "getNewVersion": "Scarica la versione nuova",
+        "useNewVersion": "Usa la versione nuova",
+        "deleteOld": "Elimina i vecchi file ({{size}})",
+        "deleteTitle": "Elimina i vecchi file",
+        "deleteConfirm": "Eliminare i vecchi file di questi modelli ({{size}})? Le versioni nuove che hai scaricato restano."
+      },
       "customModel": {
         "addButton": "Cerca su Hugging Face",
         "searchTitle": "Ti serve un altro modello?",
@@ -853,31 +877,17 @@
         "label": "Tasti del mouse come scorciatoie",
         "description": "Usa il tasto centrale, Indietro o Avanti del mouse come scorciatoia: fai clic sui tasti di una scorciatoia, poi premi il tasto. Finché è una scorciatoia, il tasto non fa nient'altro.",
         "linux": "Su Linux funziona solo il tasto centrale.",
-        "needsEngine": "Richiede l'implementazione della tastiera SpeakoFlow Keys.",
-        "reset": "Le scorciatoie che usavano un tasto del mouse sono tornate ai tasti predefiniti."
+        "needsEngine": "Richiede l'implementazione della tastiera SpeakoFlow Keys."
       },
-      "liveTranscription": {
-        "label": "Trascrizione in tempo reale",
-        "description": "Trascrive mentre parli, invece di tutto in una volta quando ti fermi. Sperimentale."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Finestra della trascrizione in tempo reale",
-        "description": "Durante la trascrizione in tempo reale, mostra una scheda overlay più grande con il testo che scorre, invece della pillola compatta. Richiede la trascrizione in tempo reale."
+      "longFormChunking": {
+        "title": "Dividi le registrazioni lunghe",
+        "description": "Le dettature lunghe vengono trascritte a pezzi nelle pause naturali, così i modelli non pensati per l'audio lungo restano precisi."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Accelerazione Whisper",
-          "description": "Auto usa la GPU quando è disponibile."
-        },
-        "ort": {
-          "title": "Accelerazione ONNX",
-          "description": "Per i modelli Parakeet, Canary e Moonshine. DirectML è sperimentale."
-        },
-        "gpuDevice": {
-          "title": "Dispositivo GPU",
-          "description": "Auto sceglie la GPU dedicata.",
-          "auto": "Automatico"
-        }
+        "title": "Elaborazione del parlato",
+        "description": "Automatico usa la scheda grafica, quella dedicata se ne hai due. Scegli Processore se la dettatura si blocca o il driver grafico dà problemi. È più lento, ma funziona ovunque.",
+        "auto": "Automatico",
+        "cpu": "Processore (CPU)"
       },
       "startHidden": {
         "label": "Avvia nascosto",
@@ -2264,6 +2274,7 @@
     "preparing": "Preparazione del microfono…",
     "recording": "Registrazione",
     "transcribing": "Trascrizione…",
+    "loading": "Caricamento del modello…",
     "processing": "Pulizia in corso…",
     "generating": "Scrittura con Flow…",
     "vision": "Lettura dello schermo…",
@@ -2297,6 +2308,10 @@
       "title": "Download del modello vocale…",
       "percent": "Download del modello vocale · {{percent}}%",
       "hint": "La dettatura funzionerà al termine"
+    },
+    "update": {
+      "title": "{{model}} va aggiornato",
+      "hint": "La versione nuova è nella pagina Modelli"
     },
     "handsFreeHint": "Premi {{key}} per le mani libere",
     "lockedKeys": "Registrazione a mani libere. Premi {{keys}} per terminare",
@@ -2568,6 +2583,7 @@
     "status": {
       "label": "Modello vocale: {{model}}, {{status}}. Apri le impostazioni di trascrizione.",
       "setup": "Da configurare",
+      "needsUpdate": "Da aggiornare",
       "cloud": "Cloud · {{provider}}",
       "loading": "Caricamento…",
       "error": "Caricamento non riuscito",
@@ -2753,12 +2769,27 @@
       "today": "Oggi"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} usava un motore precedente che SpeakoFlow non include più.",
+    "newVersion": "La sua versione nuova è {{model}}.",
+    "ready": "{{model}} è scaricato e pronto.",
+    "noVersion": "Scegli un altro modello per continuare a dettare.",
+    "failed": "Impossibile scaricare {{model}}.",
+    "download": "Scarica la versione nuova ({{size}})",
+    "retry": "Riprova",
+    "chooseAnother": "Scegli un altro modello",
+    "progressLabel": "Download della versione nuova",
+    "dialogTitle": "SpeakoFlow ha un nuovo motore vocale",
+    "dialogBody": "È più veloce e più stabile, quindi avrai meno problemi. {{model}} usava il vecchio motore e ha bisogno della sua nuova versione per continuare a funzionare.",
+    "later": "Più tardi"
+  },
   "modelsHub": {
     "description": "Ogni attività in SpeakoFlow è svolta da un modello che scegli tu. Eseguilo su questo computer per la privacy, o nel cloud per la velocità.",
     "addLocal": "Aggiungi un file di modello",
     "privacyNote": "I modelli su questo computer non inviano mai la tua voce o il tuo testo da nessuna parte. I modelli cloud li inviano al provider che hai scelto, usando la tua chiave API.",
     "inUse": "In uso",
     "needsSetup": "Da configurare",
+    "needsUpdate": "Da aggiornare",
     "performance": "Prestazioni",
     "where": {
       "device": "Su questo computer",
@@ -2771,6 +2802,7 @@
       "assistantOff": "L'assistente è disattivato",
       "noModel": "Nessun modello scelto",
       "notDownloaded": "Modello non scaricato",
+      "needsUpdate": "{{model}} va aggiornato",
       "noKey": "Aggiungi una chiave API",
       "noEndpoint": "Aggiungi un endpoint"
     },
@@ -3300,6 +3332,11 @@
     "undo": "Annulla",
     "addAnother": "Aggiungi un'altra",
     "addAnotherHint": "Assegna a questa scorciatoia una seconda combinazione, ad esempio un tasto del mouse",
+    "addButtonOrKeys": "Aggiungi tasto del mouse o tasti",
+    "addButtonOrKeysHint": "Assegna a questa scorciatoia un tasto del mouse o una seconda combinazione, oltre ai tasti che ha già",
+    "mouseAddedAsOther": "{{button}} ora funziona anche per {{name}}. Anche {{keys}} continua a funzionare.",
+    "mouseNeedsOtherSlot": "{{name}} ha già altri tasti ({{keys}}). Fai clic su di essi per mettere lì un tasto del mouse.",
+    "mouseNeedsOwnKeys": "Prima assegna dei tasti a {{name}}. Il tasto del mouse si aggiunge accanto a quelli.",
     "remove": "Rimuovi",
     "or": "o",
     "changeOther": "Cambia gli altri tasti della scorciatoia {{name}}",

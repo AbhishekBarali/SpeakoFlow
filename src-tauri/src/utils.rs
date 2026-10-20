@@ -181,9 +181,16 @@ fn cancel_operation(app: &AppHandle, origin: CancelOrigin) {
 
     // Unload model if immediate unload is enabled
     let tm = app.state::<Arc<TranscriptionManager>>();
-    // Cancel any active live/streaming transcription worker so it releases the
-    // leased model engine. No-op when live transcription isn't active.
+    // Cancel any active live/streaming transcription worker so it ends its
+    // stream in the engine. No-op when live transcription isn't active.
     tm.cancel_stream();
+    // And stop a dictation already transcribing, so Esc after the keys are
+    // let go is as prompt as Esc while they are held. Only for a real cancel:
+    // a withdrawn press never transcribed anything, and must not stop an
+    // earlier dictation that is still finishing.
+    if origin == CancelOrigin::User {
+        tm.cancel_transcription();
+    }
     tm.maybe_unload_immediately("cancellation");
 
     // Notify coordinator so it can keep lifecycle state coherent. An aborted
@@ -239,4 +246,73 @@ pub fn is_gnome() -> bool {
 #[cfg(target_os = "linux")]
 pub fn is_gnome_wayland() -> bool {
     is_wayland() && is_gnome()
+}
+
+/// Assign a spawned child to a process-wide Job Object configured with
+/// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. The job handle is created once and kept
+/// open for the entire process lifetime (stored as a raw `isize` in a
+/// `OnceLock`), so the only event that closes the job's last handle is THIS
+/// process terminating — at which point Windows kills every process in the job:
+/// `llama-server.exe` (`local_llm`) and the transcription worker
+/// (`engine_supervisor`).
+///
+/// This is the crash / force-kill backstop for orphaned engine processes (the
+/// root cause of the "memory keeps climbing, disk hits 100%, PC freezes"
+/// reports). The normal quit path stops them itself, but that — like `Drop` —
+/// never runs when the process is killed hard (panic, crash, Task Manager, or
+/// the OS reaping us during a low-memory freeze). A failure here only disables
+/// that backstop; it never stops the child from starting.
+#[cfg(windows)]
+pub fn assign_child_to_kill_on_close_job(child: &std::process::Child) {
+    use log::warn;
+    use std::os::windows::io::AsRawHandle;
+    use std::sync::OnceLock;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    // Raw job handle value (stored as isize so it is Send + Sync for the
+    // OnceLock). 0 means creation failed; we then skip assignment so a failure
+    // here only disables cleanup rather than breaking engine startup.
+    static JOB: OnceLock<isize> = OnceLock::new();
+
+    let job_raw = *JOB.get_or_init(|| unsafe {
+        match CreateJobObjectW(None, PCWSTR::null()) {
+            Ok(job) => {
+                let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                if let Err(e) = SetInformationJobObject(
+                    job,
+                    JobObjectExtendedLimitInformation,
+                    &info as *const _ as *const core::ffi::c_void,
+                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+                ) {
+                    warn!("Failed to configure the child-process Job Object (orphan cleanup disabled): {e}");
+                }
+                job.0 as isize
+            }
+            Err(e) => {
+                warn!("Failed to create the child-process Job Object (orphan cleanup disabled): {e}");
+                0
+            }
+        }
+    });
+
+    if job_raw == 0 {
+        return;
+    }
+
+    let job = HANDLE(job_raw as *mut core::ffi::c_void);
+    let child_handle = HANDLE(child.as_raw_handle());
+    // SAFETY: `job` is a valid job handle kept open for the process lifetime and
+    // `child_handle` is the live child's process handle owned by `child`.
+    unsafe {
+        if let Err(e) = AssignProcessToJobObject(job, child_handle) {
+            warn!("Failed to assign a child process to the Job Object: {e}");
+        }
+    }
 }

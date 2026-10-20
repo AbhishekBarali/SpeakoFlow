@@ -1,12 +1,14 @@
 use crate::audio_toolkit::{
-    list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad, SpeechActivity,
+    list_input_devices,
+    vad::{SmoothedVad, VadTail},
+    AudioRecorder, SileroVad, SpeechActivity,
 };
 use crate::helpers::clamshell;
 use crate::managers::transcription::StreamRouter;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
 use log::{debug, error, info, trace, warn};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -129,11 +131,15 @@ fn create_audio_recorder(
 ) -> Result<AudioRecorder, anyhow::Error> {
     let silero = SileroVad::new(vad_path, 0.3)
         .map_err(|e| anyhow::anyhow!("Failed to create SileroVad: {}", e))?;
-    let smoothed_vad = SmoothedVad::new(Box::new(silero), 15, 15, 2);
+    // 450 ms of pre-roll, the offline tail until a recording asks for another
+    // (`AudioRecorder::set_vad_tail`), and 60 ms of voice before speech starts.
+    let smoothed_vad =
+        SmoothedVad::new(Box::new(silero), 15, VadTail::Offline.hangover_frames(), 2);
 
     // Recorder with VAD plus a spectrum-level callback that forwards updates to
-    // the frontend, and a raw-frame callback that feeds the live-transcription
-    // router (a cheap no-op unless a stream is active).
+    // the frontend, and two callbacks that feed the live-transcription router
+    // (cheap no-ops unless a session that takes that kind of audio is open):
+    // every frame for a stream, the kept speech for long-form chunks.
     let recorder = AudioRecorder::new()
         .map_err(|e| anyhow::anyhow!("Failed to create AudioRecorder: {}", e))?
         .with_vad(Box::new(smoothed_vad))
@@ -147,9 +153,24 @@ fn create_audio_recorder(
         .with_frame_callback({
             let stream_router = stream_router.clone();
             move |frame| stream_router.feed(frame)
+        })
+        .with_speech_callback({
+            let stream_router = stream_router.clone();
+            move |kept| stream_router.feed_speech(kept)
         });
 
     Ok(recorder)
+}
+
+/// The bundled Silero VAD model, which the recorder and long-form chunking
+/// both run.
+pub fn silero_vad_path(app: &tauri::AppHandle) -> Result<PathBuf, anyhow::Error> {
+    app.path()
+        .resolve(
+            "resources/models/silero_vad_v4.onnx",
+            tauri::path::BaseDirectory::Resource,
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to resolve VAD path: {}", e))
 }
 
 /* ──────────────────────────────────────────────────────────────── */
@@ -289,14 +310,7 @@ impl AudioRecordingManager {
     pub fn preload_vad(&self) -> Result<(), anyhow::Error> {
         let mut recorder_opt = self.recorder.lock().unwrap();
         if recorder_opt.is_none() {
-            let vad_path = self
-                .app_handle
-                .path()
-                .resolve(
-                    "resources/models/silero_vad_v4.onnx",
-                    tauri::path::BaseDirectory::Resource,
-                )
-                .map_err(|e| anyhow::anyhow!("Failed to resolve VAD path: {}", e))?;
+            let vad_path = silero_vad_path(&self.app_handle)?;
             *recorder_opt = Some(create_audio_recorder(
                 &vad_path,
                 &self.app_handle,
@@ -443,7 +457,10 @@ impl AudioRecordingManager {
 
     /* ---------- recording --------------------------------------------------- */
 
-    pub fn try_start_recording(&self, binding_id: &str) -> Result<(), String> {
+    /// Start recording for `binding_id`, keeping `tail` of trailing silence
+    /// after each stretch of speech (see [`VadTail`]): the tail belongs to the
+    /// model that will transcribe this recording, so every recording sets it.
+    pub fn try_start_recording(&self, binding_id: &str, tail: VadTail) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
 
         if let RecordingState::Idle = *state {
@@ -462,12 +479,13 @@ impl AudioRecordingManager {
             }
 
             if let Some(rec) = self.recorder.lock().unwrap().as_ref() {
+                rec.set_vad_tail(tail);
                 if rec.start().is_ok() {
                     *self.is_recording.lock().unwrap() = true;
                     *state = RecordingState::Recording {
                         binding_id: binding_id.to_string(),
                     };
-                    debug!("Recording started for binding {binding_id}");
+                    debug!("Recording started for binding {binding_id} ({tail:?} VAD tail)");
                     return Ok(());
                 }
             }

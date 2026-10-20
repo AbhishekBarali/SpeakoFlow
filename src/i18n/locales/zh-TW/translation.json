@@ -519,11 +519,13 @@
       "singleLanguage": "僅支援此語言",
       "multiLanguage": "多語言",
       "languageOnly": "僅支援{{language}}",
+      "languageList": "{{model}} 能辨識的語言",
       "translation": "可翻譯為英語",
       "translate": "翻譯為英語",
       "streaming": "串流",
       "quantization": "量化",
-      "legacy": "較舊"
+      "legacy": "較舊",
+      "retired": "已停用"
     }
   },
   "settings": {
@@ -663,6 +665,15 @@
         "noResults": "未找到語言",
         "auto": "自動"
       },
+      "chineseScript": {
+        "title": "中文字形",
+        "description": "將中文轉寫結果寫成簡體或繁體。其他語言保持不變。",
+        "options": {
+          "auto": "保持原樣",
+          "simplified": "簡體",
+          "traditional": "繁體"
+        }
+      },
       "pushToTalk": {
         "dictation": "開：按住按鍵期間持續錄音。關：按一下開始，再按一下停止，因此每次聽寫都是免持的。",
         "assistant": "開：按住按鍵期間持續聆聽。關：按一下開始，再按一下送出。",
@@ -710,14 +721,27 @@
         "all": "全部",
         "multiLanguage": "多語言",
         "translation": "翻譯",
-        "allLanguages": "所有語言"
+        "allLanguages": "所有語言",
+        "streamingHint": "只顯示邊說邊轉寫的模型",
+        "translate": "翻譯",
+        "translateHint": "只顯示能把語音翻譯成英文的模型",
+        "noMatch": "沒有符合這些篩選條件的模型",
+        "clear": "清除篩選"
       },
-      "noModelsMatch": "沒有符合此篩選條件的模型",
       "searchPlaceholder": "依名稱搜尋模型…",
       "clearSearch": "清除搜尋",
       "noSearchResults": "找不到名稱為「{{query}}」的模型。",
-      "olderModels": "較舊的模型",
-      "olderModelsHint": "使用舊版引擎執行。仍完全受支援——多數人不需要這些模型。",
+      "olderHint": "舊格式。{{model}}（{{size}}）是這個模型的新版本。",
+      "retiredHint": "使用的是 SpeakoFlow 已不再內含的舊引擎。請改為下載 {{model}}（{{size}}）。",
+      "retired": {
+        "notice": "這些模型使用的是 SpeakoFlow 已不再內含的舊引擎。",
+        "newVersion": "新版本：{{model}} · {{size}}",
+        "getNewVersion": "取得新版本",
+        "useNewVersion": "使用新版本",
+        "deleteOld": "刪除舊檔案（{{size}}）",
+        "deleteTitle": "刪除舊檔案",
+        "deleteConfirm": "要刪除這些模型的舊檔案（{{size}}）嗎？已下載的新版本會保留。"
+      },
       "customModel": {
         "addButton": "搜尋 Hugging Face",
         "searchTitle": "需要其他模型嗎？",
@@ -841,31 +865,17 @@
         "label": "將滑鼠按鈕當作快捷鍵",
         "description": "將滑鼠中鍵、上一頁鍵或下一頁鍵當作快捷鍵：點按快捷鍵的按鍵，然後按下該滑鼠按鈕。作為快捷鍵期間，該按鈕不會執行其他動作。",
         "linux": "在 Linux 上只有滑鼠中鍵可用。",
-        "needsEngine": "需要使用 SpeakoFlow Keys 鍵盤實作方式。",
-        "reset": "使用滑鼠按鈕的快捷鍵已恢復為預設按鍵。"
+        "needsEngine": "需要使用 SpeakoFlow Keys 鍵盤實作方式。"
       },
-      "liveTranscription": {
-        "label": "即時轉錄",
-        "description": "說話時就同步轉錄，而不是等停止後一次輸出。實驗性功能。"
-      },
-      "liveTranscriptionWindow": {
-        "label": "即時轉錄視窗",
-        "description": "即時轉錄進行時，以較大的懸浮卡片顯示正在產生的文字，取代精簡的膠囊。需搭配即時轉錄。"
+      "longFormChunking": {
+        "title": "分割長錄音",
+        "description": "較長的聽寫會在自然停頓處分段轉寫，讓不擅長處理長音訊的模型保持準確。"
       },
       "acceleration": {
-        "whisper": {
-          "title": "Whisper 加速",
-          "description": "自動會在 GPU 可用時使用 GPU。"
-        },
-        "ort": {
-          "title": "ONNX 加速",
-          "description": "適用於 Parakeet、Canary 與 Moonshine 模型。DirectML 為實驗性功能。"
-        },
-        "gpuDevice": {
-          "title": "GPU 裝置",
-          "description": "自動會選擇獨立 GPU。",
-          "auto": "自動"
-        }
+        "title": "語音處理",
+        "description": "「自動」會使用顯示卡；如果有兩張，會使用獨立顯示卡。如果聽寫當機或顯示卡驅動程式有問題，請選擇「處理器」。速度較慢，但在任何電腦上都能執行。",
+        "auto": "自動",
+        "cpu": "處理器 (CPU)"
       },
       "startHidden": {
         "label": "隱藏啟動",
@@ -2240,6 +2250,7 @@
     "preparing": "正在準備麥克風…",
     "recording": "錄製中",
     "transcribing": "正在轉錄…",
+    "loading": "正在載入模型…",
     "processing": "整理中…",
     "generating": "Flow 正在撰寫…",
     "vision": "正在查看您的螢幕…",
@@ -2273,6 +2284,10 @@
       "title": "正在下載語音模型…",
       "percent": "正在下載語音模型 · {{percent}}%",
       "hint": "下載完成後即可開始語音輸入"
+    },
+    "update": {
+      "title": "{{model}} 需要更新",
+      "hint": "新版本在「模型」頁面"
     },
     "handsFreeHint": "按 {{key}} 進入免持",
     "lockedKeys": "免持錄製中。按 {{keys}} 結束",
@@ -2532,6 +2547,7 @@
     "status": {
       "label": "語音模型：{{model}}，{{status}}。開啟語音轉文字設定。",
       "setup": "需要設定",
+      "needsUpdate": "需要更新",
       "cloud": "雲端 · {{provider}}",
       "loading": "載入中…",
       "error": "無法載入",
@@ -2707,12 +2723,27 @@
       "today": "今天"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} 使用的是 SpeakoFlow 已不再內含的舊引擎。",
+    "newVersion": "它的新版本是 {{model}}。",
+    "ready": "{{model}} 已下載，可以使用。",
+    "noVersion": "請選擇其他模型以繼續聽寫。",
+    "failed": "無法下載 {{model}}。",
+    "download": "下載新版本（{{size}}）",
+    "retry": "再試一次",
+    "chooseAnother": "選擇其他模型",
+    "progressLabel": "正在下載新版本",
+    "dialogTitle": "SpeakoFlow 換上了新的語音引擎",
+    "dialogBody": "它更快、更穩定，遇到的問題會更少。{{model}} 執行於舊引擎，需要下載新版本才能繼續使用。",
+    "later": "稍後"
+  },
   "modelsHub": {
     "description": "SpeakoFlow 的每項工作都由您選擇的模型完成。在這台電腦上執行可保護隱私，在雲端執行則速度更快。",
     "addLocal": "新增模型檔案",
     "privacyNote": "在這台電腦上執行的模型，絕不會將您的語音或文字傳送到任何地方。雲端模型則會使用您的 API 金鑰，將內容傳送給您選擇的供應商。",
     "inUse": "使用中",
     "needsSetup": "需要設定",
+    "needsUpdate": "需要更新",
     "performance": "效能",
     "where": {
       "device": "在這台電腦上",
@@ -2725,6 +2756,7 @@
       "assistantOff": "助理已關閉",
       "noModel": "尚未選擇模型",
       "notDownloaded": "模型尚未下載",
+      "needsUpdate": "{{model}} 需要更新",
       "noKey": "新增 API 金鑰",
       "noEndpoint": "新增端點"
     },
@@ -3242,6 +3274,11 @@
     "undo": "復原",
     "addAnother": "新增另一組",
     "addAnotherHint": "為這個快捷鍵再設一組按鍵，例如滑鼠按鈕",
+    "addButtonOrKeys": "新增滑鼠按鈕或按鍵",
+    "addButtonOrKeysHint": "在現有按鍵之外，為這個快捷鍵再設一個滑鼠按鈕或一組按鍵",
+    "mouseAddedAsOther": "{{button}} 現在也可用於{{name}}。{{keys}} 仍然有效。",
+    "mouseNeedsOtherSlot": "{{name}}已有另一組按鍵（{{keys}}）。點擊它們即可改成滑鼠按鈕。",
+    "mouseNeedsOwnKeys": "請先為{{name}}設定按鍵。滑鼠按鈕會新增在它們旁邊。",
     "remove": "移除",
     "or": "或",
     "changeOther": "變更「{{name}}」快捷鍵的另一組按鍵",

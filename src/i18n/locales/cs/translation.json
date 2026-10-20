@@ -525,11 +525,13 @@
       "singleLanguage": "Podporuje pouze tento jazyk",
       "multiLanguage": "Vícejazyčný",
       "languageOnly": "Pouze {{language}}",
+      "languageList": "Jazyky, kterým {{model}} rozumí",
       "translation": "Umí překládat do angličtiny",
       "translate": "Přeložit do angličtiny",
       "streaming": "Průběžný přepis",
       "quantization": "Kvantizace",
-      "legacy": "Starší"
+      "legacy": "Starší",
+      "retired": "Vyřazený"
     }
   },
   "settings": {
@@ -669,6 +671,15 @@
         "noResults": "Žádné jazyky nenalezeny",
         "auto": "Automaticky"
       },
+      "chineseScript": {
+        "title": "Čínské písmo",
+        "description": "Čínské přepisy se zapíšou zjednodušenými nebo tradičními znaky. Ostatní jazyky zůstanou beze změny.",
+        "options": {
+          "auto": "Jak je přepsáno",
+          "simplified": "Zjednodušené",
+          "traditional": "Tradiční"
+        }
+      },
       "pushToTalk": {
         "dictation": "Zapnuto: nahrává se, dokud držíte klávesy. Vypnuto: jeden stisk spustí, další zastaví, takže každé diktování je bez držení.",
         "assistant": "Zapnuto: poslouchá, dokud držíte klávesy. Vypnuto: jeden stisk spustí, další odešle.",
@@ -716,14 +727,27 @@
         "all": "Vše",
         "multiLanguage": "Vícejazyčný",
         "translation": "Překlad",
-        "allLanguages": "Všechny jazyky"
+        "allLanguages": "Všechny jazyky",
+        "streamingHint": "Jen modely, které přepisují už během mluvení",
+        "translate": "Překlad",
+        "translateHint": "Jen modely, které umí překládat řeč do angličtiny",
+        "noMatch": "Těmto filtrům neodpovídá žádný model",
+        "clear": "Zrušit filtry"
       },
-      "noModelsMatch": "Tomuto filtru neodpovídají žádné modely.",
       "searchPlaceholder": "Hledat modely podle názvu…",
       "clearSearch": "Vymazat hledání",
       "noSearchResults": "Žádné modely s názvem „{{query}}“.",
-      "olderModels": "Starší modely",
-      "olderModelsHint": "Běží na předchozím jádru. Stále plně podporované — většina lidí je nepotřebuje.",
+      "olderHint": "Starší formát. {{model}} ({{size}}) je novější verze tohoto modelu.",
+      "retiredHint": "Používá starší jádro, které SpeakoFlow už neobsahuje. Stáhněte místo něj {{model}} ({{size}}).",
+      "retired": {
+        "notice": "Tyto modely používaly starší jádro, které SpeakoFlow už neobsahuje.",
+        "newVersion": "Nová verze: {{model}} · {{size}}",
+        "getNewVersion": "Stáhnout novou verzi",
+        "useNewVersion": "Použít novou verzi",
+        "deleteOld": "Smazat staré soubory ({{size}})",
+        "deleteTitle": "Smazat staré soubory",
+        "deleteConfirm": "Smazat staré soubory těchto modelů ({{size}})? Stažené nové verze zůstanou."
+      },
       "customModel": {
         "addButton": "Prohledat Hugging Face",
         "searchTitle": "Potřebujete jiný model?",
@@ -859,31 +883,17 @@
         "label": "Tlačítka myši jako zkratky",
         "description": "Použijte prostřední tlačítko myši nebo tlačítka Zpět a Vpřed jako zkratku: klikněte na klávesy zkratky a pak stiskněte tlačítko. Dokud je zkratkou, tlačítko nedělá nic jiného.",
         "linux": "V Linuxu funguje jen prostřední tlačítko.",
-        "needsEngine": "Vyžaduje implementaci klávesnice SpeakoFlow Keys.",
-        "reset": "Zkratky, které používaly tlačítko myši, mají zase výchozí klávesy."
+        "needsEngine": "Vyžaduje implementaci klávesnice SpeakoFlow Keys."
       },
-      "liveTranscription": {
-        "label": "Průběžný přepis",
-        "description": "Přepisovat řeč průběžně, jak mluvíte, místo naráz po zastavení. Experimentální."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Okno průběžného přepisu",
-        "description": "Během průběžného přepisu zobrazovat větší kartu překryvu s průběžným textem místo kompaktní lišty. Vyžaduje průběžný přepis."
+      "longFormChunking": {
+        "title": "Rozdělovat dlouhé nahrávky",
+        "description": "Dlouhé diktáty se přepisují po částech v přirozených pauzách, takže modely, které nejsou stavěné na dlouhý zvuk, zůstanou přesné."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Akcelerace Whisper",
-          "description": "Auto použije GPU, pokud je k dispozici."
-        },
-        "ort": {
-          "title": "Akcelerace ONNX",
-          "description": "Pro modely Parakeet, Canary a Moonshine. DirectML je experimentální."
-        },
-        "gpuDevice": {
-          "title": "Grafická karta",
-          "description": "Auto vybere dedikovaný GPU.",
-          "auto": "Automaticky"
-        }
+        "title": "Zpracování řeči",
+        "description": "Automaticky používá grafickou kartu, a pokud máte dvě, tu dedikovanou. Zvolte Procesor, pokud diktování padá nebo ovladač grafiky dělá potíže. Je pomalejší, ale funguje všude.",
+        "auto": "Automaticky",
+        "cpu": "Procesor (CPU)"
       },
       "startHidden": {
         "label": "Spouštět skrytě",
@@ -2276,6 +2286,7 @@
     "preparing": "Připravuji mikrofon…",
     "recording": "Nahrávání",
     "transcribing": "Přepisuji…",
+    "loading": "Načítání modelu…",
     "processing": "Čistím…",
     "generating": "Píšu s Flow…",
     "vision": "Dívám se na vaši obrazovku…",
@@ -2309,6 +2320,10 @@
       "title": "Stahuje se model pro přepis…",
       "percent": "Stahuje se model pro přepis · {{percent}} %",
       "hint": "Diktování začne fungovat po dokončení"
+    },
+    "update": {
+      "title": "{{model}} potřebuje aktualizaci",
+      "hint": "Nová verze je na stránce Modely"
     },
     "handsFreeHint": "Stiskněte {{key}} pro diktování bez držení",
     "lockedKeys": "Nahrávám bez držení. Stiskněte {{keys}} pro dokončení",
@@ -2586,6 +2601,7 @@
     "status": {
       "label": "Model pro přepis: {{model}}, {{status}}. Otevřít nastavení převodu řeči na text.",
       "setup": "Vyžaduje nastavení",
+      "needsUpdate": "Vyžaduje aktualizaci",
       "cloud": "Cloud · {{provider}}",
       "loading": "Načítání…",
       "error": "Nepodařilo se načíst",
@@ -2776,12 +2792,27 @@
       "today": "Dnes"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} používal starší jádro, které SpeakoFlow už neobsahuje.",
+    "newVersion": "Jeho nová verze je {{model}}.",
+    "ready": "{{model}} je stažený a připravený.",
+    "noVersion": "Vyberte jiný model, abyste mohli dál diktovat.",
+    "failed": "{{model}} se nepodařilo stáhnout.",
+    "download": "Stáhnout novou verzi ({{size}})",
+    "retry": "Zkusit znovu",
+    "chooseAnother": "Vybrat jiný model",
+    "progressLabel": "Stahování nové verze",
+    "dialogTitle": "SpeakoFlow má nový řečový engine",
+    "dialogBody": "Je rychlejší a stabilnější, takže narazíte na méně problémů. {{model}} běžel na starém enginu a potřebuje svou novou verzi, aby dál fungoval.",
+    "later": "Později"
+  },
   "modelsHub": {
     "description": "Každou úlohu v SpeakoFlow obstarává model, který si vyberete. Spusťte ho na tomto počítači kvůli soukromí, nebo v cloudu kvůli rychlosti.",
     "addLocal": "Přidat soubor modelu",
     "privacyNote": "Modely na tomto počítači nikam neposílají váš hlas ani text. Cloudové modely je posílají vybranému poskytovateli pomocí vašeho API klíče.",
     "inUse": "Používá se",
     "needsSetup": "Vyžaduje nastavení",
+    "needsUpdate": "Vyžaduje aktualizaci",
     "performance": "Výkon",
     "where": {
       "device": "Na tomto počítači",
@@ -2794,6 +2825,7 @@
       "assistantOff": "Asistent je vypnutý",
       "noModel": "Zatím není vybrán žádný model",
       "notDownloaded": "Model není stažený",
+      "needsUpdate": "{{model}} potřebuje aktualizaci",
       "noKey": "Přidejte API klíč",
       "noEndpoint": "Přidejte koncový bod"
     },
@@ -3329,6 +3361,11 @@
     "undo": "Zpět",
     "addAnother": "Přidat další",
     "addAnotherHint": "Přiřadit této zkratce druhou sadu kláves, třeba tlačítko myši",
+    "addButtonOrKeys": "Přidat tlačítko myši nebo klávesy",
+    "addButtonOrKeysHint": "Přiřadit této zkratce tlačítko myši nebo druhou sadu kláves, vedle kláves, které už má",
+    "mouseAddedAsOther": "{{button}} teď funguje i pro {{name}}. {{keys}} funguje dál.",
+    "mouseNeedsOtherSlot": "{{name}} už má jiné klávesy ({{keys}}). Klikněte na ně a nastavte tam tlačítko myši.",
+    "mouseNeedsOwnKeys": "Nejdřív zkratce {{name}} přiřaďte klávesy. Tlačítko myši se přidá k nim.",
     "remove": "Odebrat",
     "or": "nebo",
     "changeOther": "Změnit další klávesy zkratky {{name}}",
