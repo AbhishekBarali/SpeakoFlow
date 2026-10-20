@@ -848,6 +848,20 @@
       "volume": {
         "title": "Hlasitost",
         "description": "Upravte hlasitost zvukové odezvy"
+      },
+      "ducking": {
+        "label": "Při nahrávání",
+        "ariaLabel": "Ostatní zvuk při nahrávání",
+        "description": "Ztiší nebo ztlumí ostatní zvuk, zatímco nahráváte, aby vás nerušil a nedostal se do mikrofonu. Vrátí se, jakmile nahrávání skončí. Známé také jako ducking.",
+        "options": {
+          "off": "Beze změny",
+          "lower": "Ztišit",
+          "mute": "Ztlumit"
+        },
+        "amount": {
+          "label": "Ztišit o",
+          "description": "O kolik bude ostatní zvuk tišší. Posuňte posuvník, zatímco něco hraje, a uslyšíte to. Pokud během nahrávání sami změníte hlasitost, zůstane tak, jak jste ji nastavili."
+        }
       }
     },
     "advanced": {
@@ -1466,10 +1480,6 @@
       "postProcessingToggle": {
         "label": "Čištění pomocí AI",
         "description": "Po přepisu vyčistit diktování pomocí AI"
-      },
-      "muteWhileRecording": {
-        "label": "Ztlumit při nahrávání",
-        "description": "Ztlumit systémový zvuk během nahrávání"
       },
       "appendTrailingSpace": {
         "label": "Přidat koncovou mezeru",
@@ -2635,6 +2645,8 @@
     },
     "audio": {
       "microphone": "Mikrofon",
+      "otherAudio": "Ostatní zvuk",
+      "otherAudioHint": "Hudba, videa a hovory, které hrají v počítači, zatímco diktujete nebo se ptáte asistenta.",
       "overlayHint": "Malá pilulka, která se zobrazuje během nahrávání."
     },
     "dictation": {

@@ -830,6 +830,20 @@
       "volume": {
         "title": "音量",
         "description": "调整音频反馈的音量"
+      },
+      "ducking": {
+        "label": "录音时",
+        "ariaLabel": "录音时的其他音频",
+        "description": "录音时降低其他音频的音量或将其静音，避免分散注意力或被麦克风收录。录音结束后立即恢复。也称为“闪避”（ducking）。",
+        "options": {
+          "off": "不变",
+          "lower": "降低",
+          "mute": "静音"
+        },
+        "amount": {
+          "label": "降低幅度",
+          "description": "其他音频降低多少。在播放内容时拖动滑块即可试听。如果你在录音期间自行调整了音量，将保持你设置的音量。"
+        }
       }
     },
     "advanced": {
@@ -1439,10 +1453,6 @@
       "postProcessingToggle": {
         "label": "AI 清理",
         "description": "转录后用 AI 清理您的语音输入"
-      },
-      "muteWhileRecording": {
-        "label": "录制时静音",
-        "description": "录制期间静音系统音频"
       },
       "appendTrailingSpace": {
         "label": "追加尾部空格",
@@ -2581,6 +2591,8 @@
     },
     "audio": {
       "microphone": "麦克风",
+      "otherAudio": "其他音频",
+      "otherAudioHint": "你在语音输入或询问助手时，电脑上正在播放的音乐、视频和通话。",
       "overlayHint": "录音时显示的小胶囊条。"
     },
     "dictation": {

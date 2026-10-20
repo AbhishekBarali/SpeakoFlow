@@ -830,6 +830,20 @@
       "volume": {
         "title": "볼륨",
         "description": "오디오 피드백 사운드의 볼륨 조절"
+      },
+      "ducking": {
+        "label": "녹음 중",
+        "ariaLabel": "녹음 중 다른 오디오",
+        "description": "녹음하는 동안 다른 오디오를 줄이거나 음소거해 방해가 되거나 마이크에 들어가지 않게 합니다. 녹음이 끝나면 바로 원래대로 돌아옵니다. 더킹(ducking)이라고도 합니다.",
+        "options": {
+          "off": "변경 안 함",
+          "lower": "줄이기",
+          "mute": "음소거"
+        },
+        "amount": {
+          "label": "줄이는 정도",
+          "description": "다른 오디오를 얼마나 작게 할지 정합니다. 무언가 재생 중일 때 슬라이더를 움직이면 직접 들어 볼 수 있습니다. 녹음 중에 직접 볼륨을 바꾸면 바꾼 그대로 유지됩니다."
+        }
       }
     },
     "advanced": {
@@ -1439,10 +1453,6 @@
       "postProcessingToggle": {
         "label": "AI 정리",
         "description": "전사 후 AI로 받아쓰기를 정리합니다"
-      },
-      "muteWhileRecording": {
-        "label": "녹음 중 음소거",
-        "description": "녹음 중 시스템 오디오 음소거"
       },
       "appendTrailingSpace": {
         "label": "끝에 공백 추가",
@@ -2581,6 +2591,8 @@
     },
     "audio": {
       "microphone": "마이크",
+      "otherAudio": "다른 오디오",
+      "otherAudioHint": "받아쓰기나 어시스턴트에게 묻는 동안 컴퓨터에서 재생 중인 음악, 동영상, 통화.",
       "overlayHint": "녹음하는 동안 표시되는 작은 알약 모양 표시입니다."
     },
     "dictation": {

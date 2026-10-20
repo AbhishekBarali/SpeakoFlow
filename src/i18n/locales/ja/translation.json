@@ -830,6 +830,20 @@
       "volume": {
         "title": "音量",
         "description": "音声フィードバックの音量を調整"
+      },
+      "ducking": {
+        "label": "録音中",
+        "ariaLabel": "録音中の他の音声",
+        "description": "録音中は他の音声を小さくするかミュートして、気が散ったりマイクに入ったりしないようにします。録音が終わるとすぐに元に戻ります。ダッキングとも呼ばれます。",
+        "options": {
+          "off": "変更しない",
+          "lower": "小さくする",
+          "mute": "ミュート"
+        },
+        "amount": {
+          "label": "下げる量",
+          "description": "他の音声をどれだけ小さくするか。何かを再生しながらスライダーを動かすと、実際に聞いて確かめられます。録音中に自分で音量を変えた場合は、その音量のまま保たれます。"
+        }
       }
     },
     "advanced": {
@@ -1439,10 +1453,6 @@
       "postProcessingToggle": {
         "label": "AI整形",
         "description": "文字起こしのあと、音声入力をAIで整えます"
-      },
-      "muteWhileRecording": {
-        "label": "録音中にミュート",
-        "description": "録音中にシステムオーディオをミュート"
       },
       "appendTrailingSpace": {
         "label": "末尾にスペースを追加",
@@ -2581,6 +2591,8 @@
     },
     "audio": {
       "microphone": "マイク",
+      "otherAudio": "他の音声",
+      "otherAudioHint": "音声入力中やアシスタントに聞いている間に、コンピューターで再生されている音楽・動画・通話。",
       "overlayHint": "録音中に表示される小さなピルです。"
     },
     "dictation": {

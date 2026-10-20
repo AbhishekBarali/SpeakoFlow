@@ -800,6 +800,38 @@ impl OverlayLinger {
     }
 }
 
+/// What a dictation or an ask does to the computer's other audio (music, a
+/// video, a call) while it records. It comes back when the recording ends.
+/// See `audio_toolkit::ducking`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioDucking {
+    /// Leave it as it is. The default.
+    #[default]
+    Off,
+    /// Turn it down by `audio_ducking_amount` percent ("ducking").
+    Lower,
+    /// Mute it. What the "Mute while recording" switch did.
+    Mute,
+}
+
+/// The range "Lower by" offers, in percent. Below 10 the change is hard to
+/// hear; at 100 it is Mute, which is a choice of its own.
+pub const AUDIO_DUCKING_AMOUNT_MIN: u8 = 10;
+pub const AUDIO_DUCKING_AMOUNT_MAX: u8 = 90;
+
+/// Quiet enough that music stops competing with your own voice, loud enough
+/// that it is clearly still playing.
+fn default_audio_ducking_amount() -> u8 {
+    70
+}
+
+/// `audio_ducking_amount` within the range the slider offers, for a value
+/// from a hand-edited settings file or a stray command.
+pub fn clamp_audio_ducking_amount(amount: u8) -> u8 {
+    amount.clamp(AUDIO_DUCKING_AMOUNT_MIN, AUDIO_DUCKING_AMOUNT_MAX)
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelUnloadTimeout {
@@ -1657,8 +1689,15 @@ pub struct AppSettings {
     /// access mode on purpose — the two features are permissioned independently.
     #[serde(default)]
     pub flow_screen_access: bool,
+    /// What happens to the computer's other audio while a dictation or an ask
+    /// records. Replaces the `mute_while_recording` switch, whose on is
+    /// `Mute` (`migrate_mute_while_recording`).
     #[serde(default)]
-    pub mute_while_recording: bool,
+    pub audio_ducking: AudioDucking,
+    /// How far `AudioDucking::Lower` turns other audio down, in percent of
+    /// its volume, from `AUDIO_DUCKING_AMOUNT_MIN` to `AUDIO_DUCKING_AMOUNT_MAX`.
+    #[serde(default = "default_audio_ducking_amount")]
+    pub audio_ducking_amount: u8,
     #[serde(default)]
     pub append_trailing_space: bool,
     /// Smart spacing: fit each dictation onto the text already in the field
@@ -4338,7 +4377,8 @@ pub fn get_default_settings() -> AppSettings {
         flow_enabled: false,
         flow_phrase: default_flow_phrase(),
         flow_screen_access: false,
-        mute_while_recording: false,
+        audio_ducking: AudioDucking::Off,
+        audio_ducking_amount: default_audio_ducking_amount(),
         append_trailing_space: false,
         smart_spacing: true,
         smart_spacing_fix_case: true,
@@ -5257,6 +5297,9 @@ fn hydrate_secrets(settings: &mut AppSettings) {
 ///
 /// The speech engine's device choice moved to transcribe.cpp's settings; see
 /// [`migrate_accelerator_settings`].
+///
+/// "Mute while recording" became one of three choices for other audio; see
+/// [`migrate_mute_while_recording`].
 fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bool) {
     let Some(settings) = raw.as_object_mut() else {
         return (raw, false);
@@ -5264,7 +5307,25 @@ fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bo
     let screen = migrate_screen_access(settings);
     let modes = split_recording_modes(settings);
     let accelerator = migrate_accelerator_settings(settings);
-    (raw, screen || modes || accelerator)
+    let ducking = migrate_mute_while_recording(settings);
+    (raw, screen || modes || accelerator || ducking)
+}
+
+/// `mute_while_recording` was a switch. `audio_ducking` is a choice of three
+/// that includes it, so a store from before keeps what it had: on is Mute, off
+/// stays Off. A store that already has `audio_ducking` keeps that. Idempotent:
+/// the old key is gone after the first load.
+fn migrate_mute_while_recording(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
+    let Some(muted) = settings.remove("mute_while_recording") else {
+        return false;
+    };
+    if muted.as_bool() == Some(true) && !settings.contains_key("audio_ducking") {
+        settings.insert(
+            "audio_ducking".to_string(),
+            serde_json::Value::String("mute".to_string()),
+        );
+    }
+    true
 }
 
 /// The keys the two retired engines' device choice was stored under.
@@ -6427,6 +6488,58 @@ mod tests {
         let (normalized, changed) = normalize_settings_json(split.clone());
         assert!(!changed);
         assert_eq!(normalized, split);
+    }
+
+    #[test]
+    fn the_mute_switch_becomes_the_mute_choice() {
+        for (muted, expected) in [(true, AudioDucking::Mute), (false, AudioDucking::Off)] {
+            let (normalized, changed) =
+                normalize_settings_json(serde_json::json!({ "mute_while_recording": muted }));
+            assert!(changed);
+            assert!(normalized.get("mute_while_recording").is_none());
+            let settings: AppSettings = serde_json::from_value(normalized).unwrap();
+            assert_eq!(settings.audio_ducking, expected, "{muted}");
+            assert_eq!(
+                settings.audio_ducking_amount,
+                default_audio_ducking_amount()
+            );
+        }
+
+        // A choice already made is kept, and a second load changes nothing.
+        let (normalized, changed) = normalize_settings_json(serde_json::json!({
+            "mute_while_recording": true,
+            "audio_ducking": "lower"
+        }));
+        assert!(changed);
+        let settings: AppSettings = serde_json::from_value(normalized.clone()).unwrap();
+        assert_eq!(settings.audio_ducking, AudioDucking::Lower);
+        let (again, changed) = normalize_settings_json(normalized.clone());
+        assert!(!changed);
+        assert_eq!(again, normalized);
+    }
+
+    /// The strings the settings file and the frontend exchange.
+    #[test]
+    fn audio_ducking_wire_format_is_stable() {
+        for (ducking, expected) in [
+            (AudioDucking::Off, "\"off\""),
+            (AudioDucking::Lower, "\"lower\""),
+            (AudioDucking::Mute, "\"mute\""),
+        ] {
+            assert_eq!(serde_json::to_string(&ducking).unwrap(), expected);
+            let decoded: AudioDucking = serde_json::from_str(expected).unwrap();
+            assert_eq!(decoded, ducking);
+        }
+        assert_eq!(get_default_settings().audio_ducking, AudioDucking::Off);
+    }
+
+    #[test]
+    fn the_ducking_amount_stays_in_the_sliders_range() {
+        assert_eq!(clamp_audio_ducking_amount(0), AUDIO_DUCKING_AMOUNT_MIN);
+        assert_eq!(clamp_audio_ducking_amount(70), 70);
+        assert_eq!(clamp_audio_ducking_amount(255), AUDIO_DUCKING_AMOUNT_MAX);
+        let amount = default_audio_ducking_amount();
+        assert_eq!(clamp_audio_ducking_amount(amount), amount);
     }
 
     #[test]
@@ -7781,6 +7894,13 @@ mod tests {
         let map = before.as_object_mut().unwrap();
         let accelerator = map.remove("whisper_accelerator").unwrap();
         map.insert("transcribe_accelerator".into(), accelerator);
+        // The mute switch became one of three choices for other audio, and a
+        // used store has it on.
+        assert_eq!(
+            map.remove("mute_while_recording"),
+            Some(serde_json::json!(true))
+        );
+        map.insert("audio_ducking".into(), serde_json::json!("mute"));
         // -1 was automatic selection, which an unset device means now.
         assert_eq!(
             map.remove("whisper_gpu_device"),
