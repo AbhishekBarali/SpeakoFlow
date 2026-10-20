@@ -3423,15 +3423,15 @@
     "about": "Come usi SpeakoFlow, calcolato su questo computer.",
     "nothingYet": "Le tue statistiche compariranno quando detterai, farai una domanda all'assistente o registrerai una riunione.",
     "goHome": "Vedi le tue scorciatoie",
-    "dictationsSoFar_one": "{{formatted}} dettatura finora",
-    "dictationsSoFar_many": "{{formatted}} di dettature finora",
-    "dictationsSoFar_other": "{{formatted}} dettature finora",
+    "figures": {
+      "dictations": "Dettature",
+      "questions": "Domande fatte",
+      "meetings": "Riunioni registrate"
+    },
+    "activityTitle": "Attività",
     "pages_one": "Circa {{count}} pagina",
     "pages_many": "Circa {{count}} di pagine",
     "pages_other": "Circa {{count}} pagine",
-    "streak_one": "{{count}} giorno di fila",
-    "streak_many": "{{count}} di giorni di fila",
-    "streak_other": "{{count}} giorni di fila",
     "longest_one": "Record: {{count}} giorno",
     "longest_many": "Record: {{count}} di giorni",
     "longest_other": "Record: {{count}} giorni",
@@ -3480,12 +3480,10 @@
     },
     "assistantCard": {
       "info": "Domande rapide e ciò che hai detto nelle conversazioni. Restano conteggiate anche se elimini le conversazioni.",
-      "empty": "Fai una domanda all'assistente o avvia una conversazione: verrà conteggiata qui.",
       "noCalls": "Ancora nessuna conversazione"
     },
     "meetingsCard": {
-      "info": "Le riunioni che hai registrato. Restano conteggiate anche se elimini una riunione.",
-      "empty": "Registra una riunione e verrà conteggiata qui."
+      "info": "Le riunioni che hai registrato. Restano conteggiate anche se elimini una riunione."
     },
     "share": {
       "button": "Condividi",
@@ -3563,7 +3561,9 @@
         "saved": {
           "title": "Tempo risparmiato",
           "label": "senza digitare",
-          "note": "Rispetto a digitare a {{wpm}} parole al minuto"
+          "workdays_one": "Un’intera giornata di lavoro",
+          "workdays_many": "Circa {{count}} giornate di lavoro",
+          "workdays_other": "Circa {{count}} giornate di lavoro"
         },
         "streak": {
           "title": "Non mi fermo più",

@@ -3510,24 +3510,18 @@
     "about": "استخدامك لـ SpeakoFlow، محسوبًا على هذا الجهاز.",
     "nothingYet": "تظهر إحصاءاتك بعد أن تُملي أو تسأل المساعد أو تسجّل اجتماعًا.",
     "goHome": "عرض اختصاراتك",
-    "dictationsSoFar_zero": "{{formatted}} إملاء حتى الآن",
-    "dictationsSoFar_one": "{{formatted}} إملاء حتى الآن",
-    "dictationsSoFar_two": "{{formatted}} إملاء حتى الآن",
-    "dictationsSoFar_few": "{{formatted}} إملاءات حتى الآن",
-    "dictationsSoFar_many": "{{formatted}} إملاءً حتى الآن",
-    "dictationsSoFar_other": "{{formatted}} إملاء حتى الآن",
+    "figures": {
+      "dictations": "الإملاءات",
+      "questions": "الأسئلة المطروحة",
+      "meetings": "الاجتماعات المسجّلة"
+    },
+    "activityTitle": "النشاط",
     "pages_zero": "أقل من صفحة",
     "pages_one": "نحو صفحة واحدة",
     "pages_two": "نحو صفحتين",
     "pages_few": "نحو {{count}} صفحات",
     "pages_many": "نحو {{count}} صفحةً",
     "pages_other": "نحو {{count}} صفحة",
-    "streak_zero": "{{count}} أيام متتالية",
-    "streak_one": "يوم واحد متتالٍ",
-    "streak_two": "يومان متتاليان",
-    "streak_few": "{{count}} أيام متتالية",
-    "streak_many": "{{count}} يومًا متتاليًا",
-    "streak_other": "{{count}} يوم متتالٍ",
     "longest_zero": "الأطول: {{count}} يوم",
     "longest_one": "الأطول: يوم واحد",
     "longest_two": "الأطول: يومان",
@@ -3597,12 +3591,10 @@
     },
     "assistantCard": {
       "info": "الأسئلة السريعة، وما قلته في المحادثات. تبقى محسوبةً حتى بعد حذف المحادثات.",
-      "empty": "اسأل المساعد شيئًا، أو ابدأ محادثة، وسيُحتسب هنا.",
       "noCalls": "لا محادثات بعد"
     },
     "meetingsCard": {
-      "info": "الاجتماعات التي سجّلتها. تبقى محسوبةً حتى بعد حذف اجتماع.",
-      "empty": "سجّل اجتماعًا وسيُحتسب هنا."
+      "info": "الاجتماعات التي سجّلتها. تبقى محسوبةً حتى بعد حذف اجتماع."
     },
     "share": {
       "button": "مشاركة",
@@ -3701,7 +3693,12 @@
         "saved": {
           "title": "وقتٌ وفّرتُه",
           "label": "لم أقضِه في الكتابة",
-          "note": "مقارنةً بالكتابة بسرعة {{wpm}} كلمة في الدقيقة"
+          "workdays_zero": "نحو {{count}} يوم عمل",
+          "workdays_one": "يوم عمل كامل",
+          "workdays_two": "نحو يومي عمل",
+          "workdays_few": "نحو {{count}} أيام عمل",
+          "workdays_many": "نحو {{count}} يوم عمل",
+          "workdays_other": "نحو {{count}} يوم عمل"
         },
         "streak": {
           "title": "سلسلة لا تنقطع",

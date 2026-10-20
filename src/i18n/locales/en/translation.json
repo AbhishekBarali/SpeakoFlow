@@ -3394,12 +3394,14 @@
     "about": "How you use SpeakoFlow, counted on this computer.",
     "nothingYet": "Your insights appear once you dictate, ask the assistant or record a meeting.",
     "goHome": "See your shortcuts",
-    "dictationsSoFar_one": "{{formatted}} dictation so far",
-    "dictationsSoFar_other": "{{formatted}} dictations so far",
+    "figures": {
+      "dictations": "Dictations",
+      "questions": "Questions asked",
+      "meetings": "Meetings recorded"
+    },
+    "activityTitle": "Activity",
     "pages_one": "About {{count}} page",
     "pages_other": "About {{count}} pages",
-    "streak_one": "{{count}} day streak",
-    "streak_other": "{{count}} day streak",
     "longest_one": "Longest: {{count}} day",
     "longest_other": "Longest: {{count}} days",
     "streakHint": "A day counts when you dictate, ask the assistant, take a call or record a meeting.",
@@ -3441,12 +3443,10 @@
     },
     "assistantCard": {
       "info": "Quick asks, and what you said on calls. These stay counted when you delete conversations.",
-      "empty": "Ask the assistant something, or start a call, and it's counted here.",
       "noCalls": "No calls yet"
     },
     "meetingsCard": {
-      "info": "Meetings you recorded. These stay counted when you delete a meeting.",
-      "empty": "Record a meeting and it's counted here."
+      "info": "Meetings you recorded. These stay counted when you delete a meeting."
     },
     "share": {
       "button": "Share",
@@ -3517,7 +3517,8 @@
         "saved": {
           "title": "Time saved",
           "label": "not spent typing",
-          "note": "Compared with typing at {{wpm}} words a minute"
+          "workdays_one": "A whole working day",
+          "workdays_other": "About {{count}} working days"
         },
         "streak": {
           "title": "On a roll",

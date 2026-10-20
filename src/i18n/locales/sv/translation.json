@@ -3394,12 +3394,14 @@
     "about": "Hur du använder SpeakoFlow, räknat på den här datorn.",
     "nothingYet": "Din statistik visas när du har dikterat, frågat assistenten eller spelat in ett möte.",
     "goHome": "Visa dina kortkommandon",
-    "dictationsSoFar_one": "{{formatted}} diktering hittills",
-    "dictationsSoFar_other": "{{formatted}} dikteringar hittills",
+    "figures": {
+      "dictations": "Dikteringar",
+      "questions": "Ställda frågor",
+      "meetings": "Inspelade möten"
+    },
+    "activityTitle": "Aktivitet",
     "pages_one": "Ungefär {{count}} sida",
     "pages_other": "Ungefär {{count}} sidor",
-    "streak_one": "{{count}} dag i rad",
-    "streak_other": "{{count}} dagar i rad",
     "longest_one": "Längst: {{count}} dag",
     "longest_other": "Längst: {{count}} dagar",
     "streakHint": "En dag räknas när du dikterar, frågar assistenten, för en konversation eller spelar in ett möte.",
@@ -3441,12 +3443,10 @@
     },
     "assistantCard": {
       "info": "Snabba frågor och det du sa i konversationer. De räknas kvar även när du tar bort konversationer.",
-      "empty": "Fråga assistenten något eller starta en konversation, så räknas det här.",
       "noCalls": "Inga konversationer än"
     },
     "meetingsCard": {
-      "info": "Möten du har spelat in. De räknas kvar även när du tar bort ett möte.",
-      "empty": "Spela in ett möte, så räknas det här."
+      "info": "Möten du har spelat in. De räknas kvar även när du tar bort ett möte."
     },
     "share": {
       "button": "Dela",
@@ -3517,7 +3517,8 @@
         "saved": {
           "title": "Tid jag sparat",
           "label": "inte vid tangentbordet",
-          "note": "Jämfört med att skriva {{wpm}} ord per minut"
+          "workdays_one": "En hel arbetsdag",
+          "workdays_other": "Ungefär {{count}} arbetsdagar"
         },
         "streak": {
           "title": "På rulle",

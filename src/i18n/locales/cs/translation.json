@@ -3452,18 +3452,16 @@
     "about": "Jak používáte SpeakoFlow, spočítáno na tomto počítači.",
     "nothingYet": "Přehledy se zobrazí, jakmile začnete diktovat, ptát se asistenta nebo nahrávat schůzky.",
     "goHome": "Zobrazit zkratky",
-    "dictationsSoFar_one": "Zatím {{formatted}} diktování",
-    "dictationsSoFar_few": "Zatím {{formatted}} diktování",
-    "dictationsSoFar_many": "Zatím {{formatted}} diktování",
-    "dictationsSoFar_other": "Zatím {{formatted}} diktování",
+    "figures": {
+      "dictations": "Diktování",
+      "questions": "Položené otázky",
+      "meetings": "Nahrané schůzky"
+    },
+    "activityTitle": "Aktivita",
     "pages_one": "Přibližně {{count}} strana",
     "pages_few": "Přibližně {{count}} strany",
     "pages_many": "Přibližně {{count}} strany",
     "pages_other": "Přibližně {{count}} stran",
-    "streak_one": "{{count}} den v řadě",
-    "streak_few": "{{count}} dny v řadě",
-    "streak_many": "{{count}} dne v řadě",
-    "streak_other": "{{count}} dní v řadě",
     "longest_one": "Nejdelší: {{count}} den",
     "longest_few": "Nejdelší: {{count}} dny",
     "longest_many": "Nejdelší: {{count}} dne",
@@ -3519,12 +3517,10 @@
     },
     "assistantCard": {
       "info": "Rychlé dotazy a to, co jste řekli v konverzacích. Započítané zůstávají, i když konverzace smažete.",
-      "empty": "Zeptejte se asistenta na cokoli nebo zahajte konverzaci a zobrazí se to tady.",
       "noCalls": "Zatím žádné konverzace"
     },
     "meetingsCard": {
-      "info": "Schůzky, které jste nahráli. Započítané zůstávají, i když schůzku smažete.",
-      "empty": "Nahrajte schůzku a zobrazí se tady."
+      "info": "Schůzky, které jste nahráli. Započítané zůstávají, i když schůzku smažete."
     },
     "share": {
       "button": "Sdílet",
@@ -3609,7 +3605,10 @@
         "saved": {
           "title": "Ušetřený čas",
           "label": "méně u klávesnice",
-          "note": "Ve srovnání s psaním rychlostí {{wpm}} slov za minutu"
+          "workdays_one": "Celý pracovní den",
+          "workdays_few": "Přibližně {{count}} pracovní dny",
+          "workdays_many": "Přibližně {{count}} pracovního dne",
+          "workdays_other": "Přibližně {{count}} pracovních dní"
         },
         "streak": {
           "title": "Jsem v ráži",

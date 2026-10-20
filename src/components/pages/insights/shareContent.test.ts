@@ -153,6 +153,29 @@ describe("the share deck", () => {
     expect(streak(19, 19)).toBe("insights.share.cards.streak.best");
   });
 
+  test("time saved is told in working days once it comes to one", () => {
+    const saved = (words: number) =>
+      buildCardDeck(
+        insights({
+          dictation: {
+            ...insights().dictation,
+            total_words: words,
+            timed_words: words,
+            // Speaking at 160 words a minute.
+            total_audio_seconds: (words / 160) * 60,
+          },
+        }),
+        t,
+        "en",
+        NOW,
+      ).slides.find((slide) => slide.kind === "saved")?.note;
+    // 27,676 words: about 8.6 hours saved against typing at 40 a minute.
+    expect(saved(27_676)).toContain("insights.share.cards.saved.workdays");
+    expect(saved(27_676)).toContain('"count":1');
+    // 12,000 words: under 4 hours, so no working days to speak of.
+    expect(saved(12_000)).toBeUndefined();
+  });
+
   test("each card's post speaks for the feature it shows", () => {
     const slides = buildCardDeck(insights(), t, "en", NOW).slides;
     const post = (kind: string) =>
@@ -160,13 +183,6 @@ describe("the share deck", () => {
     expect(post("words")).toContain("insights.share.post.dictation");
     expect(post("assistant")).toContain("insights.share.post.asks");
     expect(post("meetings")).toContain("insights.share.post.meetings");
-  });
-
-  test("the voice bars follow the last seven days", () => {
-    const { week } = buildCardDeck(insights(), t, "en", NOW);
-    expect(week).toHaveLength(7);
-    expect(Math.max(...week)).toBe(1);
-    expect(week.every((value) => value >= 0 && value <= 1)).toBe(true);
   });
 
   test("the activity card counts its days and holds six months of weeks", () => {

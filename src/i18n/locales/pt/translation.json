@@ -3423,15 +3423,15 @@
     "about": "Como você usa o SpeakoFlow, contado neste computador.",
     "nothingYet": "Suas estatísticas aparecem assim que você dita, faz uma pergunta ao assistente ou grava uma reunião.",
     "goHome": "Ver seus atalhos",
-    "dictationsSoFar_one": "{{formatted}} ditado até agora",
-    "dictationsSoFar_many": "{{formatted}} de ditados até agora",
-    "dictationsSoFar_other": "{{formatted}} ditados até agora",
+    "figures": {
+      "dictations": "Ditados",
+      "questions": "Perguntas feitas",
+      "meetings": "Reuniões gravadas"
+    },
+    "activityTitle": "Atividade",
     "pages_one": "Cerca de {{count}} página",
     "pages_many": "Cerca de {{count}} de páginas",
     "pages_other": "Cerca de {{count}} páginas",
-    "streak_one": "{{count}} dia seguido",
-    "streak_many": "{{count}} de dias seguidos",
-    "streak_other": "{{count}} dias seguidos",
     "longest_one": "Recorde: {{count}} dia",
     "longest_many": "Recorde: {{count}} de dias",
     "longest_other": "Recorde: {{count}} dias",
@@ -3480,12 +3480,10 @@
     },
     "assistantCard": {
       "info": "Perguntas rápidas e o que você disse nas conversas. Elas continuam contadas mesmo se você excluir as conversas.",
-      "empty": "Faça uma pergunta ao assistente ou inicie uma conversa, e a contagem aparece aqui.",
       "noCalls": "Nenhuma conversa ainda"
     },
     "meetingsCard": {
-      "info": "Reuniões que você gravou. Elas continuam contadas mesmo se você excluir uma reunião.",
-      "empty": "Grave uma reunião e ela será contada aqui."
+      "info": "Reuniões que você gravou. Elas continuam contadas mesmo se você excluir uma reunião."
     },
     "share": {
       "button": "Compartilhar",
@@ -3563,7 +3561,9 @@
         "saved": {
           "title": "Tempo economizado",
           "label": "sem digitar",
-          "note": "Comparado a digitar a {{wpm}} palavras por minuto"
+          "workdays_one": "Um dia de trabalho inteiro",
+          "workdays_many": "Cerca de {{count}} dias de trabalho",
+          "workdays_other": "Cerca de {{count}} dias de trabalho"
         },
         "streak": {
           "title": "Sem parar",

@@ -274,28 +274,6 @@ export const averageActiveDay = (days: DayValue[]): number => {
   return Math.round(total / active.length);
 };
 
-/**
- * The last `count` local days ending today, oldest first, each with its value
- * (zero for a day without use). For the share card's voiceprint.
- */
-export const recentValues = (
-  recent: DayValue[],
-  count: number,
-  now: Date = new Date(),
-): number[] => {
-  const byDay = new Map(recent.map((day) => [day.day, day.value]));
-  const values: number[] = [];
-  for (let offset = count - 1; offset >= 0; offset -= 1) {
-    const date = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() - offset,
-    );
-    values.push(Math.max(0, byDay.get(localDayKey(date)) ?? 0));
-  }
-  return values;
-};
-
 /** A printed page holds about this many words. */
 export const WORDS_PER_PAGE = 250;
 

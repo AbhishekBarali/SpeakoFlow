@@ -12,7 +12,6 @@ import {
   localDayKey,
   pagesFor,
   parseDayKey,
-  recentValues,
   type DayValue,
 } from "./insightsMath";
 
@@ -209,12 +208,6 @@ describe("activities", () => {
       meetingSeconds: 0,
     });
     expect(parts.get("2026-09-21")?.questions).toBe(10);
-  });
-
-  test("give the last days oldest first, zero where nothing happened", () => {
-    expect(
-      recentValues([day("2026-09-26", 9), day("2026-09-24", 4)], 4, NOW),
-    ).toEqual([0, 4, 0, 9]);
   });
 });
 

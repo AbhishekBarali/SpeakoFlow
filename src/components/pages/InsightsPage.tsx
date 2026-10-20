@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { Segmented } from "@/components/ui/Segmented";
 import { useNavigation } from "@/components/shell/navigation";
-import { useSettings } from "@/hooks/useSettings";
 import {
   formatCount,
   formatDuration,
@@ -33,104 +32,122 @@ import {
   type HeatCell,
   type HeatLevel,
 } from "./insights/insightsMath";
-import { NOVEL_WORDS } from "./insights/shareContent";
+import type { FlowSpec } from "./insights/flowGeometry";
+import { FlowArt } from "./insights/FlowArt";
+import {
+  fullNumber,
+  NOVEL_WORDS,
+  WORKDAY_SECONDS,
+} from "./insights/shareContent";
 import { useInsights } from "./insights/useInsights";
 import { ShareDialog } from "./insights/ShareDialog";
+import "@fontsource-variable/plus-jakarta-sans";
 
 /** Weeks in the activity grid: about six months. */
 const WEEKS = 26;
 
 const LEVEL_CLASSES: Record<HeatLevel, string> = {
-  0: "bg-ink/[0.06]",
-  1: "bg-accent/25",
-  2: "bg-accent/45",
-  3: "bg-accent/70",
+  0: "bg-ink/[0.055]",
+  1: "bg-accent/20",
+  2: "bg-accent/40",
+  3: "bg-accent/65",
   4: "bg-accent",
 };
 
-/**
- * One number: the figure, what it counts in small capitals, and under a
- * hairline one line that puts it in context. Every card on the page is this,
- * so the page reads as one set rather than a wall of different boxes.
- */
-const StatCard: React.FC<{
-  value?: string;
-  label: string;
-  info?: string;
-  /** Shown instead of a figure before the feature has been used. */
-  empty?: string;
-  className?: string;
-  children?: React.ReactNode;
-}> = ({ value, label, info, empty, className = "", children }) => (
-  <section
-    className={`flex min-w-0 flex-col rounded-2xl border border-hairline bg-surface px-6 pt-5 pb-5 elev-card ${className}`}
-  >
-    {empty ? (
-      <>
-        <h2 className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-[0.12em] text-muted uppercase">
-          {label}
-          {info && <InfoTip text={info} />}
-        </h2>
-        <p className="mt-3 text-sm text-muted text-pretty">{empty}</p>
-      </>
-    ) : (
-      <>
-        <p
-          className="truncate text-[2rem] leading-none font-semibold tracking-[-0.025em] text-ink tabular-nums"
-          title={value}
-        >
-          {value}
-        </p>
-        <h2 className="mt-2.5 flex items-center gap-1 text-[0.6875rem] font-semibold tracking-[0.12em] text-muted uppercase">
-          <span className="truncate">{label}</span>
-          {info && <InfoTip text={info} />}
-        </h2>
-        {children && (
-          <div className="mt-4 border-t border-hairline pt-3.5 text-[0.8125rem] text-ink/80 text-pretty">
-            {children}
-          </div>
-        )}
-      </>
-    )}
+/** The ribbon behind the summary: the share cards' bands as one wave across
+ *  the right half, so the figure on the left stays on a quiet ground. */
+const SUMMARY_FLOW: FlowSpec = {
+  spine: [
+    [0.42, 1.3],
+    [0.62, -0.5],
+    [0.8, 1.5],
+    [1.05, -0.3],
+  ],
+  edges: [-0.4, -0.13, 0.13, 0.4],
+  fan: [1, 1],
+};
+const SUMMARY_FILLS = [
+  "var(--insights-flow-1)",
+  "var(--insights-flow-2)",
+  "var(--insights-flow-3)",
+];
+
+/** The first thing the page says: the one number that sums up the most,
+ *  large, over the ribbon the share cards are drawn with. */
+const Summary: React.FC<{ label: string; value: string; note?: string }> = ({
+  label,
+  value,
+  note,
+}) => (
+  <section className="insights-summary relative overflow-hidden rounded-3xl border border-hairline elev-card">
+    <FlowArt
+      spec={SUMMARY_FLOW}
+      width={960}
+      height={260}
+      fills={SUMMARY_FILLS}
+      className="absolute inset-0 h-full w-full"
+    />
+    <div className="relative px-8 pt-8 pb-9">
+      <h2 className="text-sm font-medium text-ink/75">{label}</h2>
+      <p className="insights-figure mt-2 text-[3.75rem] leading-none text-ink tabular-nums">
+        {value}
+      </p>
+      {note && <p className="mt-3.5 text-[0.9375rem] text-body">{note}</p>}
+    </div>
   </section>
 );
 
-/** Speaking against typing, as two bars. */
-const SpeedBars: React.FC<{ wpm: number }> = ({ wpm }) => {
-  const { t } = useTranslation();
-  const max = Math.max(wpm, TYPING_WPM);
-  const rows = [
-    {
-      label: t("insights.share.cards.speed.you"),
-      value: wpm,
-      bar: "bg-accent",
-    },
-    {
-      label: t("insights.share.cards.speed.typing"),
-      value: TYPING_WPM,
-      // A typical typist, not the user: a reference, drawn as an outline.
-      bar: "border border-dashed border-ink/30",
-    },
-  ];
+interface Figure {
+  key: string;
+  label: string;
+  value: string;
+  note?: string;
+  info?: string;
+}
+
+/**
+ * The rest of the numbers, three to a row in one card with hairlines between
+ * them: a label, the figure, and one quiet line about it. A row with fewer
+ * than three shares its width out, so there is never an empty cell.
+ */
+const Figures: React.FC<{ figures: Figure[] }> = ({ figures }) => {
+  if (figures.length === 0) return null;
+  const rows: Figure[][] = [];
+  for (let index = 0; index < figures.length; index += 3) {
+    rows.push(figures.slice(index, index + 3));
+  }
   return (
-    <div className="space-y-1.5" aria-hidden="true">
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center gap-2.5">
-          <span className="w-24 shrink-0 truncate text-xs text-muted">
-            {row.label}
-          </span>
-          <span className="h-2 flex-1 overflow-hidden rounded-full">
-            <span
-              className={`block h-full rounded-full ${row.bar}`}
-              style={{ width: `${(row.value / max) * 100}%` }}
-            />
-          </span>
-          <span className="w-8 shrink-0 text-end text-xs text-muted tabular-nums">
-            {row.value}
-          </span>
-        </div>
-      ))}
-    </div>
+    <section className="overflow-hidden rounded-2xl border border-hairline bg-hairline elev-card">
+      <div className="grid gap-px">
+        {rows.map((row) => (
+          <div
+            key={row.map((figure) => figure.key).join()}
+            className="grid gap-px @lg:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]"
+            style={{ "--cols": row.length } as React.CSSProperties}
+          >
+            {row.map((figure) => (
+              <div key={figure.key} className="min-w-0 bg-surface px-6 py-5">
+                <h3 className="flex items-center gap-1 text-[0.8125rem] text-muted">
+                  <span className="truncate">{figure.label}</span>
+                  {figure.info && <InfoTip text={figure.info} />}
+                </h3>
+                <p
+                  className="mt-1.5 truncate text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums"
+                  title={figure.value}
+                >
+                  {figure.value}
+                </p>
+                {figure.note && (
+                  <p className="mt-1 text-[0.8125rem] text-muted text-pretty">
+                    {figure.note}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 };
 
@@ -179,10 +196,10 @@ const useDaySaying = (insights: Insights) => {
 };
 
 /**
- * The busiest weekday, best day and typical day of the activity in view, as
- * a short list beside the grid they are read from. For all of them, the best
- * day says what it held and there is no typical day, since an average of a
- * mixed score means nothing.
+ * The busiest weekday, best day and typical day of the activity in view, in
+ * a row under the grid they are read from. For all of them, the best day
+ * says what it held and there is no typical day, since an average of a mixed
+ * score means nothing.
  */
 const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
   insights,
@@ -245,17 +262,20 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
     });
   }
   return (
-    <dl className="grid content-start gap-x-6 gap-y-5 @xl:grid-cols-3 @3xl:grid-cols-1">
+    <dl
+      className="grid gap-x-8 gap-y-4 @lg:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]"
+      style={{ "--cols": rows.length } as React.CSSProperties}
+    >
       {rows.map((row) => (
         <div key={row.label} className="min-w-0">
-          <dt className="text-[0.6875rem] font-semibold tracking-[0.12em] text-muted uppercase">
-            {row.label}
-          </dt>
-          <dd className="mt-1 truncate text-[0.9375rem] font-semibold text-ink">
+          <dt className="text-[0.8125rem] text-muted">{row.label}</dt>
+          <dd className="mt-0.5 truncate text-[0.9375rem] font-semibold text-ink">
             {row.value}
           </dd>
           {row.sub && (
-            <dd className="mt-0.5 truncate text-xs text-muted">{row.sub}</dd>
+            <dd className="mt-0.5 truncate text-[0.8125rem] text-muted">
+              {row.sub}
+            </dd>
           )}
         </div>
       ))}
@@ -264,10 +284,9 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
 };
 
 /**
- * Six months, one square per day, darker for more use, with the streak over
- * it and the day's highlights beside it. Once more than one feature has been
- * used it opens on all of them, the days the streak counts, with each
- * feature a switch away.
+ * Six months, one square per day, darker for more use, as wide as the card.
+ * Once more than one feature has been used it opens on all of them, the days
+ * the streak counts, with each feature a switch away.
  */
 const ActivityCard: React.FC<{
   insights: Insights;
@@ -330,15 +349,10 @@ const ActivityCard: React.FC<{
   return (
     <section className="@container rounded-2xl border border-hairline bg-surface px-6 pt-5 pb-6 elev-card">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h2 className="flex items-center gap-1.5 text-[1.0625rem] font-semibold text-ink">
-            {t("insights.streak", { count: insights.current_streak_days })}
-            <InfoTip text={t("insights.streakHint")} />
-          </h2>
-          <p className="text-xs text-muted">
-            {t("insights.longest", { count: insights.longest_streak_days })}
-          </p>
-        </div>
+        <h2 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold text-ink">
+          {t("insights.activityTitle")}
+          <InfoTip text={t("insights.streakHint")} />
+        </h2>
         {activities.length > 1 && (
           <Segmented<Activity>
             size="sm"
@@ -356,98 +370,96 @@ const ActivityCard: React.FC<{
         )}
       </div>
 
-      <div className="mt-6 grid gap-x-10 gap-y-6 @3xl:grid-cols-[auto_minmax(0,1fr)]">
-        <div className="min-w-0 overflow-x-auto">
-          <div className="inline-flex gap-2">
-            {/* Weekday labels share the grid's rows, so they line up. */}
+      {/* One grid for the weekday labels, the months and the days, so they
+          line up at any width. Each day is a small square in the middle of
+          its slot, which keeps six months light enough to read at a glance
+          across the whole card. */}
+      <div
+        role="img"
+        aria-label={summary}
+        onMouseLeave={() => setHovered(null)}
+        className="mt-5 grid items-center"
+        style={{
+          gridTemplateColumns: `auto repeat(${WEEKS}, minmax(0, 1fr))`,
+          gridTemplateRows: "auto repeat(7, auto)",
+        }}
+      >
+        {map.months.map(({ col, date }) => (
+          <span
+            key={`m-${col}-${date.getMonth()}`}
+            aria-hidden="true"
+            className="pb-1.5 text-[0.6875rem] leading-none whitespace-nowrap text-muted"
+            style={{ gridRow: 1, gridColumn: col + 2 }}
+          >
+            {monthFormat.format(date)}
+          </span>
+        ))}
+        {rowLabels.map((label, row) => (
+          <span
+            key={`d-${row}`}
+            aria-hidden="true"
+            className="pe-3 text-[0.6875rem] leading-none text-muted"
+            style={{ gridRow: row + 2, gridColumn: 1 }}
+          >
+            {label}
+          </span>
+        ))}
+        {map.weeks.map((column, col) =>
+          column.map((cell, row) => (
             <div
-              aria-hidden="true"
-              className="grid shrink-0 grid-rows-[repeat(7,1rem)] gap-[3px] pt-5 text-[0.6875rem] text-muted"
+              key={`${activity}-${cell.key}`}
+              onMouseEnter={() => setHovered(cell.future ? null : cell)}
+              className="grid aspect-square place-items-center"
+              style={{ gridRow: row + 2, gridColumn: col + 2 }}
             >
-              {rowLabels.map((label, row) => (
-                <span key={row} className="flex h-4 items-center leading-none">
-                  {label}
-                </span>
-              ))}
-            </div>
-            <div>
               <div
-                aria-hidden="true"
-                className="relative mb-1.5 h-3.5 text-[0.6875rem] leading-none text-muted"
-              >
-                {map.months.map(({ col, date }) => (
-                  <span
-                    key={`${col}-${date.getMonth()}`}
-                    className="absolute top-0"
-                    style={{ insetInlineStart: `${col * 19}px` }}
-                  >
-                    {monthFormat.format(date)}
-                  </span>
-                ))}
-              </div>
-              <div
-                role="img"
-                aria-label={summary}
-                onMouseLeave={() => setHovered(null)}
-                className="grid grid-flow-col grid-rows-[repeat(7,1rem)] gap-[3px]"
-                style={{ gridTemplateColumns: `repeat(${WEEKS}, 1rem)` }}
-              >
-                {map.weeks.map((column, col) =>
-                  column.map((cell, row) => (
-                    <div
-                      key={`${activity}-${cell.key}`}
-                      onMouseEnter={() => setHovered(cell.future ? null : cell)}
-                      className={`heat-cell h-4 w-4 rounded-[4px] transition-[box-shadow] duration-150 ${
-                        cell.future
-                          ? "bg-transparent"
-                          : `${LEVEL_CLASSES[cell.level]} hover:shadow-[0_0_0_1.5px_var(--color-ink)]`
-                      } ${cell.isToday ? "shadow-[0_0_0_1.5px_var(--color-accent)]" : ""}`}
-                      style={
-                        { "--col": col, "--row": row } as React.CSSProperties
-                      }
-                    />
-                  )),
-                )}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="min-h-[1.25rem] text-xs text-muted tabular-nums">
-                  {hovered ? (
-                    <>
-                      <span className="font-medium text-ink">
-                        {dayFormat.format(hovered.date)}
-                      </span>
-                      {" · "}
-                      {hovered.value > 0
-                        ? say(activity, {
-                            day: hovered.key,
-                            value: hovered.value,
-                          })
-                        : noneLabel}
-                    </>
-                  ) : (
-                    summary
-                  )}
-                </p>
-                <div
-                  aria-hidden="true"
-                  className="flex items-center gap-1 text-[0.6875rem] text-muted"
-                >
-                  <span className="me-1">{t("insights.less")}</span>
-                  {([0, 1, 2, 3, 4] as HeatLevel[]).map((level) => (
-                    <span
-                      key={level}
-                      className={`h-2.5 w-2.5 rounded-[3px] ${LEVEL_CLASSES[level]}`}
-                    />
-                  ))}
-                  <span className="ms-1">{t("insights.more")}</span>
-                </div>
-              </div>
+                className={`heat-cell aspect-square w-[62%] rounded-[28%] transition-[box-shadow,transform] duration-150 ${
+                  cell.future
+                    ? "bg-transparent"
+                    : `${LEVEL_CLASSES[cell.level]} hover:shadow-[0_0_0_1.5px_var(--color-ink)]`
+                } ${cell.isToday ? "shadow-[0_0_0_1.5px_var(--color-accent)]" : ""}`}
+                style={{ "--col": col, "--row": row } as React.CSSProperties}
+              />
             </div>
-          </div>
+          )),
+        )}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <p className="min-h-[1.25rem] text-xs text-muted tabular-nums">
+          {hovered ? (
+            <>
+              <span className="font-medium text-ink">
+                {dayFormat.format(hovered.date)}
+              </span>
+              {" · "}
+              {hovered.value > 0
+                ? say(activity, {
+                    day: hovered.key,
+                    value: hovered.value,
+                  })
+                : noneLabel}
+            </>
+          ) : (
+            summary
+          )}
+        </p>
+        <div
+          aria-hidden="true"
+          className="flex items-center gap-1 text-[0.6875rem] text-muted"
+        >
+          <span className="me-1">{t("insights.less")}</span>
+          {([0, 1, 2, 3, 4] as HeatLevel[]).map((level) => (
+            <span
+              key={level}
+              className={`h-2.5 w-2.5 rounded-[3px] ${LEVEL_CLASSES[level]}`}
+            />
+          ))}
+          <span className="ms-1">{t("insights.more")}</span>
         </div>
-        <div className="border-t border-hairline pt-5 @3xl:border-t-0 @3xl:border-s @3xl:ps-10 @3xl:pt-1">
-          <Highlights insights={insights} activity={activity} />
-        </div>
+      </div>
+
+      <div className="mt-5 border-t border-hairline pt-5">
+        <Highlights insights={insights} activity={activity} />
       </div>
     </section>
   );
@@ -457,11 +469,14 @@ const ActivityCard: React.FC<{
  * Insights: how much you have said to SpeakoFlow, how fast, and when, across
  * dictation, the assistant and meetings, and cards to share it. Everything
  * is counted on this computer.
+ *
+ * Three things, in the order they are read: the one number that sums it up,
+ * the rest of the numbers in a single card, and the calendar. Each feature
+ * that has not been used yet is left out rather than shown as a zero.
  */
 export const InsightsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { navigate } = useNavigation();
-  const { settings } = useSettings();
   const insights = useInsights();
   const [activity, setActivity] = useState<Activity>("all");
   const [sharing, setSharing] = useState(false);
@@ -503,7 +518,7 @@ export const InsightsPage: React.FC = () => {
         {header}
         <div
           aria-hidden="true"
-          className="h-[26rem] animate-pulse rounded-2xl border border-hairline bg-surface-muted"
+          className="h-[26rem] animate-pulse rounded-3xl border border-hairline bg-surface-muted"
         />
       </Page>
     );
@@ -535,94 +550,138 @@ export const InsightsPage: React.FC = () => {
 
   const { dictation, assistant, meetings } = insights;
   const lang = i18n.language;
-  const wpm = wordsPerMinute(dictation);
-  const questions = assistantQuestions(insights);
-  const assistantOn = settings?.assistant_enabled ?? true;
-  const showAssistant = assistantOn || used.includes("assistant");
   const words = dictation.total_words;
+  const wpm = wordsPerMinute(dictation);
+  const saved = timeSavedSeconds(dictation);
+  const questions = assistantQuestions(insights);
+  const workdays = Math.floor(saved / WORKDAY_SECONDS);
+
+  const callsNote =
+    assistant.calls > 0
+      ? t("insights.share.cards.assistant.calls", {
+          count: assistant.calls,
+          time: formatShortDuration(assistant.call_seconds, t),
+        })
+      : t("insights.assistantCard.noCalls");
+  const meetingsNote =
+    meetings.seconds >= 60
+      ? meetings.words > 0
+        ? t("insights.share.cards.meetings.note", {
+            time: formatShortDuration(meetings.seconds, t),
+            words: formatCount(meetings.words, lang),
+          })
+        : t("insights.share.cards.meetings.time", {
+            time: formatShortDuration(meetings.seconds, t),
+          })
+      : undefined;
+
+  // The summary leads with words dictated, or with whatever has been used
+  // when dictation has not.
+  const lead: "dictation" | "assistant" | "meetings" = used.includes(
+    "dictation",
+  )
+    ? "dictation"
+    : used.includes("assistant")
+      ? "assistant"
+      : "meetings";
+  const summary =
+    lead === "dictation"
+      ? {
+          label: t("home.stats.wordsLabel"),
+          value: fullNumber(words, lang),
+          note:
+            words >= NOVEL_WORDS
+              ? t("insights.share.cards.words.books", {
+                  count: Math.floor(words / NOVEL_WORDS),
+                })
+              : t("insights.pages", { count: pagesFor(words) }),
+        }
+      : lead === "assistant"
+        ? {
+            label: t("insights.figures.questions"),
+            value: fullNumber(questions, lang),
+            note: callsNote,
+          }
+        : {
+            label: t("insights.figures.meetings"),
+            value: fullNumber(meetings.meetings, lang),
+            note: meetingsNote,
+          };
+
+  const figures: Figure[] = [];
+  if (used.includes("dictation")) {
+    figures.push(
+      {
+        key: "wpm",
+        label: t("home.stats.wpmLabel"),
+        value: wpm !== null ? String(wpm) : t("home.stats.none"),
+        note:
+          wpm !== null && wpm > TYPING_WPM
+            ? t("insights.share.cards.speed.note", {
+                times: (wpm / TYPING_WPM).toFixed(1),
+              })
+            : undefined,
+        info: t("home.stats.wpmHint"),
+      },
+      {
+        key: "saved",
+        label: t("home.stats.savedLabel"),
+        value: formatDuration(saved, t),
+        note:
+          workdays >= 1
+            ? t("insights.share.cards.saved.workdays", { count: workdays })
+            : undefined,
+        info: t("home.stats.savedHint", { wpm: TYPING_WPM }),
+      },
+    );
+  }
+  figures.push({
+    key: "streak",
+    label: t("home.stats.streakLabel", {
+      count: insights.current_streak_days,
+    }),
+    value: formatCount(insights.current_streak_days, lang),
+    note: t("insights.longest", { count: insights.longest_streak_days }),
+    info: t("insights.streakHint"),
+  });
+  if (used.includes("dictation")) {
+    figures.push({
+      key: "dictations",
+      label: t("insights.figures.dictations"),
+      value: formatCount(dictation.total_dictations, lang),
+      note:
+        dictation.today_words > 0
+          ? t("home.stats.today", {
+              words: formatCount(dictation.today_words, lang),
+            })
+          : undefined,
+    });
+  }
+  if (used.includes("assistant") && lead !== "assistant") {
+    figures.push({
+      key: "questions",
+      label: t("insights.figures.questions"),
+      value: formatCount(questions, lang),
+      note: callsNote,
+      info: t("insights.assistantCard.info"),
+    });
+  }
+  if (used.includes("meetings") && lead !== "meetings") {
+    figures.push({
+      key: "meetings",
+      label: t("insights.figures.meetings"),
+      value: formatCount(meetings.meetings, lang),
+      note: meetingsNote,
+      info: t("insights.meetingsCard.info"),
+    });
+  }
 
   return (
     <Page>
       {header}
       <div className="space-y-4">
-        {used.includes("dictation") && (
-          <div className="grid gap-4 @lg:grid-cols-2 @3xl:grid-cols-3">
-            <StatCard
-              value={formatCount(words, lang)}
-              label={t("home.stats.wordsLabel")}
-            >
-              {words >= NOVEL_WORDS
-                ? t("insights.share.cards.words.books", {
-                    count: Math.floor(words / NOVEL_WORDS),
-                  })
-                : t("insights.pages", { count: pagesFor(words) })}
-            </StatCard>
-            <StatCard
-              value={wpm !== null ? String(wpm) : t("home.stats.none")}
-              label={t("home.stats.wpmLabel")}
-              info={t("home.stats.wpmHint")}
-            >
-              {wpm !== null ? <SpeedBars wpm={wpm} /> : t("home.stats.none")}
-            </StatCard>
-            <StatCard
-              value={formatDuration(timeSavedSeconds(dictation), t)}
-              label={t("home.stats.savedLabel")}
-              info={t("home.stats.savedHint", { wpm: TYPING_WPM })}
-              className="@lg:col-span-2 @3xl:col-span-1"
-            >
-              {t("insights.dictationsSoFar", {
-                count: dictation.total_dictations,
-                formatted: formatCount(dictation.total_dictations, lang),
-              })}
-            </StatCard>
-          </div>
-        )}
-
-        <div className={`grid gap-4 ${showAssistant ? "@lg:grid-cols-2" : ""}`}>
-          {showAssistant && (
-            <StatCard
-              value={formatCount(questions, lang)}
-              label={t("insights.share.cards.assistant.label", {
-                count: questions,
-              })}
-              info={t("insights.assistantCard.info")}
-              empty={
-                used.includes("assistant")
-                  ? undefined
-                  : t("insights.assistantCard.empty")
-              }
-            >
-              {assistant.calls > 0
-                ? t("insights.share.cards.assistant.calls", {
-                    count: assistant.calls,
-                    time: formatShortDuration(assistant.call_seconds, t),
-                  })
-                : t("insights.assistantCard.noCalls")}
-            </StatCard>
-          )}
-          <StatCard
-            value={formatCount(meetings.meetings, lang)}
-            label={t("insights.share.cards.meetings.label", {
-              count: meetings.meetings,
-            })}
-            info={t("insights.meetingsCard.info")}
-            empty={
-              used.includes("meetings")
-                ? undefined
-                : t("insights.meetingsCard.empty")
-            }
-          >
-            {meetings.words > 0
-              ? t("insights.share.cards.meetings.note", {
-                  time: formatShortDuration(meetings.seconds, t),
-                  words: formatCount(meetings.words, lang),
-                })
-              : t("insights.share.cards.meetings.time", {
-                  time: formatShortDuration(meetings.seconds, t),
-                })}
-          </StatCard>
-        </div>
-
+        <Summary {...summary} />
+        <Figures figures={figures} />
         <ActivityCard
           insights={insights}
           activity={shown}

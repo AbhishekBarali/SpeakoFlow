@@ -3394,12 +3394,14 @@
     "about": "Wie du SpeakoFlow nutzt, gezählt auf diesem Computer.",
     "nothingYet": "Deine Statistiken erscheinen, sobald du diktierst, dem Assistenten eine Frage stellst oder ein Meeting aufnimmst.",
     "goHome": "Deine Tastenkürzel ansehen",
-    "dictationsSoFar_one": "{{formatted}} Diktat bisher",
-    "dictationsSoFar_other": "{{formatted}} Diktate bisher",
+    "figures": {
+      "dictations": "Diktate",
+      "questions": "Gestellte Fragen",
+      "meetings": "Aufgenommene Meetings"
+    },
+    "activityTitle": "Aktivität",
     "pages_one": "Etwa {{count}} Seite",
     "pages_other": "Etwa {{count}} Seiten",
-    "streak_one": "{{count}} Tag in Folge",
-    "streak_other": "{{count}} Tage in Folge",
     "longest_one": "Längste Serie: {{count}} Tag",
     "longest_other": "Längste Serie: {{count}} Tage",
     "streakHint": "Ein Tag zählt, wenn du diktierst, dem Assistenten eine Frage stellst, ein Gespräch führst oder ein Meeting aufnimmst.",
@@ -3441,12 +3443,10 @@
     },
     "assistantCard": {
       "info": "Schnelle Fragen und was du in Gesprächen gesagt hast. Das bleibt gezählt, auch wenn du Gespräche löschst.",
-      "empty": "Stell dem Assistenten eine Frage oder starte ein Gespräch, dann wird es hier gezählt.",
       "noCalls": "Noch keine Gespräche"
     },
     "meetingsCard": {
-      "info": "Meetings, die du aufgenommen hast. Sie bleiben gezählt, auch wenn du ein Meeting löschst.",
-      "empty": "Nimm ein Meeting auf, dann wird es hier gezählt."
+      "info": "Meetings, die du aufgenommen hast. Sie bleiben gezählt, auch wenn du ein Meeting löschst."
     },
     "share": {
       "button": "Teilen",
@@ -3517,7 +3517,8 @@
         "saved": {
           "title": "Zeit gespart",
           "label": "nicht mit Tippen verbracht",
-          "note": "Im Vergleich zum Tippen mit {{wpm}} Wörtern pro Minute"
+          "workdays_one": "Ein ganzer Arbeitstag",
+          "workdays_other": "Etwa {{count}} Arbeitstage"
         },
         "streak": {
           "title": "Ich bleib dran",

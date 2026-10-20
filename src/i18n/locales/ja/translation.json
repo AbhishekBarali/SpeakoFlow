@@ -3365,9 +3365,13 @@
     "about": "SpeakoFlowの利用状況です。集計はこのPC上で行われます。",
     "nothingYet": "音声入力、アシスタントへの質問、会議の録音のいずれかを行うと、インサイトが表示されます。",
     "goHome": "ショートカットを見る",
-    "dictationsSoFar_other": "これまでに{{formatted}}回の音声入力",
+    "figures": {
+      "dictations": "音声入力の回数",
+      "questions": "質問した数",
+      "meetings": "録音した会議"
+    },
+    "activityTitle": "アクティビティ",
     "pages_other": "約{{count}}ページ",
-    "streak_other": "{{count}}日連続",
     "longest_other": "最長：{{count}}日",
     "streakHint": "音声入力、アシスタントへの質問、会話、会議の録音のどれかをした日が1日としてカウントされます。",
     "gridSummary_other": "過去6か月間の{{count}}日で{{words}}語",
@@ -3402,12 +3406,10 @@
     },
     "assistantCard": {
       "info": "アシスタントへの質問と、会話での発言を数えています。会話を削除しても、カウントは残ります。",
-      "empty": "アシスタントに質問するか会話を始めると、ここでカウントされます。",
       "noCalls": "会話はまだありません"
     },
     "meetingsCard": {
-      "info": "録音した会議です。会議を削除しても、カウントは残ります。",
-      "empty": "会議を録音すると、ここでカウントされます。"
+      "info": "録音した会議です。会議を削除しても、カウントは残ります。"
     },
     "share": {
       "button": "共有",
@@ -3471,7 +3473,7 @@
         "saved": {
           "title": "短縮できた時間",
           "label": "タイピングせずに済んだ時間",
-          "note": "1分あたり{{wpm}}語でタイピングした場合との比較"
+          "workdays_other": "約{{count}}日分の勤務時間"
         },
         "streak": {
           "title": "絶好調",
