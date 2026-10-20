@@ -3403,30 +3403,173 @@
     }
   },
   "insights": {
-    "description": "Din diktering över tid, räknad på den här datorn.",
-    "empty": "Din statistik visas efter din första diktering.",
-    "dictations": "Dikteringar",
-    "today": "{{words}} ord i dag",
+    "about": "Hur du använder SpeakoFlow, räknat på den här datorn.",
+    "nothingYet": "Din statistik visas när du har dikterat, frågat assistenten eller spelat in ett möte.",
+    "goHome": "Visa dina kortkommandon",
+    "figures": {
+      "dictations": "Dikteringar",
+      "questions": "Ställda frågor",
+      "meetings": "Inspelade möten"
+    },
+    "activityTitle": "Aktivitet",
     "pages_one": "Ungefär {{count}} sida",
     "pages_other": "Ungefär {{count}} sidor",
-    "fasterThanTyping": "{{times}}× snabbare än att skriva",
-    "streak_one": "{{count}} dag i rad",
-    "streak_other": "{{count}} dagar i rad",
     "longest_one": "Längst: {{count}} dag",
     "longest_other": "Längst: {{count}} dagar",
-    "gridLabel_one": "{{words}} ord på {{count}} dag under de senaste sex månaderna",
-    "gridLabel_other": "{{words}} ord på {{count}} dagar under de senaste sex månaderna",
+    "streakHint": "En dag räknas när du dikterar, frågar assistenten, för en konversation eller spelar in ett möte.",
     "gridSummary_one": "{{words}} ord på {{count}} dag de senaste 6 månaderna",
     "gridSummary_other": "{{words}} ord på {{count}} dagar de senaste 6 månaderna",
+    "gridSummaryAssistant_one": "{{questions}} på {{count}} dag de senaste 6 månaderna",
+    "gridSummaryAssistant_other": "{{questions}} på {{count}} dagar de senaste 6 månaderna",
+    "gridSummaryMeetings_one": "{{time}} mötestid på {{count}} dag de senaste 6 månaderna",
+    "gridSummaryMeetings_other": "{{time}} mötestid på {{count}} dagar de senaste 6 månaderna",
+    "gridSummaryAll_one": "Aktiv {{count}} dag de senaste 6 månaderna",
+    "gridSummaryAll_other": "Aktiv {{count}} dagar de senaste 6 månaderna",
     "dayWords_one": "{{formatted}} ord",
     "dayWords_other": "{{formatted}} ord",
-    "dayNone": "Ingen diktering",
+    "dayQuestions_one": "{{formatted}} fråga",
+    "dayQuestions_other": "{{formatted}} frågor",
+    "dayMeetings": "{{time}} mötestid",
+    "dayNoneFor": {
+      "all": "Inget den dagen",
+      "dictation": "Ingen diktering",
+      "assistant": "Inga frågor",
+      "meetings": "Inga möten"
+    },
     "less": "Mindre",
     "more": "Mer",
     "busiest": "Mest aktiva dag",
     "best": "Bästa dag",
     "typical": "Typisk dag",
-    "typicalSub": "Dagar du dikterar"
+    "typicalFor": {
+      "dictation": "Dagar du dikterar",
+      "assistant": "Dagar du frågar",
+      "meetings": "Dagar med möte"
+    },
+    "activity": {
+      "label": "Aktivitet att visa",
+      "all": "Allt",
+      "dictation": "Diktering",
+      "assistant": "Assistent",
+      "meetings": "Möten"
+    },
+    "assistantCard": {
+      "info": "Snabba frågor och det du sa i konversationer. De räknas kvar även när du tar bort konversationer.",
+      "noCalls": "Inga konversationer än"
+    },
+    "meetingsCard": {
+      "info": "Möten du har spelat in. De räknas kvar även när du tar bort ett möte."
+    },
+    "share": {
+      "button": "Dela",
+      "nothingYet": "Det finns något att dela när du har använt SpeakoFlow.",
+      "title": "Dela din statistik",
+      "private": "Skapas på den här datorn. Inget laddas upp.",
+      "size": "Storlek",
+      "formats": {
+        "square": "Kvadrat",
+        "story": "Story",
+        "wide": "Bred"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, för flöden",
+        "story": "1080 × 1920, för stories",
+        "wide": "1600 × 900, för inlägg och länkar"
+      },
+      "previous": "Föregående kort",
+      "next": "Nästa kort",
+      "cardsLabel": "Kort",
+      "position": "Kort {{index}} av {{count}}",
+      "copy": "Kopiera bild",
+      "copied": "Kopierat",
+      "copyFailed": "Det gick inte att kopiera bilden",
+      "save": "Spara bild",
+      "saved": "Bilden sparades",
+      "saveFailed": "Det gick inte att spara bilden",
+      "showInFolder": "Visa i mapp",
+      "postOn": "Publicera på {{site}}",
+      "copiedForPost": "Kortet är kopierat. Tryck {{keys}} i det nya inlägget för att lägga till det.",
+      "savedForPost": "Kortet är sparat i Hämtade filer. {{site}} tar inte emot inklistrade bilder, så lägg till det med fotoknappen i det nya inlägget.",
+      "openSite": "Öppna {{site}}",
+      "openFailed": "Det gick inte att öppna {{site}}",
+      "more": "Fler appar",
+      "sheetTitle": "Min SpeakoFlow-statistik",
+      "shareFailed": "Det gick inte att öppna Dela",
+      "drawFailed": "Korten kunde inte ritas. Stäng och försök igen.",
+      "tagline": "Gratis · Öppen källkod · Fungerar offline",
+      "cards": {
+        "highlights": {
+          "title": "Mitt SpeakoFlow i siffror",
+          "words_one": "talat ord",
+          "words_other": "talade ord",
+          "streak_one": "dag i rad",
+          "streak_other": "dagar i rad",
+          "wpm": "ord per minut",
+          "questions_one": "ställd fråga",
+          "questions_other": "ställda frågor",
+          "meetings_one": "inspelat möte",
+          "meetings_other": "inspelade möten",
+          "saved": "sparat mot att skriva"
+        },
+        "words": {
+          "title": "Talat, inte skrivet",
+          "label_one": "talat ord",
+          "label_other": "talade ord",
+          "pages_one": "Ungefär {{count}} sida",
+          "pages_other": "Ungefär {{count}} sidor",
+          "books_one": "Lika långt som en hel roman",
+          "books_other": "Lika långt som {{count}} romaner"
+        },
+        "speed": {
+          "title": "Så snabbt pratar jag",
+          "label": "ord per minut",
+          "note": "{{times}}× snabbare än att skriva",
+          "you": "Prata",
+          "typing": "Typiskt skrivande"
+        },
+        "saved": {
+          "title": "Tid jag sparat",
+          "label": "inte vid tangentbordet",
+          "workdays_one": "En hel arbetsdag",
+          "workdays_other": "Ungefär {{count}} arbetsdagar"
+        },
+        "streak": {
+          "title": "På rulle",
+          "unit_one": "dag i rad",
+          "unit_other": "dagar i rad",
+          "longest_one": "Längsta svit: {{count}} dag",
+          "longest_other": "Längsta svit: {{count}} dagar",
+          "best": "Min längsta svit hittills"
+        },
+        "assistant": {
+          "title": "Min assistent",
+          "label_one": "fråga jag ställt",
+          "label_other": "frågor jag ställt",
+          "calls_one": "{{count}} konversation, {{time}} samtalstid",
+          "calls_other": "{{count}} konversationer, {{time}} samtalstid"
+        },
+        "meetings": {
+          "title": "Mina möten",
+          "label_one": "inspelat möte",
+          "label_other": "inspelade möten",
+          "note": "{{time}} inspelat, {{words}} ord nedskrivna",
+          "time": "{{time}} inspelat och nedskrivet"
+        },
+        "activity": {
+          "title": "Sex månader av prat",
+          "label_one": "aktiv dag",
+          "label_other": "aktiva dagar"
+        }
+      },
+      "post": {
+        "dictation_one": "Med SpeakoFlow har jag pratat in {{formatted}} ord på datorn i stället för att skriva det.",
+        "dictation_other": "Med SpeakoFlow har jag pratat in {{formatted}} ord på datorn i stället för att skriva dem.",
+        "asks_one": "Jag har ställt {{formatted}} fråga till SpeakoFlows assistent utan att byta flik.",
+        "asks_other": "Jag har ställt {{formatted}} frågor till SpeakoFlows assistent utan att byta flik.",
+        "meetings_one": "SpeakoFlow har spelat in {{formatted}} möte och skrivit anteckningarna åt mig.",
+        "meetings_other": "SpeakoFlow har spelat in {{formatted}} möten och skrivit anteckningarna åt mig."
+      }
+    }
   },
   "settingsNotice": {
     "restored": "Dina inställningar var skadade och har återställts från en säkerhetskopia.",

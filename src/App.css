@@ -1024,6 +1024,63 @@
   animation: style-swap 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Insights summary: the share cards' flowing ribbon in tones of the brand
+ * teal, pale on paper and deep on the dark theme, behind the page's one
+ * large figure. The figure is set in the share cards' typeface (the logo's),
+ * so the page and the cards it makes read as one thing. */
+.insights-summary {
+  background-color: color-mix(
+    in oklab,
+    var(--color-accent) 5%,
+    var(--color-surface)
+  );
+  --insights-flow-1: color-mix(
+    in oklab,
+    var(--color-accent) 10%,
+    var(--color-surface)
+  );
+  --insights-flow-2: color-mix(
+    in oklab,
+    var(--color-accent) 16%,
+    var(--color-surface)
+  );
+  --insights-flow-3: color-mix(
+    in oklab,
+    var(--color-accent) 23%,
+    var(--color-surface)
+  );
+}
+:root[data-theme="dark"] .insights-summary {
+  background-color: color-mix(
+    in oklab,
+    var(--color-accent-fill) 14%,
+    var(--color-surface)
+  );
+  --insights-flow-1: color-mix(
+    in oklab,
+    var(--color-accent-fill) 20%,
+    var(--color-surface)
+  );
+  --insights-flow-2: color-mix(
+    in oklab,
+    var(--color-accent-fill) 26%,
+    var(--color-surface)
+  );
+  --insights-flow-3: color-mix(
+    in oklab,
+    var(--color-accent-fill) 33%,
+    var(--color-surface)
+  );
+}
+.insights-figure {
+  font-family: "Plus Jakarta Sans Variable", var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+:root[data-theme="dark"] .insights-figure {
+  font-weight: 650;
+}
+
 /* Insights heatmap: the grid sweeps in left to right when the page opens. It
  * starts partly visible, so a paused clock never leaves an empty grid. */
 @keyframes heat-in {

@@ -18,6 +18,7 @@ mod hands_free;
 mod helpers;
 mod huggingface;
 mod input;
+mod insights;
 mod llm_client;
 mod managers;
 mod meetings;
@@ -34,6 +35,7 @@ mod secret_store;
 mod selection;
 mod settings;
 mod settings_file;
+mod share_sheet;
 mod shortcut;
 mod signal_handle;
 mod smart_spacing;
@@ -1170,6 +1172,11 @@ pub fn run(cli_args: CliArgs) {
             commands::history::get_assistant_history_entry,
             commands::history::delete_assistant_history_entry,
             commands::history::get_usage_stats,
+            insights::get_insights,
+            insights::save_insights_card,
+            insights::save_insights_card_to_downloads,
+            insights::copy_insights_card,
+            insights::share_insights_card,
             commands::assistant::assistant_send_text,
             commands::assistant::assistant_read_file,
             commands::assistant::assistant_read_image,
