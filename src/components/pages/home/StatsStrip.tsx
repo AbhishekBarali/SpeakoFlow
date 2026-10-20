@@ -13,10 +13,12 @@ import {
 } from "./usageMath";
 
 /** The dictation figures on their own, read only while `enabled` (Insights
- *  could not be read), so the strip shows them instead of waiting. `"error"`
- *  when they cannot be read either. */
+ *  could not be read), so the strip shows them instead of waiting, and read
+ *  again whenever `refresh` changes. `"error"` when they cannot be read
+ *  either. */
 const useUsageStatsFallback = (
   enabled: boolean,
+  refresh: number,
 ): UsageStats | "error" | null => {
   const [stats, setStats] = useState<UsageStats | "error" | null>(null);
   useEffect(() => {
@@ -34,7 +36,7 @@ const useUsageStatsFallback = (
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, refresh]);
   return enabled ? stats : null;
 };
 
@@ -73,8 +75,8 @@ const Stat: React.FC<{
 export const StatsStrip: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { navigate } = useNavigation();
-  const { insights, failed } = useInsights();
-  const fallback = useUsageStatsFallback(failed && !insights);
+  const { insights, failed, reads } = useInsights();
+  const fallback = useUsageStatsFallback(failed && !insights, reads);
   const stats = insights?.dictation ?? (fallback === "error" ? null : fallback);
   // Without Insights, the streak is the dictation one.
   const streak =
