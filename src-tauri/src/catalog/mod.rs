@@ -130,7 +130,27 @@ pub struct CatalogFile {
     pub sha256: Option<String>,
 }
 
+/// Names shown instead of the catalog's own, for slugs the catalog gives the
+/// same name as another model. Upstream calls both Cohere models "Cohere
+/// Transcribe", although one is the Arabic fine-tune, so the Models page showed
+/// what read as one model listed twice. `catalog.json` stays byte-identical to
+/// upstream's, so the names are corrected here, in the catalog's own
+/// "(Arabic)" style (Moonshine Base (Arabic)).
+const DISPLAY_NAMES: &[(&str, &str)] = &[(
+    "cohere-transcribe-arabic-07-2026",
+    "Cohere Transcribe (Arabic)",
+)];
+
 impl CatalogModel {
+    /// The name the app shows: the catalog's, unless [`DISPLAY_NAMES`]
+    /// corrects it.
+    pub fn display_name(&self) -> &str {
+        DISPLAY_NAMES
+            .iter()
+            .find(|(slug, _)| *slug == self.slug)
+            .map_or(self.name.as_str(), |(_, name)| name)
+    }
+
     /// The id `ModelManager` gives this model (`"<slug>-gguf"`, the Hugging
     /// Face repo suffix), kept distinct from the legacy ids that share a slug
     /// (e.g. `canary-180m-flash`) so neither shadows the other.
@@ -396,6 +416,24 @@ mod tests {
             missing.is_empty(),
             "catalog architecture(s) missing from KNOWN_ARCHES: {:?}",
             missing
+        );
+    }
+
+    /// Two rows with one name read as the same model listed twice. A catalog
+    /// update that brings a new clash fails here; name it in `DISPLAY_NAMES`.
+    #[test]
+    fn every_model_shows_a_name_of_its_own() {
+        let mut seen = BTreeSet::new();
+        let clashes: Vec<&str> = catalog()
+            .models
+            .iter()
+            .map(CatalogModel::display_name)
+            .filter(|name| !seen.insert(*name))
+            .collect();
+        assert!(clashes.is_empty(), "names shown twice: {clashes:?}");
+        assert_eq!(
+            model_for_id("cohere-transcribe-arabic-07-2026-gguf").map(CatalogModel::display_name),
+            Some("Cohere Transcribe (Arabic)")
         );
     }
 }
