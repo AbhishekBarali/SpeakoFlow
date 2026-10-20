@@ -2353,10 +2353,10 @@ mod live_tests {
                 secs(&pcm),
                 started.elapsed().as_millis(),
                 finalized.elapsed.as_millis(),
-                finalized.text.display().chars().count(),
+                finalized.text.full.chars().count(),
                 info.device
             );
-            assert!(!finalized.text.display().trim().is_empty());
+            assert!(!finalized.text.full.trim().is_empty());
         }
         drop(engine);
         thread::sleep(Duration::from_millis(500));
@@ -2630,7 +2630,7 @@ mod live_tests {
             stream.feed(chunk.to_vec());
         }
         let finalized = stream.finalize(false).expect("finalize").expect("result");
-        assert!(!finalized.text.display().trim().is_empty());
+        assert!(!finalized.text.full.trim().is_empty());
         assert!(batch
             .join()
             .unwrap()
@@ -2667,7 +2667,7 @@ mod live_tests {
             stream.feed(chunk.to_vec());
         }
         let finalized = stream.finalize(false).expect("finalize").expect("result");
-        assert!(!finalized.text.display().trim().is_empty());
+        assert!(!finalized.text.full.trim().is_empty());
         assert!(unloading.wait_timeout(Duration::from_secs(10)));
     }
 
