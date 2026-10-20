@@ -551,12 +551,38 @@ fn init_logger() {
 /// SIGUSR2 toggles transcription in the app (`signal_handle.rs`). Aimed at
 /// SpeakoFlow by name (`pkill -USR2 -n speakoflow`), it can reach this newer
 /// process instead, and its default action would kill it.
+///
+/// On Linux the worker has a name of its own (`set_process_name`), so a
+/// signal aimed at the app by name never lands here, and the signals are
+/// ignored. macOS cannot rename a process: the worker is `speakoflow` too, and
+/// the newest one whenever a model is loaded, so `pkill -n` picks it every
+/// time and the toggle went nowhere. There the worker passes the signal on to
+/// the app, which drops the second copy when a `pkill` without `-n` reached
+/// both (`signal_handle::setup_signal_handler`).
 #[cfg(unix)]
 fn ignore_app_signals() {
-    // SAFETY: setting a signal's disposition to SIG_IGN has no preconditions.
+    #[cfg(target_os = "macos")]
+    let handler = forward_to_app as extern "C" fn(libc::c_int) as libc::sighandler_t;
+    #[cfg(not(target_os = "macos"))]
+    let handler = libc::SIG_IGN;
+    // SAFETY: SIG_IGN has no preconditions, and `forward_to_app` only makes
+    // async-signal-safe calls.
     unsafe {
-        libc::signal(libc::SIGUSR1, libc::SIG_IGN);
-        libc::signal(libc::SIGUSR2, libc::SIG_IGN);
+        libc::signal(libc::SIGUSR1, handler);
+        libc::signal(libc::SIGUSR2, handler);
+    }
+}
+
+/// macOS: pass an app signal on to the app (see [`ignore_app_signals`]).
+#[cfg(target_os = "macos")]
+extern "C" fn forward_to_app(signal: libc::c_int) {
+    // SAFETY: getppid and kill are async-signal-safe.
+    unsafe {
+        let parent = libc::getppid();
+        // Orphaned (the app is gone): reparented to launchd, pid 1.
+        if parent > 1 {
+            libc::kill(parent, signal);
+        }
     }
 }
 

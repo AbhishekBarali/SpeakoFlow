@@ -2017,7 +2017,7 @@ id: "gemma-3-4b".to_string(),
                 id.clone(),
                 ModelInfo {
                     id,
-                    name: model.name.clone(),
+                    name: model.display_name().to_string(),
                     description: model.description.clone(),
                     filename: file.filename.clone(),
                     url: Some(url),

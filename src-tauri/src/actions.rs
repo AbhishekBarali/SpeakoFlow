@@ -2035,14 +2035,19 @@ async fn send_one_post_process_request(
 /// A cut-off answer with no visible text stays an empty answer: that is a
 /// reasoning model spending the whole ceiling thinking, and
 /// `run_plain_attempt` recognises it by the empty answer and retries without
-/// the ceiling.
+/// the ceiling. "Visible" is judged after reasoning blocks are removed, the
+/// way the answer would be pasted: a model that thinks inline (LM Studio
+/// without its reasoning parser, an older Ollama, a raw vLLM endpoint) is cut
+/// off inside an unclosed `<think>`, and counting that monologue as text made
+/// it a `Truncated` failure, which never gets the uncapped retry, so cleanup
+/// never ran for that model again.
 fn cleanup_content(
     completion: crate::llm_client::Completion,
 ) -> Result<Option<String>, crate::llm_client::ChatCompletionError> {
     let has_text = completion
         .content
         .as_deref()
-        .is_some_and(|text| !text.trim().is_empty());
+        .is_some_and(|text| !crate::flow::strip_reasoning_blocks(text).trim().is_empty());
     if completion.truncated() && has_text {
         return Err(crate::llm_client::ChatCompletionError::Truncated);
     }
@@ -2218,6 +2223,14 @@ async fn run_provider_post_process(
                 }
             }
             Ok(Ok(None)) => PostProcessFailureKind::EmptyResponse,
+            // A structured answer cut off at the output limit is an unfinished
+            // JSON object. Before the truncation check existed it failed to
+            // parse and took the plain request below; it still should, since
+            // the bare text carries no schema overhead and often fits where the
+            // object did not. The plain attempt refuses a cut-off answer too.
+            Ok(Err(crate::llm_client::ChatCompletionError::Truncated)) => {
+                PostProcessFailureKind::Truncated
+            }
             Ok(Err(error)) => {
                 if !is_schema_compatibility_error(&error) {
                     return PostProcessAttemptOutcome::Failed(classify_chat_error(&error));
@@ -2955,6 +2968,9 @@ impl ShortcutAction for TranscribeAction {
         // The coordinator runs this straight after this recording's own start,
         // so the current generation is this dictation's.
         let dictation_generation = crate::voice_conversation::dictation_generation();
+        // Taken now, on the hotkey thread, so an Esc that lands before the
+        // task below reaches its batch run still cancels it.
+        let dictation_cancel = tm.dictation_cancel_token();
 
         tauri::async_runtime::spawn(async move {
             let _guard = FinishGuard(ah.clone());
@@ -3022,14 +3038,14 @@ impl ShortcutAction for TranscribeAction {
             // cancelled finalize must not turn into a batch run.
             let transcription_result = match tm.finalize_stream(samples.len()) {
                 Ok(Some(text)) => Ok(text),
-                Ok(None) => tm.transcribe_for_dictation(samples),
+                Ok(None) => tm.transcribe_for_dictation_with(samples, dictation_cancel),
                 Err(e) if crate::managers::transcription::is_cancellation(&e) => Err(e),
                 Err(e) => {
                     warn!(
                         "Live transcription finalize failed ({}); using batch transcription",
                         e
                     );
-                    tm.transcribe_for_dictation(samples)
+                    tm.transcribe_for_dictation_with(samples, dictation_cancel)
                 }
             };
             // Read on this thread, right after `transcribe`, before any await.
@@ -4124,7 +4140,16 @@ impl ShortcutAction for AssistantAction {
 
             // Whether to look at the screen is the model's call, inside the
             // turn (`capture_screen`), so nothing is decided here.
-            match tm.transcribe(samples) {
+            //
+            // Off the async worker: a local transcription now waits on the
+            // transcription worker process, which can mean a model load (up to
+            // `LOAD_TIMEOUT`) or a crash-and-retry on the CPU, and holding a
+            // Tokio worker for that long starves every other async task (the
+            // call path does the same, in `voice_conversation`).
+            let transcribed = tauri::async_runtime::spawn_blocking(move || tm.transcribe(samples))
+                .await
+                .unwrap_or_else(|e| Err(anyhow::anyhow!("Transcription task panicked: {e}")));
+            match transcribed {
                 Ok(transcription) => {
                     change_tray_icon(&ah, TrayIconState::Idle);
                     // Shared with the STT overlay's Ask-Assistant redirect.
@@ -4299,6 +4324,37 @@ mod tests {
         // No finish reason at all reads as finished.
         let unknown = cleanup_content(completion(Some("We ship Friday."), None));
         assert_eq!(unknown.unwrap().as_deref(), Some("We ship Friday."));
+    }
+
+    /// A reasoning model is cut off at the output limit inside an unclosed think block.
+    #[test]
+    fn a_cut_off_cleanup_still_thinking_inline_stays_an_empty_answer() {
+        // Cut off inside an unclosed think block: nothing would be pasted, so
+        // it must read as empty (which earns the uncapped retry), not as a
+        // cut-off answer.
+        let thinking = cleanup_content(completion(
+            Some("<think>The user wants me to clean up the transcript. First"),
+            Some("length"),
+        ));
+        let content = thinking.expect("an inline monologue is not a truncated answer");
+        let outcome = map_plain_result(
+            "Clean it.",
+            "we should ship the release on friday",
+            true,
+            Ok(Ok(content)),
+        );
+        assert_eq!(
+            outcome,
+            PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EmptyResponse)
+        );
+        // Text after a closed block is an answer, and a cut-off one.
+        assert!(matches!(
+            cleanup_content(completion(
+                Some("<think>plan</think>We should ship the"),
+                Some("length"),
+            )),
+            Err(ChatCompletionError::Truncated)
+        ));
     }
 
     /// A reasoning model that spent the whole ceiling thinking is cut off with
@@ -5009,7 +5065,12 @@ Try plugging it into a coding agent or productivity app listed on https://openro
             for response in responses {
                 let (mut stream, _) = listener.accept().unwrap();
                 let body = read_request_body(&mut stream);
-                sender.send(serde_json::from_str(&body).unwrap()).unwrap();
+                // A client that gave up (its deadline passed) may close before
+                // sending a body; that is what the deadline tests provoke, and
+                // it must not panic the mock and fail the test on a slow host.
+                sender
+                    .send(serde_json::from_str(&body).unwrap_or(serde_json::Value::Null))
+                    .unwrap();
                 if !response.delay.is_zero() {
                     thread::sleep(response.delay);
                 }

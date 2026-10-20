@@ -262,6 +262,11 @@ pub struct StreamRouter {
     /// finalize/cancel invalidates it immediately so queued old audio cannot
     /// affect a later recording's Flow prewarm watcher.
     generation: AtomicU64,
+    /// The generation the open (or most recently opened) session started
+    /// with, written under the `tx` lock. [`clear`](Self::clear) only closes
+    /// the router for that session, so a worker that exits late never closes
+    /// the session opened after it.
+    session: AtomicU64,
     /// Number of `Feed` frames enqueued but not yet consumed by the worker.
     /// Gates `feed()` so the channel can never grow past
     /// [`MAX_QUEUED_FEED_FRAMES`]. Reset to 0 on each [`open`](Self::open).
@@ -281,6 +286,7 @@ impl StreamRouter {
             give_up: Mutex::new(Arc::new(AtomicBool::new(false))),
             cancel: Mutex::new(transcribe_cpp::CancelToken::new()),
             generation: AtomicU64::new(0),
+            session: AtomicU64::new(0),
             queued: AtomicUsize::new(0),
             dropped: AtomicU64::new(0),
         }
@@ -372,17 +378,24 @@ impl StreamRouter {
     /// the backlog/drop counters so each session starts clean.
     fn open(&self, kind: FeedKind) -> OpenedStream {
         let (tx, rx) = mpsc::channel();
+        // Held for the whole open, so a late `clear` from the previous
+        // session's worker sees either the old session (and closes it before
+        // this one exists) or this one (and leaves it alone), never half of
+        // each.
+        let mut tx_slot = self.tx.lock().unwrap_or_else(|e| e.into_inner());
         self.queued.store(0, Ordering::Relaxed);
         self.dropped.store(0, Ordering::Relaxed);
         let give_up = Arc::new(AtomicBool::new(false));
         *self.give_up.lock().unwrap() = give_up.clone();
         let cancel = transcribe_cpp::CancelToken::new();
         *self.cancel.lock().unwrap() = cancel.clone();
-        *self.tx.lock().unwrap() = Some(tx);
+        *tx_slot = Some(tx);
         self.takes_speech
             .store(kind == FeedKind::Speech, Ordering::Relaxed);
         let generation = self.generation.fetch_add(1, Ordering::AcqRel) + 1;
+        self.session.store(generation, Ordering::SeqCst);
         self.open.store(true, Ordering::Release);
+        drop(tx_slot);
         OpenedStream {
             rx,
             generation,
@@ -412,10 +425,26 @@ impl StreamRouter {
         self.open.load(Ordering::Acquire) && self.generation.load(Ordering::Acquire) == generation
     }
 
-    /// Mark closed and drop any channel (defensive cleanup on worker exit).
-    fn clear(&self) {
+    /// Mark closed and drop any channel (defensive cleanup on worker exit),
+    /// but only while `session` (the generation its worker was opened with)
+    /// is still the router's session.
+    ///
+    /// A worker can exit long after its session was taken: one cancelled by
+    /// Esc, or by a press the hotkey engine withdrew, may still be waiting
+    /// for a model load or a stream to begin. By then the next dictation can
+    /// have opened its own session, and an unconditional clear closed that
+    /// one: its live text stopped and its finalize found nothing, so the
+    /// recording was quietly transcribed again in batch. Every dictation
+    /// opens a session now (streaming follows the model), and moving from the
+    /// dictation keys to the clean-up keys aborts one and opens the next at
+    /// once, so the race was a common one.
+    fn clear(&self, session: u64) {
+        let mut tx = self.tx.lock().unwrap_or_else(|e| e.into_inner());
+        if self.session.load(Ordering::SeqCst) != session {
+            return;
+        }
         self.open.store(false, Ordering::Relaxed);
-        *self.tx.lock().unwrap() = None;
+        *tx = None;
     }
 
     /// Cancel the decode of the most recent session, whether it is still open
@@ -493,8 +522,17 @@ impl TranscriptionManager {
         // first's engine.
         let engine = ENGINE
             .get_or_init(|| {
-                let gpu_allowed = !transcribe_gpu_disabled_for_host();
-                if !gpu_allowed {
+                // A CPU without FMA3 cannot run ggml's Vulkan backend at all
+                // (an uncatchable SIGILL), so it never lists a GPU
+                // (`cpu_can_list_gpus`). Letting its model workers register
+                // that backend anyway crashed the first worker of every
+                // session before the CPU-only retry, which is the same
+                // outcome a second slower.
+                let fma_ok = cpu_can_list_gpus();
+                let gpu_allowed = !transcribe_gpu_disabled_for_host() && fma_ok;
+                if !fma_ok {
+                    warn!("This CPU lacks FMA3, which the GPU backend needs; speech runs on the processor");
+                } else if !gpu_allowed {
                     // Every worker is then CPU-only, so the emulated GPU
                     // driver is never loaded at all.
                     warn!(
@@ -710,7 +748,8 @@ impl TranscriptionManager {
     /// must never wait on a hung one. Returns whether the worker has exited.
     pub fn stop_engine_before_exit(&self, timeout: Duration) -> bool {
         // Unconditionally: a load in progress has a worker but no model yet.
-        self.engine.unload().wait_timeout(timeout)
+        // And without waiting for a live stream, which ends with the app.
+        self.engine.unload_now().wait_timeout(timeout)
     }
 
     /// Every state change of an unload, done now on the caller's thread: a
@@ -786,10 +825,23 @@ impl TranscriptionManager {
             },
         );
 
-        let model_info = self
-            .model_manager
-            .get_model_info(model_id)
-            .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+        // Every failure below must end in `loading_failed`: the overlay (and the
+        // Models page) treat `loading_started` as "a load is open" until one of
+        // the two ending events arrives, so an early return that skipped it left
+        // "Loading model…" latched for the next dictation.
+        let Some(model_info) = self.model_manager.get_model_info(model_id) else {
+            let error_msg = format!("Model not found: {}", model_id);
+            let _ = self.app_handle.emit(
+                "model-state-changed",
+                ModelStateEvent {
+                    event_type: "loading_failed".to_string(),
+                    model_id: Some(model_id.to_string()),
+                    model_name: None,
+                    error: Some(error_msg.clone()),
+                },
+            );
+            return Err(anyhow::anyhow!(error_msg));
+        };
 
         // A model of a retired engine stays on disk but is never loaded; say
         // what to do instead of failing on a file the app cannot run. Checked
@@ -826,8 +878,6 @@ impl TranscriptionManager {
             return Err(anyhow::anyhow!(error_msg));
         }
 
-        let model_path = self.model_manager.get_model_path(model_id)?;
-
         let emit_loading_failed = |error_msg: &str| {
             let _ = self.app_handle.emit(
                 "model-state-changed",
@@ -838,6 +888,14 @@ impl TranscriptionManager {
                     error: Some(error_msg.to_string()),
                 },
             );
+        };
+
+        let model_path = match self.model_manager.get_model_path(model_id) {
+            Ok(path) => path,
+            Err(e) => {
+                emit_loading_failed(&e.to_string());
+                return Err(e);
+            }
         };
 
         let loaded = match model_info.engine_type {
@@ -1106,11 +1164,33 @@ impl TranscriptionManager {
     ///
     /// [`cancel_transcription`]: Self::cancel_transcription
     pub fn transcribe_for_dictation(&self, audio: Vec<f32>) -> Result<String> {
-        let cancel = self
-            .dictation_cancel
+        self.transcribe_with(audio, Some(self.dictation_cancel_token()))
+    }
+
+    /// The token the next [`cancel_transcription`] cancels. A dictation takes
+    /// it when its recording stops, before any of its pipeline runs: Esc can
+    /// land in the moment between the key-up and the batch run, and that
+    /// cancel replaces the token, so one fetched afterwards would never see it
+    /// and the whole recording would be transcribed before being dismissed.
+    ///
+    /// [`cancel_transcription`]: Self::cancel_transcription
+    pub fn dictation_cancel_token(&self) -> CancelToken {
+        self.dictation_cancel
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .clone();
+            .clone()
+    }
+
+    /// [`transcribe_for_dictation`](Self::transcribe_for_dictation) with a
+    /// token taken earlier (see [`dictation_cancel_token`](Self::dictation_cancel_token)).
+    pub fn transcribe_for_dictation_with(
+        &self,
+        audio: Vec<f32>,
+        cancel: CancelToken,
+    ) -> Result<String> {
+        if cancel.is_cancelled() {
+            return Err(anyhow::Error::new(TranscriptionCancelled));
+        }
         self.transcribe_with(audio, Some(cancel))
     }
 
@@ -1432,8 +1512,9 @@ impl TranscriptionManager {
                     this.run_cloud_stream_worker(opened.rx, cfg, opened.generation);
                 } else {
                     // The cloud transcribes the whole recording when it ends.
+                    let session = opened.generation;
                     this.drain_stream_no_model(opened.rx);
-                    this.stream_router.clear();
+                    this.stream_router.clear(session);
                 }
                 return;
             }
@@ -1492,7 +1573,7 @@ impl TranscriptionManager {
                     e
                 );
                 self.drain_stream_no_model(rx);
-                self.stream_router.clear();
+                self.stream_router.clear(stream_generation);
                 return;
             }
         };
@@ -1524,7 +1605,7 @@ impl TranscriptionManager {
             final_text = session.finish();
         }
 
-        self.stream_router.clear();
+        self.stream_router.clear(stream_generation);
 
         if let Some(reply) = finalize_reply {
             let settings = get_settings(&self.app_handle);
@@ -1593,7 +1674,7 @@ impl TranscriptionManager {
                 warn!("Live transcription: no model loaded; falling back to batch");
             }
             self.drain_stream_no_model(rx);
-            self.stream_router.clear();
+            self.stream_router.clear(generation);
             return;
         };
 
@@ -1675,7 +1756,7 @@ impl TranscriptionManager {
                     e
                 );
                 self.drain_stream_no_model(rx);
-                self.stream_router.clear();
+                self.stream_router.clear(generation);
                 return;
             }
         };
@@ -1776,7 +1857,7 @@ impl TranscriptionManager {
         // A stream still held here was cancelled or abandoned; dropping the
         // handle resets it in the worker.
         drop(stream);
-        self.stream_router.clear();
+        self.stream_router.clear(generation);
 
         if let Some(reply) = finalize_reply {
             let result = final_text
@@ -2943,6 +3024,32 @@ mod tests {
         let router2 = StreamRouter::new();
         router2.note_feed_consumed();
         assert_eq!(router2.queued.load(Ordering::Relaxed), 0);
+    }
+
+    /// A worker that exits after its session was taken must not close the
+    /// session the next dictation opened in the meantime.
+    #[test]
+    fn a_late_clear_leaves_the_next_session_open() {
+        let router = StreamRouter::new();
+        let first = router.open(FeedKind::Raw);
+        // Esc (or a withdrawn press) takes the first session...
+        let _ = router.take();
+        // ...and the next dictation opens its own before the first worker
+        // has finished exiting.
+        let second = router.open(FeedKind::Raw);
+        router.clear(first.generation);
+        assert!(
+            router.is_open(),
+            "the first worker closed the second session"
+        );
+        router.feed(&[0.3; 480]);
+        assert!(second
+            .rx
+            .try_iter()
+            .any(|cmd| matches!(cmd, StreamCmd::Feed(frame) if frame[0] == 0.3)));
+        // Its own worker's clear still closes it.
+        router.clear(second.generation);
+        assert!(!router.is_open());
     }
 
     /// Giving up on one recording's stream must never reach the next one's

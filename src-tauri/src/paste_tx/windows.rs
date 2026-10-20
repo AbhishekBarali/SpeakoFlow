@@ -36,8 +36,9 @@ use windows::Win32::Foundation::{
 };
 use windows::Win32::Graphics::Gdi::{DeleteObject, HGDIOBJ};
 use windows::Win32::System::DataExchange::{
-    CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData, GetClipboardOwner,
-    GetClipboardSequenceNumber, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
+    CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
+    GetClipboardFormatNameW, GetClipboardOwner, GetClipboardSequenceNumber, OpenClipboard,
+    RegisterClipboardFormatW, SetClipboardData,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Memory::{
@@ -51,8 +52,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{
-    evaluate, send_auto_submit_later, send_chord, settle_reason, settlement, ClipboardSettle,
-    PasteRequest, PasteTxError, TxState, WaitDecision, PUBLISH_TIMEOUT,
+    blind_submit_due, evaluate, send_auto_submit_later, send_chord, settle_reason, settlement,
+    ClipboardSettle, PasteRequest, PasteTxError, TxState, WaitDecision, PUBLISH_TIMEOUT,
 };
 use crate::settings::AutoSubmitKey;
 
@@ -61,6 +62,12 @@ const TIMER_ID: usize = 1;
 const TIMER_INTERVAL_MS: u32 = 25;
 /// Clipboard formats larger than this are not snapshotted.
 const MAX_FORMAT_BYTES: usize = 64 * 1024 * 1024;
+/// The snapshot stops reading formats past this total size...
+const MAX_SNAPSHOT_BYTES: usize = 128 * 1024 * 1024;
+/// ...or this long. Well under `PUBLISH_TIMEOUT`, after which the paste gives
+/// up on the transaction and takes the plain path while this snapshot could
+/// still have the clipboard open.
+const SNAPSHOT_BUDGET: Duration = Duration::from_millis(600);
 /// `OpenClipboard` fails while another window has the clipboard open, which
 /// clipboard managers do for a moment after every change.
 const OPEN_ATTEMPTS: u32 = 10;
@@ -382,11 +389,42 @@ unsafe fn restore_snapshot(tx: &WinTx) {
 
 unsafe fn snapshot_clipboard(hwnd: HWND, tx: &WinTx) -> Result<(), String> {
     open_clipboard(Some(hwnd))?;
-    let mut formats = Vec::new();
+    // Listing is cheap; reading is not, because a format the copying app
+    // promised is rendered by that app the moment it is read, while the
+    // paste (and the app's main thread) waits for this snapshot. So the text
+    // is read first, OLE's own bookkeeping is never read, and the rest is
+    // read only within a time and size budget. The plain paste kept only the
+    // text (or an image), so a snapshot cut short still restores more.
+    let mut listed: Vec<(usize, u32)> = Vec::new();
     let mut format = 0u32;
     loop {
         format = EnumClipboardFormats(format);
         if format == 0 {
+            break;
+        }
+        listed.push((listed.len(), format));
+    }
+    // Read the text first, but remember where each format was: apps pick the
+    // first format they understand in clipboard order, so the restore has to
+    // keep the order (rich text ahead of plain text) the copying app chose.
+    if let Some(text_at) = listed.iter().position(|&(_, f)| f == CF_UNICODETEXT) {
+        listed[..=text_at].rotate_right(1);
+    }
+
+    let started = Instant::now();
+    let mut total = 0usize;
+    let mut formats: Vec<(usize, SavedFormat)> = Vec::new();
+    for (index, &(order, format)) in listed.iter().enumerate() {
+        // The text always; everything else only while the budget lasts.
+        if index > 0 && (started.elapsed() >= SNAPSHOT_BUDGET || total >= MAX_SNAPSHOT_BYTES) {
+            info!(
+                "Paste: clipboard snapshot stopped after {} of {} formats ({} ms, {} KB); \
+                 the rest will not be restored",
+                formats.len(),
+                listed.len(),
+                started.elapsed().as_millis(),
+                total / 1024
+            );
             break;
         }
         if format == CF_BITMAP {
@@ -398,7 +436,7 @@ unsafe fn snapshot_clipboard(hwnd: HWND, tx: &WinTx) -> Result<(), String> {
             }
             continue;
         }
-        if !is_byte_copyable(format) {
+        if !is_byte_copyable(format) || is_ole_bookkeeping(format) {
             continue;
         }
         let Ok(handle) = GetClipboardData(format) else {
@@ -415,11 +453,46 @@ unsafe fn snapshot_clipboard(hwnd: HWND, tx: &WinTx) -> Result<(), String> {
         }
         let data = std::slice::from_raw_parts(ptr, size).to_vec();
         let _ = GlobalUnlock(hg);
-        formats.push(SavedFormat { format, data });
+        total += size;
+        formats.push((order, SavedFormat { format, data }));
     }
     let _ = CloseClipboard();
-    *lock(&tx.snapshot) = formats;
+    formats.sort_by_key(|(order, _)| *order);
+    *lock(&tx.snapshot) = formats.into_iter().map(|(_, saved)| saved).collect();
     Ok(())
+}
+
+/// Registered formats that are OLE's bookkeeping rather than data: they
+/// describe, or point at, a live data object inside the app that copied.
+/// Their bytes mean nothing once that copy is replaced (put back, they would
+/// send an OLE-aware app looking for an object that is gone), and reading
+/// them makes the copying app (Office, typically) render embedded objects
+/// while the paste waits.
+fn is_ole_bookkeeping(format: u32) -> bool {
+    const OLE_FORMATS: [&str; 10] = [
+        "DataObject",
+        "Ole Private Data",
+        "Object Descriptor",
+        "Link Source Descriptor",
+        "Embed Source",
+        "Embedded Object",
+        "Link Source",
+        "Native",
+        "OwnerLink",
+        "ObjectLink",
+    ];
+    // Registered formats start at 0xC000; below that are the standard ones.
+    if format < 0xC000 {
+        return false;
+    }
+    let mut name = [0u16; 64];
+    // SAFETY: the buffer is valid for its length, which the call is given.
+    let len = unsafe { GetClipboardFormatNameW(format, &mut name) };
+    if len <= 0 {
+        return false;
+    }
+    let name = String::from_utf16_lossy(&name[..len as usize]);
+    OLE_FORMATS.iter().any(|ole| name.eq_ignore_ascii_case(ole))
 }
 
 /// Publish the dictation as a promise. Returns the new sequence number.
@@ -452,6 +525,25 @@ unsafe fn publish_formats() -> Result<(), String> {
 }
 
 fn on_timer(tx: &WinTx) {
+    // A blind paste's Enter goes ahead of the restore (`BLIND_SUBMIT_DELAY`).
+    if let (Some(key), Some(submit)) = (tx.auto_submit, tx.submit_later.as_ref()) {
+        // `settled` is read under the state lock, which `settle` holds while it
+        // decides its own Enter: either this sends it and `settle` sees
+        // `submitted`, or `settle` got there first and this sees `settled`.
+        let due = {
+            let mut state = lock(&tx.state);
+            let due =
+                !tx.settled.load(Ordering::SeqCst) && blind_submit_due(&state, Instant::now());
+            if due {
+                state.submitted = true;
+            }
+            due
+        };
+        if due {
+            debug!("Paste: sending auto-submit; the target's read cannot be seen");
+            submit(key);
+        }
+    }
     let finish = tx.settled.load(Ordering::SeqCst)
         || evaluate(&lock(&tx.state), Instant::now()) == WaitDecision::Finish;
     if !finish {
@@ -480,9 +572,20 @@ fn flush_pending() -> Option<AutoSubmitKey> {
     unsafe { settle(&previous) }
 }
 
-/// [`flush_pending`] for a caller outside a paste, which does not hold the
-/// input lock, so an owed Enter is sent the way a settling worker sends it.
-pub(super) fn settle_pending(app_handle: &tauri::AppHandle) {
+/// [`flush_pending`] for an ask's selection harvest, which runs while the ask
+/// keys are held: an Enter still owed would reach the target with them (see
+/// `paste_tx::settle_pending`), so it is dropped.
+pub(super) fn settle_pending(_app_handle: &tauri::AppHandle) {
+    if flush_pending().is_some() {
+        warn!(
+            "Paste: skipped the previous dictation's auto-submit; an ask started \
+             before its target had read it"
+        );
+    }
+}
+
+/// [`flush_pending`] before the app exits; an owed Enter still goes.
+pub(super) fn settle_before_exit(app_handle: &tauri::AppHandle) {
     if let Some(key) = flush_pending() {
         send_auto_submit_later(app_handle, key);
     }

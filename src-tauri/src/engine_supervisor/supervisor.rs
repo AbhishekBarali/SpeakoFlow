@@ -279,7 +279,12 @@ type OnProgress = Box<dyn FnMut(StreamProgress) + Send>;
 
 enum Command {
     Load(LoadSpec, Reply<Result<LoadedInfo, EngineError>>),
-    Unload(Reply<()>),
+    /// `now` skips the wait for a live stream (see `Owner::handle`); only
+    /// quitting the app wants that.
+    Unload {
+        reply: Reply<()>,
+        now: bool,
+    },
     Transcribe {
         pcm: Vec<f32>,
         run: RunOptions,
@@ -325,6 +330,13 @@ struct Shared {
     /// Held for the length of a device probe, so concurrent callers wait for
     /// the one probe instead of starting their own.
     probing: Mutex<()>,
+    /// A model-less device probe failed without crashing (the worker could
+    /// not be started, or refused). Not retried on every call: the GPU list is
+    /// read several times per llama.cpp start and by every settings screen,
+    /// and each call would start (and wait for) another worker that fails the
+    /// same way. A model worker's hello still refreshes the list, and
+    /// [`EngineSupervisor::retry_gpu`] allows one more probe.
+    probe_failed: AtomicBool,
     /// Bumped by every [`EngineSupervisor::unload`] as it is called, so the
     /// model reads as unloaded at once, even while the unload waits its turn.
     unloads_requested: AtomicU64,
@@ -345,6 +357,7 @@ impl Shared {
                     "Could not start a transcription worker to list compute devices: {}",
                     failure
                 );
+                self.probe_failed.store(true, Ordering::Release);
                 if failure.worker_lost() && !cpu_only {
                     self.mark_gpu_unavailable(format!(
                         "a worker with GPU backends {failure} while listing compute devices"
@@ -464,13 +477,27 @@ impl EngineSupervisor {
     /// unload is queued ahead of anything requested later, so a new dictation
     /// queues a fresh load behind it and is never affected by it.
     /// [`Unloading::wait`] returns once the worker has exited.
+    ///
+    /// A live stream (a dictation still recording) keeps the model until it
+    /// ends: the unload waits for it, the way a batch run does.
     pub fn unload(&self) -> Unloading {
+        self.send_unload(false)
+    }
+
+    /// [`unload`](Self::unload), without waiting for a live stream to end. For
+    /// quitting, where the dictation is going away with the app anyway and the
+    /// worker must be gone before an update replaces the executable.
+    pub fn unload_now(&self) -> Unloading {
+        self.send_unload(true)
+    }
+
+    fn send_unload(&self, now: bool) -> Unloading {
         let (reply, exited) = mpsc::channel();
         {
             let mut loaded = lock(&self.shared.loaded);
             self.shared.unloads_requested.fetch_add(1, Ordering::SeqCst);
             *loaded = None;
-            if self.commands.send(Command::Unload(reply)).is_err() {
+            if self.commands.send(Command::Unload { reply, now }).is_err() {
                 return Unloading(None);
             }
         }
@@ -481,6 +508,7 @@ impl EngineSupervisor {
     /// any, so the next load may use (and list) the GPU again. A new failure
     /// sets the flag again.
     pub fn retry_gpu(&self, reason: &str) {
+        self.shared.probe_failed.store(false, Ordering::Release);
         if self.shared.gpu_unavailable.swap(false, Ordering::AcqRel) {
             info!("Transcription GPU no longer marked unavailable: {}", reason);
         }
@@ -551,10 +579,14 @@ impl EngineSupervisor {
     /// listed them yet, starts a short-lived worker on this thread to list
     /// them. It runs beside any model worker, which it leaves alone. Not while
     /// the GPU is marked unavailable: that probe would crash or hang the same
-    /// way.
+    /// way. Nor after a probe failed for another reason (see
+    /// [`Shared::probe_failed`]).
     pub fn devices(&self) -> Option<Vec<DeviceInfo>> {
         let _probing = lock(&self.shared.probing);
-        if lock(&self.shared.devices).is_none() && !self.shared.gpu_unavailable() {
+        if lock(&self.shared.devices).is_none()
+            && !self.shared.gpu_unavailable()
+            && !self.shared.probe_failed.load(Ordering::Acquire)
+        {
             self.shared.probe_devices();
         }
         lock(&self.shared.devices).clone()
@@ -842,10 +874,28 @@ impl Owner {
 
     fn handle(&mut self, command: Command) {
         match command {
+            // A load or an unload stops the worker, and the live stream with
+            // it: the dictation still recording lost its live text and, when
+            // it ended, found no model for its batch fallback ("Model is not
+            // loaded for transcription"). The in-process engine this replaced
+            // was out of reach while a stream had it leased, so a model switch,
+            // a Speech processing change or an "Immediately" unload after
+            // another transcription waited for the dictation. They wait here
+            // too, queued with the batch runs in the order they came. Quitting
+            // (`now`) does not wait.
+            command @ (Command::Load(..) | Command::Unload { now: false, .. })
+                if self.stream.is_some() =>
+            {
+                debug!("A model load or unload is waiting for the live stream to end");
+                self.deferred.push_back(command);
+            }
             Command::Load(spec, reply) => {
                 let _ = reply.send(self.load(spec));
             }
-            Command::Unload(reply) => {
+            Command::Unload { reply, now } => {
+                if now {
+                    self.drop_deferred();
+                }
                 self.unload();
                 self.unloads_done += 1;
                 let _ = reply.send(());
@@ -890,6 +940,31 @@ impl Owner {
     }
 
     /// Answer deferred runs whose caller cancelled them while they waited.
+    /// Answer everything that was waiting for the live stream, without running
+    /// it. Quitting stops the worker without waiting for the stream, which
+    /// then reads as ended; a model switch queued behind it would otherwise run
+    /// next and start a fresh worker after the app had stopped this one, which
+    /// during an in-app update is a running copy of the app the installer is
+    /// about to replace.
+    fn drop_deferred(&mut self) {
+        for command in std::mem::take(&mut self.deferred) {
+            match command {
+                Command::Load(_, reply) => {
+                    let _ = reply.send(Err(engine_stopped()));
+                }
+                Command::Unload { reply, .. } => {
+                    self.unloads_done += 1;
+                    let _ = reply.send(());
+                }
+                Command::Transcribe { reply, .. } => {
+                    let _ = reply.send(Err(EngineError::Cancelled));
+                }
+                // Only loads, unloads and batch runs are ever deferred.
+                _ => {}
+            }
+        }
+    }
+
     fn answer_cancelled_deferred(&mut self) {
         self.deferred.retain(|command| match command {
             Command::Transcribe {
@@ -2560,6 +2635,80 @@ mod live_tests {
             .join()
             .unwrap()
             .is_ok_and(|t| !t.text.trim().is_empty()));
+    }
+
+    /// An unload requested while a dictation streams (a model switch, a
+    /// Speech processing change, an "Immediately" unload after another
+    /// transcription) waits for the stream to end instead of killing it.
+    #[test]
+    #[ignore = "needs the built app, a streaming model and a recording"]
+    fn live_an_unload_waits_for_a_stream() {
+        set_fault(None, false);
+        let pcm = recording();
+        let engine = EngineSupervisor::new(true);
+        engine
+            .load(spec(model("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf")))
+            .expect("load");
+        let stream = engine
+            .start_stream(
+                RunOptions::default(),
+                StreamOptions::default(),
+                CancelToken::new(),
+                |_| {},
+            )
+            .expect("stream");
+        let (half, rest) = pcm.split_at(pcm.len() / 2);
+        for chunk in half.chunks(1280) {
+            stream.feed(chunk.to_vec());
+        }
+        let unloading = engine.unload();
+        assert!(engine.loaded().is_none(), "reads as unloaded at once");
+        for chunk in rest.chunks(1280) {
+            stream.feed(chunk.to_vec());
+        }
+        let finalized = stream.finalize(false).expect("finalize").expect("result");
+        assert!(!finalized.text.display().trim().is_empty());
+        assert!(unloading.wait_timeout(Duration::from_secs(10)));
+    }
+
+    /// Quitting does not wait for a live stream, and a model switch that was
+    /// waiting for that stream is answered instead of starting a new worker
+    /// once the app has stopped this one.
+    #[test]
+    #[ignore = "needs the built app, a streaming model and a recording"]
+    fn live_quitting_drops_a_load_waiting_for_a_stream() {
+        set_fault(None, false);
+        let pcm = recording();
+        let engine = EngineSupervisor::new(true);
+        let model_path = model("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf");
+        engine.load(spec(model_path.clone())).expect("load");
+        let stream = engine
+            .start_stream(
+                RunOptions::default(),
+                StreamOptions::default(),
+                CancelToken::new(),
+                |_| {},
+            )
+            .expect("stream");
+        for chunk in pcm[..pcm.len() / 2].chunks(1280) {
+            stream.feed(chunk.to_vec());
+        }
+        let switching = {
+            let engine = engine.clone();
+            std::thread::spawn(move || engine.load(spec(model_path)))
+        };
+        // Let the load reach the queue and be deferred behind the stream.
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(engine.unload_now().wait_timeout(Duration::from_secs(10)));
+        let switched = switching.join().expect("load thread");
+        assert!(
+            switched.is_err(),
+            "the waiting load is refused: {switched:?}"
+        );
+        drop(stream);
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(engine.loaded().is_none());
+        assert_eq!(worker_count(), 0, "no worker started after quitting");
     }
 
     /// (f) The worker exits when the supervisor is dropped (its stdin closes),

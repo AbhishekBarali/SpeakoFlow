@@ -112,11 +112,12 @@ export const ModelLanguages: React.FC<{
             <p className="mb-1.5 text-xs font-medium text-muted">
               {t("onboarding.speech.languages", { count: languages.length })}
             </p>
-            <ul className="max-h-56 columns-2 gap-4 overflow-y-auto pe-1 text-[0.8125rem] leading-relaxed text-body">
+            {/* A grid, not CSS columns: columns in a box of fixed height add
+                more columns off to the side instead of scrolling down, which
+                left Whisper's list at "Danish" with no way to reach the rest. */}
+            <ul className="grid max-h-56 grid-cols-2 gap-x-4 overflow-y-auto overscroll-contain pe-1 text-[0.8125rem] leading-relaxed text-body">
               {names.map((name) => (
-                <li key={name} className="break-inside-avoid">
-                  {name}
-                </li>
+                <li key={name}>{name}</li>
               ))}
             </ul>
           </div>

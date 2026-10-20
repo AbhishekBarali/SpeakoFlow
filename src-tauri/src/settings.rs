@@ -7686,6 +7686,18 @@ mod tests {
         for key in LEGACY_LIVE_TRANSCRIPTION_KEYS {
             assert!(map.remove(key).is_some(), "a 2.0.1 store has {key}");
         }
+        // `default_binding` is the code's default, not a choice: every launch
+        // refreshes it (`migrate_binding_defaults`). The store under test was
+        // written on Windows, so on macOS and Linux it is refreshed to their
+        // defaults, which is the upgrade working rather than a lost choice.
+        let defaults = get_default_settings().bindings;
+        if let Some(bindings) = map.get_mut("bindings").and_then(|b| b.as_object_mut()) {
+            for (key, binding) in bindings.iter_mut() {
+                if let Some(code) = defaults.get(key) {
+                    binding["default_binding"] = serde_json::json!(code.default_binding);
+                }
+            }
+        }
         before
     }
 
