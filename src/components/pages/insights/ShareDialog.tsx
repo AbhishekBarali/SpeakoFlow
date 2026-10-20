@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { save } from "@tauri-apps/plugin-dialog";
-import { downloadDir, join } from "@tauri-apps/api/path";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { type as osType } from "@tauri-apps/plugin-os";
 import { toast } from "sonner";
@@ -47,9 +46,6 @@ import {
   TAKES_PASTED_IMAGE,
   TARGET_NAMES,
 } from "./shareTargets";
-
-/** The file a card is saved to for a site that cannot take a pasted one. */
-const POST_FILE = "SpeakoFlow insights.png";
 
 /** The size last used, so a second share starts where the first left off.
  *  A convenience: losing it costs nothing. */
@@ -138,9 +134,17 @@ export const ShareDialog: React.FC<{
   /** A post being made: the card is ready, and this says how it goes in. */
   const [posting, setPosting] = useState<{
     site: SocialSite;
+    /** The words of the card that was made ready, for the post. */
+    post: string;
     /** Where the card was saved, for a site that takes no pasted image. */
     path?: string;
   } | null>(null);
+  /** Bumped when the card or its size changes, so a post made ready for the
+   *  card before never shows its guide under this one. */
+  const postFor = useRef(0);
+  const copyButton = useRef<HTMLButtonElement>(null);
+  /** Whether Copy has had its focus since the dialog opened. */
+  const copyFocused = useRef(false);
   const swipe = useRef<{ x: number; id: number } | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ w: 0, h: 0 });
@@ -204,12 +208,18 @@ export const ShareDialog: React.FC<{
     // `current` only orders the work; moving between cards must not redraw.
   }, [open, slides, deck, format, i18n.language, rtl]);
 
+  // A closed dialog keeps no cards: their images are let go on close, and
+  // the next open starts from the first card's placeholder.
   useEffect(() => {
-    if (!open) setIndex(0);
+    if (open) return;
+    setIndex(0);
+    setRendered([]);
+    copyFocused.current = false;
   }, [open]);
 
   // What the post guide says is about the card it was made for.
   useEffect(() => {
+    postFor.current += 1;
     setPosting(null);
   }, [open, index, format]);
 
@@ -315,20 +325,23 @@ export const ShareDialog: React.FC<{
    * photo button.
    */
   const preparePost = async (site: SocialSite) => {
-    if (!card || busy) return;
+    if (!card || !slide || busy) return;
+    const post = slide.post;
+    const made = postFor.current;
     setBusy("copy");
     try {
       if (TAKES_PASTED_IMAGE[site]) {
-        if (await writeClipboard(card.blob)) setPosting({ site });
+        const copied = await writeClipboard(card.blob);
+        if (copied && made === postFor.current) setPosting({ site, post });
         return;
       }
-      const path = await join(await downloadDir(), POST_FILE);
-      const result = await commands.saveInsightsCard(
-        path,
+      const result = await commands.saveInsightsCardToDownloads(
         await blobToBase64(card.blob),
       );
       if (result.status === "ok") {
-        setPosting({ site, path });
+        if (made === postFor.current) {
+          setPosting({ site, post, path: result.data });
+        }
       } else {
         toast.error(t("insights.share.saveFailed"), {
           description: result.error,
@@ -343,11 +356,10 @@ export const ShareDialog: React.FC<{
     }
   };
 
-  /** Open a new post on `site` with the card's words filled in. */
-  const openPost = async (site: SocialSite) => {
-    if (!slide) return;
+  /** Open a new post on `site` with the words of the card made ready. */
+  const openPost = async (site: SocialSite, post: string) => {
     try {
-      await openUrl(composeUrl(site, slide.post));
+      await openUrl(composeUrl(site, post));
     } catch (error) {
       toast.error(
         t("insights.share.openFailed", { site: TARGET_NAMES[site] }),
@@ -399,6 +411,18 @@ export const ShareDialog: React.FC<{
   const disabled = !ready || busy !== null;
   const Prev = rtl ? ChevronRight : ChevronLeft;
   const Next = rtl ? ChevronLeft : ChevronRight;
+
+  // Copy is disabled until the first card is drawn, so the dialog opens with
+  // the panel focused; Copy takes the focus once it can, unless the person
+  // has already moved it.
+  useEffect(() => {
+    const button = copyButton.current;
+    if (!open || !ready || copyFocused.current || !button) return;
+    copyFocused.current = true;
+    if (document.activeElement === button.closest('[role="dialog"]')) {
+      button.focus({ preventScroll: true });
+    }
+  }, [open, ready]);
 
   return (
     <Dialog
@@ -553,6 +577,7 @@ export const ShareDialog: React.FC<{
 
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
           <button
+            ref={copyButton}
             type="button"
             onClick={() => void copyImage()}
             disabled={disabled}
@@ -636,7 +661,10 @@ export const ShareDialog: React.FC<{
                   {t("insights.share.showInFolder")}
                 </Button>
               )}
-              <Button size="sm" onClick={() => void openPost(posting.site)}>
+              <Button
+                size="sm"
+                onClick={() => void openPost(posting.site, posting.post)}
+              >
                 {t("insights.share.openSite", {
                   site: TARGET_NAMES[posting.site],
                 })}

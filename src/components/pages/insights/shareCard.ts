@@ -1,6 +1,7 @@
 import iconUrl from "../../../../Logo/final-v2/png/icon-256.png";
 import jakartaUrl from "@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2?url";
 import jakartaExtUrl from "@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-ext-wght-normal.woff2?url";
+import jakartaVietUrl from "@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-vietnamese-wght-normal.woff2?url";
 import { flowBands, type FlowSpec } from "./flowGeometry";
 import {
   CARD_SIZES,
@@ -221,6 +222,11 @@ export const loadCardAssets = (): Promise<Assets> => {
         unicodeRange:
           "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
       }),
+      new FontFace(FAMILY, `url(${jakartaVietUrl})`, {
+        weight: "200 800",
+        unicodeRange:
+          "U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB",
+      }),
     ];
     const fonts = Promise.all(
       faces.map((face) =>
@@ -373,15 +379,22 @@ const wrapBalanced = (
  * "min", "K", "万") at a third of that, on the same baseline, so "8 hr 11
  * min" reads as two numbers rather than one long word.
  */
-interface Run {
+export interface Run {
   text: string;
   unit: boolean;
 }
 
-const runsOf = (text: string): Run[] => {
+/** Digits in any script (Arabic-Indic too), the decimal and group marks,
+ *  and the spaces locales group digits with: a plain space, a no-break space
+ *  and a narrow no-break space. */
+const FIGURE_RUN =
+  /[\p{Nd}.,\u066B\u066C\u00A0\u202F ]+|\s+|[^\p{Nd}.,\u066B\u066C\s]+/gu;
+const FIGURE_ONLY = /^[\p{Nd}.,\u066B\u066C\u00A0\u202F ]+$/u;
+
+export const runsOf = (text: string): Run[] => {
   const runs: Run[] = [];
-  for (const part of text.match(/[\d.,٫٬  ]+|\s+|[^\d.,\s]+/g) ?? [text]) {
-    const unit = !/^[\d.,٫٬  ]+$/.test(part) || /^\s+$/.test(part);
+  for (const part of text.match(FIGURE_RUN) ?? [text]) {
+    const unit = !FIGURE_ONLY.test(part) || /^\s+$/.test(part);
     runs.push({ text: part, unit });
   }
   return runs;

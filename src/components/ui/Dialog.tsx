@@ -109,13 +109,16 @@ export const Dialog: React.FC<DialogProps> = ({
   // Move focus in on open, and give it back on close. Focus goes to an element
   // marked `data-autofocus`, else to the panel itself: landing on the first
   // focusable (usually the close button) drew a focus ring on it every time.
+  // A marked element that is disabled cannot take focus, which would leave it
+  // on the page behind, so the panel takes it then too.
   useLayoutEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     if (panel) {
       const preferred = panel.querySelector<HTMLElement>("[data-autofocus]");
-      (preferred ?? panel).focus({ preventScroll: true });
+      const usable = preferred && !preferred.matches(":disabled");
+      (usable ? preferred : panel).focus({ preventScroll: true });
     }
     return () => {
       if (previous && document.contains(previous)) {

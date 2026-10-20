@@ -1651,6 +1651,9 @@ const handlers: Record<string, (args: Json) => unknown> = {
       : usageStats(),
   get_insights: () => insightsData(),
   save_insights_card: () => null,
+  // Where the share dialog saves a card for LinkedIn.
+  save_insights_card_to_downloads: () =>
+    "C:\\Users\\you\\Downloads\\SpeakoFlow insights.png",
   copy_insights_card: () => null,
   share_insights_card: () => null,
   list_meetings: () => ({ meetings, has_more: false }),
@@ -1823,9 +1826,6 @@ const handlers: Record<string, (args: Json) => unknown> = {
   "plugin:app|version": () => "2.0.1",
   "plugin:window|is_maximized": () => false,
   "plugin:os|locale": () => "en-US",
-  // Where the share dialog saves a card for LinkedIn.
-  "plugin:path|resolve_directory": () => "C:/Users/you/Downloads",
-  "plugin:path|join": ({ paths }) => (paths as string[]).join("\\"),
   "plugin:updater|check": () =>
     params.get("update") === "1"
       ? {
