@@ -284,8 +284,14 @@ fn serve_stream(
                 inject_fault("feed", on_gpu);
                 match stream.feed(&pcm) {
                     Ok(update) => {
-                        let text = (update.committed_changed || update.tentative_changed)
-                            .then(|| stream.text());
+                        // `result_changed` covers a model that revises words
+                        // inside the committed text (Moonshine Streaming):
+                        // `full` moves while committed and tentative stay
+                        // the same, and the live text has to follow it.
+                        let changed = update.committed_changed
+                            || update.tentative_changed
+                            || update.result_changed;
+                        let text = changed.then(|| stream.text());
                         (Response::Fed { update, text }, false)
                     }
                     Err(e) => (Response::failed(&e), false),
