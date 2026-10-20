@@ -15,6 +15,8 @@
  * asked for.
  */
 
+import { commands } from "@/bindings";
+
 type Renderer = (markdown: string) => string;
 
 let renderer: Renderer | null = null;
@@ -60,11 +62,36 @@ export async function answerHtml(markdown: string): Promise<string | null> {
 }
 
 /**
- * Copy an answer: HTML beside the Markdown when it is formatted, the Markdown
- * alone otherwise, or when this webview cannot write HTML to the clipboard
- * (no `ClipboardItem`, or a write it refuses).
+ * The app's own clipboard write (`assistant_copy_answer`), answering whether
+ * it worked. Injected so the tests can stand in for the backend.
  */
-export async function copyAnswer(markdown: string): Promise<void> {
+export type NativeCopy = (
+  text: string,
+  html: string | null,
+) => Promise<boolean>;
+
+const nativeCopy: NativeCopy = async (text, html) => {
+  try {
+    return (await commands.assistantCopyAnswer(text, html)).status === "ok";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Copy an answer: HTML beside the Markdown when it is formatted, the Markdown
+ * alone otherwise.
+ *
+ * The webview's clipboard goes first, as it always has. WebKit (macOS, Linux)
+ * refuses that write once the click's user activation has passed or the panel
+ * is not the focused window, and some WebKitGTK builds have no
+ * `ClipboardItem`, so a refused write is retried through the app's own
+ * clipboard, which needs neither. A formatted answer keeps its HTML there too.
+ */
+export async function copyAnswer(
+  markdown: string,
+  native: NativeCopy = nativeCopy,
+): Promise<void> {
   const html = formattedHtml(
     renderer ?? (await loadAnswerRenderer()),
     markdown,
@@ -83,8 +110,14 @@ export async function copyAnswer(markdown: string): Promise<void> {
       ]);
       return;
     } catch {
-      // Fall through to the text every earlier version copied.
+      // Refused: the app's own clipboard below.
     }
   }
-  await navigator.clipboard.writeText(markdown);
+  if (html && (await native(markdown, html))) return;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
+    await navigator.clipboard.writeText(markdown);
+  } catch (error) {
+    if (!(await native(markdown, null))) throw error;
+  }
 }

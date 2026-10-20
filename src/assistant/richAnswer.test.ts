@@ -85,7 +85,9 @@ class FakeClipboardItem {
   constructor(readonly items: Record<string, Blob>) {}
 }
 
-function installClipboard(options: { writeFails?: boolean } = {}): Written[] {
+function installClipboard(
+  options: { writeFails?: boolean; writeTextFails?: boolean } = {},
+): Written[] {
   const written: Written[] = [];
   (globalThis as { ClipboardItem?: unknown }).ClipboardItem = FakeClipboardItem;
   Object.defineProperty(globalThis.navigator, "clipboard", {
@@ -100,6 +102,7 @@ function installClipboard(options: { writeFails?: boolean } = {}): Written[] {
         written.push({ kind: "items", items: flat });
       },
       writeText: async (text: string) => {
+        if (options.writeTextFails) throw new Error("NotAllowedError");
         written.push({ kind: "text", text });
       },
     },
@@ -107,24 +110,62 @@ function installClipboard(options: { writeFails?: boolean } = {}): Written[] {
   return written;
 }
 
+/** Stands in for the app's own clipboard (`assistant_copy_answer`). */
+function nativeClipboard(works = true) {
+  const calls: Array<{ text: string; html: string | null }> = [];
+  const native = async (text: string, html: string | null) => {
+    calls.push({ text, html });
+    return works;
+  };
+  return { calls, native };
+}
+
 test("copying a formatted answer writes HTML beside the Markdown", async () => {
   const written = installClipboard();
-  await copyAnswer(STEPS);
+  const { calls, native } = nativeClipboard();
+  await copyAnswer(STEPS, native);
   expect(written).toHaveLength(1);
   const entry = written[0];
   if (entry.kind !== "items") throw new Error("expected a rich write");
   expect(entry.items["text/plain"]).toBe(STEPS);
   expect(entry.items["text/html"]).toContain("<strong>CPU</strong>");
+  expect(calls).toEqual([]);
 });
 
 test("copying prose writes text alone, as before", async () => {
   const written = installClipboard();
-  await copyAnswer("Thanks, Tim.");
+  const { calls, native } = nativeClipboard();
+  await copyAnswer("Thanks, Tim.", native);
   expect(written).toEqual([{ kind: "text", text: "Thanks, Tim." }]);
+  expect(calls).toEqual([]);
 });
 
-test("a refused rich write falls back to the Markdown text", async () => {
+test("a refused rich write is copied with its HTML by the app instead", async () => {
   const written = installClipboard({ writeFails: true });
-  await copyAnswer(STEPS);
+  const { calls, native } = nativeClipboard();
+  await copyAnswer(STEPS, native);
+  expect(written).toEqual([]);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].text).toBe(STEPS);
+  expect(calls[0].html).toContain("<strong>CPU</strong>");
+});
+
+test("with both rich writes refused, the Markdown text is copied", async () => {
+  const written = installClipboard({ writeFails: true });
+  const { native } = nativeClipboard(false);
+  await copyAnswer(STEPS, native);
   expect(written).toEqual([{ kind: "text", text: STEPS }]);
+});
+
+test("a refused text write is copied by the app instead", async () => {
+  installClipboard({ writeTextFails: true });
+  const { calls, native } = nativeClipboard();
+  await copyAnswer("Thanks, Tim.", native);
+  expect(calls).toEqual([{ text: "Thanks, Tim.", html: null }]);
+});
+
+test("a copy that fails everywhere is reported", async () => {
+  installClipboard({ writeTextFails: true });
+  const { native } = nativeClipboard(false);
+  await expect(copyAnswer("Thanks, Tim.", native)).rejects.toThrow();
 });
