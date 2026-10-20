@@ -836,6 +836,20 @@
       "volume": {
         "title": "Volym",
         "description": "Justera volymen för ljudåterkopplingsljud"
+      },
+      "ducking": {
+        "label": "Under inspelning",
+        "ariaLabel": "Annat ljud under inspelning",
+        "description": "Sänker eller stänger av annat ljud medan du spelar in, så att det inte stör dig eller hörs i mikrofonen. Det kommer tillbaka så fort inspelningen är klar. Kallas även ducking.",
+        "options": {
+          "off": "Oförändrat",
+          "lower": "Sänk",
+          "mute": "Stäng av"
+        },
+        "amount": {
+          "label": "Sänk med",
+          "description": "Hur mycket tystare annat ljud blir. Dra reglaget medan något spelas för att höra det. Om du själv ändrar volymen under en inspelning stannar den där du satte den."
+        }
       }
     },
     "advanced": {
@@ -1448,10 +1462,6 @@
       "postProcessingToggle": {
         "label": "AI-rensning",
         "description": "Rensa din diktering med AI efter transkriberingen"
-      },
-      "muteWhileRecording": {
-        "label": "Stäng av ljudet under inspelning",
-        "description": "Stäng av systemljudet under inspelning"
       },
       "appendTrailingSpace": {
         "label": "Lägg till avslutande mellanslag",
@@ -2599,6 +2609,8 @@
     },
     "audio": {
       "microphone": "Mikrofon",
+      "otherAudio": "Annat ljud",
+      "otherAudioHint": "Musik, videor och samtal som spelas på datorn medan du dikterar eller frågar assistenten.",
       "overlayHint": "Den lilla rutan som visas medan du spelar in."
     },
     "dictation": {

@@ -378,6 +378,12 @@ objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
   "NSSharingService",
   "NSView",
 ] }
+# Audio ducking (see audio_toolkit/ducking/macos.rs): reads the default output
+# device id, so a volume is only put back on the device it was lowered on.
+objc2-core-audio = { version = "=0.3.2", default-features = false, features = [
+  "std",
+  "AudioHardware",
+] }
 
 # macOS aarch64 (Apple Silicon, M1+) — the shipping macOS target.
 # STATIC with the Metal GPU backend compiled in (Apple's default posture).

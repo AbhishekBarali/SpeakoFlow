@@ -842,6 +842,20 @@
       "volume": {
         "title": "Volume",
         "description": "Ajustar o volume dos sons de feedback de áudio"
+      },
+      "ducking": {
+        "label": "Durante a gravação",
+        "ariaLabel": "Outros áudios durante a gravação",
+        "description": "Abaixa ou silencia outros áudios enquanto você grava, para que não distraiam nem cheguem ao microfone. Eles voltam assim que a gravação termina. Também conhecido como ducking.",
+        "options": {
+          "off": "Sem alteração",
+          "lower": "Abaixar",
+          "mute": "Silenciar"
+        },
+        "amount": {
+          "label": "Abaixar em",
+          "description": "Quanto mais baixo ficam os outros áudios. Arraste o controle enquanto algo toca para ouvir. Se você mudar o volume durante uma gravação, ele fica onde você deixou."
+        }
       }
     },
     "advanced": {
@@ -1457,10 +1471,6 @@
       "postProcessingToggle": {
         "label": "Limpeza com IA",
         "description": "Limpar seu ditado com IA depois da transcrição"
-      },
-      "muteWhileRecording": {
-        "label": "Silenciar durante a gravação",
-        "description": "Silenciar áudio do sistema durante a gravação"
       },
       "appendTrailingSpace": {
         "label": "Adicionar espaço no final",
@@ -2617,6 +2627,8 @@
     },
     "audio": {
       "microphone": "Microfone",
+      "otherAudio": "Outros áudios",
+      "otherAudioHint": "Músicas, vídeos e chamadas tocando no seu computador enquanto você dita ou pergunta ao assistente.",
       "overlayHint": "A pequena pílula que aparece enquanto você grava."
     },
     "dictation": {

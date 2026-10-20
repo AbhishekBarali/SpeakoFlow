@@ -842,6 +842,20 @@
       "volume": {
         "title": "Volume",
         "description": "Regola il volume del feedback audio"
+      },
+      "ducking": {
+        "label": "Durante la registrazione",
+        "ariaLabel": "Altro audio durante la registrazione",
+        "description": "Abbassa o silenzia l'altro audio mentre registri, così non ti distrae e non arriva al microfono. Torna appena la registrazione finisce. Noto anche come ducking.",
+        "options": {
+          "off": "Invariato",
+          "lower": "Abbassa",
+          "mute": "Silenzia"
+        },
+        "amount": {
+          "label": "Abbassa del",
+          "description": "Quanto più basso diventa l'altro audio. Trascina il cursore mentre qualcosa è in riproduzione per sentirlo. Se cambi tu il volume durante una registrazione, resta dove l'hai messo."
+        }
       }
     },
     "advanced": {
@@ -1457,10 +1471,6 @@
       "postProcessingToggle": {
         "label": "Pulizia IA",
         "description": "Ripulisci la tua dettatura con l'IA dopo la trascrizione"
-      },
-      "muteWhileRecording": {
-        "label": "Silenzia durante la registrazione",
-        "description": "Silenzia l'audio di sistema durante la registrazione"
       },
       "appendTrailingSpace": {
         "label": "Aggiungi uno spazio finale",
@@ -2617,6 +2627,8 @@
     },
     "audio": {
       "microphone": "Microfono",
+      "otherAudio": "Altro audio",
+      "otherAudioHint": "Musica, video e chiamate in riproduzione sul computer mentre detti o chiedi all'assistente.",
       "overlayHint": "La piccola pillola visibile mentre registri."
     },
     "dictation": {

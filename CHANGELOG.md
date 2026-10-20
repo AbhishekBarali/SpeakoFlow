@@ -59,6 +59,20 @@ every dictation, as before.
 your custom words while they transcribe, as Whisper always has. Other models
 still get the correction pass afterwards.
 
+**Lower other audio while you dictate.** Settings → Audio → Other audio
+replaces the Mute while recording switch with Unchanged, Lower or Mute. Lower
+fades your music, videos and calls down while you dictate or ask, and back up
+when you stop, by an amount you choose (10–90%, 70% by default). Drag the
+slider while something is playing to hear it. It works on Windows, macOS and
+Linux (PipeWire, PulseAudio or ALSA). If you had Mute while recording on, it
+is now set to Mute.
+
+- If you change the volume yourself during a recording, it stays where you put
+  it.
+- Plugging in headphones mid-recording doesn't turn them up to your speakers'
+  volume when the recording ends.
+- Audio that was already muted stays muted. The old switch unmuted it.
+
 **Insights covers the assistant and meetings.** Beside dictation, Insights
 now shows questions asked, calls and time on calls, and meetings recorded with
 their length and words. The streak counts a day when you used any of them, and
@@ -107,6 +121,10 @@ made on your computer; nothing is uploaded.
 
 ### Fixed
 
+- **Mute while recording could leave the computer muted** after a very short
+  dictation, after Esc with the always-on microphone, when a recording failed
+  to start, or when you quit mid-dictation. Nothing unmuted it until the next
+  dictation ended.
 - **A graphics driver crash could take the whole app down** (#82), or leave a
   dictation stuck on "Transcribing…". Speech models now run in a separate
   process: if it crashes or stops responding, SpeakoFlow switches speech to

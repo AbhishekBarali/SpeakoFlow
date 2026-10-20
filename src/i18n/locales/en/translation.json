@@ -836,6 +836,20 @@
       "volume": {
         "title": "Volume",
         "description": "Adjust the volume of audio feedback sounds"
+      },
+      "ducking": {
+        "label": "While recording",
+        "ariaLabel": "Other audio while recording",
+        "description": "Lower or mute other audio while you record, so it doesn't distract you or reach the microphone. It comes back as soon as the recording ends. Also known as ducking.",
+        "options": {
+          "off": "Unchanged",
+          "lower": "Lower",
+          "mute": "Mute"
+        },
+        "amount": {
+          "label": "Lower by",
+          "description": "How much quieter other audio gets. Drag the slider while something is playing to hear it. If you change the volume yourself during a recording, it stays where you put it."
+        }
       }
     },
     "advanced": {
@@ -1448,10 +1462,6 @@
       "postProcessingToggle": {
         "label": "AI cleanup",
         "description": "Clean up your dictation with AI after transcription"
-      },
-      "muteWhileRecording": {
-        "label": "Mute while recording",
-        "description": "Mute system audio during recording"
       },
       "appendTrailingSpace": {
         "label": "Append trailing space",
@@ -2599,6 +2609,8 @@
     },
     "audio": {
       "microphone": "Microphone",
+      "otherAudio": "Other audio",
+      "otherAudioHint": "Music, videos and calls playing on your computer while you dictate or ask the assistant.",
       "overlayHint": "The small pill that shows while you record."
     },
     "dictation": {
