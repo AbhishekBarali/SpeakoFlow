@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Clock, Flame, Gauge, Type } from "lucide-react";
-import { commands, events, type UsageStats } from "@/bindings";
 import { useNavigation } from "@/components/shell/navigation";
+import { useInsights } from "../insights/useInsights";
 import {
   formatCount,
   formatDuration,
@@ -10,34 +10,6 @@ import {
   timeSavedSeconds,
   wordsPerMinute,
 } from "./usageMath";
-
-/** Live lifetime usage, refetched whenever a dictation lands. */
-export const useUsageStats = (): UsageStats | null => {
-  const [stats, setStats] = useState<UsageStats | null>(null);
-  const load = useCallback(() => {
-    void commands
-      .getUsageStats()
-      .then((result) => {
-        if (result.status === "ok") setStats(result.data);
-      })
-      .catch(() => {});
-  }, []);
-  useEffect(() => {
-    load();
-    const unlisten = events.historyUpdatePayload.listen((event) => {
-      if (
-        event.payload.action === "added" ||
-        event.payload.action === "updated"
-      ) {
-        load();
-      }
-    });
-    return () => {
-      void unlisten.then((off) => off());
-    };
-  }, [load]);
-  return stats;
-};
 
 /** One number and its word, on a line. The explanation, where there is one,
  *  is the hover text rather than an (i) beside every figure. */
@@ -74,9 +46,10 @@ const Stat: React.FC<{
 export const StatsStrip: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { navigate } = useNavigation();
-  const stats = useUsageStats();
+  const insights = useInsights();
+  const stats = insights?.dictation ?? null;
 
-  if (!stats) {
+  if (!insights || !stats) {
     return (
       <div
         aria-hidden="true"
@@ -122,12 +95,14 @@ export const StatsStrip: React.FC = () => {
         label={t("home.stats.saved")}
         hint={t("home.stats.savedHint", { wpm: TYPING_WPM })}
       />
+      {/* The streak Insights shows: a day counts when anything was said to
+          the app, not only a dictation. */}
       <Stat
         icon={Flame}
         tint="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-        value={String(stats.current_streak_days)}
+        value={String(insights.current_streak_days)}
         label={t("home.stats.streakUnit", {
-          count: stats.current_streak_days,
+          count: insights.current_streak_days,
         })}
       />
       <span className="ms-auto inline-flex items-center gap-1 text-[0.8125rem] font-medium text-muted transition-colors group-hover:text-ink">

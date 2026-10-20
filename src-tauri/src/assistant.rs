@@ -3292,6 +3292,7 @@ fn run_cat_turn(
     }
     emit_conversation(app);
     persist_assistant_session(app);
+    crate::insights::record_question(app);
 
     let reply = random_meow();
     {
@@ -4112,6 +4113,7 @@ async fn run_assistant_turn_inner(
         drop(history);
         emit_conversation(&app);
         persist_assistant_session(&app);
+        crate::insights::record_question(&app);
     }
 
     // If the user pressed Stop up to here, abort before spending a model call.

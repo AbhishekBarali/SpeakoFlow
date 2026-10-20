@@ -3391,8 +3391,8 @@
     }
   },
   "insights": {
-    "description": "Your dictation over time, counted on this computer.",
-    "empty": "Your insights appear after your first dictation.",
+    "about": "How you use SpeakoFlow, counted on this computer.",
+    "nothingYet": "Your insights appear once you dictate, ask the assistant or record a meeting.",
     "dictations": "Dictations",
     "today": "{{words}} words today",
     "pages_one": "About {{count}} page",
@@ -3402,19 +3402,134 @@
     "streak_other": "{{count}} day streak",
     "longest_one": "Longest: {{count}} day",
     "longest_other": "Longest: {{count}} days",
-    "gridLabel_one": "{{words}} words on {{count}} day in the last six months",
-    "gridLabel_other": "{{words}} words on {{count}} days in the last six months",
+    "streakHint": "A day counts when you dictate, ask the assistant, take a call or record a meeting.",
     "gridSummary_one": "{{words}} words on {{count}} day in the last 6 months",
     "gridSummary_other": "{{words}} words on {{count}} days in the last 6 months",
+    "gridSummaryAssistant_one": "{{questions}} on {{count}} day in the last 6 months",
+    "gridSummaryAssistant_other": "{{questions}} on {{count}} days in the last 6 months",
+    "gridSummaryMeetings_one": "{{time}} of meetings on {{count}} day in the last 6 months",
+    "gridSummaryMeetings_other": "{{time}} of meetings on {{count}} days in the last 6 months",
     "dayWords_one": "{{formatted}} word",
     "dayWords_other": "{{formatted}} words",
-    "dayNone": "No dictation",
+    "dayQuestions_one": "{{formatted}} question",
+    "dayQuestions_other": "{{formatted}} questions",
+    "dayNoneFor": {
+      "dictation": "No dictation",
+      "assistant": "No questions",
+      "meetings": "No meetings"
+    },
     "less": "Less",
     "more": "More",
     "busiest": "Busiest day",
     "best": "Best day",
     "typical": "Typical day",
-    "typicalSub": "On days you dictate"
+    "typicalFor": {
+      "dictation": "On days you dictate",
+      "assistant": "On days you ask",
+      "meetings": "On days with a meeting"
+    },
+    "activity": {
+      "label": "Activity to show",
+      "dictation": "Dictation",
+      "assistant": "Assistant",
+      "meetings": "Meetings"
+    },
+    "open": "Open",
+    "assistantCard": {
+      "info": "Quick asks, and what you said on calls. These stay counted when you delete conversations.",
+      "empty": "Ask the assistant something, or start a call, and it's counted here.",
+      "questions_one": "Question asked",
+      "questions_other": "Questions asked",
+      "calls_one": "Call",
+      "calls_other": "Calls",
+      "callTime": "Time on calls"
+    },
+    "meetingsCard": {
+      "info": "Meetings you recorded. These stay counted when you delete a meeting.",
+      "empty": "Record a meeting and it's counted here.",
+      "meetings_one": "Meeting",
+      "meetings_other": "Meetings",
+      "time": "Time recorded",
+      "words_one": "Word transcribed",
+      "words_other": "Words transcribed"
+    },
+    "share": {
+      "button": "Share",
+      "nothingYet": "There's something to share once you've used SpeakoFlow.",
+      "title": "Share your insights",
+      "description": "Your numbers as an image, sized for wherever you post it.",
+      "private": "Made on this computer. Nothing is uploaded.",
+      "size": "Size",
+      "formats": {
+        "square": "Square",
+        "story": "Story",
+        "wide": "Wide"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, for feeds",
+        "story": "1080 × 1920, for stories",
+        "wide": "1600 × 900, for posts and links"
+      },
+      "look": "Look",
+      "looks": {
+        "paper": "Paper",
+        "graphite": "Graphite",
+        "mint": "Mint",
+        "dusk": "Dusk"
+      },
+      "show": "Show",
+      "include": {
+        "assistant": "Show the assistant on the card",
+        "meetings": "Show meetings on the card"
+      },
+      "copy": "Copy image",
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy the image",
+      "save": "Save image",
+      "saved": "Image saved",
+      "saveFailed": "Couldn't save the image",
+      "showInFolder": "Show in folder",
+      "drawFailed": "The card couldn't be drawn. Close this and try again.",
+      "since": "Since {{date}}",
+      "barsCaption_one": "The last {{count}} week, one bar a day",
+      "barsCaption_other": "The last {{count}} weeks, one bar a day",
+      "tagline": "Free · Open source · Works offline",
+      "headline": {
+        "dictation": {
+          "lead_one": "word spoken,",
+          "lead_other": "words spoken,",
+          "accent": "not typed."
+        },
+        "assistant": {
+          "lead_one": "question asked",
+          "lead_other": "questions asked",
+          "accent": "out loud."
+        },
+        "meetings": {
+          "lead_one": "meeting recorded,",
+          "lead_other": "meetings recorded,",
+          "accent": "notes written for me."
+        }
+      },
+      "fact": {
+        "saved": "saved vs. typing",
+        "wpm": "words a minute",
+        "questions_one": "question answered",
+        "questions_other": "questions answered",
+        "meetings_one": "meeting written up",
+        "meetings_other": "meetings written up",
+        "meetingTime": "of meetings recorded",
+        "meetingWords_one": "word transcribed",
+        "meetingWords_other": "words transcribed",
+        "callTime": "talking on calls",
+        "streak_one": "day streak",
+        "streak_other": "day streak",
+        "activeDays_one": "day talking to my computer",
+        "activeDays_other": "days talking to my computer",
+        "dictations_one": "dictation",
+        "dictations_other": "dictations"
+      }
+    }
   },
   "settingsNotice": {
     "restored": "Your settings were damaged and have been restored from a backup.",

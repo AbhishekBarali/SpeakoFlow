@@ -59,6 +59,11 @@ struct Session {
     /// off turns the call into voice-in, text-out without touching the
     /// microphone. Seeded from `assistant_tts_enabled` when the call starts.
     speaker_on: bool,
+    /// When the call started, on both clocks: the monotonic one to measure it
+    /// and the wall clock for the day Insights counts it on.
+    started: Option<(std::time::Instant, i64)>,
+    /// Things said on this call so far. A call nobody spoke on is not counted.
+    turns: u32,
 }
 
 #[derive(Default)]
@@ -420,6 +425,18 @@ pub fn is_current(app: &AppHandle, ticket: VoiceTicket) -> bool {
     app.state::<VoiceConversation>().is_current(ticket)
 }
 
+/// Note that something was said on the live call, so that it counts as a call
+/// when it ends. Nothing happens when no call is live.
+pub fn note_turn(app: &AppHandle) {
+    if let Some(voice) = app.try_state::<VoiceConversation>() {
+        if let Ok(mut s) = voice.session.lock() {
+            if s.ticket.is_some() {
+                s.turns = s.turns.saturating_add(1);
+            }
+        }
+    }
+}
+
 pub fn is_active(app: &AppHandle) -> bool {
     app.try_state::<VoiceConversation>()
         .is_some_and(|voice| voice.is_active())
@@ -445,9 +462,13 @@ fn end_session(app: &AppHandle, expected_session: Option<u32>) {
         if expected_session.is_some_and(|id| s.ticket.is_none_or(|t| t.session != id)) {
             return None;
         }
-        s.ticket.take()
+        let ticket = s.ticket.take()?;
+        Some((ticket, s.started.take(), std::mem::take(&mut s.turns)))
     });
-    if let Some(ticket) = ended {
+    if let Some((ticket, started, turns)) = ended {
+        if let Some((at, started_at)) = started.filter(|_| turns > 0) {
+            crate::insights::record_call(app, started_at, at.elapsed());
+        }
         voice.clear_carried();
         // Hanging up while the assistant is talking cuts the answer off just as
         // a barge-in does, so the record has to say so too — otherwise the next
@@ -576,6 +597,8 @@ pub async fn assistant_conversation_start(app: AppHandle) -> Result<VoiceTicket,
         s.carried.clear();
         s.carried_at = None;
         s.speaker_on = settings.assistant_tts_enabled;
+        s.started = Some((std::time::Instant::now(), chrono::Utc::now().timestamp()));
+        s.turns = 0;
         ticket
     };
     // A call is its own conversation, so it starts from nothing.
