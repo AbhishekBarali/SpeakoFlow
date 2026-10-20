@@ -3362,24 +3362,123 @@
     }
   },
   "insights": {
-    "description": "시간에 따른 받아쓰기 기록으로, 이 컴퓨터에서 집계합니다.",
-    "empty": "첫 받아쓰기를 마치면 인사이트가 표시됩니다.",
+    "about": "SpeakoFlow 사용 현황으로, 이 컴퓨터에서 집계합니다.",
+    "nothingYet": "받아쓰기를 하거나, 어시스턴트에게 묻거나, 회의를 녹음하면 인사이트가 표시됩니다.",
     "dictations": "받아쓰기 횟수",
     "today": "오늘 {{words}}단어",
     "pages_other": "약 {{count}}페이지",
     "fasterThanTyping": "타이핑보다 {{times}}배 빠름",
     "streak_other": "{{count}}일 연속",
     "longest_other": "최장 기록: {{count}}일",
-    "gridLabel_other": "최근 6개월 동안 {{count}}일에 걸쳐 {{words}}단어",
+    "streakHint": "받아쓰기, 어시스턴트에게 질문, 대화, 회의 녹음 중 하나라도 한 날은 하루로 계산됩니다.",
     "gridSummary_other": "최근 6개월 동안 {{count}}일, {{words}}단어",
+    "gridSummaryAssistant_other": "최근 6개월 동안 {{count}}일, {{questions}}",
+    "gridSummaryMeetings_other": "최근 6개월 동안 {{count}}일, 회의 {{time}}",
     "dayWords_other": "{{formatted}}단어",
-    "dayNone": "받아쓰기 없음",
+    "dayQuestions_other": "질문 {{formatted}}개",
+    "dayNoneFor": {
+      "dictation": "받아쓰기 없음",
+      "assistant": "질문 없음",
+      "meetings": "회의 없음"
+    },
     "less": "적음",
     "more": "많음",
     "busiest": "가장 바쁜 날",
     "best": "최고 기록",
     "typical": "평소",
-    "typicalSub": "받아쓰기한 날 기준"
+    "typicalFor": {
+      "dictation": "받아쓰기한 날 기준",
+      "assistant": "질문한 날 기준",
+      "meetings": "회의가 있었던 날 기준"
+    },
+    "activity": {
+      "label": "표시할 활동",
+      "dictation": "받아쓰기",
+      "assistant": "어시스턴트",
+      "meetings": "회의"
+    },
+    "open": "열기",
+    "assistantCard": {
+      "info": "빠른 질문과, 대화 중에 한 말을 셉니다. 대화를 삭제해도 집계는 그대로 남습니다.",
+      "empty": "어시스턴트에게 무엇이든 묻거나 대화를 시작하면 여기에 집계됩니다.",
+      "questions_other": "질문한 횟수",
+      "calls_other": "대화 횟수",
+      "callTime": "대화한 시간"
+    },
+    "meetingsCard": {
+      "info": "녹음한 회의입니다. 회의를 삭제해도 집계는 그대로 남습니다.",
+      "empty": "회의를 녹음하면 여기에 집계됩니다.",
+      "meetings_other": "회의 수",
+      "time": "녹음 시간",
+      "words_other": "전사한 단어"
+    },
+    "share": {
+      "button": "공유",
+      "nothingYet": "SpeakoFlow를 사용하고 나면 공유할 내용이 생깁니다.",
+      "title": "인사이트 공유",
+      "description": "내 기록을 이미지로, 올릴 곳에 맞는 크기로 만듭니다.",
+      "private": "이 컴퓨터에서 만듭니다. 아무것도 업로드되지 않습니다.",
+      "size": "크기",
+      "formats": {
+        "square": "정사각형",
+        "story": "스토리",
+        "wide": "와이드"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, 피드용",
+        "story": "1080 × 1920, 스토리용",
+        "wide": "1600 × 900, 게시물과 링크용"
+      },
+      "look": "스타일",
+      "looks": {
+        "paper": "페이퍼",
+        "graphite": "그래파이트",
+        "mint": "민트",
+        "dusk": "황혼"
+      },
+      "show": "표시",
+      "include": {
+        "assistant": "카드에 어시스턴트 표시",
+        "meetings": "카드에 회의 표시"
+      },
+      "copy": "이미지 복사",
+      "copied": "복사됨",
+      "copyFailed": "이미지를 복사하지 못했습니다",
+      "save": "이미지 저장",
+      "saved": "이미지를 저장했습니다",
+      "saveFailed": "이미지를 저장하지 못했습니다",
+      "showInFolder": "폴더에서 보기",
+      "drawFailed": "카드를 그리지 못했습니다. 닫고 다시 시도하세요.",
+      "since": "{{date}}부터",
+      "barsCaption_other": "최근 {{count}}주, 막대 하나가 하루",
+      "tagline": "무료 · 오픈 소스 · 오프라인 작동",
+      "headline": {
+        "dictation": {
+          "lead_other": "단어를 말로 썼다.",
+          "accent": "타이핑 없이."
+        },
+        "assistant": {
+          "lead_other": "개의 질문을",
+          "accent": "소리 내어 물었다."
+        },
+        "meetings": {
+          "lead_other": "번의 회의를 녹음하고,",
+          "accent": "회의록은 알아서."
+        }
+      },
+      "fact": {
+        "saved": "타이핑 대비 절약",
+        "wpm": "분당 단어 수",
+        "questions_other": "답변받은 질문",
+        "meetings_other": "회의록으로 정리한 회의",
+        "meetingTime": "회의 녹음 시간",
+        "meetingWords_other": "전사한 단어",
+        "callTime": "어시스턴트와 대화",
+        "streak_other": "일 연속",
+        "activeDays_other": "컴퓨터와 말한 날",
+        "dictations_other": "받아쓰기 횟수"
+      }
+    }
   },
   "settingsNotice": {
     "restored": "설정이 손상되어 백업에서 복원했습니다.",

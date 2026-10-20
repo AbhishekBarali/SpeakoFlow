@@ -206,7 +206,14 @@ export const ShareDialog: React.FC<{
     loadCardAssets()
       .then((assets) => {
         if (cancelled || !canvasRef.current) return;
-        drawCard(canvasRef.current, content, prefs.format, prefs.look, assets);
+        drawCard(
+          canvasRef.current,
+          content,
+          prefs.format,
+          prefs.look,
+          assets,
+          i18n.dir() === "rtl",
+        );
         setReady(true);
         setFailed(false);
       })
@@ -216,7 +223,7 @@ export const ShareDialog: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [open, content, prefs.format, prefs.look]);
+  }, [open, content, prefs.format, prefs.look, i18n]);
 
   useEffect(() => {
     if (!copied) return;

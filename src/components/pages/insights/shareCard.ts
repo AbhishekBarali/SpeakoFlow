@@ -387,6 +387,26 @@ interface Box {
   h: number;
 }
 
+/**
+ * A right-to-left language reads the card from the right, so the card is
+ * drawn as the mirror image of its left-to-right layout: text aligned right,
+ * the logo at the top right, and the voiceprint running from today on the
+ * left. Layout is written left to right; these two turn it around. Set by
+ * `drawCard` for the card being drawn.
+ */
+const frame = { rtl: false, width: 0 };
+
+/** The left edge of a box `w` wide whose left-to-right left edge is `x`. */
+const mx = (x: number, w = 0): number => (frame.rtl ? frame.width - x - w : x);
+
+/** Text alignment, turned around for a right-to-left card. */
+const flip = (align: CanvasTextAlign): CanvasTextAlign => {
+  if (!frame.rtl) return align;
+  if (align === "left") return "right";
+  if (align === "right") return "left";
+  return align;
+};
+
 /** The headline: the figure, then the sentence it starts. Returns the height
  *  it takes at `scale`, drawing only when asked. */
 const headline = (
@@ -399,7 +419,7 @@ const headline = (
 ): number => {
   const valueSize = sizes.value;
   const wordsSize = sizes.words;
-  ctx.textAlign = "left";
+  ctx.textAlign = flip("left");
   ctx.textBaseline = "alphabetic";
 
   ctx.font = font(720, valueSize, DISPLAY);
@@ -407,7 +427,7 @@ const headline = (
   let y = box.y + valueSize * 0.78;
   if (draw) {
     ctx.fillStyle = look.ink;
-    ctx.fillText(content.value, box.x - valueSize * 0.04, y);
+    ctx.fillText(content.value, mx(box.x - valueSize * 0.04), y);
   }
 
   ctx.font = font(700, wordsSize, DISPLAY);
@@ -424,11 +444,12 @@ const headline = (
       y += lineHeight;
       if (draw) {
         ctx.fillStyle = color;
-        ctx.fillText(line, box.x, y);
+        ctx.fillText(line, mx(box.x), y);
       }
     }
   }
   setTracking(ctx, 0, 1);
+  ctx.textAlign = "left";
   return y + wordsSize * 0.24 - box.y;
 };
 
@@ -474,12 +495,19 @@ const voiceprint = (
   ctx.shadowColor = look.pillShadow;
   ctx.shadowBlur = box.h * 0.45;
   ctx.shadowOffsetY = box.h * 0.16;
-  roundRect(ctx, box.x, box.y, box.w, box.h, box.h / 2);
+  roundRect(ctx, mx(box.x, box.w), box.y, box.w, box.h, box.h / 2);
   ctx.fillStyle = look.pill;
   ctx.fill();
   ctx.restore();
   if (look.pillEdge) {
-    roundRect(ctx, box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1, box.h / 2);
+    roundRect(
+      ctx,
+      mx(box.x, box.w) + 0.5,
+      box.y + 0.5,
+      box.w - 1,
+      box.h - 1,
+      box.h / 2,
+    );
     ctx.strokeStyle = look.pillEdge;
     ctx.lineWidth = 1.5;
     ctx.stroke();
@@ -493,7 +521,7 @@ const voiceprint = (
   const tallest = box.h * 0.62;
   const max = Math.max(1, ...bars);
   bars.forEach((value, index) => {
-    const x = box.x + inset + pitch * index + (pitch - width) / 2;
+    const x = mx(box.x + inset + pitch * index + (pitch - width) / 2, width);
     // Older days a little quieter, so the line reads toward today.
     const age = index / Math.max(1, bars.length - 1);
     const today = index === bars.length - 1;
@@ -523,9 +551,9 @@ const caption = (
   align: CanvasTextAlign = "left",
 ) => {
   ctx.font = font(500, size, TEXT);
-  ctx.textAlign = align;
+  ctx.textAlign = flip(align);
   ctx.fillStyle = look.muted;
-  ctx.fillText(text, x, y);
+  ctx.fillText(text, mx(x), y);
   ctx.textAlign = "left";
 };
 
@@ -541,12 +569,19 @@ const panel = (
     ctx.shadowBlur = 48;
     ctx.shadowOffsetY = 18;
   }
-  roundRect(ctx, box.x, box.y, box.w, box.h, r);
+  roundRect(ctx, mx(box.x, box.w), box.y, box.w, box.h, r);
   ctx.fillStyle = look.panel;
   ctx.fill();
   ctx.restore();
   if (look.panelEdge) {
-    roundRect(ctx, box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1, r);
+    roundRect(
+      ctx,
+      mx(box.x, box.w) + 0.5,
+      box.y + 0.5,
+      box.w - 1,
+      box.h - 1,
+      r,
+    );
     ctx.strokeStyle = look.panelEdge;
     ctx.lineWidth = 1.5;
     ctx.stroke();
@@ -582,8 +617,8 @@ const fact = (
     sizes.label * 0.25;
   const valueY = box.y + Math.max(0, (box.h - height) / 2) + valueSize * 0.76;
   ctx.fillStyle = look.ink;
-  ctx.textAlign = "left";
-  ctx.fillText(item.value, box.x, valueY);
+  ctx.textAlign = flip("left");
+  ctx.fillText(item.value, mx(box.x), valueY);
   setTracking(ctx, 0, 1);
 
   ctx.font = font(500, sizes.label, TEXT);
@@ -591,10 +626,11 @@ const fact = (
   lines.forEach((line, index) => {
     ctx.fillText(
       line,
-      box.x,
+      mx(box.x),
       valueY + sizes.label * 1.55 + index * sizes.label * 1.25,
     );
   });
+  ctx.textAlign = "left";
 };
 
 /** Figures in a row of columns divided by hairlines, inside one panel. */
@@ -612,7 +648,7 @@ const factRow = (
     const x = box.x + width * index;
     if (index > 0) {
       ctx.fillStyle = look.rule;
-      ctx.fillRect(x, box.y + sizes.pad, 1.5, box.h - sizes.pad * 2);
+      ctx.fillRect(mx(x, 1.5), box.y + sizes.pad, 1.5, box.h - sizes.pad * 2);
     }
     fact(
       ctx,
@@ -645,7 +681,7 @@ const factGrid = (
   for (let row = 1; row < rows; row += 1) {
     ctx.fillStyle = look.rule;
     ctx.fillRect(
-      box.x + sizes.pad,
+      mx(box.x + sizes.pad, box.w - sizes.pad * 2),
       box.y + cellH * row,
       box.w - sizes.pad * 2,
       1.5,
@@ -654,7 +690,7 @@ const factGrid = (
   for (let col = 1; col < columns; col += 1) {
     ctx.fillStyle = look.rule;
     ctx.fillRect(
-      box.x + cellW * col,
+      mx(box.x + cellW * col, 1.5),
       box.y + sizes.pad,
       1.5,
       box.h - sizes.pad * 2,
@@ -692,7 +728,7 @@ const header = (
 ) => {
   const logo = look.lockup === "dark" ? assets.lockupDark : assets.lockupLight;
   const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
-  ctx.drawImage(logo, x, y, logoWidth, logoHeight);
+  ctx.drawImage(logo, mx(x, logoWidth), y, logoWidth, logoHeight);
   if (content.period) {
     caption(
       ctx,
@@ -718,8 +754,9 @@ const footer = (
 ) => {
   ctx.font = font(650, size, TEXT);
   ctx.fillStyle = look.ink;
+  ctx.textAlign = flip("left");
+  ctx.fillText(CARD_SITE, mx(x), baseline);
   ctx.textAlign = "left";
-  ctx.fillText(CARD_SITE, x, baseline);
   const siteWidth = ctx.measureText(CARD_SITE).width;
   ctx.font = font(500, size * 0.9, TEXT);
   if (
@@ -730,19 +767,24 @@ const footer = (
   }
 };
 
-/** Draw the card at its full size onto `canvas`. Assets must be loaded. */
+/** Draw the card at its full size onto `canvas`, mirrored for a
+ *  right-to-left language. Assets must be loaded. */
 export const drawCard = (
   canvas: HTMLCanvasElement,
   content: CardContent,
   format: CardFormat,
   lookName: CardLook,
   assets: Assets,
+  rtl = false,
 ) => {
   const { width: w, height: h } = CARD_SIZES[format];
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+  frame.rtl = rtl;
+  frame.width = w;
+  ctx.direction = rtl ? "rtl" : "ltr";
   const look = LOOKS[lookName];
   ctx.clearRect(0, 0, w, h);
   look.paint(ctx, w, h);

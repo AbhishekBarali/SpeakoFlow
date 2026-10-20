@@ -3362,24 +3362,123 @@
     }
   },
   "insights": {
-    "description": "Hoạt động đọc chính tả của bạn theo thời gian, được đếm trên máy tính này.",
-    "empty": "Thống kê của bạn sẽ hiện ra sau lần đọc chính tả đầu tiên.",
+    "about": "Cách bạn dùng SpeakoFlow, được đếm trên máy tính này.",
+    "nothingYet": "Thống kê của bạn sẽ hiện ra khi bạn đọc chính tả, hỏi trợ lý hoặc ghi âm một cuộc họp.",
     "dictations": "Lần đọc chính tả",
     "today": "{{words}} từ hôm nay",
     "pages_other": "Khoảng {{count}} trang",
     "fasterThanTyping": "Nhanh hơn gõ phím {{times}}×",
     "streak_other": "Chuỗi {{count}} ngày",
     "longest_other": "Dài nhất: {{count}} ngày",
-    "gridLabel_other": "{{words}} từ trong {{count}} ngày của sáu tháng qua",
+    "streakHint": "Một ngày được tính khi bạn đọc chính tả, hỏi trợ lý, trò chuyện hoặc ghi âm một cuộc họp.",
     "gridSummary_other": "{{words}} từ trong {{count}} ngày của 6 tháng qua",
+    "gridSummaryAssistant_other": "{{questions}} trong {{count}} ngày của 6 tháng qua",
+    "gridSummaryMeetings_other": "{{time}} họp trong {{count}} ngày của 6 tháng qua",
     "dayWords_other": "{{formatted}} từ",
-    "dayNone": "Không đọc chính tả",
+    "dayQuestions_other": "{{formatted}} câu hỏi",
+    "dayNoneFor": {
+      "dictation": "Không đọc chính tả",
+      "assistant": "Không có câu hỏi",
+      "meetings": "Không có cuộc họp"
+    },
     "less": "Ít hơn",
     "more": "Nhiều hơn",
     "busiest": "Ngày bận rộn nhất",
     "best": "Ngày tốt nhất",
     "typical": "Ngày điển hình",
-    "typicalSub": "Vào những ngày bạn đọc chính tả"
+    "typicalFor": {
+      "dictation": "Vào những ngày bạn đọc chính tả",
+      "assistant": "Vào những ngày bạn hỏi",
+      "meetings": "Vào những ngày có cuộc họp"
+    },
+    "activity": {
+      "label": "Hoạt động hiển thị",
+      "dictation": "Đọc chính tả",
+      "assistant": "Trợ lý",
+      "meetings": "Cuộc họp"
+    },
+    "open": "Mở",
+    "assistantCard": {
+      "info": "Các câu hỏi nhanh và những gì bạn nói khi trò chuyện. Vẫn được tính kể cả khi bạn xóa cuộc trò chuyện.",
+      "empty": "Hãy hỏi trợ lý điều gì đó hoặc bắt đầu trò chuyện, và nó sẽ được tính ở đây.",
+      "questions_other": "Câu hỏi đã hỏi",
+      "calls_other": "Cuộc trò chuyện",
+      "callTime": "Thời gian trò chuyện"
+    },
+    "meetingsCard": {
+      "info": "Các cuộc họp bạn đã ghi âm. Vẫn được tính kể cả khi bạn xóa một cuộc họp.",
+      "empty": "Ghi âm một cuộc họp và nó sẽ được tính ở đây.",
+      "meetings_other": "Cuộc họp",
+      "time": "Thời gian ghi âm",
+      "words_other": "Từ đã chép lời"
+    },
+    "share": {
+      "button": "Chia sẻ",
+      "nothingYet": "Sẽ có thứ để chia sẻ khi bạn đã dùng SpeakoFlow.",
+      "title": "Chia sẻ thống kê của bạn",
+      "description": "Số liệu của bạn dưới dạng ảnh, đúng kích thước cho nơi bạn đăng.",
+      "private": "Được tạo trên máy tính này. Không có gì được tải lên.",
+      "size": "Kích thước",
+      "formats": {
+        "square": "Vuông",
+        "story": "Dọc",
+        "wide": "Ngang"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, cho bảng tin",
+        "story": "1080 × 1920, cho tin (story)",
+        "wide": "1600 × 900, cho bài đăng và liên kết"
+      },
+      "look": "Phong cách",
+      "looks": {
+        "paper": "Giấy",
+        "graphite": "Than chì",
+        "mint": "Bạc hà",
+        "dusk": "Chạng vạng"
+      },
+      "show": "Hiển thị",
+      "include": {
+        "assistant": "Hiện trợ lý trên thẻ",
+        "meetings": "Hiện cuộc họp trên thẻ"
+      },
+      "copy": "Sao chép ảnh",
+      "copied": "Đã sao chép",
+      "copyFailed": "Không sao chép được ảnh",
+      "save": "Lưu ảnh",
+      "saved": "Đã lưu ảnh",
+      "saveFailed": "Không lưu được ảnh",
+      "showInFolder": "Hiện trong thư mục",
+      "drawFailed": "Không vẽ được thẻ. Hãy đóng lại và thử lại.",
+      "since": "Từ {{date}}",
+      "barsCaption_other": "{{count}} tuần qua, mỗi cột là một ngày",
+      "tagline": "Miễn phí · Mã nguồn mở · Chạy ngoại tuyến",
+      "headline": {
+        "dictation": {
+          "lead_other": "từ tôi đã nói,",
+          "accent": "chứ không gõ."
+        },
+        "assistant": {
+          "lead_other": "câu hỏi tôi đã hỏi",
+          "accent": "thành tiếng."
+        },
+        "meetings": {
+          "lead_other": "cuộc họp đã ghi âm,",
+          "accent": "ghi chú được viết sẵn."
+        }
+      },
+      "fact": {
+        "saved": "tiết kiệm so với gõ phím",
+        "wpm": "từ mỗi phút",
+        "questions_other": "câu hỏi được trả lời",
+        "meetings_other": "cuộc họp đã có ghi chú",
+        "meetingTime": "thời gian họp đã ghi âm",
+        "meetingWords_other": "từ đã chép lời",
+        "callTime": "trò chuyện với trợ lý",
+        "streak_other": "ngày liên tiếp",
+        "activeDays_other": "ngày trò chuyện với máy tính",
+        "dictations_other": "lần đọc chính tả"
+      }
+    }
   },
   "settingsNotice": {
     "restored": "Cài đặt của bạn bị hỏng và đã được khôi phục từ bản sao lưu.",

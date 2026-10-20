@@ -3420,8 +3420,8 @@
     }
   },
   "insights": {
-    "description": "ההכתבה שלך לאורך זמן, נספרת במחשב הזה.",
-    "empty": "התובנות שלך יופיעו אחרי ההכתבה הראשונה שלך.",
+    "about": "השימוש שלך ב-SpeakoFlow, נספר במחשב הזה.",
+    "nothingYet": "התובנות שלך יופיעו אחרי שתכתיב, תשאל את העוזר או תקליט פגישה.",
     "dictations": "הכתבות",
     "today": "{{words}} מילים היום",
     "pages_one": "בערך עמוד אחד",
@@ -3434,22 +3434,153 @@
     "longest_one": "הארוך ביותר: יום אחד",
     "longest_two": "הארוך ביותר: יומיים",
     "longest_other": "הארוך ביותר: {{count}} ימים",
-    "gridLabel_one": "{{words}} מילים ביום אחד בששת החודשים האחרונים",
-    "gridLabel_two": "{{words}} מילים ביומיים בששת החודשים האחרונים",
-    "gridLabel_other": "{{words}} מילים ב-{{count}} ימים בששת החודשים האחרונים",
+    "streakHint": "יום נספר כשאתה מכתיב, שואל את העוזר, מקיים שיחה או מקליט פגישה.",
     "gridSummary_one": "{{words}} מילים ביום אחד ב-6 החודשים האחרונים",
     "gridSummary_two": "{{words}} מילים ביומיים ב-6 החודשים האחרונים",
     "gridSummary_other": "{{words}} מילים ב-{{count}} ימים ב-6 החודשים האחרונים",
+    "gridSummaryAssistant_one": "{{questions}} ביום אחד ב-6 החודשים האחרונים",
+    "gridSummaryAssistant_two": "{{questions}} ביומיים ב-6 החודשים האחרונים",
+    "gridSummaryAssistant_other": "{{questions}} ב-{{count}} ימים ב-6 החודשים האחרונים",
+    "gridSummaryMeetings_one": "{{time}} של פגישות ביום אחד ב-6 החודשים האחרונים",
+    "gridSummaryMeetings_two": "{{time}} של פגישות ביומיים ב-6 החודשים האחרונים",
+    "gridSummaryMeetings_other": "{{time}} של פגישות ב-{{count}} ימים ב-6 החודשים האחרונים",
     "dayWords_one": "{{formatted}} מילה",
     "dayWords_two": "{{formatted}} מילים",
     "dayWords_other": "{{formatted}} מילים",
-    "dayNone": "אין הכתבה",
+    "dayQuestions_one": "{{formatted}} שאלה",
+    "dayQuestions_two": "{{formatted}} שאלות",
+    "dayQuestions_other": "{{formatted}} שאלות",
+    "dayNoneFor": {
+      "dictation": "אין הכתבה",
+      "assistant": "אין שאלות",
+      "meetings": "אין פגישות"
+    },
     "less": "פחות",
     "more": "יותר",
     "busiest": "היום העמוס ביותר",
     "best": "היום הטוב ביותר",
     "typical": "יום טיפוסי",
-    "typicalSub": "בימים שבהם אתה מכתיב"
+    "typicalFor": {
+      "dictation": "בימים שבהם אתה מכתיב",
+      "assistant": "בימים שבהם אתה שואל",
+      "meetings": "בימים עם פגישה"
+    },
+    "activity": {
+      "label": "פעילות להצגה",
+      "dictation": "הכתבה",
+      "assistant": "עוזר",
+      "meetings": "פגישות"
+    },
+    "open": "פתח",
+    "assistantCard": {
+      "info": "שאלות מהירות, ומה שאמרת בשיחות. הן נשארות בספירה גם כשאתה מוחק שיחות.",
+      "empty": "שאל את העוזר משהו, או התחל שיחה, וזה ייספר כאן.",
+      "questions_one": "שאלה שנשאלה",
+      "questions_two": "שאלות שנשאלו",
+      "questions_other": "שאלות שנשאלו",
+      "calls_one": "שיחה",
+      "calls_two": "שיחות",
+      "calls_other": "שיחות",
+      "callTime": "זמן בשיחות"
+    },
+    "meetingsCard": {
+      "info": "פגישות שהקלטת. הן נשארות בספירה גם כשאתה מוחק פגישה.",
+      "empty": "הקלט פגישה והיא תיספר כאן.",
+      "meetings_one": "פגישה",
+      "meetings_two": "פגישות",
+      "meetings_other": "פגישות",
+      "time": "זמן מוקלט",
+      "words_one": "מילה שתומללה",
+      "words_two": "מילים שתומללו",
+      "words_other": "מילים שתומללו"
+    },
+    "share": {
+      "button": "שתף",
+      "nothingYet": "יהיה מה לשתף אחרי שתשתמש ב-SpeakoFlow.",
+      "title": "שתף את התובנות שלך",
+      "description": "המספרים שלך כתמונה, בגודל שמתאים למקום שבו תפרסם אותה.",
+      "private": "נוצר במחשב הזה. שום דבר לא מועלה.",
+      "size": "גודל",
+      "formats": {
+        "square": "ריבוע",
+        "story": "סטורי",
+        "wide": "רחב"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, לפיד",
+        "story": "1080 × 1920, לסטוריז",
+        "wide": "1600 × 900, לפוסטים ולקישורים"
+      },
+      "look": "מראה",
+      "looks": {
+        "paper": "נייר",
+        "graphite": "גרפיט",
+        "mint": "מנטה",
+        "dusk": "דמדומים"
+      },
+      "show": "הצג",
+      "include": {
+        "assistant": "הצג את העוזר בכרטיס",
+        "meetings": "הצג פגישות בכרטיס"
+      },
+      "copy": "העתק תמונה",
+      "copied": "הועתק",
+      "copyFailed": "לא ניתן היה להעתיק את התמונה",
+      "save": "שמור תמונה",
+      "saved": "התמונה נשמרה",
+      "saveFailed": "לא ניתן היה לשמור את התמונה",
+      "showInFolder": "הצג בתיקייה",
+      "drawFailed": "לא ניתן היה לצייר את הכרטיס. סגור את החלון ונסה שוב.",
+      "since": "מאז {{date}}",
+      "barsCaption_one": "השבוע האחרון, עמודה לכל יום",
+      "barsCaption_two": "השבועיים האחרונים, עמודה לכל יום",
+      "barsCaption_other": "{{count}} השבועות האחרונים, עמודה לכל יום",
+      "tagline": "חינמי · קוד פתוח · עובד בלי אינטרנט",
+      "headline": {
+        "dictation": {
+          "lead_one": "מילה שאמרתי,",
+          "lead_two": "מילים שאמרתי,",
+          "lead_other": "מילים שאמרתי,",
+          "accent": "לא הקלדתי."
+        },
+        "assistant": {
+          "lead_one": "שאלה ששאלתי",
+          "lead_two": "שאלות ששאלתי",
+          "lead_other": "שאלות ששאלתי",
+          "accent": "בקול."
+        },
+        "meetings": {
+          "lead_one": "פגישה מוקלטת,",
+          "lead_two": "פגישות מוקלטות,",
+          "lead_other": "פגישות מוקלטות,",
+          "accent": "והסיכומים נכתבו בשבילי."
+        }
+      },
+      "fact": {
+        "saved": "נחסך לעומת הקלדה",
+        "wpm": "מילים לדקה",
+        "questions_one": "שאלה שנענתה",
+        "questions_two": "שאלות שנענו",
+        "questions_other": "שאלות שנענו",
+        "meetings_one": "פגישה שסוכמה",
+        "meetings_two": "פגישות שסוכמו",
+        "meetings_other": "פגישות שסוכמו",
+        "meetingTime": "של פגישות מוקלטות",
+        "meetingWords_one": "מילה שתומללה",
+        "meetingWords_two": "מילים שתומללו",
+        "meetingWords_other": "מילים שתומללו",
+        "callTime": "של דיבור בשיחות",
+        "streak_one": "יום ברצף",
+        "streak_two": "ימים ברצף",
+        "streak_other": "ימים ברצף",
+        "activeDays_one": "יום של דיבור עם המחשב שלי",
+        "activeDays_two": "ימים של דיבור עם המחשב שלי",
+        "activeDays_other": "ימים של דיבור עם המחשב שלי",
+        "dictations_one": "הכתבה",
+        "dictations_two": "הכתבות",
+        "dictations_other": "הכתבות"
+      }
+    }
   },
   "settingsNotice": {
     "restored": "ההגדרות שלך נפגמו ושוחזרו מגיבוי.",

@@ -3420,8 +3420,8 @@
     }
   },
   "insights": {
-    "description": "La tua dettatura nel tempo, calcolata su questo computer.",
-    "empty": "Le tue statistiche compariranno dopo la prima dettatura.",
+    "about": "Come usi SpeakoFlow, calcolato su questo computer.",
+    "nothingYet": "Le tue statistiche compariranno quando detterai, farai una domanda all'assistente o registrerai una riunione.",
     "dictations": "Dettature",
     "today": "{{words}} parole oggi",
     "pages_one": "Circa {{count}} pagina",
@@ -3434,22 +3434,153 @@
     "longest_one": "Record: {{count}} giorno",
     "longest_many": "Record: {{count}} di giorni",
     "longest_other": "Record: {{count}} giorni",
-    "gridLabel_one": "{{words}} parole in {{count}} giorno negli ultimi sei mesi",
-    "gridLabel_many": "{{words}} parole in {{count}} di giorni negli ultimi sei mesi",
-    "gridLabel_other": "{{words}} parole in {{count}} giorni negli ultimi sei mesi",
+    "streakHint": "Un giorno conta quando detti, fai una domanda all'assistente, avvii una conversazione o registri una riunione.",
     "gridSummary_one": "{{words}} parole in {{count}} giorno negli ultimi 6 mesi",
     "gridSummary_many": "{{words}} parole in {{count}} di giorni negli ultimi 6 mesi",
     "gridSummary_other": "{{words}} parole in {{count}} giorni negli ultimi 6 mesi",
+    "gridSummaryAssistant_one": "{{questions}} in {{count}} giorno negli ultimi 6 mesi",
+    "gridSummaryAssistant_many": "{{questions}} in {{count}} di giorni negli ultimi 6 mesi",
+    "gridSummaryAssistant_other": "{{questions}} in {{count}} giorni negli ultimi 6 mesi",
+    "gridSummaryMeetings_one": "{{time}} di riunioni in {{count}} giorno negli ultimi 6 mesi",
+    "gridSummaryMeetings_many": "{{time}} di riunioni in {{count}} di giorni negli ultimi 6 mesi",
+    "gridSummaryMeetings_other": "{{time}} di riunioni in {{count}} giorni negli ultimi 6 mesi",
     "dayWords_one": "{{formatted}} parola",
     "dayWords_many": "{{formatted}} di parole",
     "dayWords_other": "{{formatted}} parole",
-    "dayNone": "Nessuna dettatura",
+    "dayQuestions_one": "{{formatted}} domanda",
+    "dayQuestions_many": "{{formatted}} di domande",
+    "dayQuestions_other": "{{formatted}} domande",
+    "dayNoneFor": {
+      "dictation": "Nessuna dettatura",
+      "assistant": "Nessuna domanda",
+      "meetings": "Nessuna riunione"
+    },
     "less": "Meno",
     "more": "Più",
     "busiest": "Giorno più intenso",
     "best": "Giorno migliore",
     "typical": "Giorno tipico",
-    "typicalSub": "Nei giorni in cui detti"
+    "typicalFor": {
+      "dictation": "Nei giorni in cui detti",
+      "assistant": "Nei giorni in cui fai domande",
+      "meetings": "Nei giorni con una riunione"
+    },
+    "activity": {
+      "label": "Attività da mostrare",
+      "dictation": "Dettatura",
+      "assistant": "Assistente",
+      "meetings": "Riunioni"
+    },
+    "open": "Apri",
+    "assistantCard": {
+      "info": "Domande rapide e ciò che hai detto nelle conversazioni. Restano conteggiate anche se elimini le conversazioni.",
+      "empty": "Fai una domanda all'assistente o avvia una conversazione: verrà conteggiata qui.",
+      "questions_one": "Domanda fatta",
+      "questions_many": "Domande fatte",
+      "questions_other": "Domande fatte",
+      "calls_one": "Conversazione",
+      "calls_many": "Conversazioni",
+      "calls_other": "Conversazioni",
+      "callTime": "Tempo in conversazione"
+    },
+    "meetingsCard": {
+      "info": "Le riunioni che hai registrato. Restano conteggiate anche se elimini una riunione.",
+      "empty": "Registra una riunione e verrà conteggiata qui.",
+      "meetings_one": "Riunione",
+      "meetings_many": "Riunioni",
+      "meetings_other": "Riunioni",
+      "time": "Tempo registrato",
+      "words_one": "Parola trascritta",
+      "words_many": "Parole trascritte",
+      "words_other": "Parole trascritte"
+    },
+    "share": {
+      "button": "Condividi",
+      "nothingYet": "Avrai qualcosa da condividere dopo aver usato SpeakoFlow.",
+      "title": "Condividi le tue statistiche",
+      "description": "I tuoi numeri in un'immagine, nel formato giusto per dove la pubblichi.",
+      "private": "Creata su questo computer. Non viene caricato nulla.",
+      "size": "Dimensione",
+      "formats": {
+        "square": "Quadrato",
+        "story": "Storia",
+        "wide": "Orizzontale"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, per il feed",
+        "story": "1080 × 1920, per le storie",
+        "wide": "1600 × 900, per post e link"
+      },
+      "look": "Stile",
+      "looks": {
+        "paper": "Carta",
+        "graphite": "Grafite",
+        "mint": "Menta",
+        "dusk": "Crepuscolo"
+      },
+      "show": "Mostra",
+      "include": {
+        "assistant": "Mostra l'assistente sulla scheda",
+        "meetings": "Mostra le riunioni sulla scheda"
+      },
+      "copy": "Copia immagine",
+      "copied": "Copiata",
+      "copyFailed": "Impossibile copiare l'immagine",
+      "save": "Salva immagine",
+      "saved": "Immagine salvata",
+      "saveFailed": "Impossibile salvare l'immagine",
+      "showInFolder": "Mostra nella cartella",
+      "drawFailed": "Impossibile creare la scheda. Chiudi questa finestra e riprova.",
+      "since": "Da {{date}}",
+      "barsCaption_one": "L'ultima settimana, una barra al giorno",
+      "barsCaption_many": "Le ultime {{count}} settimane, una barra al giorno",
+      "barsCaption_other": "Le ultime {{count}} settimane, una barra al giorno",
+      "tagline": "Gratis · Open source · Funziona offline",
+      "headline": {
+        "dictation": {
+          "lead_one": "parola detta,",
+          "lead_many": "di parole dette,",
+          "lead_other": "parole dette,",
+          "accent": "senza digitare."
+        },
+        "assistant": {
+          "lead_one": "domanda fatta",
+          "lead_many": "di domande fatte",
+          "lead_other": "domande fatte",
+          "accent": "ad alta voce."
+        },
+        "meetings": {
+          "lead_one": "riunione registrata,",
+          "lead_many": "di riunioni registrate,",
+          "lead_other": "riunioni registrate,",
+          "accent": "con le note già scritte."
+        }
+      },
+      "fact": {
+        "saved": "risparmiato rispetto a digitare",
+        "wpm": "parole al minuto",
+        "questions_one": "risposta ricevuta",
+        "questions_many": "di risposte ricevute",
+        "questions_other": "risposte ricevute",
+        "meetings_one": "riunione riassunta",
+        "meetings_many": "di riunioni riassunte",
+        "meetings_other": "riunioni riassunte",
+        "meetingTime": "di riunioni registrate",
+        "meetingWords_one": "parola trascritta",
+        "meetingWords_many": "di parole trascritte",
+        "meetingWords_other": "parole trascritte",
+        "callTime": "in conversazione",
+        "streak_one": "giorno di fila",
+        "streak_many": "di giorni di fila",
+        "streak_other": "giorni di fila",
+        "activeDays_one": "giorno a parlare con il mio computer",
+        "activeDays_many": "di giorni a parlare con il mio computer",
+        "activeDays_other": "giorni a parlare con il mio computer",
+        "dictations_one": "dettatura",
+        "dictations_many": "di dettature",
+        "dictations_other": "dettature"
+      }
+    }
   },
   "settingsNotice": {
     "restored": "Le tue impostazioni erano danneggiate e sono state ripristinate da un backup.",
