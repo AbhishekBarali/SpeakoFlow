@@ -6543,6 +6543,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-application-services",
+ "objc2-core-audio",
  "objc2-core-foundation",
  "objc2-foundation",
  "once_cell",

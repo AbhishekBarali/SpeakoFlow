@@ -842,6 +842,20 @@
       "volume": {
         "title": "Volumen",
         "description": "Ajusta el volumen de los sonidos de retroalimentación de audio"
+      },
+      "ducking": {
+        "label": "Durante la grabación",
+        "ariaLabel": "Otro audio durante la grabación",
+        "description": "Baja o silencia el resto del audio mientras grabas, para que no te distraiga ni llegue al micrófono. Vuelve en cuanto termina la grabación. También se conoce como ducking.",
+        "options": {
+          "off": "Sin cambios",
+          "lower": "Bajar",
+          "mute": "Silenciar"
+        },
+        "amount": {
+          "label": "Bajar un",
+          "description": "Cuánto más bajo suena el resto del audio. Mueve el control mientras suena algo para oírlo. Si cambias tú el volumen durante una grabación, se queda donde lo pusiste."
+        }
       }
     },
     "advanced": {
@@ -1457,10 +1471,6 @@
       "postProcessingToggle": {
         "label": "Limpieza con IA",
         "description": "Limpia tu dictado con IA después de la transcripción"
-      },
-      "muteWhileRecording": {
-        "label": "Silenciar mientras se graba",
-        "description": "Silenciar el audio del sistema durante la grabación"
       },
       "appendTrailingSpace": {
         "label": "Añadir espacio al final",
@@ -2617,6 +2627,8 @@
     },
     "audio": {
       "microphone": "Micrófono",
+      "otherAudio": "Otro audio",
+      "otherAudioHint": "Música, vídeos y llamadas que suenan en tu ordenador mientras dictas o preguntas al asistente.",
       "overlayHint": "La pequeña píldora que aparece mientras grabas."
     },
     "dictation": {

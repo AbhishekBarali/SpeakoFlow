@@ -43,7 +43,7 @@ import { SilenceStop } from "@/components/settings/SilenceStop";
 import { HandsFreeShortcut } from "@/components/settings/HandsFree";
 import { MicrophoneSelector } from "@/components/settings/MicrophoneSelector";
 import { AlwaysOnMicrophone } from "@/components/settings/AlwaysOnMicrophone";
-import { MuteWhileRecording } from "@/components/settings/MuteWhileRecording";
+import { AudioDuckingSetting } from "@/components/settings/AudioDucking";
 import { AudioFeedback } from "@/components/settings/AudioFeedback";
 import { SoundPicker } from "@/components/settings/SoundPicker";
 import { OutputDeviceSelector } from "@/components/settings/OutputDeviceSelector";
@@ -217,7 +217,14 @@ export const AudioTab: React.FC = () => {
           tone="teal"
         />
         <AlwaysOnMicrophone descriptionMode="tooltip" grouped={true} />
-        <MuteWhileRecording descriptionMode="tooltip" grouped={true} />
+      </SettingsGroup>
+
+      {/* Playback that is not SpeakoFlow's own: what a recording does to it. */}
+      <SettingsGroup
+        title={t("settingsDialog.audio.otherAudio")}
+        description={t("settingsDialog.audio.otherAudioHint")}
+      >
+        <AudioDuckingSetting grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.general.groups.sounds")}>

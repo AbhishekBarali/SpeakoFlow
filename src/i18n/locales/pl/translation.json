@@ -848,6 +848,20 @@
       "volume": {
         "title": "Głośność",
         "description": "Dostosuj głośność dźwięków informacyjnych"
+      },
+      "ducking": {
+        "label": "Podczas nagrywania",
+        "ariaLabel": "Inny dźwięk podczas nagrywania",
+        "description": "Ścisza lub wycisza inny dźwięk podczas nagrywania, żeby nie rozpraszał i nie trafiał do mikrofonu. Wraca, gdy tylko nagrywanie się skończy. Znane też jako ducking.",
+        "options": {
+          "off": "Bez zmian",
+          "lower": "Ścisz",
+          "mute": "Wycisz"
+        },
+        "amount": {
+          "label": "Ścisz o",
+          "description": "O ile ciszej ma być inny dźwięk. Przesuń suwak, gdy coś gra, żeby to usłyszeć. Jeśli sam zmienisz głośność podczas nagrywania, zostanie tak, jak ją ustawisz."
+        }
       }
     },
     "advanced": {
@@ -1466,10 +1480,6 @@
       "postProcessingToggle": {
         "label": "Czyszczenie AI",
         "description": "Porządkuj dyktowanie za pomocą AI po transkrypcji"
-      },
-      "muteWhileRecording": {
-        "label": "Wycisz podczas nagrywania",
-        "description": "Wycisz dźwięk systemu podczas nagrywania"
       },
       "appendTrailingSpace": {
         "label": "Dodaj spację na końcu",
@@ -2635,6 +2645,8 @@
     },
     "audio": {
       "microphone": "Mikrofon",
+      "otherAudio": "Inny dźwięk",
+      "otherAudioHint": "Muzyka, filmy i rozmowy odtwarzane na komputerze, gdy dyktujesz lub pytasz asystenta.",
       "overlayHint": "Mała pigułka widoczna podczas nagrywania."
     },
     "dictation": {

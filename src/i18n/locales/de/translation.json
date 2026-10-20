@@ -836,6 +836,20 @@
       "volume": {
         "title": "Lautstärke",
         "description": "Lautstärke der Audio-Feedback-Töne anpassen"
+      },
+      "ducking": {
+        "label": "Während der Aufnahme",
+        "ariaLabel": "Andere Audiowiedergabe während der Aufnahme",
+        "description": "Macht andere Audiowiedergabe leiser oder schaltet sie stumm, während du aufnimmst, damit sie nicht ablenkt oder ins Mikrofon gelangt. Sobald die Aufnahme endet, ist sie wieder da. Auch als Ducking bekannt.",
+        "options": {
+          "off": "Unverändert",
+          "lower": "Leiser",
+          "mute": "Stumm"
+        },
+        "amount": {
+          "label": "Leiser um",
+          "description": "Wie viel leiser andere Audiowiedergabe wird. Bewege den Regler, während etwas läuft, um es zu hören. Änderst du die Lautstärke während einer Aufnahme selbst, bleibt sie so, wie du sie eingestellt hast."
+        }
       }
     },
     "advanced": {
@@ -1448,10 +1462,6 @@
       "postProcessingToggle": {
         "label": "KI-Bereinigung",
         "description": "Dein Diktat nach der Transkription mit KI bereinigen"
-      },
-      "muteWhileRecording": {
-        "label": "Während der Aufnahme stummschalten",
-        "description": "Systemaudio während der Aufnahme stummschalten"
       },
       "appendTrailingSpace": {
         "label": "Leerzeichen anhängen",
@@ -2599,6 +2609,8 @@
     },
     "audio": {
       "microphone": "Mikrofon",
+      "otherAudio": "Andere Audiowiedergabe",
+      "otherAudioHint": "Musik, Videos und Anrufe, die auf deinem Computer laufen, während du diktierst oder den Assistenten fragst.",
       "overlayHint": "Die kleine Pille, die während der Aufnahme erscheint."
     },
     "dictation": {
