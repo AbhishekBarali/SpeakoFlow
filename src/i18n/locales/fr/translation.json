@@ -3423,15 +3423,15 @@
     "about": "Votre utilisation de SpeakoFlow, comptabilisée sur cet ordinateur.",
     "nothingYet": "Vos statistiques apparaîtront dès que vous dicterez, poserez une question à l'assistant ou enregistrerez une réunion.",
     "goHome": "Voir vos raccourcis",
-    "dictationsSoFar_one": "{{formatted}} dictée jusqu'à présent",
-    "dictationsSoFar_many": "{{formatted}} de dictées jusqu'à présent",
-    "dictationsSoFar_other": "{{formatted}} dictées jusqu'à présent",
+    "figures": {
+      "dictations": "Dictées",
+      "questions": "Questions posées",
+      "meetings": "Réunions enregistrées"
+    },
+    "activityTitle": "Activité",
     "pages_one": "Environ {{count}} page",
     "pages_many": "Environ {{count}} de pages",
     "pages_other": "Environ {{count}} pages",
-    "streak_one": "{{count}} jour d'affilée",
-    "streak_many": "{{count}} de jours d'affilée",
-    "streak_other": "{{count}} jours d'affilée",
     "longest_one": "Record : {{count}} jour",
     "longest_many": "Record : {{count}} de jours",
     "longest_other": "Record : {{count}} jours",
@@ -3480,12 +3480,10 @@
     },
     "assistantCard": {
       "info": "Vos questions rapides et ce que vous avez dit en conversation. Le décompte est conservé même si vous supprimez des conversations.",
-      "empty": "Posez une question à l'assistant ou lancez une conversation : tout est compté ici.",
       "noCalls": "Aucune conversation pour l'instant"
     },
     "meetingsCard": {
-      "info": "Les réunions que vous avez enregistrées. Le décompte est conservé même si vous supprimez une réunion.",
-      "empty": "Enregistrez une réunion et elle sera comptée ici."
+      "info": "Les réunions que vous avez enregistrées. Le décompte est conservé même si vous supprimez une réunion."
     },
     "share": {
       "button": "Partager",
@@ -3563,7 +3561,9 @@
         "saved": {
           "title": "Temps gagné",
           "label": "de saisie évitée",
-          "note": "Par rapport à une saisie à {{wpm}} mots par minute"
+          "workdays_one": "Une journée de travail entière",
+          "workdays_many": "Environ {{count}} journées de travail",
+          "workdays_other": "Environ {{count}} journées de travail"
         },
         "streak": {
           "title": "Sur ma lancée",

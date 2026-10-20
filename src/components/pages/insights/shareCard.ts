@@ -1,6 +1,7 @@
 import iconUrl from "../../../../Logo/final-v2/png/icon-256.png";
-import displayFontUrl from "@/assets/fonts/hubot-sans-latin-standard.woff2?url";
-import digitsFontUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+import jakartaUrl from "@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2?url";
+import jakartaExtUrl from "@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-ext-wght-normal.woff2?url";
+import { flowBands, type FlowSpec } from "./flowGeometry";
 import {
   CARD_SIZES,
   type CardDeck,
@@ -25,109 +26,103 @@ import {
  * taints the canvas there). What each card says is decided in
  * `shareContent.ts`; this file only lays it out.
  *
- * Every card is built the same way, so a deck of them reads as one set: a
- * flat field in its own colour, the SpeakoFlow icon's seven voice bars drawn
- * huge in a tone of it and hanging from the top edge (their heights are the
- * user's last seven days), the card's title, one white panel sized to what it
- * holds, and the logo with the tagline along the foot. One number per card
- * and plenty of room around it: a card that reads as an advert, or as a page
- * of statistics, is a card nobody posts.
+ * Every card is one colour field with the icon's flowing bands crossing it
+ * in tones of that colour, one number set large straight on the field in the
+ * logo's own typeface, a line or two about it, and the logo. Nothing sits in
+ * a box: a card that reads as a screenshot of a dashboard is a card nobody
+ * posts.
  */
 
-const DISPLAY_FAMILY = "SpeakoFlow Display";
-/** Inter's digits in front of the display face: its zero is drawn with a
- *  stroke through it, which reads as a theta at this size. The website
- *  makes the same swap. */
-const DIGITS_FAMILY = "SpeakoFlow Digits";
-const DISPLAY = `"${DIGITS_FAMILY}", "${DISPLAY_FAMILY}", "Inter Variable", system-ui, sans-serif`;
-const TEXT = `"Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif`;
-const HEADING = `"${DIGITS_FAMILY}", "${DISPLAY_FAMILY}", ${TEXT}`;
-
-/** The panel's own ink, the same on every card. */
-const PANEL_INK = "#14181b";
-const PANEL_MUTED = "#5d6569";
-
-/** Tracking of a figure; tighter and the digits of a duration run into its
- *  units at feed size. */
-const FIGURE_TRACKING = -0.03;
+const FAMILY = "SpeakoFlow Card";
+const FONT = `"${FAMILY}", "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif`;
 
 interface Palette {
   ground: string;
-  /** The voice bars, a tone of the ground. */
-  bars: string;
-  /** The title and the "Speako" of the wordmark. */
+  /** The colour the bands lean toward, a step at a time. */
+  band: string;
+  /** How far each band leans toward `band`, outermost first. */
+  steps: number[];
   ink: string;
+  /** Labels, notes and the tagline. */
+  soft: string;
+  /** Hairlines and empty cells. */
+  faint: string;
   /** The "Flow" of the wordmark. */
   flow: string;
-  tagline: string;
-  /** The speed card's own bar. */
-  accent: string;
 }
 
 const PALETTES: Record<CardKind, Palette> = {
   highlights: {
-    ground: "#d9d0fb",
-    bars: "#ccc0f8",
-    ink: "#211a57",
-    flow: "#0b6f64",
-    tagline: "rgba(33, 26, 87, 0.8)",
-    accent: "#5b4fd6",
+    ground: "#0b5651",
+    band: "#3fd6bd",
+    steps: [0.11, 0.19, 0.28],
+    ink: "#ffffff",
+    soft: "rgba(255, 255, 255, 0.74)",
+    faint: "rgba(255, 255, 255, 0.2)",
+    flow: "#7ff2dc",
   },
   words: {
-    ground: "#0c6a63",
-    bars: "#137a71",
-    ink: "#ffffff",
-    flow: "#8ff2df",
-    tagline: "rgba(255, 255, 255, 0.84)",
-    accent: "#0f766e",
+    ground: "#e4defc",
+    band: "#7b6af0",
+    steps: [0.09, 0.15, 0.22],
+    ink: "#1c1543",
+    soft: "rgba(28, 21, 67, 0.68)",
+    faint: "rgba(28, 21, 67, 0.14)",
+    flow: "#0b7469",
   },
   speed: {
-    ground: "#15191c",
-    bars: "#21272b",
-    ink: "#ffffff",
+    ground: "#0f171a",
+    band: "#2ccdb1",
+    steps: [0.09, 0.15, 0.22],
+    ink: "#f2f6f5",
+    soft: "rgba(242, 246, 245, 0.64)",
+    faint: "rgba(242, 246, 245, 0.16)",
     flow: "#5eead4",
-    tagline: "rgba(255, 255, 255, 0.76)",
-    accent: "#14b8a6",
   },
   saved: {
-    ground: "#f6b07a",
-    bars: "#efa169",
-    ink: "#3a1c0b",
-    flow: "#3a1c0b",
-    tagline: "rgba(58, 28, 11, 0.82)",
-    accent: "#c2410c",
+    ground: "#fbdcc2",
+    band: "#ea7a3c",
+    steps: [0.1, 0.17, 0.25],
+    ink: "#391806",
+    soft: "rgba(57, 24, 6, 0.68)",
+    faint: "rgba(57, 24, 6, 0.14)",
+    flow: "#391806",
   },
   streak: {
-    ground: "#5b48d9",
-    bars: "#6654de",
+    ground: "#4433c8",
+    band: "#a596ff",
+    steps: [0.11, 0.19, 0.28],
     ink: "#ffffff",
-    flow: "#b9f5ea",
-    tagline: "rgba(255, 255, 255, 0.84)",
-    accent: "#5b48d9",
+    soft: "rgba(255, 255, 255, 0.74)",
+    faint: "rgba(255, 255, 255, 0.2)",
+    flow: "#c4fff3",
   },
   assistant: {
-    ground: "#f4d771",
-    bars: "#ebca5a",
-    ink: "#362b06",
-    flow: "#362b06",
-    tagline: "rgba(54, 43, 6, 0.82)",
-    accent: "#a16207",
+    ground: "#d6e7ff",
+    band: "#3f7fe2",
+    steps: [0.09, 0.15, 0.22],
+    ink: "#0b2446",
+    soft: "rgba(11, 36, 70, 0.68)",
+    faint: "rgba(11, 36, 70, 0.14)",
+    flow: "#0b2446",
   },
   meetings: {
-    ground: "#f4adc9",
-    bars: "#ee9fbf",
-    ink: "#47132d",
-    flow: "#47132d",
-    tagline: "rgba(71, 19, 45, 0.82)",
-    accent: "#be185d",
+    ground: "#541b3e",
+    band: "#f08cbc",
+    steps: [0.11, 0.19, 0.28],
+    ink: "#fff5f9",
+    soft: "rgba(255, 245, 249, 0.72)",
+    faint: "rgba(255, 245, 249, 0.18)",
+    flow: "#ffc4dd",
   },
   activity: {
-    ground: "#1c4a34",
-    bars: "#24583f",
-    ink: "#ffffff",
-    flow: "#a7f3d0",
-    tagline: "rgba(255, 255, 255, 0.82)",
-    accent: "#15803d",
+    ground: "#d3f1e5",
+    band: "#0f9e80",
+    steps: [0.09, 0.15, 0.22],
+    ink: "#08372e",
+    soft: "rgba(8, 55, 46, 0.68)",
+    faint: "rgba(8, 55, 46, 0.12)",
+    flow: "#0a7a68",
   },
 };
 
@@ -136,23 +131,64 @@ export const CARD_GROUNDS: Record<CardKind, string> = Object.fromEntries(
   Object.entries(PALETTES).map(([kind, palette]) => [kind, palette.ground]),
 ) as Record<CardKind, string>;
 
-/** The activity grid's five levels, empty to busiest. */
-const HEAT = ["#e6ecec", "#bfe8e1", "#7fd5c6", "#2fb3a1", "#0d7268"];
+/** The ribbon's three bands, the same on every card. */
+const RIBBON = [-0.2, -0.06, 0.05, 0.19];
 
-/** The SpeakoFlow icon's voice bars, for a week with nothing in it. */
-const ICON_BARS = [0.38, 0.7, 1, 0.58, 0.84, 0.46, 0.26];
-
-/** Where each card's bars hang across the top, so a deck does not repeat
- *  itself: the centre of the seven, as a share of the card's width. */
-const BAR_CENTRE: Record<CardKind, number> = {
-  highlights: 0.74,
-  words: 0.8,
-  speed: 0.7,
-  saved: 0.78,
-  streak: 0.72,
-  assistant: 0.8,
-  meetings: 0.7,
-  activity: 0.76,
+/**
+ * The S each card's ribbon follows, so a deck does not repeat itself. It
+ * passes behind the words, in tones close enough to the ground that the
+ * words never have to fight it, the way the icon's waves sit behind its
+ * voice bars.
+ */
+const SPINES: Record<CardKind, FlowSpec["spine"]> = {
+  highlights: [
+    [1.15, 0.12],
+    [0.35, -0.02],
+    [0.68, 1.02],
+    [-0.15, 0.88],
+  ],
+  words: [
+    [-0.15, 0.15],
+    [0.55, 0],
+    [0.45, 1],
+    [1.15, 0.85],
+  ],
+  speed: [
+    [-0.2, 0.55],
+    [0.4, -0.15],
+    [0.75, 1.15],
+    [1.2, 0.4],
+  ],
+  saved: [
+    [0.25, -0.2],
+    [1.15, 0.3],
+    [-0.05, 0.7],
+    [0.85, 1.2],
+  ],
+  streak: [
+    [-0.15, 0.85],
+    [0.35, 0.3],
+    [0.75, 0.95],
+    [1.15, 0.05],
+  ],
+  assistant: [
+    [1.2, 0.62],
+    [0.6, -0.12],
+    [0.3, 1.1],
+    [-0.2, 0.35],
+  ],
+  meetings: [
+    [0.62, -0.2],
+    [1.3, 0.45],
+    [0.1, 0.6],
+    [0.66, 1.2],
+  ],
+  activity: [
+    [-0.2, 0.28],
+    [0.5, -0.05],
+    [0.55, 0.75],
+    [1.2, 0.6],
+  ],
 };
 
 interface Assets {
@@ -169,18 +205,20 @@ const loadImage = (src: string) =>
     image.src = src;
   });
 
-/** Fonts and the icon, loaded once. A face that fails to load falls back to
- *  Inter rather than failing the card. */
+/** The typeface and the icon, loaded once. A face that fails to load falls
+ *  back to Inter rather than failing the card. */
 export const loadCardAssets = (): Promise<Assets> => {
   if (!assetsPromise) {
     const faces = [
-      new FontFace(DISPLAY_FAMILY, `url(${displayFontUrl})`, {
-        weight: "600 720",
-        stretch: "100% 102%",
+      new FontFace(FAMILY, `url(${jakartaUrl})`, {
+        weight: "200 800",
+        unicodeRange:
+          "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
       }),
-      new FontFace(DIGITS_FAMILY, `url(${digitsFontUrl})`, {
-        weight: "100 900",
-        unicodeRange: "U+0030-0039",
+      new FontFace(FAMILY, `url(${jakartaExtUrl})`, {
+        weight: "200 800",
+        unicodeRange:
+          "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
       }),
     ];
     const fonts = Promise.all(
@@ -241,8 +279,8 @@ const setTracking = (
   }
 };
 
-const font = (weight: number, size: number, family: string) =>
-  `${weight} ${Math.round(size)}px ${family}`;
+const font = (weight: number, size: number) =>
+  `${weight} ${Math.round(size)}px ${FONT}`;
 
 const roundRect = (
   ctx: CanvasRenderingContext2D,
@@ -260,6 +298,18 @@ const roundRect = (
   ctx.arcTo(x, y + h, x, y, radius);
   ctx.arcTo(x, y, x + w, y, radius);
   ctx.closePath();
+};
+
+/** `color` moved `amount` of the way toward `toward`. */
+const mix = (color: string, toward: string, amount: number): string => {
+  const parse = (hex: string) => {
+    const value = parseInt(hex.slice(1), 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  };
+  const a = parse(color);
+  const b = parse(toward);
+  const channel = (i: number) => Math.round(a[i] + (b[i] - a[i]) * amount);
+  return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 };
 
 /** Break `text` into lines no wider than `max`. Splits at spaces, or between
@@ -315,41 +365,12 @@ const wrapBalanced = (
   return best;
 };
 
-/** The largest size up to `size` at which `text` fits in `width`. Leaves
- *  the font and tracking set. */
-const fitSize = (
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  width: number,
-  size: number,
-  weight: number,
-  family: string,
-  tracking: number,
-): number => {
-  let fitted = size;
-  for (;;) {
-    ctx.font = font(weight, fitted, family);
-    setTracking(ctx, tracking, fitted);
-    if (ctx.measureText(text).width <= width || fitted <= 14) return fitted;
-    fitted -= Math.max(1, Math.round(fitted * 0.03));
-  }
-};
-
-/** A caption in capitals, the way a figure's label is set. */
-const caps = (text: string, locale: string): string => {
-  try {
-    return text.toLocaleUpperCase(locale);
-  } catch {
-    return text.toUpperCase();
-  }
-};
-
 /* ───────────────────────────── figures ───────────────────────────── */
 
 /**
  * A figure is set as its digits at full size and any words in it ("hr",
- * "min", "K", "万") at less than half, on the same baseline, so "8 hr 11 min"
- * reads as two numbers rather than one long word.
+ * "min", "K", "万") at a third of that, on the same baseline, so "8 hr 11
+ * min" reads as two numbers rather than one long word.
  */
 interface Run {
   text: string;
@@ -358,17 +379,21 @@ interface Run {
 
 const runsOf = (text: string): Run[] => {
   const runs: Run[] = [];
-  for (const part of text.match(/[\d.,٫٬  ]+|\s+|[^\d.,\s]+/g) ?? [text]) {
-    const unit = !/^[\d.,٫٬  ]+$/.test(part) || /^\s+$/.test(part);
+  for (const part of text.match(/[\d.,٫٬  ]+|\s+|[^\d.,\s]+/g) ?? [text]) {
+    const unit = !/^[\d.,٫٬  ]+$/.test(part) || /^\s+$/.test(part);
     runs.push({ text: part, unit });
   }
   return runs;
 };
 
-const UNIT_SCALE = 0.44;
+const UNIT_SCALE = 0.34;
+const FIGURE_WEIGHT = 700;
+const FIGURE_TRACKING = -0.045;
 
 const runFont = (run: Run, size: number) =>
-  run.unit ? font(650, size * UNIT_SCALE, HEADING) : font(680, size, DISPLAY);
+  run.unit ? font(620, size * UNIT_SCALE) : font(FIGURE_WEIGHT, size);
+
+const runTracking = (run: Run) => (run.unit ? -0.01 : FIGURE_TRACKING);
 
 const figureWidth = (
   ctx: CanvasRenderingContext2D,
@@ -377,7 +402,7 @@ const figureWidth = (
 ): number =>
   runsOf(text).reduce((sum, run) => {
     ctx.font = runFont(run, size);
-    setTracking(ctx, run.unit ? 0 : FIGURE_TRACKING, size);
+    setTracking(ctx, runTracking(run), size * (run.unit ? UNIT_SCALE : 1));
     return sum + ctx.measureText(run.text).width;
   }, 0);
 
@@ -395,7 +420,8 @@ const fitFigure = (
   return fitted;
 };
 
-/** Draw a figure starting at `left` (left to right) on `baseline`. */
+/** Draw a figure starting at `left` (left to right) on `baseline`. Returns
+ *  its width. */
 const drawFigure = (
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -403,11 +429,11 @@ const drawFigure = (
   baseline: number,
   size: number,
   color: string,
-) => {
+): number => {
   const runs = runsOf(text);
   const widths = runs.map((run) => {
     ctx.font = runFont(run, size);
-    setTracking(ctx, run.unit ? 0 : FIGURE_TRACKING, size);
+    setTracking(ctx, runTracking(run), size * (run.unit ? UNIT_SCALE : 1));
     return ctx.measureText(run.text).width;
   });
   const total = widths.reduce((a, b) => a + b, 0);
@@ -418,7 +444,7 @@ const drawFigure = (
   let x = frame.rtl ? mx(left, total) + total : left;
   runs.forEach((run, index) => {
     ctx.font = runFont(run, size);
-    setTracking(ctx, run.unit ? 0 : FIGURE_TRACKING, size);
+    setTracking(ctx, runTracking(run), size * (run.unit ? UNIT_SCALE : 1));
     if (frame.rtl) {
       x -= widths[index];
       ctx.fillText(run.text, x, baseline);
@@ -428,95 +454,38 @@ const drawFigure = (
     }
   });
   setTracking(ctx, 0, 1);
+  return total;
 };
+
+/** Cap height of the figure face, as a share of its size. */
+const CAP = 0.72;
 
 /* ───────────────────────────── the frame ───────────────────────────── */
 
-/**
- * The seven voice bars of the SpeakoFlow icon, in a tone of the ground. Their
- * heights are the user's last seven days, so the mark is theirs. They never
- * touch a panel or the band the logo sits in: beside the panel where a card
- * leaves room at its side (a wide card), otherwise hanging from the top edge
- * and ending a margin above the panel.
- */
-const voiceBars = (
+/** The flowing bands, laid out in `box`: the top of the card down to just
+ *  above its words. */
+const drawFlow = (
   ctx: CanvasRenderingContext2D,
-  w: number,
-  kind: CardKind,
-  color: string,
-  week: number[],
-  floor: number,
-  margin: number,
-  around: Box,
+  spec: FlowSpec,
+  palette: Palette,
+  box: Box,
 ) => {
-  const busiest = Math.max(0, ...week);
-  const heights =
-    week.length === 7 && busiest > 0
-      ? week.map((value) => 0.3 + 0.7 * Math.sqrt(value))
-      : ICON_BARS;
-  const count = heights.length;
-  const besideRoom = w - (around.x + around.w) - margin;
-  ctx.save();
-  ctx.fillStyle = color;
-  if (besideRoom > w * 0.25) {
-    // Standing in the room beside the panel, whole, from the top edge to
-    // above the foot.
-    const left = around.x + around.w + margin;
-    const length = floor * 0.9;
-    const width = Math.min(
-      length * 0.115,
-      (besideRoom * 0.9) / (count + (count - 1) * 0.6),
-    );
-    const gap = width * 0.6;
-    const span = count * width + (count - 1) * gap;
-    const start = left + (besideRoom - span) / 2;
-    const middle = floor * 0.46;
+  const bands = flowBands(spec, box.w, box.h);
+  bands.forEach((band, index) => {
     ctx.beginPath();
-    ctx.rect(mx(left, w - left), 0, w - left, floor);
-    ctx.clip();
-    heights.forEach((height, index) => {
-      const barH = length * height;
-      roundRect(
-        ctx,
-        mx(start + index * (width + gap), width),
-        middle - barH / 2,
-        width,
-        barH,
-        width / 2,
-      );
-      ctx.fill();
+    band.forEach(([x, y], point) => {
+      const px = mx(box.x + x);
+      if (point === 0) ctx.moveTo(px, box.y + y);
+      else ctx.lineTo(px, box.y + y);
     });
-  } else {
-    // Hanging from the top edge, the longest ending a margin above the
-    // panel, so the mark is cropped only by the card itself.
-    const limit = Math.min(around.y, floor) - margin;
-    if (limit > margin) {
-      const overhang = 0.42;
-      const length = limit / (1 - overhang);
-      const width = Math.min(
-        length * 0.2,
-        (w * 0.44) / (count + (count - 1) * 0.6),
-      );
-      const gap = width * 0.6;
-      const span = count * width + (count - 1) * gap;
-      const left = Math.min(
-        BAR_CENTRE[kind] * w - span / 2,
-        w - span - margin * 0.5,
-      );
-      heights.forEach((height, index) => {
-        roundRect(
-          ctx,
-          mx(left + index * (width + gap), width),
-          -length * overhang,
-          width,
-          length * height,
-          width / 2,
-        );
-        ctx.fill();
-      });
-    }
-  }
-  ctx.restore();
+    ctx.closePath();
+    ctx.fillStyle = mix(
+      palette.ground,
+      palette.band,
+      palette.steps[Math.min(index, palette.steps.length - 1)],
+    );
+    ctx.fill();
+  });
 };
 
 /** The logo at `height` tall with its bottom on `bottom`, its words in the
@@ -550,509 +519,393 @@ const logo = (
   return width;
 };
 
-/** A white panel for a number to sit on. */
-const panel = (ctx: CanvasRenderingContext2D, box: Box, radius: number) => {
-  ctx.save();
-  ctx.shadowColor = "rgba(10, 14, 20, 0.14)";
-  ctx.shadowBlur = radius * 1.2;
-  ctx.shadowOffsetY = radius * 0.35;
-  roundRect(ctx, mx(box.x, box.w), box.y, box.w, box.h, radius);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.restore();
-};
-
 interface Layout {
   pad: number;
-  title: { size: number; baseline: number };
-  /** Where the panel may go; it takes the height its content needs and is
-   *  centred in this. */
+  /** Where the words go: they stand on its bottom edge. */
   region: Box;
-  radius: number;
+  /** The gap kept between the bands and the words. */
+  clearance: number;
   footer: { bottom: number; logo: number; tagline: number };
-  /** The band the voice bars stay above. */
-  floor: number;
-  /** Scale for everything set inside the panel. */
+  /** The largest a figure is set. */
+  figure: number;
+  /** Scale for the type around the figure. */
   k: number;
-  /** A story sets its title right above the panel and centres the two. */
-  grouped: boolean;
 }
 
 const layoutFor = (format: CardFormat, w: number, h: number): Layout => {
   if (format === "story") {
     // Instagram and Facebook draw their own bars over about the top and
-    // bottom 250 pixels of a story, so the title and the logo stay inside.
-    const pad = 84;
-    const top = 270;
-    const bottom = h - 270;
-    const logo = 60;
+    // bottom 250 pixels of a story, so the words and the logo stay inside.
+    const pad = 92;
+    const bottom = h - 290;
+    const logo = 62;
     return {
       pad,
-      title: { size: 76, baseline: top + 64 },
-      region: { x: pad, y: top, w: w - pad * 2, h: bottom - logo - 90 - top },
-      radius: 56,
-      footer: { bottom, logo, tagline: 30 },
-      floor: bottom - logo - 60,
-      k: 1.5,
-      grouped: true,
+      region: { x: pad, y: 290, w: w - pad * 2, h: bottom - logo - 150 - 290 },
+      clearance: 120,
+      footer: { bottom, logo, tagline: 28 },
+      figure: 330,
+      k: 1.2,
     };
   }
   if (format === "wide") {
-    const pad = 80;
-    const logo = 48;
-    const footerTop = h - pad - logo;
-    const top = pad + 50 + pad;
+    const pad = 96;
+    const logo = 52;
     return {
       pad,
-      title: { size: 58, baseline: pad + 50 },
-      // The panel keeps to the left three fifths; the voice bars have the
-      // rest.
-      region: { x: pad, y: top, w: 880, h: footerTop - pad - top },
-      radius: 44,
-      footer: { bottom: h - pad + 4, logo, tagline: 26 },
-      floor: footerTop - 40,
-      k: 1,
-      grouped: false,
+      region: { x: pad, y: pad, w: 900, h: h - pad - logo - 76 - pad },
+      clearance: 70,
+      footer: { bottom: h - pad + 6, logo, tagline: 26 },
+      figure: 230,
+      k: 0.9,
     };
   }
-  const pad = 84;
-  const logo = 52;
-  const footerTop = h - pad - logo;
+  const pad = 92;
+  const logo = 56;
   return {
     pad,
-    title: { size: 62, baseline: pad + 54 },
-    region: {
-      x: pad,
-      y: pad + 100,
-      w: w - pad * 2,
-      h: footerTop - 48 - (pad + 100),
-    },
-    radius: 44,
-    footer: { bottom: h - pad + 4, logo, tagline: 26 },
-    floor: footerTop - 40,
+    region: { x: pad, y: pad, w: w - pad * 2, h: h - pad - logo - 92 - pad },
+    clearance: 90,
+    footer: { bottom: h - pad + 6, logo, tagline: 27 },
+    figure: 260,
     k: 1,
-    grouped: false,
   };
 };
 
-/* ───────────────────────────── the panels ───────────────────────────── */
+/* ───────────────────────────── the content ───────────────────────────── */
 
 interface Ctx {
   ctx: CanvasRenderingContext2D;
   palette: Palette;
-  locale: string;
+  layout: Layout;
   format: CardFormat;
-  k: number;
-  radius: number;
-  /** The most height a panel can have. */
-  room: number;
-  /** The box for a panel `height` tall; `full` takes the card's whole
-   *  width where the panel otherwise keeps to part of it. */
-  place: (height: number, full?: boolean) => Box;
+  deck: CardDeck;
 }
 
-/** One line of a centred block. */
-interface Line {
-  text: string;
+/** Lines of text, wrapped to `max`, at most two of them. */
+interface TextBlock {
+  rows: string[];
   size: number;
   weight: number;
-  family: string;
   color: string;
   tracking: number;
-  /** Space above this line, in units of its size. */
+  /** Space above, as a share of the size. */
   gap: number;
-  /** The figure itself: digits and units, shrunk to the width. */
-  figure?: boolean;
-  /** A word set after the figure on its baseline, as in "12 days". */
-  unit?: { text: string; size: number };
 }
 
-interface SetLine {
-  line: Line;
-  size: number;
-  rows: string[];
-}
-
-interface Block {
-  set: SetLine[];
-  height: number;
-}
-
-const unitWidth = (ctx: CanvasRenderingContext2D, unit: Line["unit"]) => {
-  if (!unit) return 0;
-  ctx.font = font(650, unit.size, TEXT);
-  setTracking(ctx, 0.06, unit.size);
-  return ctx.measureText(unit.text).width + unit.size * 0.45;
+const textBlock = (
+  c: Ctx,
+  text: string | undefined,
+  size: number,
+  weight: number,
+  color: string,
+  max: number,
+  gap: number,
+  tracking = -0.012,
+): TextBlock | null => {
+  if (!text) return null;
+  const { ctx } = c;
+  ctx.font = font(weight, size);
+  setTracking(ctx, tracking, size);
+  return {
+    rows: wrapBalanced(ctx, text, max).slice(0, 2),
+    size,
+    weight,
+    color,
+    tracking,
+    gap,
+  };
 };
 
-const advance = (line: Line, size: number) =>
-  line.figure ? size * 0.74 : size * 1.24;
+const LINE = 1.22;
 
-/** Fit and wrap `lines` to `width`, and say how tall they stand. */
-const measure = (c: Ctx, width: number, lines: Line[]): Block => {
-  const { ctx } = c;
-  const set = lines.map((line): SetLine => {
-    if (line.figure) {
-      const size = fitFigure(
-        ctx,
-        line.text,
-        width - unitWidth(ctx, line.unit),
-        line.size,
-      );
-      return { line, size, rows: [line.text] };
-    }
-    ctx.font = font(line.weight, line.size, line.family);
-    setTracking(ctx, line.tracking, line.size);
-    return {
-      line,
-      size: line.size,
-      rows: wrapBalanced(ctx, line.text, width).slice(0, 2),
-    };
-  });
-  const height = set.reduce(
-    (sum, { line, size, rows }) =>
-      sum + line.gap * size + advance(line, size) * rows.length,
-    0,
-  );
-  return { set, height };
-};
+const blockHeight = (block: TextBlock | null) =>
+  block ? block.gap * block.size + block.rows.length * block.size * LINE : 0;
 
-/** Draw a measured block centred in `box`. */
-const drawBlock = (c: Ctx, box: Box, block: Block) => {
+/** Draw a text block with its top at `top`; returns its bottom. */
+const drawText = (
+  c: Ctx,
+  block: TextBlock | null,
+  left: number,
+  top: number,
+): number => {
+  if (!block) return top;
   const { ctx } = c;
-  let y = box.y + (box.h - block.height) / 2;
-  for (const { line, size, rows } of block.set) {
-    y += line.gap * size;
-    for (const row of rows) {
-      const baseline = y + (line.figure ? size * 0.74 : size * 0.95);
-      if (line.figure) {
-        const valueWidth = figureWidth(ctx, row, size);
-        const extra = unitWidth(ctx, line.unit);
-        const start = box.x + (box.w - valueWidth - extra) / 2;
-        drawFigure(ctx, row, start, baseline, size, line.color);
-        if (line.unit) {
-          ctx.font = font(650, line.unit.size, TEXT);
-          setTracking(ctx, 0.06, line.unit.size);
-          ctx.fillStyle = line.color;
-          ctx.textAlign = flip("left");
-          ctx.fillText(
-            line.unit.text,
-            mx(start + valueWidth + line.unit.size * 0.45),
-            baseline,
-          );
-        }
-      } else {
-        ctx.font = font(line.weight, size, line.family);
-        setTracking(ctx, line.tracking, size);
-        ctx.fillStyle = line.color;
-        ctx.textAlign = "center";
-        ctx.fillText(row, mx(box.x + box.w / 2), baseline);
-      }
-      y += advance(line, size);
-    }
+  ctx.font = font(block.weight, block.size);
+  setTracking(ctx, block.tracking, block.size);
+  ctx.fillStyle = block.color;
+  ctx.textAlign = flip("left");
+  let y = top + block.gap * block.size;
+  for (const row of block.rows) {
+    ctx.fillText(row, mx(left), y + block.size * 0.92);
+    y += block.size * LINE;
   }
   setTracking(ctx, 0, 1);
-  ctx.textAlign = "left";
+  return y;
 };
 
-const valueLine = (
+/** The card's title, set over its figure. */
+const kicker = (c: Ctx, slide: CardSlide, width: number) =>
+  textBlock(c, slide.title, 40 * c.layout.k, 620, c.palette.ink, width, 0);
+
+/**
+ * What a card says, in its lower part: how tall it stands, and how to draw
+ * it with its top at a given height. The card stands it on the bottom of its
+ * region and gives the bands the room above.
+ */
+interface Piece {
+  height: number;
+  draw: (top: number) => void;
+}
+
+interface Extra {
+  height: number;
+  gap: number;
+  draw: (top: number) => void;
+}
+
+/** The title, the figure, what it counts and a sentence: words, time saved,
+ *  the streak, the assistant and meetings. `extra` goes under the words. */
+const figurePiece = (
   c: Ctx,
-  text: string,
-  size: number,
-  unit?: string,
-): Line => ({
-  text,
-  size: size * c.k,
-  weight: 680,
-  family: DISPLAY,
-  color: PANEL_INK,
-  tracking: FIGURE_TRACKING,
-  gap: 0,
-  figure: true,
-  unit: unit ? { text: caps(unit, c.locale), size: 54 * c.k } : undefined,
-});
-
-const labelLine = (c: Ctx, text: string, gap: number): Line => ({
-  text: caps(text, c.locale),
-  size: 27 * c.k,
-  weight: 600,
-  family: TEXT,
-  color: PANEL_MUTED,
-  tracking: 0.14,
-  gap,
-});
-
-const noteLine = (c: Ctx, text: string, gap: number): Line => ({
-  text,
-  size: 38 * c.k,
-  weight: 600,
-  family: HEADING,
-  color: PANEL_INK,
-  tracking: -0.01,
-  gap,
-});
-
-/** The figure, what it counts, and a sentence: words, time saved, the
- *  streak, the assistant and meetings. */
-const figureCard = (c: Ctx, slide: CardSlide, region: Box) => {
-  const { k } = c;
-  const padX = 64 * k;
-  const padY = 84 * k;
-  const lines: Line[] = [];
-  if (slide.value) lines.push(valueLine(c, slide.value, 220, slide.unit));
-  if (slide.label) lines.push(labelLine(c, slide.label, 1.5));
-  if (slide.note) {
-    lines.push(noteLine(c, slide.note, slide.label ? 0.95 : 1.15));
-  }
-  const block = measure(c, region.w - padX * 2, lines);
-  const box = c.place(block.height + padY * 2);
-  panel(c.ctx, box, c.radius);
-  drawBlock(
-    c,
-    { x: box.x + padX, y: box.y, w: box.w - padX * 2, h: box.h },
-    block,
+  slide: CardSlide,
+  region: Box,
+  extra?: Extra,
+): Piece => {
+  const { ctx, palette, layout } = c;
+  const k = layout.k;
+  const title = kicker(c, slide, region.w);
+  const unitSize = slide.unit ? layout.figure * 0.3 : 0;
+  ctx.font = font(640, unitSize);
+  setTracking(ctx, -0.02, unitSize);
+  const unitW = slide.unit
+    ? ctx.measureText(slide.unit).width + unitSize * 0.3
+    : 0;
+  const size = fitFigure(
+    ctx,
+    slide.value ?? "",
+    region.w - unitW,
+    layout.figure,
   );
-};
-
-/** The speed: the figure, and a bar for it over a hairline one for a
- *  typical typist, who is a reference rather than the user. Side by side on
- *  a wide card, one above the other on the others. */
-const speedCard = (c: Ctx, slide: CardSlide, region: Box) => {
-  const { ctx, k, palette } = c;
-  const compare = slide.compare;
-  const wide = c.format === "wide";
-  const padX = 64 * k;
-  const padY = (wide ? 60 : 76) * k;
-  const innerW = region.w - padX * 2;
-  const figureW = wide ? innerW * 0.5 : innerW;
-  const figure = measure(c, figureW, [
-    valueLine(c, slide.value ?? "", wide ? 190 : 210),
-    labelLine(c, slide.label ?? "", 1.5),
-  ]);
-  const labelSize = 28 * k;
-  const barH = (wide ? 36 : 44) * k;
-  const rowGap = 26 * k;
-  const noteSize = (wide ? 32 : 36) * k;
-  const barsH =
-    2 * (labelSize * 1.5 + barH) + rowGap + (slide.note ? noteSize * 1.9 : 0);
-  const between = 64 * k;
-  const contentH = wide
-    ? Math.max(figure.height, barsH)
-    : figure.height + between + barsH;
-  const box = c.place(contentH + padY * 2);
-  panel(ctx, box, c.radius);
-  const inner = {
-    x: box.x + padX,
-    y: box.y + padY,
-    w: innerW,
-    h: box.h - padY * 2,
-  };
-  drawBlock(
+  const label = textBlock(
     c,
-    wide
-      ? { x: inner.x, y: inner.y, w: figureW, h: inner.h }
-      : { x: inner.x, y: inner.y, w: inner.w, h: figure.height },
-    figure,
+    slide.label,
+    48 * k,
+    640,
+    palette.ink,
+    region.w,
+    0.45,
   );
-  if (!compare) return;
-  const bars: Box = wide
-    ? {
-        x: inner.x + innerW * 0.56,
-        y: inner.y + (inner.h - barsH) / 2,
-        w: innerW * 0.44,
-        h: barsH,
-      }
-    : {
-        x: inner.x,
-        y: inner.y + figure.height + between,
-        w: inner.w,
-        h: barsH,
-      };
-  const max = Math.max(compare.you, compare.typing);
-  let y = bars.y;
-  [
-    { label: compare.youLabel, value: compare.you, reference: false },
-    { label: compare.typingLabel, value: compare.typing, reference: true },
-  ].forEach((row, index) => {
-    ctx.font = font(600, labelSize, TEXT);
-    setTracking(ctx, 0, 1);
-    ctx.fillStyle = row.reference ? PANEL_MUTED : PANEL_INK;
-    ctx.textAlign = flip("left");
-    ctx.fillText(row.label, mx(bars.x), y + labelSize);
-    ctx.textAlign = flip("right");
-    ctx.font = font(680, labelSize, DISPLAY);
-    ctx.fillText(String(row.value), mx(bars.x + bars.w), y + labelSize);
-    y += labelSize * 1.5;
-    const length = Math.max(barH, (bars.w * row.value) / max);
-    if (row.reference) {
-      roundRect(
+  const note = textBlock(
+    c,
+    slide.note,
+    34 * k,
+    520,
+    palette.soft,
+    region.w,
+    0.5,
+  );
+  const titleGap = 0.38 * size;
+  const height =
+    blockHeight(title) +
+    titleGap +
+    size * CAP +
+    size * 0.05 +
+    blockHeight(label) +
+    blockHeight(note) +
+    (extra ? extra.gap + extra.height : 0);
+  return {
+    height,
+    draw: (top) => {
+      let y = drawText(c, title, region.x, top);
+      const baseline = y + titleGap + size * CAP;
+      const width = drawFigure(
         ctx,
-        mx(bars.x, length) + 1.5,
-        y + 1.5,
-        length - 3,
-        barH - 3,
-        barH / 2,
+        slide.value ?? "",
+        region.x,
+        baseline,
+        size,
+        palette.ink,
       );
-      ctx.strokeStyle = "#b9c2c3";
-      ctx.lineWidth = 3;
-      ctx.setLineDash([10 * k, 8 * k]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    } else {
-      roundRect(ctx, mx(bars.x, length), y, length, barH, barH / 2);
-      ctx.fillStyle = palette.accent;
-      ctx.fill();
-    }
-    y += barH + (index === 0 ? rowGap : 0);
-  });
-  if (slide.note) {
-    ctx.font = font(600, noteSize, HEADING);
-    ctx.fillStyle = PANEL_INK;
-    ctx.textAlign = flip("left");
-    ctx.fillText(slide.note, mx(bars.x), y + noteSize * 1.6);
-  }
-  ctx.textAlign = "left";
+      if (slide.unit) {
+        ctx.font = font(640, unitSize);
+        setTracking(ctx, -0.02, unitSize);
+        ctx.fillStyle = palette.ink;
+        ctx.textAlign = flip("left");
+        ctx.fillText(
+          slide.unit,
+          mx(region.x + width + unitSize * 0.3),
+          baseline,
+        );
+        setTracking(ctx, 0, 1);
+      }
+      y = drawText(c, label, region.x, baseline + size * 0.05);
+      y = drawText(c, note, region.x, y);
+      if (extra) extra.draw(y + extra.gap);
+    },
+  };
 };
 
-/** Highlights: small white panels instead of one, two by two, or one under
- *  another on a story. */
-const highlightsCard = (c: Ctx, slide: CardSlide, region: Box) => {
-  const { ctx, k } = c;
+/** Highlights: up to four figures, two by two, each under a hairline. */
+const highlightsPiece = (c: Ctx, slide: CardSlide, region: Box): Piece => {
+  const { ctx, palette, layout, format } = c;
   const items = slide.items ?? [];
-  const columns = c.format === "story" ? 1 : 2;
+  const k = layout.k;
+  const columns = 2;
   const rows = Math.ceil(items.length / columns);
-  const gap = 28 * k;
-  const cellW = (region.w - gap * (columns - 1)) / columns;
-  const padX = 48 * k;
-  const labelSize = 26 * k;
-  const valueMax = (c.format === "story" ? 92 : 104) * k;
-  // Every cell is set at the size the widest figure allows, so they read as
-  // one set.
-  const valueSize = Math.min(
-    ...items.map((item) =>
-      fitFigure(ctx, item.value, cellW - padX * 2, valueMax),
-    ),
+  const colGap = 64 * k;
+  const cellW = (region.w - colGap * (columns - 1)) / columns;
+  const max = (format === "story" ? 150 : format === "wide" ? 112 : 124) * k;
+  // Every figure is set at the size the widest allows, so they read as one
+  // set.
+  const size = Math.min(
+    ...items.map((item) => fitFigure(ctx, item.value, cellW, max)),
   );
-  const labels = items.map((item) => {
-    ctx.font = font(600, labelSize, TEXT);
-    setTracking(ctx, 0.12, labelSize);
-    return wrap(ctx, caps(item.label, c.locale), cellW - padX * 2).slice(0, 2);
-  });
-  const lines = Math.max(...labels.map((rowLines) => rowLines.length));
-  const contentH =
-    valueSize * 0.74 + labelSize * 1.7 + (lines - 1) * labelSize * 1.3;
-  const cellH = Math.min(
-    (c.room - gap * (rows - 1)) / rows,
-    contentH + 64 * k * 2,
+  const labels = items.map((item) =>
+    textBlock(c, item.label, 32 * k, 560, palette.soft, cellW, 0.4),
   );
-  const block = c.place(rows * cellH + (rows - 1) * gap);
-  items.forEach((item, index) => {
-    const col = index % columns;
-    const row = Math.floor(index / columns);
-    const cell: Box = {
-      x: block.x + col * (cellW + gap),
-      y: block.y + row * (cellH + gap),
-      w: cellW,
-      h: cellH,
-    };
-    panel(ctx, cell, c.radius * 0.8);
-    const y = cell.y + (cell.h - contentH) / 2;
-    drawFigure(
-      ctx,
-      item.value,
-      cell.x + padX,
-      y + valueSize * 0.74,
-      valueSize,
-      PANEL_INK,
-    );
-    ctx.font = font(600, labelSize, TEXT);
-    setTracking(ctx, 0.12, labelSize);
-    ctx.fillStyle = PANEL_MUTED;
-    ctx.textAlign = flip("left");
-    labels[index].forEach((line, lineIndex) => {
-      ctx.fillText(
-        line,
-        mx(cell.x + padX),
-        y + valueSize * 0.74 + labelSize * 1.7 + lineIndex * labelSize * 1.3,
-      );
-    });
-    setTracking(ctx, 0, 1);
-    ctx.textAlign = "left";
-  });
+  const ruleGap = 30 * k;
+  const cellH = ruleGap + size * CAP + Math.max(...labels.map(blockHeight));
+  const rowGap = (format === "story" ? 60 : 48) * k;
+  const title = kicker(c, slide, region.w);
+  const titleGap = 44 * k;
+  const height =
+    blockHeight(title) + titleGap + rows * cellH + (rows - 1) * rowGap;
+  return {
+    height,
+    draw: (top) => {
+      const gridTop = drawText(c, title, region.x, top) + titleGap;
+      items.forEach((item, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        const x = region.x + col * (cellW + colGap);
+        const y = gridTop + row * (cellH + rowGap);
+        ctx.fillStyle = palette.faint;
+        ctx.fillRect(mx(x, cellW), y, cellW, Math.max(2, 2 * k));
+        const baseline = y + ruleGap + size * CAP;
+        drawFigure(ctx, item.value, x, baseline, size, palette.ink);
+        drawText(c, labels[index], x, baseline + size * 0.02);
+      });
+    },
+  };
 };
 
-/** The days active and six months of them, one square each: the figure
- *  over the grid, or beside it across the whole of a wide card. */
-const activityCard = (c: Ctx, slide: CardSlide, region: Box) => {
-  const { ctx, k } = c;
+/** The speed: the figure, and a bar for it over a fainter one for a typical
+ *  typist, who is a reference rather than the user. */
+const speedPiece = (c: Ctx, slide: CardSlide, region: Box): Piece => {
+  const { ctx, palette, layout } = c;
+  const compare = slide.compare;
+  const k = layout.k;
+  const barH = 18 * k;
+  const rowLabel = 28 * k;
+  const rowH = rowLabel * 1.55 + barH;
+  const rowGap = 26 * k;
+  const barsW = Math.min(region.w, 780 * k);
+  const bars: Extra | undefined = compare && {
+    height: rowH * 2 + rowGap,
+    gap: 56 * k,
+    draw: (top) => {
+      const max = Math.max(compare.you, compare.typing);
+      let y = top;
+      [
+        { label: compare.youLabel, value: compare.you, color: palette.ink },
+        {
+          label: compare.typingLabel,
+          value: compare.typing,
+          color: palette.faint,
+        },
+      ].forEach((row, index) => {
+        ctx.font = font(560, rowLabel);
+        setTracking(ctx, -0.01, rowLabel);
+        ctx.fillStyle = index === 0 ? palette.ink : palette.soft;
+        ctx.textAlign = flip("left");
+        ctx.fillText(row.label, mx(region.x), y + rowLabel);
+        ctx.textAlign = flip("right");
+        ctx.font = font(680, rowLabel);
+        ctx.fillText(String(row.value), mx(region.x + barsW), y + rowLabel);
+        setTracking(ctx, 0, 1);
+        y += rowLabel * 1.55;
+        const length = Math.max(barH, (barsW * row.value) / max);
+        roundRect(ctx, mx(region.x, length), y, length, barH, barH / 2);
+        ctx.fillStyle = row.color;
+        ctx.fill();
+        y += barH + rowGap;
+      });
+      ctx.textAlign = "left";
+    },
+  };
+  return figurePiece(c, { ...slide, note: undefined }, region, bars);
+};
+
+/** The days active over six months of them, one square each: under the
+ *  figure, or beside it across the whole of a wide card. */
+const activityPiece = (c: Ctx, slide: CardSlide, region: Box): Piece => {
+  const { ctx, palette, layout, format } = c;
   const grid = slide.activity;
-  if (!grid) return;
-  const wide = c.format === "wide";
+  const k = layout.k;
+  if (!grid) return figurePiece(c, slide, region);
   const weeks = grid.weeks.length;
-  const padX = 56 * k;
-  const padY = 60 * k;
-  const monthSize = 22 * k;
-  const monthBand = monthSize * 1.9;
-  const fullW = wide ? frame.width - region.x * 2 : region.w;
-  const figureW = wide ? 300 * k : fullW - padX * 2;
-  const figure = measure(c, figureW, [
-    valueLine(c, slide.value ?? "", wide || c.format === "story" ? 150 : 132),
-    labelLine(c, slide.label ?? "", 1.4),
-  ]);
-  const between = (wide ? 64 : 48) * k;
-  const gridRoomW = wide
-    ? fullW - padX * 2 - figureW - between
-    : fullW - padX * 2;
-  const fixedH = wide ? monthBand : figure.height + between + monthBand;
-  const gridRoomH = c.room - padY * 2 - fixedH;
-  const pitch = Math.min(gridRoomW / weeks, gridRoomH / 7, 54);
-  const cell = pitch * 0.84;
+  const wide = format === "wide";
+  const monthSize = 24 * k;
+  const monthBand = monthSize * 1.7;
+  const textW = wide ? 380 : region.w;
+  const between = 72;
+  const gridRoom = wide
+    ? frame.width - layout.pad - (region.x + textW + between)
+    : region.w;
+  const pitch = Math.min(gridRoom / weeks, 40 * k);
+  const cell = pitch * 0.8;
   const gridW = pitch * weeks - (pitch - cell);
   const gridH = pitch * 7 - (pitch - cell);
-  const contentH = wide
-    ? Math.max(figure.height, monthBand + gridH)
-    : figure.height + between + monthBand + gridH;
-  const box = c.place(contentH + padY * 2, wide);
-  panel(ctx, box, c.radius);
-  const innerY = box.y + (box.h - contentH) / 2;
-  let left: number;
-  let top: number;
-  if (wide) {
-    drawBlock(c, { x: box.x + padX, y: box.y, w: figureW, h: box.h }, figure);
-    left = box.x + padX + figureW + between + (gridRoomW - gridW) / 2;
-    top = box.y + (box.h - (monthBand + gridH)) / 2 + monthBand;
-  } else {
-    drawBlock(
-      c,
-      { x: box.x + padX, y: innerY, w: box.w - padX * 2, h: figure.height },
-      figure,
-    );
-    left = box.x + (box.w - gridW) / 2;
-    top = innerY + figure.height + between + monthBand;
-  }
-  ctx.font = font(500, monthSize, TEXT);
-  ctx.fillStyle = PANEL_MUTED;
-  ctx.textAlign = flip("left");
-  grid.months.forEach(({ col, label }) => {
-    if (col > weeks - 2) return;
-    ctx.fillText(label, mx(left + col * pitch), top - monthSize * 0.75);
-  });
-  grid.weeks.forEach((column, week) => {
-    column.forEach((level, day) => {
-      if (level < 0) return;
-      roundRect(
-        ctx,
-        mx(left + week * pitch, cell),
-        top + day * pitch,
-        cell,
-        cell,
-        cell * 0.24,
-      );
-      ctx.fillStyle = HEAT[level];
-      ctx.fill();
+  // Opaque, so a cell reads the same over a band as over the ground.
+  const levels = [
+    mix(palette.ground, palette.ink, 0.09),
+    mix(palette.ground, palette.band, 0.32),
+    mix(palette.ground, palette.band, 0.55),
+    mix(palette.ground, palette.band, 0.8),
+    palette.band,
+  ];
+  const drawGrid = (left: number, gridTop: number) => {
+    ctx.font = font(560, monthSize);
+    ctx.fillStyle = palette.soft;
+    ctx.textAlign = flip("left");
+    grid.months.forEach(({ col, label }) => {
+      if (col > weeks - 2) return;
+      ctx.fillText(label, mx(left + col * pitch), gridTop - monthSize * 0.7);
     });
-  });
-  ctx.textAlign = "left";
+    grid.weeks.forEach((column, week) => {
+      column.forEach((level, day) => {
+        if (level < 0) return;
+        roundRect(
+          ctx,
+          mx(left + week * pitch, cell),
+          gridTop + day * pitch,
+          cell,
+          cell,
+          cell * 0.3,
+        );
+        ctx.fillStyle = levels[level];
+        ctx.fill();
+      });
+    });
+    ctx.textAlign = "left";
+  };
+  if (!wide) {
+    return figurePiece(c, slide, region, {
+      height: monthBand + gridH,
+      gap: 52 * k,
+      draw: (top) => drawGrid(region.x, top + monthBand),
+    });
+  }
+  const text = figurePiece(c, slide, { ...region, w: textW });
+  const height = Math.max(text.height, monthBand + gridH);
+  return {
+    height,
+    draw: (top) => {
+      text.draw(top + height - text.height);
+      drawGrid(frame.width - layout.pad - gridW, top + height - gridH);
+    },
+  };
 };
 
 /* ───────────────────────────── the card ───────────────────────────── */
@@ -1065,7 +918,6 @@ export const drawCard = (
   deck: CardDeck,
   format: CardFormat,
   assets: Assets,
-  locale: string,
   rtl = false,
 ) => {
   const { width: w, height: h } = CARD_SIZES[format];
@@ -1079,93 +931,28 @@ export const drawCard = (
   ctx.textBaseline = "alphabetic";
   const palette = PALETTES[slide.kind];
   const layout = layoutFor(format, w, h);
+  const c: Ctx = { ctx, palette, layout, format, deck };
+  const { region } = layout;
+
+  const piece =
+    slide.kind === "highlights"
+      ? highlightsPiece(c, slide, region)
+      : slide.kind === "speed"
+        ? speedPiece(c, slide, region)
+        : slide.kind === "activity"
+          ? activityPiece(c, slide, region)
+          : figurePiece(c, slide, region);
+  const top = region.y + Math.max(0, region.h - piece.height);
 
   ctx.fillStyle = palette.ground;
   ctx.fillRect(0, 0, w, h);
-
-  // A story sets its title right above the panel and centres the two in
-  // the room it has; the other sizes keep the title at the top.
-  let titleBaseline = layout.title.baseline;
-  const titleGap = 56 * layout.k;
-  const room = layout.grouped
-    ? layout.region.h - layout.title.size - titleGap
-    : layout.region.h;
-  // The voice bars go down with the first panel placed, once its box is
-  // known, so they can keep clear of it.
-  let barsDrawn = false;
-  const withBars = (box: Box): Box => {
-    if (!barsDrawn) {
-      barsDrawn = true;
-      voiceBars(
-        ctx,
-        w,
-        slide.kind,
-        palette.bars,
-        deck.week,
-        layout.floor,
-        layout.pad * 0.6,
-        layout.grouped
-          ? { ...box, y: box.y - layout.title.size - titleGap }
-          : box,
-      );
-    }
-    return box;
-  };
-  const placeBox = (height: number, full = false): Box => {
-    const region = full
-      ? { ...layout.region, w: w - layout.region.x * 2 }
-      : layout.region;
-    if (layout.grouped) {
-      const block = layout.title.size + titleGap + height;
-      const top = region.y + Math.max(0, (region.h - block) * 0.55);
-      titleBaseline = top + layout.title.size * 0.8;
-      return {
-        x: region.x,
-        y: top + layout.title.size + titleGap,
-        w: region.w,
-        h: Math.min(height, region.h - layout.title.size - titleGap),
-      };
-    }
-    const fitted = Math.min(region.h, height);
-    return {
-      x: region.x,
-      y: region.y + (region.h - fitted) / 2,
-      w: region.w,
-      h: fitted,
-    };
-  };
-  const place = (height: number, full = false): Box =>
-    withBars(placeBox(height, full));
-
-  const c: Ctx = {
+  drawFlow(
     ctx,
+    { spine: SPINES[slide.kind], edges: RIBBON, fan: [1, 1] },
     palette,
-    locale,
-    format,
-    k: layout.k,
-    radius: layout.radius,
-    room,
-    place,
-  };
-  if (slide.kind === "highlights") highlightsCard(c, slide, layout.region);
-  else if (slide.kind === "speed") speedCard(c, slide, layout.region);
-  else if (slide.kind === "activity") activityCard(c, slide, layout.region);
-  else figureCard(c, slide, layout.region);
-
-  // fitSize leaves the title's font set.
-  fitSize(
-    ctx,
-    slide.title,
-    w - layout.pad * 2,
-    layout.title.size,
-    650,
-    HEADING,
-    -0.025,
+    { x: 0, y: 0, w, h },
   );
-  ctx.fillStyle = palette.ink;
-  ctx.textAlign = flip("left");
-  ctx.fillText(slide.title, mx(layout.pad), titleBaseline);
-  setTracking(ctx, 0, 1);
+  piece.draw(top);
 
   const { footer } = layout;
   const logoWidth = logo(
@@ -1178,9 +965,9 @@ export const drawCard = (
   );
   const taglineRoom = w - layout.pad * 2 - logoWidth - footer.tagline * 2;
   for (let size = footer.tagline; size >= footer.tagline * 0.72; size -= 1) {
-    ctx.font = font(500, size, TEXT);
+    ctx.font = font(540, size);
     if (ctx.measureText(deck.tagline).width <= taglineRoom) {
-      ctx.fillStyle = palette.tagline;
+      ctx.fillStyle = palette.soft;
       ctx.textAlign = flip("right");
       ctx.fillText(
         deck.tagline,

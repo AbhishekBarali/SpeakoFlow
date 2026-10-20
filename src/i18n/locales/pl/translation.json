@@ -3452,18 +3452,16 @@
     "about": "Jak używasz SpeakoFlow, liczone na tym komputerze.",
     "nothingYet": "Statystyki pojawią się, gdy zaczniesz dyktować, pytać asystenta lub nagrywać spotkania.",
     "goHome": "Zobacz swoje skróty",
-    "dictationsSoFar_one": "Już {{formatted}} dyktowanie",
-    "dictationsSoFar_few": "Już {{formatted}} dyktowania",
-    "dictationsSoFar_many": "Już {{formatted}} dyktowań",
-    "dictationsSoFar_other": "Już {{formatted}} dyktowania",
+    "figures": {
+      "dictations": "Dyktowania",
+      "questions": "Zadane pytania",
+      "meetings": "Nagrane spotkania"
+    },
+    "activityTitle": "Aktywność",
     "pages_one": "Około {{count}} strony",
     "pages_few": "Około {{count}} stron",
     "pages_many": "Około {{count}} stron",
     "pages_other": "Około {{count}} strony",
-    "streak_one": "{{count}} dzień z rzędu",
-    "streak_few": "{{count}} dni z rzędu",
-    "streak_many": "{{count}} dni z rzędu",
-    "streak_other": "{{count}} dnia z rzędu",
     "longest_one": "Najdłużej: {{count}} dzień",
     "longest_few": "Najdłużej: {{count}} dni",
     "longest_many": "Najdłużej: {{count}} dni",
@@ -3519,12 +3517,10 @@
     },
     "assistantCard": {
       "info": "Szybkie pytania i to, co mówisz w rozmowach. Zostają w statystykach, nawet gdy usuniesz rozmowy.",
-      "empty": "Zapytaj o coś asystenta albo rozpocznij rozmowę, a pojawi się to tutaj.",
       "noCalls": "Na razie bez rozmów"
     },
     "meetingsCard": {
-      "info": "Nagrane przez Ciebie spotkania. Zostają w statystykach, nawet gdy usuniesz spotkanie.",
-      "empty": "Nagraj spotkanie, a pojawi się tutaj."
+      "info": "Nagrane przez Ciebie spotkania. Zostają w statystykach, nawet gdy usuniesz spotkanie."
     },
     "share": {
       "button": "Udostępnij",
@@ -3609,7 +3605,10 @@
         "saved": {
           "title": "Zaoszczędzony czas",
           "label": "mniej przy klawiaturze",
-          "note": "W porównaniu z pisaniem w tempie {{wpm}} słów na minutę"
+          "workdays_one": "Cały dzień pracy",
+          "workdays_few": "Około {{count}} dni pracy",
+          "workdays_many": "Około {{count}} dni pracy",
+          "workdays_other": "Około {{count}} dnia pracy"
         },
         "streak": {
           "title": "Nie zwalniam tempa",

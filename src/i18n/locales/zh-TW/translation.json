@@ -3365,9 +3365,13 @@
     "about": "您使用 SpeakoFlow 的情形，在這台電腦上統計。",
     "nothingYet": "只要使用語音輸入、詢問助理或錄製會議，就會顯示您的使用分析。",
     "goHome": "查看快捷鍵",
-    "dictationsSoFar_other": "已語音輸入 {{formatted}} 次",
+    "figures": {
+      "dictations": "語音輸入次數",
+      "questions": "提問次數",
+      "meetings": "錄音的會議"
+    },
+    "activityTitle": "活動",
     "pages_other": "約 {{count}} 頁",
-    "streak_other": "連續 {{count}} 天",
     "longest_other": "最長：{{count}} 天",
     "streakHint": "當天只要使用語音輸入、詢問助理、進行對話或錄製會議，就算一天。",
     "gridSummary_other": "過去 6 個月內，{{count}} 天共 {{words}} 字",
@@ -3402,12 +3406,10 @@
     },
     "assistantCard": {
       "info": "快速提問，以及您在對話中說的話。刪除對話後，這些仍會計入。",
-      "empty": "向助理問個問題或開始對話，就會計入這裡。",
       "noCalls": "還沒有對話"
     },
     "meetingsCard": {
-      "info": "您錄製的會議。刪除會議後，這些仍會計入。",
-      "empty": "錄製一場會議，就會計入這裡。"
+      "info": "您錄製的會議。刪除會議後，這些仍會計入。"
     },
     "share": {
       "button": "分享",
@@ -3471,7 +3473,7 @@
         "saved": {
           "title": "省下的時間",
           "label": "不必花在打字上",
-          "note": "與每分鐘打 {{wpm}} 字相比"
+          "workdays_other": "約 {{count}} 個工作天"
         },
         "streak": {
           "title": "欲罷不能",

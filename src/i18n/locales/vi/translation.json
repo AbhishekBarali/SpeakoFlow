@@ -3365,9 +3365,13 @@
     "about": "Cách bạn dùng SpeakoFlow, được đếm trên máy tính này.",
     "nothingYet": "Thống kê của bạn sẽ hiện ra khi bạn đọc chính tả, hỏi trợ lý hoặc ghi âm một cuộc họp.",
     "goHome": "Xem phím tắt",
-    "dictationsSoFar_other": "{{formatted}} lần đọc chính tả đến nay",
+    "figures": {
+      "dictations": "Lượt đọc chính tả",
+      "questions": "Câu hỏi đã hỏi",
+      "meetings": "Cuộc họp đã ghi âm"
+    },
+    "activityTitle": "Hoạt động",
     "pages_other": "Khoảng {{count}} trang",
-    "streak_other": "Chuỗi {{count}} ngày",
     "longest_other": "Dài nhất: {{count}} ngày",
     "streakHint": "Một ngày được tính khi bạn đọc chính tả, hỏi trợ lý, trò chuyện hoặc ghi âm một cuộc họp.",
     "gridSummary_other": "{{words}} từ trong {{count}} ngày của 6 tháng qua",
@@ -3402,12 +3406,10 @@
     },
     "assistantCard": {
       "info": "Các câu hỏi nhanh và những gì bạn nói khi trò chuyện. Vẫn được tính kể cả khi bạn xóa cuộc trò chuyện.",
-      "empty": "Hãy hỏi trợ lý điều gì đó hoặc bắt đầu trò chuyện, và nó sẽ được tính ở đây.",
       "noCalls": "Chưa có cuộc trò chuyện nào"
     },
     "meetingsCard": {
-      "info": "Các cuộc họp bạn đã ghi âm. Vẫn được tính kể cả khi bạn xóa một cuộc họp.",
-      "empty": "Ghi âm một cuộc họp và nó sẽ được tính ở đây."
+      "info": "Các cuộc họp bạn đã ghi âm. Vẫn được tính kể cả khi bạn xóa một cuộc họp."
     },
     "share": {
       "button": "Chia sẻ",
@@ -3471,7 +3473,7 @@
         "saved": {
           "title": "Thời gian tiết kiệm",
           "label": "khỏi phải gõ phím",
-          "note": "So với gõ phím ở tốc độ {{wpm}} từ mỗi phút"
+          "workdays_other": "Khoảng {{count}} ngày làm việc"
         },
         "streak": {
           "title": "Đang vào guồng",

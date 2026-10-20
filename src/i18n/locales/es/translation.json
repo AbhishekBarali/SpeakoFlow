@@ -3423,15 +3423,15 @@
     "about": "Cómo usas SpeakoFlow, contabilizado en este equipo.",
     "nothingYet": "Tus estadísticas aparecerán cuando dictes, le preguntes algo al asistente o grabes una reunión.",
     "goHome": "Ver tus atajos",
-    "dictationsSoFar_one": "{{formatted}} dictado hasta ahora",
-    "dictationsSoFar_many": "{{formatted}} de dictados hasta ahora",
-    "dictationsSoFar_other": "{{formatted}} dictados hasta ahora",
+    "figures": {
+      "dictations": "Dictados",
+      "questions": "Preguntas hechas",
+      "meetings": "Reuniones grabadas"
+    },
+    "activityTitle": "Actividad",
     "pages_one": "Aproximadamente {{count}} página",
     "pages_many": "Aproximadamente {{count}} páginas",
     "pages_other": "Aproximadamente {{count}} páginas",
-    "streak_one": "Racha de {{count}} día",
-    "streak_many": "Racha de {{count}} días",
-    "streak_other": "Racha de {{count}} días",
     "longest_one": "La más larga: {{count}} día",
     "longest_many": "La más larga: {{count}} días",
     "longest_other": "La más larga: {{count}} días",
@@ -3480,12 +3480,10 @@
     },
     "assistantCard": {
       "info": "Preguntas rápidas y lo que dijiste en conversaciones. Se siguen contando aunque elimines las conversaciones.",
-      "empty": "Pregúntale algo al asistente o inicia una conversación, y se contará aquí.",
       "noCalls": "Aún no hay conversaciones"
     },
     "meetingsCard": {
-      "info": "Las reuniones que has grabado. Se siguen contando aunque elimines una reunión.",
-      "empty": "Graba una reunión y se contará aquí."
+      "info": "Las reuniones que has grabado. Se siguen contando aunque elimines una reunión."
     },
     "share": {
       "button": "Compartir",
@@ -3563,7 +3561,9 @@
         "saved": {
           "title": "Tiempo ahorrado",
           "label": "sin teclear",
-          "note": "Comparado con teclear a {{wpm}} palabras por minuto"
+          "workdays_one": "Una jornada laboral entera",
+          "workdays_many": "Unas {{count}} jornadas laborales",
+          "workdays_other": "Unas {{count}} jornadas laborales"
         },
         "streak": {
           "title": "En racha",

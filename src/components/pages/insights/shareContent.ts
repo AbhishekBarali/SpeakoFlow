@@ -12,7 +12,6 @@ import {
   assistantQuestions,
   buildHeatmap,
   pagesFor,
-  recentValues,
   type HeatLevel,
 } from "./insightsMath";
 
@@ -54,6 +53,9 @@ export const SHARE_URL = "https://speakoflow.com";
 
 /** Words in a novel, near enough, for "as long as a novel". */
 export const NOVEL_WORDS = 80_000;
+
+/** A working day, for "about 4 working days" of time saved. */
+export const WORKDAY_SECONDS = 8 * 3600;
 
 /** Weeks of activity a card can show; each size draws as many as fit. */
 export const ACTIVITY_WEEKS = 26;
@@ -104,13 +106,10 @@ export interface CardSlide {
 export interface CardDeck {
   slides: CardSlide[];
   tagline: string;
-  /** The last seven days, oldest first, each 0 to 1 of the busiest: the
-   *  heights of the voice bars every card is drawn with. */
-  week: number[];
 }
 
 /** A figure in full ("101,412"): it is the number being shown off. */
-const fullNumber = (value: number, locale: string): string => {
+export const fullNumber = (value: number, locale: string): string => {
   try {
     return new Intl.NumberFormat(locale, {
       notation: value >= 10_000_000 ? "compact" : "standard",
@@ -255,7 +254,13 @@ export const buildCardDeck = (
   if (saved >= 60) {
     const title = t("insights.share.cards.saved.title");
     const label = t("insights.share.cards.saved.label");
-    const note = t("insights.share.cards.saved.note", { wpm: TYPING_WPM });
+    // In working days once it comes to one, which is easier to picture than
+    // a count of hours.
+    const workdays = Math.floor(saved / WORKDAY_SECONDS);
+    const note =
+      workdays >= 1
+        ? t("insights.share.cards.saved.workdays", { count: workdays })
+        : undefined;
     const value = formatShortDuration(saved, t);
     slides.push({
       kind: "saved",
@@ -373,11 +378,5 @@ export const buildCardDeck = (
     });
   }
 
-  const recent = recentValues(activitySeries(insights, "all"), 7, now);
-  const busiest = Math.max(...recent);
-  return {
-    slides,
-    tagline: t("insights.share.tagline"),
-    week: recent.map((value) => (busiest > 0 ? value / busiest : 0)),
-  };
+  return { slides, tagline: t("insights.share.tagline") };
 };

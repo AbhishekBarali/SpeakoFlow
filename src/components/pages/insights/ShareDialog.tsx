@@ -86,14 +86,14 @@ const FORMAT_ICONS: Record<
   wide: RectangleHorizontal,
 };
 
-/** The most of the carousel's width one card's slot takes: what is left
- *  shows the cards either side. */
-const SLOT_MAX = 0.7;
-/** Room around a card in its slot, in pixels. */
+/** Room above and below a card in its slot, in pixels. */
 const SLOT_PAD = 14;
+/** Room either side of a card, so the arrows never sit on it. */
+const ARROW_ROOM = 72;
 
+/** Everything but Copy: quiet, so the one dark button is the obvious one. */
 const roundButton =
-  "grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full bg-ink text-canvas transition-[transform,opacity] duration-150 hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-default disabled:opacity-40";
+  "grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full border border-hairline bg-surface text-ink transition-[transform,background-color] duration-150 hover:bg-surface-strong active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-default disabled:opacity-40";
 
 const arrowButton =
   "z-10 grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-hairline bg-surface text-ink shadow-[0_4px_14px_-6px_rgba(10,20,24,0.3)] transition-[opacity,background-color] hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:pointer-events-none disabled:opacity-0";
@@ -127,8 +127,7 @@ export const ShareDialog: React.FC<{
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ w: 0, h: 0 });
 
-  // A slot is as wide as its card at the carousel's height, so the cards
-  // either side sit close enough to be seen, whatever the size.
+  // Each card has the whole width to itself and slides in from the side.
   useEffect(() => {
     const element = viewport.current;
     if (!open || !element) return;
@@ -165,15 +164,7 @@ export const ShareDialog: React.FC<{
         const canvas = document.createElement("canvas");
         for (const position of order) {
           if (cancelled) return;
-          drawCard(
-            canvas,
-            slides[position],
-            deck,
-            format,
-            assets,
-            i18n.language,
-            rtl,
-          );
+          drawCard(canvas, slides[position], deck, format, assets, rtl);
           const blob = await cardBlob(canvas);
           if (cancelled) return;
           const url = URL.createObjectURL(blob);
@@ -353,13 +344,7 @@ export const ShareDialog: React.FC<{
   };
 
   const { width, height } = CARD_SIZES[format];
-  const slot = Math.max(
-    1,
-    Math.min(
-      view.w * SLOT_MAX,
-      (view.h - SLOT_PAD * 2) * (width / height) + SLOT_PAD * 2,
-    ),
-  );
+  const slot = Math.max(1, view.w);
   const titleId = "insights-share-title";
   const ready = card !== null && !failed;
   const disabled = !ready || busy !== null;
@@ -405,13 +390,7 @@ export const ShareDialog: React.FC<{
         <div className="relative -mx-6 mt-2">
           <div
             ref={viewport}
-            className="relative h-[min(56vh,30rem)] min-w-0 touch-pan-y overflow-x-clip"
-            style={{
-              maskImage:
-                "linear-gradient(to right, transparent, #000 9%, #000 91%, transparent)",
-              WebkitMaskImage:
-                "linear-gradient(to right, transparent, #000 9%, #000 91%, transparent)",
-            }}
+            className="relative h-[min(58vh,32rem)] min-w-0 touch-pan-y overflow-x-clip"
             onPointerDown={(event) => {
               swipe.current = { x: event.clientX, id: event.pointerId };
             }}
@@ -430,13 +409,7 @@ export const ShareDialog: React.FC<{
             <div
               className="flex h-full transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
               style={{
-                // The card in view sits in the middle, its neighbours peek
-                // in at either side, so it reads as a deck.
-                transform: `translateX(${
-                  rtl
-                    ? current * slot - (view.w - slot) / 2
-                    : (view.w - slot) / 2 - current * slot
-                }px)`,
+                transform: `translateX(${rtl ? current * slot : -current * slot}px)`,
               }}
             >
               {slides.map((item, position) => {
@@ -445,12 +418,14 @@ export const ShareDialog: React.FC<{
                 return (
                   <div
                     key={`${item.kind}-${format}`}
-                    className={`flex h-full shrink-0 items-center justify-center transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-                      inView ? "" : "scale-[0.86] cursor-pointer opacity-80"
+                    className={`flex h-full shrink-0 items-center justify-center transition-opacity duration-500 motion-reduce:transition-none ${
+                      inView ? "" : "opacity-0"
                     }`}
-                    style={{ width: `${slot}px`, padding: `${SLOT_PAD}px` }}
+                    style={{
+                      width: `${slot}px`,
+                      padding: `${SLOT_PAD}px ${ARROW_ROOM}px`,
+                    }}
                     aria-hidden={!inView}
-                    onClick={inView ? undefined : () => setIndex(position)}
                   >
                     {image ? (
                       <img

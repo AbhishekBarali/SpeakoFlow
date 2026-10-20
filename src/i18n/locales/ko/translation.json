@@ -3365,9 +3365,13 @@
     "about": "SpeakoFlow 사용 현황으로, 이 컴퓨터에서 집계합니다.",
     "nothingYet": "받아쓰기를 하거나, 어시스턴트에게 묻거나, 회의를 녹음하면 인사이트가 표시됩니다.",
     "goHome": "단축키 보기",
-    "dictationsSoFar_other": "지금까지 받아쓰기 {{formatted}}회",
+    "figures": {
+      "dictations": "받아쓰기 횟수",
+      "questions": "질문한 횟수",
+      "meetings": "녹음한 회의"
+    },
+    "activityTitle": "활동",
     "pages_other": "약 {{count}}페이지",
-    "streak_other": "{{count}}일 연속",
     "longest_other": "최장 기록: {{count}}일",
     "streakHint": "받아쓰기, 어시스턴트에게 질문, 대화, 회의 녹음 중 하나라도 한 날은 하루로 계산됩니다.",
     "gridSummary_other": "최근 6개월 동안 {{count}}일, {{words}}단어",
@@ -3402,12 +3406,10 @@
     },
     "assistantCard": {
       "info": "빠른 질문과, 대화 중에 한 말을 셉니다. 대화를 삭제해도 집계는 그대로 남습니다.",
-      "empty": "어시스턴트에게 무엇이든 묻거나 대화를 시작하면 여기에 집계됩니다.",
       "noCalls": "아직 대화가 없습니다"
     },
     "meetingsCard": {
-      "info": "녹음한 회의입니다. 회의를 삭제해도 집계는 그대로 남습니다.",
-      "empty": "회의를 녹음하면 여기에 집계됩니다."
+      "info": "녹음한 회의입니다. 회의를 삭제해도 집계는 그대로 남습니다."
     },
     "share": {
       "button": "공유",
@@ -3471,7 +3473,7 @@
         "saved": {
           "title": "절약한 시간",
           "label": "타이핑에 쓰지 않은 시간",
-          "note": "분당 {{wpm}}단어 속도로 타이핑했을 때와 비교"
+          "workdays_other": "근무일 약 {{count}}일"
         },
         "streak": {
           "title": "연속 기록 행진 중",
