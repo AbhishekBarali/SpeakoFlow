@@ -1899,6 +1899,18 @@ async saveInsightsCard(path: string, pngBase64: string) : Promise<Result<null, s
 }
 },
 /**
+ * Save a share card to the Downloads folder without asking where, under a
+ * name no existing file has. Returns the absolute path written.
+ */
+async saveInsightsCardToDownloads(pngBase64: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_insights_card_to_downloads", { pngBase64 }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Put a share card on the clipboard as an image, for a webview whose own
  * clipboard refuses images (WebKit without `ClipboardItem`, or a write that
  * lost its user activation).
@@ -1915,7 +1927,8 @@ async copyInsightsCard(pngBase64: string) : Promise<Result<null, string>> {
  * Hand a share card to the system's share sheet (Windows' Share panel, the
  * macOS Share menu beside `anchor`). The image is written to the app's cache
  * first, under a name the receiving app may show, because the sheet passes
- * files rather than pixels.
+ * files rather than pixels. Each share gets its own folder, so an app that
+ * reads its file late still gets the card it was handed.
  */
 async shareInsightsCard(pngBase64: string, title: string, anchor: ShareAnchor) : Promise<Result<null, string>> {
     try {

@@ -1172,6 +1172,7 @@ pub fn run(cli_args: CliArgs) {
             commands::history::get_usage_stats,
             insights::get_insights,
             insights::save_insights_card,
+            insights::save_insights_card_to_downloads,
             insights::copy_insights_card,
             insights::share_insights_card,
             commands::assistant::assistant_send_text,

@@ -359,9 +359,12 @@ objc2-core-foundation = { version = "=0.3.2", default-features = false, features
 ] }
 # The Share menu for an Insights card (see share_sheet.rs): AirDrop,
 # Messages, Mail and the rest, shown beside the button that asked for it.
+# `objc2-core-foundation` brings the geometry types (NSPoint, NSRect, NSSize)
+# and `NSView::bounds`.
 objc2 = "=0.6.4"
 objc2-foundation = { version = "=0.3.2", default-features = false, features = [
   "std",
+  "objc2-core-foundation",
   "NSArray",
   "NSGeometry",
   "NSObject",
@@ -370,6 +373,7 @@ objc2-foundation = { version = "=0.3.2", default-features = false, features = [
 ] }
 objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
   "std",
+  "objc2-core-foundation",
   "NSResponder",
   "NSSharingService",
   "NSView",

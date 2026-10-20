@@ -748,7 +748,8 @@ fn backfill_assistant_usage(conn: &mut Connection) -> Result<usize> {
         let mut stmt = tx.prepare(
             "SELECT timestamp, updated_at, kind,
                     (SELECT COUNT(*) FROM json_each(assistant_history.messages)
-                      WHERE json_extract(json_each.value, '$.role') = 'user')
+                      WHERE json_each.type = 'object'
+                        AND json_extract(json_each.value, '$.role') = 'user')
              FROM assistant_history
              WHERE json_valid(messages)",
         )?;
@@ -788,6 +789,31 @@ fn backfill_assistant_usage(conn: &mut Connection) -> Result<usize> {
     )?;
     tx.commit()?;
     Ok(counted)
+}
+
+/// Run [`backfill_assistant_usage`] at launch, logging the outcome.
+///
+/// A backfill that fails is still marked done. Questions and calls are
+/// counted live from this launch on, so running it again on a later launch
+/// would count every conversation saved in between twice; leaving the old
+/// conversations out of the totals is the smaller error.
+fn run_assistant_backfill(conn: &mut Connection) {
+    match backfill_assistant_usage(conn) {
+        Ok(0) => {}
+        Ok(counted) => info!(
+            "Backfilled assistant usage from {} saved conversations",
+            counted
+        ),
+        Err(e) => {
+            error!("Assistant usage backfill failed, skipping it: {}", e);
+            if let Err(e) = conn.execute(
+                "INSERT OR REPLACE INTO usage_meta (key, value) VALUES (?1, ?2)",
+                params![ASSISTANT_BACKFILL_KEY, Utc::now().timestamp().to_string()],
+            ) {
+                error!("Could not mark the assistant usage backfill done: {}", e);
+            }
+        }
+    }
 }
 
 /// Lifetime assistant use as of the local date `today`.
@@ -983,14 +1009,7 @@ impl HistoryManager {
             Ok(counted) => info!("Backfilled usage stats from {} history entries", counted),
             Err(e) => error!("Usage stats backfill failed: {}", e),
         }
-        match backfill_assistant_usage(&mut conn) {
-            Ok(0) => {}
-            Ok(counted) => info!(
-                "Backfilled assistant usage from {} saved conversations",
-                counted
-            ),
-            Err(e) => error!("Assistant usage backfill failed: {}", e),
-        }
+        run_assistant_backfill(&mut conn);
 
         // Cosmetic, so a failure is logged and the launch carries on.
         match Self::repair_assistant_titles(&conn) {
@@ -2991,6 +3010,46 @@ mod tests {
         // Once only: a rerun adds nothing.
         assert_eq!(backfill_assistant_usage(&mut conn).expect("rerun"), 0);
         assert_eq!(assistant_row(&conn, "2026-05-01"), Some((2, 2, 1, 300.0)));
+    }
+
+    #[test]
+    fn assistant_backfill_skips_message_list_entries_that_are_not_objects() {
+        let mut conn = migrated_conn();
+        let d1 = local_noon(2026, 5, 1);
+        insert_kind(
+            &conn,
+            d1,
+            d1,
+            "ask",
+            r#"["stray", 7, null, [1], {"role":"user","content":"hi"}]"#,
+        );
+
+        assert_eq!(backfill_assistant_usage(&mut conn).expect("backfill"), 1);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), Some((1, 0, 0, 0.0)));
+    }
+
+    #[test]
+    fn a_failed_assistant_backfill_is_not_run_again() {
+        let mut conn = migrated_conn();
+        let ask = r#"[{"role":"user","content":"hi"},{"role":"assistant","content":"hello"}]"#;
+        let d1 = local_noon(2026, 5, 1);
+        insert_kind(&conn, d1, d1, "ask", ask);
+        conn.execute_batch(
+            "CREATE TRIGGER refuse_usage BEFORE INSERT ON assistant_usage_daily
+             BEGIN SELECT RAISE(ABORT, 'refused'); END;",
+        )
+        .expect("create trigger");
+
+        run_assistant_backfill(&mut conn);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), None, "rolled back");
+
+        // Once writes work again, the next launch must not fold the
+        // conversations in on top of what was counted live meanwhile.
+        conn.execute_batch("DROP TRIGGER refuse_usage;")
+            .expect("drop trigger");
+        apply_assistant_usage_delta(&conn, "2026-05-01", 1, 0, 0, 0.0).unwrap();
+        run_assistant_backfill(&mut conn);
+        assert_eq!(assistant_row(&conn, "2026-05-01"), Some((1, 0, 0, 0.0)));
     }
 
     #[test]

@@ -70,29 +70,40 @@ pub fn show(
                         let data = request.Data()?;
                         data.Properties()?.SetTitle(&title)?;
                         let deferral = request.GetDeferral()?;
-                        StorageFile::GetFileFromPathAsync(&path)?.SetCompleted(
-                            &AsyncOperationCompletedHandler::new(
-                                move |operation: Ref<'_, IAsyncOperation<StorageFile>>, _| {
-                                    let filled = (|| -> windows::core::Result<()> {
-                                        let file = operation.ok()?.GetResults()?;
-                                        let item: IStorageItem = file.cast()?;
-                                        data.SetStorageItemsReadOnly(
-                                            &IIterable::<IStorageItem>::from(vec![Some(item)]),
-                                        )?;
-                                        data.SetBitmap(
-                                            &RandomAccessStreamReference::CreateFromFile(&file)?,
-                                        )?;
-                                        Ok(())
-                                    })();
-                                    if let Err(error) = &filled {
-                                        log::warn!(
-                                            "Share: the image could not be attached: {error}"
-                                        );
-                                    }
-                                    deferral.Complete()
-                                },
-                            ),
-                        )
+                        let attached = deferral.clone();
+                        let opening =
+                            StorageFile::GetFileFromPathAsync(&path).and_then(|pending| {
+                                pending.SetCompleted(&AsyncOperationCompletedHandler::new(
+                                    move |operation: Ref<'_, IAsyncOperation<StorageFile>>, _| {
+                                        let filled = (|| -> windows::core::Result<()> {
+                                            let file = operation.ok()?.GetResults()?;
+                                            let item: IStorageItem = file.cast()?;
+                                            data.SetStorageItemsReadOnly(
+                                                &IIterable::<IStorageItem>::from(vec![Some(item)]),
+                                            )?;
+                                            data.SetBitmap(
+                                                &RandomAccessStreamReference::CreateFromFile(
+                                                    &file,
+                                                )?,
+                                            )?;
+                                            Ok(())
+                                        })();
+                                        if let Err(error) = &filled {
+                                            log::warn!(
+                                                "Share: the image could not be attached: {error}"
+                                            );
+                                        }
+                                        attached.Complete()
+                                    },
+                                ))
+                            });
+                        // The panel waits on the deferral, so a file that never
+                        // starts opening must release it too.
+                        if let Err(error) = &opening {
+                            log::warn!("Share: the image could not be opened: {error}");
+                            let _ = deferral.Complete();
+                        }
+                        opening
                     },
                 );
                 let token = manager.DataRequested(&handler)?;
@@ -137,38 +148,41 @@ pub fn show(
     let (done_tx, done_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     window
         .run_on_main_thread(move || {
-            let result = (|| -> Result<(), String> {
-                let mtm = MainThreadMarker::new().ok_or("Not on the main thread")?;
-                // SAFETY: `ns_view` is the window's content view, which lives as
-                // long as the window, and this runs on the main thread.
-                let view: &NSView = unsafe { &*(view_ptr as *const NSView) };
-                let url = NSURL::fileURLWithPath(&NSString::from_str(&path));
-                let item: Retained<AnyObject> = Retained::into_super(Retained::into_super(url));
-                let items = NSArray::from_retained_slice(&[item]);
-                let picker = unsafe { NSSharingServicePicker::initWithItems(mtm.alloc(), &items) };
-                // The content view counts from its bottom left; the page from
-                // its top left.
-                let bounds = view.bounds();
-                let flipped = view.isFlipped();
-                let y = if flipped {
-                    anchor.y
-                } else {
-                    bounds.size.height - anchor.y - anchor.height
-                };
-                let rect = NSRect::new(
-                    NSPoint::new(anchor.x, y),
-                    NSSize::new(anchor.width.max(1.0), anchor.height.max(1.0)),
-                );
-                let edge = if flipped {
-                    NSRectEdge::MaxY
-                } else {
-                    NSRectEdge::MinY
-                };
-                picker.showRelativeToRect_ofView_preferredEdge(rect, view, edge);
-                PICKER.with(|slot| *slot.borrow_mut() = Some(picker));
-                Ok(())
-            })();
-            let _ = done_tx.send(result);
+            let Some(mtm) = MainThreadMarker::new() else {
+                let _ = done_tx.send(Err("Not on the main thread".to_string()));
+                return;
+            };
+            // SAFETY: `ns_view` is the window's content view, which lives as
+            // long as the window, and this runs on the main thread.
+            let view: &NSView = unsafe { &*(view_ptr as *const NSView) };
+            let url = NSURL::fileURLWithPath(&NSString::from_str(&path));
+            let item: Retained<AnyObject> = Retained::into_super(Retained::into_super(url));
+            let items = NSArray::from_retained_slice(&[item]);
+            let picker = unsafe { NSSharingServicePicker::initWithItems(mtm.alloc(), &items) };
+            // The content view counts from its bottom left; the page from
+            // its top left.
+            let bounds = view.bounds();
+            let flipped = view.isFlipped();
+            let y = if flipped {
+                anchor.y
+            } else {
+                bounds.size.height - anchor.y - anchor.height
+            };
+            let rect = NSRect::new(
+                NSPoint::new(anchor.x, y),
+                NSSize::new(anchor.width.max(1.0), anchor.height.max(1.0)),
+            );
+            let edge = if flipped {
+                NSRectEdge::MaxY
+            } else {
+                NSRectEdge::MinY
+            };
+            // Nothing from here on can fail. When the picker opens as a menu,
+            // showing it does not return until the menu closes, so the caller
+            // is answered first.
+            let _ = done_tx.send(Ok(()));
+            picker.showRelativeToRect_ofView_preferredEdge(rect, view, edge);
+            PICKER.with(|slot| *slot.borrow_mut() = Some(picker));
         })
         .map_err(|e| e.to_string())?;
     done_rx
