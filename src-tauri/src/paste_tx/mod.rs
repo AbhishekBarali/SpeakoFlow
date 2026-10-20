@@ -449,6 +449,18 @@ pub(crate) fn cf_html(fragment: &str) -> Vec<u8> {
     out
 }
 
+/// `fragment` as a document that declares UTF-8, for macOS's `public.html`.
+/// The pasteboard holds the string as UTF-8 bytes but says nothing about
+/// their encoding, and Word, Pages and Mail then read them as Latin-1: "→",
+/// "é" or Devanagari come out as mojibake. The same wrapper arboard puts
+/// around the plain paste's HTML (Mozilla #466599, Chromium #11957), so
+/// both paths paste alike.
+pub(crate) fn utf8_html_document(fragment: &str) -> String {
+    format!(
+        r#"<html><head><meta http-equiv="content-type" content="text/html; charset=utf-8"></head><body>{fragment}</body></html>"#
+    )
+}
+
 /// Why a transaction paste did not complete.
 #[derive(Debug)]
 pub(crate) enum PasteTxError {
@@ -692,5 +704,16 @@ mod tests {
         assert_eq!(end_html, doc.len());
         assert!(doc[..start].ends_with("<!--StartFragment-->"));
         assert!(doc[end..].starts_with("<!--EndFragment-->"));
+    }
+
+    /// The macOS document names its encoding, and the answer is in it as it
+    /// was, non-ASCII included.
+    #[test]
+    fn mac_html_declares_utf8() {
+        let fragment = "<p>Open <strong>Settings → Advanced</strong> — नमस्ते</p>";
+        let doc = utf8_html_document(fragment);
+        assert!(doc.contains("charset=utf-8"));
+        assert!(doc.find("charset").unwrap() < doc.find(fragment).unwrap());
+        assert!(doc.contains(fragment));
     }
 }

@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use log::{error, info, warn};
 use tauri::AppHandle;
 use tauri_nspanel::objc2::rc::Retained;
-use tauri_nspanel::objc2::{define_class, msg_send, AnyThread, DefinedClass};
+use tauri_nspanel::objc2::{define_class, msg_send, AnyThread, DefinedClass, MainThreadMarker};
 use tauri_nspanel::objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
 use tauri_nspanel::objc2_foundation::{NSArray, NSInteger, NSObject, NSString};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -287,6 +287,15 @@ pub(super) fn run(
     enigo: &mut enigo::Enigo,
     request: PasteRequest<'_>,
 ) -> Result<(), PasteTxError> {
+    // AppKit answers a promise on the main run loop. Declared from any other
+    // thread, the target's read could wait on a thread nobody services and
+    // paste nothing, so take the plain paste (which works from any thread)
+    // rather than risk it. Dictation and Insert both paste on the main thread.
+    if MainThreadMarker::new().is_none() {
+        return Err(PasteTxError::Unavailable(
+            "not on the main thread".to_string(),
+        ));
+    }
     flush_pending(app_handle, enigo);
 
     let clipboard = app_handle.clipboard();
@@ -303,7 +312,7 @@ pub(super) fn run(
     let provider = SpeakoFlowPasteProvider::new(
         state.clone(),
         request.text.to_string(),
-        request.html.map(str::to_string),
+        request.html.map(super::utf8_html_document),
     );
     let pasteboard = NSPasteboard::generalPasteboard();
 

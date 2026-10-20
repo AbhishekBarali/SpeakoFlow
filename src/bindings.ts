@@ -2086,6 +2086,26 @@ async assistantInsertText(text: string, html: string | null) : Promise<Result<nu
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Copy an answer through the app's own clipboard, not the webview's: HTML
+ * beside the Markdown when `html` is given, the Markdown alone otherwise.
+ * 
+ * The panel's Copy tries the webview's clipboard first (`richAnswer.ts`) and
+ * falls back to this. WebKit, on macOS and Linux, refuses a webview clipboard
+ * write once the click's user activation has passed or the panel is not the
+ * focused window, and some WebKitGTK builds have no `ClipboardItem`; the
+ * native write needs neither. Unlike Insert's write, this is the user's own
+ * copy, so it is not kept out of clipboard history. HTML that cannot be
+ * written (Wayland without a native HTML path) falls back to the text.
+ */
+async assistantCopyAnswer(text: string, html: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_copy_answer", { text, html }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setAssistantProvider(providerId: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_provider", { providerId }) };
