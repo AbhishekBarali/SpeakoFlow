@@ -2,7 +2,7 @@
 //! ("ducking") or muting it, then bringing it back.
 //!
 //! It all runs on one worker thread, in the order it was asked for. The volume
-//! tools are slow on some systems (`osascript` on macOS, `wpctl` and `pactl` on
+//! tools are slow on some systems (`osascript` on macOS, `pactl` and `wpctl` on
 //! Linux, tens of milliseconds a call), a fade adds a few hundred milliseconds,
 //! and a recording that starts or stops must never wait for either.
 //!
@@ -116,9 +116,17 @@ struct Timing {
 const TIMING: Timing = Timing {
     fade_down: Duration::from_millis(300),
     fade_up: Duration::from_millis(200),
-    step: Duration::from_millis(15),
+    step: FADE_STEP,
     preview_hold: Duration::from_millis(1500),
 };
+
+/// Each `osascript` takes 30 to 100 ms or more, so on macOS a fade waits
+/// longer between changes and makes a few of them, rather than queueing
+/// launches that would carry the restore past the stop cue's wait.
+#[cfg(target_os = "macos")]
+const FADE_STEP: Duration = Duration::from_millis(60);
+#[cfg(not(target_os = "macos"))]
+const FADE_STEP: Duration = Duration::from_millis(15);
 
 /// Who quieted the audio. Only that owner brings it back.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -381,7 +389,7 @@ impl Engine {
             // A lowered preview, and a recording that mutes: put the preview
             // back first, so the mute is undone to the real volume.
             (Some(preview), _) => {
-                restore(preview, &self.timing);
+                restore(preview, Back::Fade(&self.timing));
                 self.apply(owner, how, wait)
             }
         }
@@ -438,6 +446,10 @@ impl Engine {
     }
 
     /// Undo what `owner` (anyone, for `None`) quieted.
+    ///
+    /// `None` is the app quitting, which waits only [`EXIT_WAIT`] for it: the
+    /// level goes back in one change instead of a fade, so a slow tool cannot
+    /// leave it partway up when the process ends.
     fn release(&mut self, owner: Option<Owner>) {
         // A recording that never quieted anything leaves a running preview,
         // and its timer, alone.
@@ -448,12 +460,24 @@ impl Engine {
             .applied
             .take_if(|applied| owner.is_none_or(|owner| owner == applied.owner))
         {
-            restore(applied, &self.timing);
+            let back = match owner {
+                Some(_) => Back::Fade(&self.timing),
+                None => Back::AtOnce,
+            };
+            restore(applied, back);
         }
     }
 }
 
-fn restore(applied: Applied, timing: &Timing) {
+/// How a lowered volume goes back up.
+enum Back<'a> {
+    /// Over `fade_up`.
+    Fade(&'a Timing),
+    /// In one change.
+    AtOnce,
+}
+
+fn restore(applied: Applied, back: Back) {
     let Applied { output, change, .. } = applied;
     let reading = output.read();
     match change {
@@ -469,17 +493,24 @@ fn restore(applied: Applied, timing: &Timing) {
                 debug!("The volume was changed during the recording; leaving it at {now:.2}");
             }
             Some(now) => {
-                fade(
-                    &*output,
-                    now,
-                    original,
-                    timing.fade_up,
-                    timing.step,
-                    &mut |step| {
-                        thread::sleep(step);
-                        None
-                    },
-                );
+                match back {
+                    Back::Fade(timing) => {
+                        fade(
+                            &*output,
+                            now,
+                            original,
+                            timing.fade_up,
+                            timing.step,
+                            &mut |step| {
+                                thread::sleep(step);
+                                None
+                            },
+                        );
+                    }
+                    Back::AtOnce => {
+                        output.set_level(original);
+                    }
+                }
                 debug!("Brought other audio back to {original:.2}");
             }
             // Unreadable now, though it was readable before: put it back anyway.
@@ -787,8 +818,10 @@ mod tests {
     #[test]
     fn a_release_mid_fade_ends_the_fade_and_turns_back_up() {
         let fake = Fake::new(1.0);
+        // Long enough that a busy machine still sees the middle of it.
         let timing = Timing {
-            fade_down: Duration::from_secs(10),
+            fade_down: Duration::from_secs(2),
+            step: Duration::from_millis(5),
             ..INSTANT
         };
         let mut engine = Engine::new(fake.opener(), timing);
@@ -797,22 +830,24 @@ mod tests {
             owner: Some(Owner::Recording),
             done,
         });
-        let mut steps = 0;
-        let next = engine.quiet(Owner::Recording, Quieting::lower_by(80), &mut |_| {
-            steps += 1;
-            if steps == 3 {
-                release.take()
-            } else {
-                None
+        let watched = fake.clone();
+        // The recording ends once the fade has audibly started.
+        let next = engine.quiet(Owner::Recording, Quieting::lower_by(80), &mut |step| {
+            if watched.level() < 0.95 {
+                return release.take();
             }
+            thread::sleep(step);
+            None
         });
         assert!(
             matches!(next, Some(Command::Release { .. })),
             "the fade hands the release back"
         );
-        assert!(fake.level() > 0.9, "cut short at {}", fake.level());
+        let cut_at = fake.level();
+        assert!(cut_at < 0.95, "lowered to {cut_at}");
+        assert!(cut_at > 0.25, "cut short of 0.2, at {cut_at}");
         engine.handle(next.unwrap(), &mut no_wait());
-        assert!(close(fake.level(), 1.0));
+        assert!(close(fake.level(), 1.0), "back at {}", fake.level());
         assert!(engine.applied.is_none());
     }
 
@@ -901,6 +936,23 @@ mod tests {
     }
 
     #[test]
+    fn quitting_puts_the_volume_back_in_one_change() {
+        let fake = Fake::new(0.8);
+        // A fade this long would outlast the exit's wait many times over.
+        let timing = Timing {
+            fade_up: Duration::from_secs(10),
+            ..INSTANT
+        };
+        let mut engine = Engine::new(fake.opener(), timing);
+        quiet(&mut engine, Owner::Recording, Quieting::lower_by(50));
+        assert!(close(fake.level(), 0.4), "lowered to {}", fake.level());
+        let sets = fake.sets();
+        engine.release(None);
+        assert!(close(fake.level(), 0.8), "back at {}", fake.level());
+        assert_eq!(fake.sets(), sets + 1, "one change, not a fade");
+    }
+
+    #[test]
     fn the_worker_restores_a_preview_by_itself() {
         let fake = Fake::new(0.8);
         // Held long enough for a busy machine to see it lowered.
@@ -933,6 +985,11 @@ mod tests {
             commands: OnceLock::from(commands),
         };
         ducker.quiet(Quieting::lower_by(50));
+        let lowered = Instant::now() + Duration::from_secs(2);
+        while !close(fake.level(), 0.4) && Instant::now() < lowered {
+            thread::sleep(Duration::from_millis(2));
+        }
+        assert!(close(fake.level(), 0.4), "lowered to {}", fake.level());
         let restored = ducker.restore();
         assert!(!restored.is_settled());
         restored.wait(Duration::from_secs(2));

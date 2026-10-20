@@ -1,7 +1,6 @@
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 use crate::apple_intelligence;
 use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, SoundType};
-use crate::audio_toolkit::ducking::Restored;
 use crate::audio_toolkit::vad::VadTail;
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error};
 use crate::dictation_recovery::{
@@ -199,19 +198,30 @@ fn finish_idle(app: &AppHandle) {
 /// takes a fifth of a second; the rest is for a slow volume tool.
 const STOP_CUE_WAIT: Duration = Duration::from_millis(600);
 
-/// Play the stop cue once other audio is back up, so the cue is heard at full
-/// volume rather than at the lowered one. With nothing to wait for (ducking
-/// off, or a recording too short to have lowered anything) it plays at once,
-/// as it always has. Otherwise it waits on a thread of its own, so the
-/// transcription never waits for a fade.
-fn play_stop_cue_after(app: &AppHandle, restored: Restored) {
+/// Bring other audio back, then play the stop cue once it is back up, so the
+/// cue is heard at full volume rather than at the lowered one. With nothing to
+/// wait for (ducking off, or a recording too short to have lowered anything)
+/// it plays at once, as it always has. Otherwise it waits on a thread of its
+/// own, so the transcription never waits for a fade.
+///
+/// A recording started while it waits (an always-on microphone lets the next
+/// one start at once) has played its own start cue by then, so this stop cue
+/// is dropped rather than played into the new recording.
+fn play_stop_cue_after(app: &AppHandle, rm: &Arc<AudioRecordingManager>) {
+    let restored = rm.restore_other_audio();
     if restored.is_settled() {
         play_feedback_sound(app, SoundType::Stop);
         return;
     }
+    let started = rm.recordings_started();
     let app = app.clone();
+    let rm = Arc::clone(rm);
     std::thread::spawn(move || {
         restored.wait(STOP_CUE_WAIT);
+        if rm.recordings_started() != started {
+            debug!("A new recording started before the stop cue; skipping it");
+            return;
+        }
         play_feedback_sound_blocking(&app, SoundType::Stop);
     });
 }
@@ -2979,7 +2989,7 @@ impl ShortcutAction for TranscribeAction {
         change_tray_icon(app, TrayIconState::Transcribing);
 
         // Other audio comes back before the stop cue, so the cue is audible.
-        play_stop_cue_after(app, rm.restore_other_audio());
+        play_stop_cue_after(app, &rm);
 
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
                                                  // Two different questions. Flow listens only on the dictation shortcut,
@@ -4150,7 +4160,7 @@ impl ShortcutAction for AssistantAction {
         change_tray_icon(app, TrayIconState::Transcribing);
         crate::assistant::emit_state(app, "transcribing");
 
-        play_stop_cue_after(app, rm.restore_other_audio());
+        play_stop_cue_after(app, &rm);
 
         let binding_id = binding_id.to_string();
         tauri::async_runtime::spawn(async move {
