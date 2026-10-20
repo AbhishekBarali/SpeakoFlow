@@ -17,14 +17,17 @@ const REFRESH_DELAY_MS = 400;
  * would not show until the next dictation.
  *
  * `insights` is `null` until the first read lands; `failed` says the last
- * read failed, so a caller still waiting for figures can stop.
+ * read failed, so a caller still waiting for figures can stop. `reads` counts
+ * finished reads, so a caller with its own fallback knows when to refresh it.
  */
 export const useInsights = (): {
   insights: Insights | null;
   failed: boolean;
+  reads: number;
 } => {
   const [insights, setInsights] = useState<Insights | null>(null);
   const [failed, setFailed] = useState(false);
+  const [reads, setReads] = useState(0);
   const { page } = useNavigation();
   const timer = useRef<number | null>(null);
   /** Bumped per read, so a slow answer never replaces a newer one. */
@@ -33,13 +36,16 @@ export const useInsights = (): {
   const load = useCallback(() => {
     const id = ++request.current;
     const fail = () => {
-      if (id === request.current) setFailed(true);
+      if (id !== request.current) return;
+      setFailed(true);
+      setReads((n) => n + 1);
     };
     void commands
       .getInsights()
       .then((result) => {
         if (id !== request.current) return;
         if (result.status === "ok") {
+          setReads((n) => n + 1);
           setInsights(result.data);
           setFailed(false);
         } else {
@@ -81,5 +87,5 @@ export const useInsights = (): {
     };
   }, [loadSoon]);
 
-  return { insights, failed };
+  return { insights, failed, reads };
 };
