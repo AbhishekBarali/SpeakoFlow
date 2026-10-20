@@ -3432,36 +3432,198 @@
     }
   },
   "insights": {
-    "description": "Vos dictées au fil du temps, comptabilisées sur cet ordinateur.",
-    "empty": "Vos statistiques apparaîtront après votre première dictée.",
-    "dictations": "Dictées",
-    "today": "{{words}} mots aujourd'hui",
+    "about": "Votre utilisation de SpeakoFlow, comptabilisée sur cet ordinateur.",
+    "nothingYet": "Vos statistiques apparaîtront dès que vous dicterez, poserez une question à l'assistant ou enregistrerez une réunion.",
+    "goHome": "Voir vos raccourcis",
+    "figures": {
+      "dictations": "Dictées",
+      "questions": "Questions posées",
+      "meetings": "Réunions enregistrées"
+    },
+    "activityTitle": "Activité",
     "pages_one": "Environ {{count}} page",
     "pages_many": "Environ {{count}} de pages",
     "pages_other": "Environ {{count}} pages",
-    "fasterThanTyping": "{{times}}× plus rapide que la saisie au clavier",
-    "streak_one": "{{count}} jour d'affilée",
-    "streak_many": "{{count}} de jours d'affilée",
-    "streak_other": "{{count}} jours d'affilée",
     "longest_one": "Record : {{count}} jour",
     "longest_many": "Record : {{count}} de jours",
     "longest_other": "Record : {{count}} jours",
-    "gridLabel_one": "{{words}} mots sur {{count}} jour au cours des six derniers mois",
-    "gridLabel_many": "{{words}} mots sur {{count}} de jours au cours des six derniers mois",
-    "gridLabel_other": "{{words}} mots sur {{count}} jours au cours des six derniers mois",
+    "streakHint": "Une journée compte dès que vous dictez, posez une question à l'assistant, lancez une conversation ou enregistrez une réunion.",
     "gridSummary_one": "{{words}} mots sur {{count}} jour ces 6 derniers mois",
     "gridSummary_many": "{{words}} mots sur {{count}} de jours ces 6 derniers mois",
     "gridSummary_other": "{{words}} mots sur {{count}} jours ces 6 derniers mois",
+    "gridSummaryAssistant_one": "{{questions}} sur {{count}} jour ces 6 derniers mois",
+    "gridSummaryAssistant_many": "{{questions}} sur {{count}} de jours ces 6 derniers mois",
+    "gridSummaryAssistant_other": "{{questions}} sur {{count}} jours ces 6 derniers mois",
+    "gridSummaryMeetings_one": "{{time}} de réunions sur {{count}} jour ces 6 derniers mois",
+    "gridSummaryMeetings_many": "{{time}} de réunions sur {{count}} de jours ces 6 derniers mois",
+    "gridSummaryMeetings_other": "{{time}} de réunions sur {{count}} jours ces 6 derniers mois",
+    "gridSummaryAll_one": "{{count}} jour d'activité ces 6 derniers mois",
+    "gridSummaryAll_many": "{{count}} de jours d'activité ces 6 derniers mois",
+    "gridSummaryAll_other": "{{count}} jours d'activité ces 6 derniers mois",
     "dayWords_one": "{{formatted}} mot",
     "dayWords_many": "{{formatted}} de mots",
     "dayWords_other": "{{formatted}} mots",
-    "dayNone": "Aucune dictée",
+    "dayQuestions_one": "{{formatted}} question",
+    "dayQuestions_many": "{{formatted}} de questions",
+    "dayQuestions_other": "{{formatted}} questions",
+    "dayMeetings": "{{time}} de réunions",
+    "dayNoneFor": {
+      "all": "Rien ce jour-là",
+      "dictation": "Aucune dictée",
+      "assistant": "Aucune question",
+      "meetings": "Aucune réunion"
+    },
     "less": "Moins",
     "more": "Plus",
     "busiest": "Jour le plus actif",
     "best": "Meilleur jour",
     "typical": "Jour type",
-    "typicalSub": "Les jours où vous dictez"
+    "typicalFor": {
+      "dictation": "Les jours où vous dictez",
+      "assistant": "Les jours où vous posez des questions",
+      "meetings": "Les jours de réunion"
+    },
+    "activity": {
+      "label": "Activité à afficher",
+      "all": "Tout",
+      "dictation": "Dictée",
+      "assistant": "Assistant",
+      "meetings": "Réunions"
+    },
+    "assistantCard": {
+      "info": "Vos questions rapides et ce que vous avez dit en conversation. Le décompte est conservé même si vous supprimez des conversations.",
+      "noCalls": "Aucune conversation pour l'instant"
+    },
+    "meetingsCard": {
+      "info": "Les réunions que vous avez enregistrées. Le décompte est conservé même si vous supprimez une réunion."
+    },
+    "share": {
+      "button": "Partager",
+      "nothingYet": "Vous aurez quelque chose à partager une fois que vous aurez utilisé SpeakoFlow.",
+      "title": "Partagez vos statistiques",
+      "private": "Créée sur cet ordinateur. Rien n'est envoyé en ligne.",
+      "size": "Taille",
+      "formats": {
+        "square": "Carré",
+        "story": "Story",
+        "wide": "Paysage"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, pour les fils d'actualité",
+        "story": "1080 × 1920, pour les stories",
+        "wide": "1600 × 900, pour les publications et les liens"
+      },
+      "previous": "Carte précédente",
+      "next": "Carte suivante",
+      "cardsLabel": "Cartes",
+      "position": "Carte {{index}} sur {{count}}",
+      "copy": "Copier l'image",
+      "copied": "Copiée",
+      "copyFailed": "Impossible de copier l'image",
+      "save": "Enregistrer l'image",
+      "saved": "Image enregistrée",
+      "saveFailed": "Impossible d'enregistrer l'image",
+      "showInFolder": "Afficher dans le dossier",
+      "postOn": "Publier sur {{site}}",
+      "copiedForPost": "Carte copiée. Dans la nouvelle publication, appuyez sur {{keys}} pour l’ajouter.",
+      "savedForPost": "Carte enregistrée dans Téléchargements. {{site}} n’accepte pas les images collées : ajoutez-la avec le bouton photo de la nouvelle publication.",
+      "openSite": "Ouvrir {{site}}",
+      "openFailed": "Impossible d'ouvrir {{site}}",
+      "more": "Autres applications",
+      "sheetTitle": "Mes statistiques SpeakoFlow",
+      "shareFailed": "Impossible d'ouvrir le partage",
+      "drawFailed": "Impossible de générer les cartes. Fermez cette fenêtre et réessayez.",
+      "tagline": "Gratuit · Open source · Fonctionne hors ligne",
+      "cards": {
+        "highlights": {
+          "title": "Mon bilan SpeakoFlow",
+          "words_one": "mot dicté",
+          "words_many": "mots dictés",
+          "words_other": "mots dictés",
+          "streak_one": "jour d'affilée",
+          "streak_many": "jours d'affilée",
+          "streak_other": "jours d'affilée",
+          "wpm": "mots par minute",
+          "questions_one": "question posée",
+          "questions_many": "questions posées",
+          "questions_other": "questions posées",
+          "meetings_one": "réunion enregistrée",
+          "meetings_many": "réunions enregistrées",
+          "meetings_other": "réunions enregistrées",
+          "saved": "de saisie en moins"
+        },
+        "words": {
+          "title": "Dicté, pas tapé",
+          "label_one": "mot dicté",
+          "label_many": "mots dictés",
+          "label_other": "mots dictés",
+          "pages_one": "Environ {{count}} page",
+          "pages_many": "Environ {{count}} de pages",
+          "pages_other": "Environ {{count}} pages",
+          "books_one": "L'équivalent d'un roman entier",
+          "books_many": "L'équivalent de {{count}} de romans",
+          "books_other": "L'équivalent de {{count}} romans"
+        },
+        "speed": {
+          "title": "Ma vitesse de parole",
+          "label": "mots par minute",
+          "note": "{{times}}× plus rapide qu'au clavier",
+          "you": "À l'oral",
+          "typing": "Frappe moyenne"
+        },
+        "saved": {
+          "title": "Temps gagné",
+          "label": "de saisie évitée",
+          "workdays_one": "Une journée de travail entière",
+          "workdays_many": "Environ {{count}} journées de travail",
+          "workdays_other": "Environ {{count}} journées de travail"
+        },
+        "streak": {
+          "title": "Sur ma lancée",
+          "unit_one": "jour",
+          "unit_many": "jours",
+          "unit_other": "jours",
+          "longest_one": "Record : {{count}} jour",
+          "longest_many": "Record : {{count}} de jours",
+          "longest_other": "Record : {{count}} jours",
+          "best": "Ma plus longue série à ce jour"
+        },
+        "assistant": {
+          "title": "Mon assistant",
+          "label_one": "question posée",
+          "label_many": "questions posées",
+          "label_other": "questions posées",
+          "calls_one": "{{count}} conversation, {{time}} de discussion",
+          "calls_many": "{{count}} de conversations, {{time}} de discussion",
+          "calls_other": "{{count}} conversations, {{time}} de discussion"
+        },
+        "meetings": {
+          "title": "Mes réunions",
+          "label_one": "réunion enregistrée",
+          "label_many": "réunions enregistrées",
+          "label_other": "réunions enregistrées",
+          "note": "{{time}} d'audio, {{words}} mots transcrits",
+          "time": "{{time}} d'audio enregistré et transcrit"
+        },
+        "activity": {
+          "title": "Six mois à parler",
+          "label_one": "jour actif",
+          "label_many": "jours actifs",
+          "label_other": "jours actifs"
+        }
+      },
+      "post": {
+        "dictation_one": "J'ai dicté {{formatted}} mot à mon ordinateur au lieu de le taper, grâce à SpeakoFlow.",
+        "dictation_many": "J'ai dicté {{formatted}} de mots à mon ordinateur au lieu de les taper, grâce à SpeakoFlow.",
+        "dictation_other": "J'ai dicté {{formatted}} mots à mon ordinateur au lieu de les taper, grâce à SpeakoFlow.",
+        "asks_one": "J'ai posé {{formatted}} question à l'assistant de SpeakoFlow sans changer d'onglet.",
+        "asks_many": "J'ai posé {{formatted}} de questions à l'assistant de SpeakoFlow sans changer d'onglet.",
+        "asks_other": "J'ai posé {{formatted}} questions à l'assistant de SpeakoFlow sans changer d'onglet.",
+        "meetings_one": "SpeakoFlow a enregistré {{formatted}} réunion et pris les notes à ma place.",
+        "meetings_many": "SpeakoFlow a enregistré {{formatted}} de réunions et pris les notes à ma place.",
+        "meetings_other": "SpeakoFlow a enregistré {{formatted}} réunions et pris les notes à ma place."
+      }
+    }
   },
   "settingsNotice": {
     "restored": "Vos paramètres étaient endommagés et ont été restaurés à partir d'une sauvegarde.",

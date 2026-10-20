@@ -3432,36 +3432,198 @@
     }
   },
   "insights": {
-    "description": "ההכתבה שלך לאורך זמן, נספרת במחשב הזה.",
-    "empty": "התובנות שלך יופיעו אחרי ההכתבה הראשונה שלך.",
-    "dictations": "הכתבות",
-    "today": "{{words}} מילים היום",
+    "about": "השימוש שלך ב-SpeakoFlow, נספר במחשב הזה.",
+    "nothingYet": "התובנות שלך יופיעו אחרי שתכתיב, תשאל את העוזר או תקליט פגישה.",
+    "goHome": "הצג את קיצורי המקשים",
+    "figures": {
+      "dictations": "הכתבות",
+      "questions": "שאלות שנשאלו",
+      "meetings": "פגישות שהוקלטו"
+    },
+    "activityTitle": "פעילות",
     "pages_one": "בערך עמוד אחד",
     "pages_two": "בערך שני עמודים",
     "pages_other": "בערך {{count}} עמודים",
-    "fasterThanTyping": "מהיר פי {{times}} מהקלדה",
-    "streak_one": "רצף של יום אחד",
-    "streak_two": "רצף של יומיים",
-    "streak_other": "רצף של {{count}} ימים",
     "longest_one": "הארוך ביותר: יום אחד",
     "longest_two": "הארוך ביותר: יומיים",
     "longest_other": "הארוך ביותר: {{count}} ימים",
-    "gridLabel_one": "{{words}} מילים ביום אחד בששת החודשים האחרונים",
-    "gridLabel_two": "{{words}} מילים ביומיים בששת החודשים האחרונים",
-    "gridLabel_other": "{{words}} מילים ב-{{count}} ימים בששת החודשים האחרונים",
+    "streakHint": "יום נספר כשאתה מכתיב, שואל את העוזר, מקיים שיחה או מקליט פגישה.",
     "gridSummary_one": "{{words}} מילים ביום אחד ב-6 החודשים האחרונים",
     "gridSummary_two": "{{words}} מילים ביומיים ב-6 החודשים האחרונים",
     "gridSummary_other": "{{words}} מילים ב-{{count}} ימים ב-6 החודשים האחרונים",
+    "gridSummaryAssistant_one": "{{questions}} ביום אחד ב-6 החודשים האחרונים",
+    "gridSummaryAssistant_two": "{{questions}} ביומיים ב-6 החודשים האחרונים",
+    "gridSummaryAssistant_other": "{{questions}} ב-{{count}} ימים ב-6 החודשים האחרונים",
+    "gridSummaryMeetings_one": "{{time}} של פגישות ביום אחד ב-6 החודשים האחרונים",
+    "gridSummaryMeetings_two": "{{time}} של פגישות ביומיים ב-6 החודשים האחרונים",
+    "gridSummaryMeetings_other": "{{time}} של פגישות ב-{{count}} ימים ב-6 החודשים האחרונים",
+    "gridSummaryAll_one": "פעילות ביום אחד ב-6 החודשים האחרונים",
+    "gridSummaryAll_two": "פעילות ביומיים ב-6 החודשים האחרונים",
+    "gridSummaryAll_other": "פעילות ב-{{count}} ימים ב-6 החודשים האחרונים",
     "dayWords_one": "{{formatted}} מילה",
     "dayWords_two": "{{formatted}} מילים",
     "dayWords_other": "{{formatted}} מילים",
-    "dayNone": "אין הכתבה",
+    "dayQuestions_one": "{{formatted}} שאלה",
+    "dayQuestions_two": "{{formatted}} שאלות",
+    "dayQuestions_other": "{{formatted}} שאלות",
+    "dayMeetings": "{{time}} של פגישות",
+    "dayNoneFor": {
+      "all": "אין פעילות",
+      "dictation": "אין הכתבה",
+      "assistant": "אין שאלות",
+      "meetings": "אין פגישות"
+    },
     "less": "פחות",
     "more": "יותר",
     "busiest": "היום העמוס ביותר",
     "best": "היום הטוב ביותר",
     "typical": "יום טיפוסי",
-    "typicalSub": "בימים שבהם אתה מכתיב"
+    "typicalFor": {
+      "dictation": "בימים שבהם אתה מכתיב",
+      "assistant": "בימים שבהם אתה שואל",
+      "meetings": "בימים עם פגישה"
+    },
+    "activity": {
+      "label": "פעילות להצגה",
+      "all": "הכול",
+      "dictation": "הכתבה",
+      "assistant": "עוזר",
+      "meetings": "פגישות"
+    },
+    "assistantCard": {
+      "info": "שאלות מהירות, ומה שאמרת בשיחות. הן נשארות בספירה גם כשאתה מוחק שיחות.",
+      "noCalls": "עדיין אין שיחות"
+    },
+    "meetingsCard": {
+      "info": "פגישות שהקלטת. הן נשארות בספירה גם כשאתה מוחק פגישה."
+    },
+    "share": {
+      "button": "שתף",
+      "nothingYet": "יהיה מה לשתף אחרי שתשתמש ב-SpeakoFlow.",
+      "title": "שתף את התובנות שלך",
+      "private": "נוצר במחשב הזה. שום דבר לא מועלה.",
+      "size": "גודל",
+      "formats": {
+        "square": "ריבוע",
+        "story": "סטורי",
+        "wide": "רחב"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, לפיד",
+        "story": "1080 × 1920, לסטוריז",
+        "wide": "1600 × 900, לפוסטים ולקישורים"
+      },
+      "previous": "הכרטיס הקודם",
+      "next": "הכרטיס הבא",
+      "cardsLabel": "כרטיסים",
+      "position": "כרטיס {{index}} מתוך {{count}}",
+      "copy": "העתק תמונה",
+      "copied": "הועתק",
+      "copyFailed": "לא ניתן היה להעתיק את התמונה",
+      "save": "שמור תמונה",
+      "saved": "התמונה נשמרה",
+      "saveFailed": "לא ניתן היה לשמור את התמונה",
+      "showInFolder": "הצג בתיקייה",
+      "postOn": "פרסם ב-{{site}}",
+      "copiedForPost": "הכרטיס הועתק. בפוסט החדש, הקישו {{keys}} כדי להוסיף אותו.",
+      "savedForPost": "הכרטיס נשמר בהורדות. {{site}} לא מקבל תמונה מודבקת, אז הוסיפו אותו עם כפתור התמונה בפוסט החדש.",
+      "openSite": "פתיחת {{site}}",
+      "openFailed": "לא ניתן היה לפתוח את {{site}}",
+      "more": "אפליקציות נוספות",
+      "sheetTitle": "התובנות שלי ב-SpeakoFlow",
+      "shareFailed": "לא ניתן היה לפתוח את חלון השיתוף",
+      "drawFailed": "לא ניתן היה לצייר את הכרטיסים. סגור את החלון ונסה שוב.",
+      "tagline": "חינמי · קוד פתוח · עובד בלי אינטרנט",
+      "cards": {
+        "highlights": {
+          "title": "ה-SpeakoFlow שלי במספרים",
+          "words_one": "מילה שאמרתי",
+          "words_two": "מילים שאמרתי",
+          "words_other": "מילים שאמרתי",
+          "streak_one": "יום ברצף",
+          "streak_two": "ימים ברצף",
+          "streak_other": "ימים ברצף",
+          "wpm": "מילים לדקה",
+          "questions_one": "שאלה לעוזר",
+          "questions_two": "שאלות לעוזר",
+          "questions_other": "שאלות לעוזר",
+          "meetings_one": "פגישה מוקלטת",
+          "meetings_two": "פגישות מוקלטות",
+          "meetings_other": "פגישות מוקלטות",
+          "saved": "נחסכו לעומת הקלדה"
+        },
+        "words": {
+          "title": "בדיבור, לא בהקלדה",
+          "label_one": "מילה שאמרתי",
+          "label_two": "מילים שאמרתי",
+          "label_other": "מילים שאמרתי",
+          "pages_one": "בערך עמוד אחד",
+          "pages_two": "בערך שני עמודים",
+          "pages_other": "בערך {{count}} עמודים",
+          "books_one": "באורך של רומן שלם",
+          "books_two": "באורך של שני רומנים",
+          "books_other": "באורך של {{count}} רומנים"
+        },
+        "speed": {
+          "title": "מהירות הדיבור שלי",
+          "label": "מילים לדקה",
+          "note": "{{times}}× מהר יותר מהקלדה",
+          "you": "דיבור",
+          "typing": "הקלדה ממוצעת"
+        },
+        "saved": {
+          "title": "זמן שחסכתי",
+          "label": "שלא בזבזתי על הקלדה",
+          "workdays_one": "יום עבודה שלם",
+          "workdays_two": "כיומיים של עבודה",
+          "workdays_other": "כ-{{count}} ימי עבודה"
+        },
+        "streak": {
+          "title": "בשוונג",
+          "unit_one": "יום ברצף",
+          "unit_two": "ימים ברצף",
+          "unit_other": "ימים ברצף",
+          "longest_one": "הרצף הארוך ביותר: יום אחד",
+          "longest_two": "הרצף הארוך ביותר: יומיים",
+          "longest_other": "הרצף הארוך ביותר: {{count}} ימים",
+          "best": "הרצף הארוך ביותר שלי עד היום"
+        },
+        "assistant": {
+          "title": "העוזר שלי",
+          "label_one": "שאלה ששאלתי",
+          "label_two": "שאלות ששאלתי",
+          "label_other": "שאלות ששאלתי",
+          "calls_one": "שיחה אחת, {{time}} של דיבור",
+          "calls_two": "שתי שיחות, {{time}} של דיבור",
+          "calls_other": "{{count}} שיחות, {{time}} של דיבור"
+        },
+        "meetings": {
+          "title": "הפגישות שלי",
+          "label_one": "פגישה שהקלטתי",
+          "label_two": "פגישות שהקלטתי",
+          "label_other": "פגישות שהקלטתי",
+          "note": "{{time}} של הקלטה, {{words}} מילים מתועדות",
+          "time": "{{time}} של הקלטה ותיעוד"
+        },
+        "activity": {
+          "title": "חצי שנה של דיבור",
+          "label_one": "יום פעיל",
+          "label_two": "ימים פעילים",
+          "label_other": "ימים פעילים"
+        }
+      },
+      "post": {
+        "dictation_one": "הכתבתי למחשב {{formatted}} מילה במקום להקליד אותה, בעזרת SpeakoFlow.",
+        "dictation_two": "הכתבתי למחשב {{formatted}} מילים במקום להקליד אותן, בעזרת SpeakoFlow.",
+        "dictation_other": "הכתבתי למחשב {{formatted}} מילים במקום להקליד אותן, בעזרת SpeakoFlow.",
+        "asks_one": "שאלתי את העוזר של SpeakoFlow {{formatted}} שאלה בלי לעבור בין לשוניות.",
+        "asks_two": "שאלתי את העוזר של SpeakoFlow {{formatted}} שאלות בלי לעבור בין לשוניות.",
+        "asks_other": "שאלתי את העוזר של SpeakoFlow {{formatted}} שאלות בלי לעבור בין לשוניות.",
+        "meetings_one": "עם SpeakoFlow הקלטתי {{formatted}} פגישה, והוא כתב בשבילי את הסיכום.",
+        "meetings_two": "עם SpeakoFlow הקלטתי {{formatted}} פגישות, והוא כתב בשבילי את הסיכומים.",
+        "meetings_other": "עם SpeakoFlow הקלטתי {{formatted}} פגישות, והוא כתב בשבילי את הסיכומים."
+      }
+    }
   },
   "settingsNotice": {
     "restored": "ההגדרות שלך נפגמו ושוחזרו מגיבוי.",

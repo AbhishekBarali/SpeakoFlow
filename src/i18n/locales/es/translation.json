@@ -3432,36 +3432,198 @@
     }
   },
   "insights": {
-    "description": "Tu dictado a lo largo del tiempo, contabilizado en este equipo.",
-    "empty": "Tus estadísticas aparecerán después de tu primer dictado.",
-    "dictations": "Dictados",
-    "today": "{{words}} palabras hoy",
+    "about": "Cómo usas SpeakoFlow, contabilizado en este equipo.",
+    "nothingYet": "Tus estadísticas aparecerán cuando dictes, le preguntes algo al asistente o grabes una reunión.",
+    "goHome": "Ver tus atajos",
+    "figures": {
+      "dictations": "Dictados",
+      "questions": "Preguntas hechas",
+      "meetings": "Reuniones grabadas"
+    },
+    "activityTitle": "Actividad",
     "pages_one": "Aproximadamente {{count}} página",
     "pages_many": "Aproximadamente {{count}} páginas",
     "pages_other": "Aproximadamente {{count}} páginas",
-    "fasterThanTyping": "{{times}}× más rápido que teclear",
-    "streak_one": "Racha de {{count}} día",
-    "streak_many": "Racha de {{count}} días",
-    "streak_other": "Racha de {{count}} días",
     "longest_one": "La más larga: {{count}} día",
     "longest_many": "La más larga: {{count}} días",
     "longest_other": "La más larga: {{count}} días",
-    "gridLabel_one": "{{words}} palabras en {{count}} día durante los últimos seis meses",
-    "gridLabel_many": "{{words}} palabras en {{count}} días durante los últimos seis meses",
-    "gridLabel_other": "{{words}} palabras en {{count}} días durante los últimos seis meses",
+    "streakHint": "Un día cuenta cuando dictas, le preguntas algo al asistente, tienes una conversación o grabas una reunión.",
     "gridSummary_one": "{{words}} palabras en {{count}} día en los últimos 6 meses",
     "gridSummary_many": "{{words}} palabras en {{count}} días en los últimos 6 meses",
     "gridSummary_other": "{{words}} palabras en {{count}} días en los últimos 6 meses",
+    "gridSummaryAssistant_one": "{{questions}} en {{count}} día en los últimos 6 meses",
+    "gridSummaryAssistant_many": "{{questions}} en {{count}} de días en los últimos 6 meses",
+    "gridSummaryAssistant_other": "{{questions}} en {{count}} días en los últimos 6 meses",
+    "gridSummaryMeetings_one": "{{time}} de reuniones en {{count}} día en los últimos 6 meses",
+    "gridSummaryMeetings_many": "{{time}} de reuniones en {{count}} de días en los últimos 6 meses",
+    "gridSummaryMeetings_other": "{{time}} de reuniones en {{count}} días en los últimos 6 meses",
+    "gridSummaryAll_one": "{{count}} día activo en los últimos 6 meses",
+    "gridSummaryAll_many": "{{count}} de días activos en los últimos 6 meses",
+    "gridSummaryAll_other": "{{count}} días activos en los últimos 6 meses",
     "dayWords_one": "{{formatted}} palabra",
     "dayWords_many": "{{formatted}} palabras",
     "dayWords_other": "{{formatted}} palabras",
-    "dayNone": "Sin dictado",
+    "dayQuestions_one": "{{formatted}} pregunta",
+    "dayQuestions_many": "{{formatted}} de preguntas",
+    "dayQuestions_other": "{{formatted}} preguntas",
+    "dayMeetings": "{{time}} de reuniones",
+    "dayNoneFor": {
+      "all": "Nada ese día",
+      "dictation": "Sin dictado",
+      "assistant": "Sin preguntas",
+      "meetings": "Sin reuniones"
+    },
     "less": "Menos",
     "more": "Más",
     "busiest": "Día con más actividad",
     "best": "Mejor día",
     "typical": "Día típico",
-    "typicalSub": "Los días que dictas"
+    "typicalFor": {
+      "dictation": "Los días que dictas",
+      "assistant": "Los días que preguntas",
+      "meetings": "Los días con reunión"
+    },
+    "activity": {
+      "label": "Actividad que mostrar",
+      "all": "Todo",
+      "dictation": "Dictado",
+      "assistant": "Asistente",
+      "meetings": "Reuniones"
+    },
+    "assistantCard": {
+      "info": "Preguntas rápidas y lo que dijiste en conversaciones. Se siguen contando aunque elimines las conversaciones.",
+      "noCalls": "Aún no hay conversaciones"
+    },
+    "meetingsCard": {
+      "info": "Las reuniones que has grabado. Se siguen contando aunque elimines una reunión."
+    },
+    "share": {
+      "button": "Compartir",
+      "nothingYet": "Cuando hayas usado SpeakoFlow, tendrás algo que compartir.",
+      "title": "Comparte tus estadísticas",
+      "private": "Creada en este equipo. No se sube nada.",
+      "size": "Tamaño",
+      "formats": {
+        "square": "Cuadrado",
+        "story": "Historia",
+        "wide": "Horizontal"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, para el feed",
+        "story": "1080 × 1920, para historias",
+        "wide": "1600 × 900, para publicaciones y enlaces"
+      },
+      "previous": "Tarjeta anterior",
+      "next": "Tarjeta siguiente",
+      "cardsLabel": "Tarjetas",
+      "position": "Tarjeta {{index}} de {{count}}",
+      "copy": "Copiar imagen",
+      "copied": "Copiada",
+      "copyFailed": "No se pudo copiar la imagen",
+      "save": "Guardar imagen",
+      "saved": "Imagen guardada",
+      "saveFailed": "No se pudo guardar la imagen",
+      "showInFolder": "Mostrar en la carpeta",
+      "postOn": "Publicar en {{site}}",
+      "copiedForPost": "Tarjeta copiada. En la nueva publicación, pulsa {{keys}} para añadirla.",
+      "savedForPost": "Tarjeta guardada en Descargas. {{site}} no admite imágenes pegadas, así que añádela con el botón de foto en la nueva publicación.",
+      "openSite": "Abrir {{site}}",
+      "openFailed": "No se pudo abrir {{site}}",
+      "more": "Más aplicaciones",
+      "sheetTitle": "Mis estadísticas de SpeakoFlow",
+      "shareFailed": "No se pudo abrir Compartir",
+      "drawFailed": "No se pudieron generar las tarjetas. Cierra esta ventana y vuelve a intentarlo.",
+      "tagline": "Gratis · Código abierto · Funciona sin conexión",
+      "cards": {
+        "highlights": {
+          "title": "Mi resumen de SpeakoFlow",
+          "words_one": "palabra dictada",
+          "words_many": "palabras dictadas",
+          "words_other": "palabras dictadas",
+          "streak_one": "día seguido",
+          "streak_many": "días seguidos",
+          "streak_other": "días seguidos",
+          "wpm": "palabras por minuto",
+          "questions_one": "pregunta hecha",
+          "questions_many": "preguntas hechas",
+          "questions_other": "preguntas hechas",
+          "meetings_one": "reunión grabada",
+          "meetings_many": "reuniones grabadas",
+          "meetings_other": "reuniones grabadas",
+          "saved": "de tecleo ahorrado"
+        },
+        "words": {
+          "title": "Hablado, no tecleado",
+          "label_one": "palabra dictada",
+          "label_many": "palabras dictadas",
+          "label_other": "palabras dictadas",
+          "pages_one": "Aproximadamente {{count}} página",
+          "pages_many": "Aproximadamente {{count}} de páginas",
+          "pages_other": "Aproximadamente {{count}} páginas",
+          "books_one": "Equivale a una novela entera",
+          "books_many": "Equivale a {{count}} de novelas",
+          "books_other": "Equivale a {{count}} novelas"
+        },
+        "speed": {
+          "title": "Lo rápido que hablo",
+          "label": "palabras por minuto",
+          "note": "{{times}}× más rápido que teclear",
+          "you": "Hablando",
+          "typing": "Tecleo típico"
+        },
+        "saved": {
+          "title": "Tiempo ahorrado",
+          "label": "sin teclear",
+          "workdays_one": "Una jornada laboral entera",
+          "workdays_many": "Unas {{count}} jornadas laborales",
+          "workdays_other": "Unas {{count}} jornadas laborales"
+        },
+        "streak": {
+          "title": "En racha",
+          "unit_one": "día",
+          "unit_many": "días",
+          "unit_other": "días",
+          "longest_one": "Racha más larga: {{count}} día",
+          "longest_many": "Racha más larga: {{count}} de días",
+          "longest_other": "Racha más larga: {{count}} días",
+          "best": "Mi racha más larga hasta ahora"
+        },
+        "assistant": {
+          "title": "Mi asistente",
+          "label_one": "pregunta hecha",
+          "label_many": "preguntas hechas",
+          "label_other": "preguntas hechas",
+          "calls_one": "{{count}} conversación, {{time}} hablando",
+          "calls_many": "{{count}} de conversaciones, {{time}} hablando",
+          "calls_other": "{{count}} conversaciones, {{time}} hablando"
+        },
+        "meetings": {
+          "title": "Mis reuniones",
+          "label_one": "reunión grabada",
+          "label_many": "reuniones grabadas",
+          "label_other": "reuniones grabadas",
+          "note": "{{time}} de grabación, {{words}} palabras transcritas",
+          "time": "{{time}} de grabación, todo transcrito"
+        },
+        "activity": {
+          "title": "Seis meses hablando",
+          "label_one": "día activo",
+          "label_many": "días activos",
+          "label_other": "días activos"
+        }
+      },
+      "post": {
+        "dictation_one": "Llevo {{formatted}} palabra dictada en lugar de tecleada, gracias a SpeakoFlow.",
+        "dictation_many": "Llevo {{formatted}} de palabras dictadas en lugar de tecleadas, gracias a SpeakoFlow.",
+        "dictation_other": "Llevo {{formatted}} palabras dictadas en lugar de tecleadas, gracias a SpeakoFlow.",
+        "asks_one": "Le he hecho {{formatted}} pregunta al asistente de SpeakoFlow sin cambiar de pestaña.",
+        "asks_many": "Le he hecho {{formatted}} de preguntas al asistente de SpeakoFlow sin cambiar de pestaña.",
+        "asks_other": "Le he hecho {{formatted}} preguntas al asistente de SpeakoFlow sin cambiar de pestaña.",
+        "meetings_one": "SpeakoFlow ha grabado {{formatted}} reunión y ha tomado las notas por mí.",
+        "meetings_many": "SpeakoFlow ha grabado {{formatted}} de reuniones y ha tomado las notas por mí.",
+        "meetings_other": "SpeakoFlow ha grabado {{formatted}} reuniones y ha tomado las notas por mí."
+      }
+    }
   },
   "settingsNotice": {
     "restored": "Tu configuración estaba dañada y se restauró desde una copia de seguridad.",

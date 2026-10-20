@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Clock, Flame, Gauge, Type } from "lucide-react";
-import { commands, events, type UsageStats } from "@/bindings";
+import { commands, type UsageStats } from "@/bindings";
 import { useNavigation } from "@/components/shell/navigation";
+import { useInsights } from "../insights/useInsights";
 import {
   formatCount,
   formatDuration,
@@ -11,32 +12,32 @@ import {
   wordsPerMinute,
 } from "./usageMath";
 
-/** Live lifetime usage, refetched whenever a dictation lands. */
-export const useUsageStats = (): UsageStats | null => {
-  const [stats, setStats] = useState<UsageStats | null>(null);
-  const load = useCallback(() => {
+/** The dictation figures on their own, read only while `enabled` (Insights
+ *  could not be read), so the strip shows them instead of waiting, and read
+ *  again whenever `refresh` changes. `"error"` when they cannot be read
+ *  either. */
+const useUsageStatsFallback = (
+  enabled: boolean,
+  refresh: number,
+): UsageStats | "error" | null => {
+  const [stats, setStats] = useState<UsageStats | "error" | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
     void commands
       .getUsageStats()
       .then((result) => {
-        if (result.status === "ok") setStats(result.data);
+        if (!cancelled)
+          setStats(result.status === "ok" ? result.data : "error");
       })
-      .catch(() => {});
-  }, []);
-  useEffect(() => {
-    load();
-    const unlisten = events.historyUpdatePayload.listen((event) => {
-      if (
-        event.payload.action === "added" ||
-        event.payload.action === "updated"
-      ) {
-        load();
-      }
-    });
+      .catch(() => {
+        if (!cancelled) setStats("error");
+      });
     return () => {
-      void unlisten.then((off) => off());
+      cancelled = true;
     };
-  }, [load]);
-  return stats;
+  }, [enabled, refresh]);
+  return enabled ? stats : null;
 };
 
 /** One number and its word, on a line. The explanation, where there is one,
@@ -74,9 +75,16 @@ const Stat: React.FC<{
 export const StatsStrip: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { navigate } = useNavigation();
-  const stats = useUsageStats();
+  const { insights, failed, reads } = useInsights();
+  const fallback = useUsageStatsFallback(failed && !insights, reads);
+  const stats = insights?.dictation ?? (fallback === "error" ? null : fallback);
+  // Without Insights, the streak is the dictation one.
+  const streak =
+    insights?.current_streak_days ?? stats?.current_streak_days ?? 0;
 
   if (!stats) {
+    // Nothing could be read: leave the line out rather than load forever.
+    if (fallback === "error") return null;
     return (
       <div
         aria-hidden="true"
@@ -122,12 +130,14 @@ export const StatsStrip: React.FC = () => {
         label={t("home.stats.saved")}
         hint={t("home.stats.savedHint", { wpm: TYPING_WPM })}
       />
+      {/* The streak Insights shows: a day counts when anything was said to
+          the app, not only a dictation. */}
       <Stat
         icon={Flame}
         tint="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-        value={String(stats.current_streak_days)}
+        value={String(streak)}
         label={t("home.stats.streakUnit", {
-          count: stats.current_streak_days,
+          count: streak,
         })}
       />
       <span className="ms-auto inline-flex items-center gap-1 text-[0.8125rem] font-medium text-muted transition-colors group-hover:text-ink">

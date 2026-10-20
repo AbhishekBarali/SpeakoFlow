@@ -73,6 +73,25 @@ is now set to Mute.
   volume when the recording ends.
 - Audio that was already muted stays muted. The old switch unmuted it.
 
+**Insights covers the assistant and meetings.** Beside dictation, Insights
+now shows questions asked, calls and time on calls, and meetings recorded with
+their length and words. The streak counts a day when you used any of them, and
+the activity grid opens on all of them so it matches, with each one a click
+away. Home shows the same streak.
+These totals are kept on their own, so deleting conversations or meetings
+does not lower them, and what you already had is counted from the first launch.
+
+**Share your insights.** Share on the Insights page turns your numbers into a
+set of cards, one insight each: highlights, words spoken, speaking speed, time
+saved, your streak, the assistant, meetings and six months of activity. Flip
+through them and copy or save the one you like, or post it to X or LinkedIn:
+the share window says how the card goes into the post before the site opens
+(X takes it pasted; for LinkedIn it is saved to your Downloads folder for the
+photo button). On Windows and macOS, More apps opens the system's share
+sheet, which hands the image to WhatsApp, Mail or your phone. Square, Story and Wide
+sizes; stories keep clear of Instagram's and Facebook's bars. The cards are
+made on your computer; nothing is uploaded.
+
 ### Changed
 
 - **A mouse button sits next to a shortcut's keys, not in place of them.**
