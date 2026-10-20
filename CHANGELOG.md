@@ -70,10 +70,11 @@ does not lower them, and what you already had is counted from the first launch.
 **Share your insights.** Share on the Insights page turns your numbers into a
 set of cards, one insight each: highlights, words spoken, speaking speed, time
 saved, your streak, the assistant, meetings and six months of activity. Flip
-through them and copy or save the one you like, or post it to X, LinkedIn,
-Facebook or WhatsApp in one click (the card is copied and a new post opens,
-ready to paste into). On Windows and macOS, More apps opens the system's share
-sheet, which reaches WhatsApp, Mail or your phone. Square, Story and Wide
+through them and copy or save the one you like, or post it to X or LinkedIn:
+the share window says how the card goes into the post before the site opens
+(X takes it pasted; for LinkedIn it is saved to your Downloads folder for the
+photo button). On Windows and macOS, More apps opens the system's share
+sheet, which hands the image to WhatsApp, Mail or your phone. Square, Story and Wide
 sizes; stories keep clear of Instagram's and Facebook's bars. The cards are
 made on your computer; nothing is uploaded.
 
