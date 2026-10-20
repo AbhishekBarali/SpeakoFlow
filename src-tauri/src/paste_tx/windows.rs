@@ -139,6 +139,10 @@ struct WinTx {
     state: Mutex<TxState>,
     /// The dictation, UTF-16 with its terminating NUL.
     text: Vec<u16>,
+    /// An assistant answer's HTML as `HTML Format` bytes ([`super::cf_html`])
+    /// and that format's registered id, promised beside the text. `None` for
+    /// a dictation.
+    html: Option<(u32, Vec<u8>)>,
     /// "Copy to clipboard": left as ordinary text when settling.
     leave_copy: Option<Vec<u16>>,
     snapshot: Mutex<Vec<SavedFormat>>,
@@ -255,11 +259,18 @@ unsafe extern "system" fn paste_wnd_proc(
     let tx = tx_ptr(hwnd);
     match msg {
         WM_RENDERFORMAT => {
-            // The system opened the clipboard for us; render into it.
+            // The system opened the clipboard for us; render into it. A read
+            // of either format is the receipt: Word and browsers read the
+            // HTML of an answer, never its text.
             if let Some(tx) = tx.as_ref() {
                 lock(&tx.state).record_receipt(Instant::now());
-                if wparam.0 as u32 == CF_UNICODETEXT {
+                let format = wparam.0 as u32;
+                if format == CF_UNICODETEXT {
                     set_text(&tx.text);
+                } else if let Some((html_format, html)) = &tx.html {
+                    if format == *html_format {
+                        set_global(*html_format, html);
+                    }
                 }
             }
             LRESULT(0)
@@ -272,6 +283,9 @@ unsafe extern "system" fn paste_wnd_proc(
                 if OpenClipboard(Some(hwnd)).is_ok() {
                     if GetClipboardOwner().is_ok_and(|owner| owner == hwnd) {
                         set_text(&tx.text);
+                        if let Some((html_format, html)) = &tx.html {
+                            set_global(*html_format, html);
+                        }
                     }
                     let _ = CloseClipboard();
                 }
@@ -496,9 +510,9 @@ fn is_ole_bookkeeping(format: u32) -> bool {
 }
 
 /// Publish the dictation as a promise. Returns the new sequence number.
-unsafe fn publish(hwnd: HWND) -> Result<u32, String> {
+unsafe fn publish(hwnd: HWND, tx: &WinTx) -> Result<u32, String> {
     open_clipboard(Some(hwnd))?;
-    let published = publish_formats();
+    let published = publish_formats(tx);
     let closed = CloseClipboard();
     published?;
     closed.map_err(|e| format!("CloseClipboard failed: {e}"))?;
@@ -507,7 +521,7 @@ unsafe fn publish(hwnd: HWND) -> Result<u32, String> {
 
 /// Everything `publish` does while the clipboard is open, split out so the
 /// clipboard is closed on every path.
-unsafe fn publish_formats() -> Result<(), String> {
+unsafe fn publish_formats(tx: &WinTx) -> Result<(), String> {
     EmptyClipboard().map_err(|e| format!("EmptyClipboard failed: {e}"))?;
     set_exclusions(&[]);
     // NULL handle = delayed rendering. SetClipboardData returns the handle it
@@ -519,6 +533,16 @@ unsafe fn publish_formats() -> Result<(), String> {
     if let Err(e) = SetClipboardData(CF_UNICODETEXT, None) {
         if e.code().is_err() {
             return Err(format!("SetClipboardData failed: {e}"));
+        }
+    }
+    // An answer's HTML beside it. Optional: if it cannot be promised, the
+    // text still pastes, as it always did.
+    if let Some((html_format, _)) = &tx.html {
+        SetLastError(ERROR_SUCCESS);
+        if let Err(e) = SetClipboardData(*html_format, None) {
+            if e.code().is_err() {
+                warn!("Paste: could not offer the HTML copy, pasting text only: {e}");
+            }
         }
     }
     Ok(())
@@ -638,7 +662,7 @@ fn pump_thread(tx: Arc<WinTx>, ready: Sender<Ready>) {
             if handshake.abandoned {
                 Err("the paste stopped waiting".to_string())
             } else {
-                let result = publish(hwnd);
+                let result = publish(hwnd, &tx);
                 match &result {
                     Ok(_) => handshake.published = true,
                     // Publishing may have emptied the clipboard before it
@@ -690,6 +714,10 @@ fn run_with(
     let tx = Arc::new(WinTx {
         state: Mutex::new(TxState::new()),
         text: wide(request.text),
+        html: request.html.and_then(|html| {
+            let format = unsafe { RegisterClipboardFormatW(w!("HTML Format")) };
+            (format != 0).then(|| (format, super::cf_html(html)))
+        }),
         leave_copy: request.leave_on_clipboard.as_deref().map(wide),
         snapshot: Mutex::new(Vec::new()),
         saved_bitmap: Mutex::new(None),
@@ -796,6 +824,7 @@ mod tests {
             &mut enigo,
             PasteRequest {
                 text: "SpeakoFlow paste test",
+                html: None,
                 paste_method: crate::settings::PasteMethod::CtrlV,
                 paste_delay: Duration::from_millis(60),
                 auto_submit: None,

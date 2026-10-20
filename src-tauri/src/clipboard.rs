@@ -1097,6 +1097,7 @@ pub fn paste_rich_with_behavior(
                 None => paste_via_clipboard(
                     &mut enigo,
                     &text,
+                    html,
                     &app_handle,
                     &paste_method,
                     paste_delay_ms,
@@ -1174,6 +1175,7 @@ pub fn paste_rich_with_behavior(
 fn paste_via_transaction(
     enigo: &mut Enigo,
     text: &str,
+    html: Option<&str>,
     app_handle: &AppHandle,
     paste_method: PasteMethod,
     paste_delay_ms: u64,
@@ -1185,6 +1187,7 @@ fn paste_via_transaction(
         use crate::paste_tx::{PasteRequest, PasteTxError};
         let request = PasteRequest {
             text,
+            html,
             paste_method,
             paste_delay: Duration::from_millis(paste_delay_ms),
             auto_submit,

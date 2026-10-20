@@ -51,7 +51,12 @@ const POLL: Duration = Duration::from_millis(15);
 pub struct ProviderIvars {
     state: Arc<Mutex<TxState>>,
     text: String,
+    /// An assistant answer's HTML, promised as `public.html` beside the text.
+    html: Option<String>,
 }
+
+/// The pasteboard type an answer's HTML is promised under.
+const HTML_TYPE: &str = "public.html";
 
 define_class!(
     // SAFETY: NSObject has no subclassing requirements and the ivars are
@@ -69,13 +74,20 @@ define_class!(
             let ivars = self.ivars();
             // SAFETY: NSPasteboardTypeString is a read-only framework static.
             let is_text = unsafe { data_type.isEqualToString(NSPasteboardTypeString) };
-            // Only a text read is a receipt: a request for a marker type is a
-            // clipboard manager inspecting the markers, not the target.
-            if is_text {
+            let html = ivars
+                .html
+                .as_deref()
+                .filter(|_| data_type.isEqualToString(&NSString::from_str(HTML_TYPE)));
+            // Only a text or HTML read is a receipt (rich editors read the
+            // HTML of an answer, never its text): a request for a marker type
+            // is a clipboard manager inspecting the markers, not the target.
+            if is_text || html.is_some() {
                 lock(&ivars.state).record_receipt(Instant::now());
             }
             let payload = if is_text {
                 NSString::from_str(&ivars.text)
+            } else if let Some(html) = html {
+                NSString::from_str(html)
             } else {
                 NSString::from_str("")
             };
@@ -90,8 +102,8 @@ define_class!(
 );
 
 impl SpeakoFlowPasteProvider {
-    fn new(state: Arc<Mutex<TxState>>, text: String) -> Retained<Self> {
-        let this = Self::alloc().set_ivars(ProviderIvars { state, text });
+    fn new(state: Arc<Mutex<TxState>>, text: String, html: Option<String>) -> Retained<Self> {
+        let this = Self::alloc().set_ivars(ProviderIvars { state, text, html });
         unsafe { msg_send![super(this), init] }
     }
 }
@@ -288,11 +300,18 @@ pub(super) fn run(
     };
 
     let state = Arc::new(Mutex::new(TxState::new()));
-    let provider = SpeakoFlowPasteProvider::new(state.clone(), request.text.to_string());
+    let provider = SpeakoFlowPasteProvider::new(
+        state.clone(),
+        request.text.to_string(),
+        request.html.map(str::to_string),
+    );
     let pasteboard = NSPasteboard::generalPasteboard();
 
-    let mut types: Vec<Retained<NSString>> = Vec::with_capacity(1 + CONCEALMENT_TYPES.len());
+    let mut types: Vec<Retained<NSString>> = Vec::with_capacity(2 + CONCEALMENT_TYPES.len());
     types.push(NSString::from_str("public.utf8-plain-text"));
+    if request.html.is_some() {
+        types.push(NSString::from_str(HTML_TYPE));
+    }
     for t in CONCEALMENT_TYPES {
         types.push(NSString::from_str(t));
     }
