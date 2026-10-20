@@ -63,8 +63,8 @@ debug = "line-tables-only"
 # Build every DEPENDENCY optimised, even in a dev build. Our own crate stays at
 # opt-level 0, so incremental rebuilds and debugging are unaffected.
 #
-# This is not a nicety. At opt-level 0 the whole speech pipeline — whisper.cpp /
-# transcribe-rs inference, Silero VAD, `rubato` resampling, `image` encode — runs
+# This is not a nicety. At opt-level 0 the whole speech pipeline — transcribe.cpp
+# inference, Silero VAD, `rubato` resampling, `image` encode — runs
 # roughly an order of magnitude slower than the shipped release build. A `tauri dev`
 # session then feels catastrophically broken: dictation that takes well under a
 # second in the real app sits there for many seconds, and it looks exactly like a
@@ -152,14 +152,13 @@ futures-util = "0.3"
 rustfft = "6.4.0"
 # Speaker diarization for meetings.
 #
-# `ort` is already in the graph twice over — `vad-rs` and `transcribe-rs`'s `onnx`
-# feature both depend on it and both pin this exact version — with its default
-# features, which include `download-binaries`: a prebuilt, statically linked ONNX
-# Runtime. Naming it directly therefore adds NO new native build dependency on any
-# target; it only lets `meetings::diarize` open its own session instead of
-# borrowing one through vad-rs. Pinned exactly, in lockstep with transcribe-rs's
-# own `=2.0.0-rc.12`, because an rc bump would otherwise split the graph in two
-# and link two ONNX Runtimes into one binary.
+# `ort` is already in the graph through `vad-rs` (Silero VAD), which pins this
+# exact version with its default features, which include `download-binaries`:
+# a prebuilt, statically linked ONNX Runtime. Naming it directly therefore adds
+# NO new native build dependency on any target; it only lets `meetings::diarize`
+# open its own session instead of borrowing one through vad-rs. Pinned exactly,
+# in lockstep with vad-rs, because an rc bump would otherwise split the graph in
+# two and link two ONNX Runtimes into one binary.
 ort = "=2.0.0-rc.12"
 # Tensor construction at the `ort` boundary. Must stay on the same minor as ort's
 # own `ndarray` feature or `Value::from_array` stops type-checking.
@@ -191,13 +190,22 @@ crc32fast = "=1.5.0"
 # native build; pinned to the versions the lockfile already resolves.
 libloading = "=0.8.9"
 bzip2 = "=0.5.2"
-transcribe-rs = { version = "0.3.11", features = ["whisper-cpp", "onnx"] }
-# transcribe.cpp (ggml/GGUF) engine — added side-by-side with transcribe-rs
-# (N2: additive; transcribe-rs 0.3.11 + its features stay untouched). This base
-# declaration is backend-less: default-features=false drops the macOS "metal"
-# default, so per-platform GPU backends are opted-in only in the target sections
-# below. Pinned exactly (pre-1.0 ABI).
-transcribe-cpp = { version = "0.1.2", default-features = false }
+# transcribe.cpp (ggml/GGUF) is the only speech-to-text engine: every local
+# model, the legacy whisper.cpp `.bin` files included, loads through it. This
+# base declaration is backend-less: default-features=false drops the macOS
+# "metal" default, so per-platform GPU backends are opted-in only in the target
+# sections below. Pinned exactly (pre-1.0 ABI). `serde` is what lets run and
+# stream options, transcripts and capabilities cross to the transcription
+# worker process (`engine_supervisor`), as upstream Handy enables it.
+transcribe-cpp = { version = "=0.4.0", default-features = false, features = [
+  "serde",
+] }
+# The transcription worker claims its stdout through the C runtime's
+# descriptors (`dup`/`dup2`) on every platform and leaves with `_exit`; Unix
+# also uses it to reap an orphaned llama-server (`kill`, `proc_pidpath`).
+# Already in the graph through other crates; pinned to the version the
+# lockfile resolves.
+libc = "=0.2.182"
 handy-keys = "0.2.4"
 ferrous-opencc = "0.2.3"
 clap = { version = "4", features = ["derive"] }
@@ -211,10 +219,6 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"
-# Reaping an orphaned llama-server after a crash: `kill`, and `proc_pidpath` to
-# confirm on macOS that a recorded pid is still our engine. Already in the
-# graph through other crates; pinned to the version the lockfile resolves.
-libc = "=0.2.182"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2.5.1"
@@ -227,7 +231,6 @@ tauri-plugin-updater = "2.10.0"
 minisign-verify = "=0.2.4"
 
 [target.'cfg(windows)'.dependencies]
-transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan", "ort-directml"] }
 # Secure API-key storage via the Windows Credential Manager. `windows-native`
 # uses windows-sys (no extra C/system build dependency).
 keyring = { version = "3", features = ["windows-native"] }
@@ -265,6 +268,18 @@ windows = { version = "0.61.3", features = [
   # Smart spacing (see smart_spacing/windows.rs): the foreground process's
   # executable name, so a terminal is recognised and never read.
   "Win32_System_Threading",
+  # Paste that restores the clipboard only after the target read it (see
+  # paste_tx/windows.rs): delayed rendering on a message-only window needs a
+  # window class (Gdi), global memory for clipboard data, and the module
+  # handle. tao already enables all three on this same `windows` version, so
+  # nothing extra is compiled.
+  "Win32_Graphics_Gdi",
+  "Win32_System_Memory",
+  # The module handle above, and `GetProcAddress` for `IsWow64Process2`,
+  # resolved at run time so the x64 build can tell it is emulated on a Windows
+  # on ARM PC and keep speech off the GPU there (managers/transcription.rs,
+  # Handy #1731).
+  "Win32_System_LibraryLoader",
 ] }
 winreg = "0.55"
 # Clipboard writes that opt out of Win+V history and cloud clipboard sync
@@ -279,7 +294,7 @@ arboard = { version = "=3.6.1", default-features = false }
 # CMAKE_PREFIX_PATH at the SDK). Windows aarch64 uses the static CPU-only
 # table just below.
 [target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
-transcribe-cpp = { version = "0.1.2", default-features = false, features = [
+transcribe-cpp = { version = "=0.4.0", default-features = false, features = [
   "dynamic-backends",
   "vulkan",
 ] }
@@ -301,7 +316,7 @@ transcribe-cpp = { version = "0.1.2", default-features = false, features = [
 # though it equals the backend-less base `[dependencies]` declaration) to
 # document the WoA posture and keep it from silently drifting.
 [target.'cfg(all(windows, target_arch = "aarch64"))'.dependencies]
-transcribe-cpp = { version = "0.1.2", default-features = false }
+transcribe-cpp = { version = "=0.4.0", default-features = false }
 
 # Arch-independent macOS dependencies. The GPU/engine backends are NOT here —
 # they differ by architecture and live in the two tables below, because cargo
@@ -337,13 +352,12 @@ objc2-core-foundation = { version = "=0.3.2", default-features = false, features
 # `metal` does NOT imply `shared`, so there are no runtime libs to ship —
 # build.rs staging is a no-op here and nothing extra is bundled.
 [target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
-transcribe-rs = { version = "0.3.11", features = ["whisper-metal"] }
-transcribe-cpp = { version = "0.1.2", default-features = false, features = [
+transcribe-cpp = { version = "=0.4.0", default-features = false, features = [
   "metal",
 ] }
 
-# macOS x86_64 (Intel) — STATIC, CPU-only. Deliberately NO Metal on either
-# engine, for two independent reasons:
+# macOS x86_64 (Intel) — STATIC, CPU-only. Deliberately NO Metal, for two
+# independent reasons:
 #   * Correctness: ggml's Metal backend targets Apple Silicon. Upstream guidance
 #     for x86_64 macOS is to build with Metal OFF, and llama.cpp/whisper.cpp
 #     carry open reports of Metal (and MoltenVK-Vulkan) producing corrupted
@@ -355,17 +369,16 @@ transcribe-cpp = { version = "0.1.2", default-features = false, features = [
 # Whisper models are usable; large ones are slow. This is documented in README.
 #
 # This table is explicit even though it matches the backend-less base
-# `[dependencies]` declaration (which already supplies `whisper-cpp` + `onnx`),
-# so the CPU-only posture is recorded and cannot drift silently — same rationale
-# as the Windows-on-ARM table above.
+# `[dependencies]` declaration, so the CPU-only posture is recorded and cannot
+# drift silently — same rationale as the Windows-on-ARM table above.
 #
-# NOTE: Intel macOS is also the ONE target where ONNX Runtime is linked
-# DYNAMICALLY rather than statically embedded, because pykeio/ort dropped
-# prebuilt x86_64-apple-darwin binaries. See BUILD.md and the
+# NOTE: Intel macOS is also the ONE target where ONNX Runtime (still linked
+# through `ort`, for Silero VAD and meeting diarization) is linked DYNAMICALLY
+# rather than statically embedded, because pykeio/ort dropped prebuilt
+# x86_64-apple-darwin binaries. See BUILD.md and the
 # "Stage ONNX Runtime for Intel macOS" step in .github/workflows/build.yml.
 [target.'cfg(all(target_os = "macos", target_arch = "x86_64"))'.dependencies]
-transcribe-rs = { version = "0.3.11", features = ["whisper-cpp"] }
-transcribe-cpp = { version = "0.1.2", default-features = false }
+transcribe-cpp = { version = "=0.4.0", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
@@ -387,14 +400,13 @@ atspi = { version = "=0.30.0", default-features = false, features = [
   "wrappers",
   "tokio",
 ] }
-transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan"] }
 # transcribe.cpp Linux: dynamic (loadable) backend .so modules + Vulkan GPU
 # acceleration (the `dynamic-backends` posture, same as Windows x86_64). Ships a
 # shared libtranscribe.so + loadable ggml backend modules; build.rs bakes a
 # `$ORIGIN/../lib` rpath into the binary and CI (scripts/ci/stage-transcribe-libs.sh)
 # co-locates the modules under /usr/lib so init_backends_default() finds them.
 # Build-time prereqs: cmake + Vulkan SDK + libvulkan-dev.
-transcribe-cpp = { version = "0.1.2", default-features = false, features = [
+transcribe-cpp = { version = "=0.4.0", default-features = false, features = [
   "dynamic-backends",
   "vulkan",
 ] }

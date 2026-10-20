@@ -5,6 +5,7 @@ import { Page, PageHeader } from "@/components/ui/Page";
 import { Button } from "@/components/ui/Button";
 import { useNavigation } from "@/components/shell/navigation";
 import { useModelSlots } from "@/components/shell/useModelSlots";
+import { RetiredSelectionPrompt } from "@/components/settings/models/RetiredSelectionPrompt";
 import { ShortcutsCard } from "./home/ShortcutsCard";
 import { ModelsCard } from "./home/ModelsCard";
 import { RecentCard } from "./home/RecentCard";
@@ -48,7 +49,11 @@ export const HomePage: React.FC = () => {
     <Page>
       <PageHeader title={greeting} />
 
-      {!slots.stt.ready && <NeedsSpeechModel />}
+      {slots.stt.issue === "needs_update" ? (
+        <RetiredSelectionPrompt placement="home" className="mb-6" />
+      ) : (
+        !slots.stt.ready && <NeedsSpeechModel />
+      )}
 
       <div className="grid grid-cols-1 gap-10 @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8">
         <ShortcutsCard />

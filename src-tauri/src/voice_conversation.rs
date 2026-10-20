@@ -549,6 +549,15 @@ pub async fn assistant_conversation_start(app: AppHandle) -> Result<VoiceTicket,
     if let Some(blocker) = crate::tts::voice_engine_blocker(&settings) {
         return Err(blocker);
     }
+    // Every utterance of a call is transcribed, so a selected speech model
+    // whose engine was removed (see `managers::legacy_models`) would fail every
+    // turn with "Model is not loaded". The call key is gated on this already
+    // (`speech_readiness::allow_voice_input`); a call opened from History or
+    // Meetings (`continue_in_call`) comes straight here, so say it here too, in
+    // the loader's own words.
+    if let Some(message) = crate::speech_readiness::retired_selection_message(&app) {
+        return Err(message);
+    }
     let voice = app.state::<VoiceConversation>();
     let ticket = {
         let mut s = voice

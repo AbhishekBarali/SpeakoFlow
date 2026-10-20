@@ -16,7 +16,7 @@ use cpal::{
 use crate::audio_toolkit::{
     audio::{AudioVisualiser, FrameResampler},
     constants,
-    vad::{self, VadFrame},
+    vad::{self, VadFrame, VadTail},
     VoiceActivityDetector,
 };
 
@@ -24,6 +24,17 @@ enum Cmd {
     Start,
     Stop(mpsc::Sender<Vec<f32>>),
     Shutdown,
+}
+
+type FrameCallback = Arc<dyn Fn(&[f32]) + Send + Sync + 'static>;
+
+/// Where the consumer hands 16 kHz audio besides the recording buffer.
+#[derive(Clone, Default)]
+struct FrameSinks {
+    /// Every frame, silence included.
+    raw: Option<FrameCallback>,
+    /// Only what the VAD keeps.
+    speech: Option<FrameCallback>,
 }
 
 /// How long opening the input stream may take before it is treated as hung.
@@ -112,7 +123,11 @@ pub struct AudioRecorder {
     /// frame while recording, BEFORE/independent of the VAD path. Used to feed
     /// a live/streaming transcriber (which needs the silence to detect chunk
     /// boundaries). `None` unless a streaming consumer is wired up.
-    frame_cb: Option<Arc<dyn Fn(&[f32]) + Send + Sync + 'static>>,
+    frame_cb: Option<FrameCallback>,
+    /// Optional callback invoked with exactly the audio the VAD keeps, in
+    /// order, as it is kept: the recording as it will be transcribed. Feeds
+    /// long-form chunks that are decoded while the user is still speaking.
+    speech_cb: Option<FrameCallback>,
     /// Becomes `true` once the microphone has delivered its first audio frame
     /// after [`AudioRecorder::start`]. Lets callers align the "start speaking"
     /// cue with a stream that is genuinely live, instead of guessing a fixed
@@ -149,6 +164,7 @@ impl AudioRecorder {
             vad: None,
             level_cb: None,
             frame_cb: None,
+            speech_cb: None,
             capture_ready: Arc::new((Mutex::new(false), Condvar::new())),
             config_cache: None,
             stream_error: Arc::new(AtomicBool::new(false)),
@@ -187,6 +203,32 @@ impl AudioRecorder {
     {
         self.frame_cb = Some(Arc::new(cb));
         self
+    }
+
+    /// Register a callback invoked with the audio the VAD keeps, as it keeps
+    /// it: the same samples, in the same order, as the buffer [`stop`]
+    /// returns.
+    ///
+    /// [`stop`]: AudioRecorder::stop
+    pub fn with_speech_callback<F>(mut self, cb: F) -> Self
+    where
+        F: Fn(&[f32]) + Send + Sync + 'static,
+    {
+        self.speech_cb = Some(Arc::new(cb));
+        self
+    }
+
+    /// Set how much trailing silence the VAD keeps after speech, for the
+    /// recordings that start from now on. Called before [`start`], since a
+    /// recording's tail follows the model that will transcribe it.
+    ///
+    /// [`start`]: AudioRecorder::start
+    pub fn set_vad_tail(&self, tail: VadTail) {
+        if let Some(vad) = &self.vad {
+            vad.lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .set_hangover_frames(tail.hangover_frames());
+        }
     }
 
     pub fn open(&mut self, device: Option<Device>) -> Result<(), Box<dyn std::error::Error>> {
@@ -246,8 +288,12 @@ impl AudioRecorder {
         let vad = self.vad.clone();
         // Move the optional level callback into the worker thread
         let level_cb = self.level_cb.clone();
-        // Move the optional raw-frame callback into the worker thread (streaming)
-        let frame_cb = self.frame_cb.clone();
+        // Move the optional raw-frame and speech callbacks into the worker
+        // thread (live transcription)
+        let sinks = FrameSinks {
+            raw: self.frame_cb.clone(),
+            speech: self.speech_cb.clone(),
+        };
         let capture_ready = self.capture_ready.clone();
         let stream_error = self.stream_error.clone();
         let speech = self.speech.clone();
@@ -350,7 +396,7 @@ impl AudioRecorder {
                         vad,
                         sample_rx,
                         level_cb,
-                        frame_cb,
+                        sinks,
                         idle,
                         stop_flag,
                         capture_ready,
@@ -666,7 +712,7 @@ mod tests {
                 None,
                 rx,
                 None,
-                None,
+                FrameSinks::default(),
                 Arc::new(AtomicBool::new(true)),
                 Arc::new(AtomicBool::new(false)),
                 Arc::new((Mutex::new(false), Condvar::new())),
@@ -811,9 +857,12 @@ mod tests {
             Some(Arc::new(move |_| {
                 level_count.fetch_add(1, Ordering::Relaxed);
             })),
-            Some(Arc::new(move |_| {
-                frame_count.fetch_add(1, Ordering::Relaxed);
-            })),
+            FrameSinks {
+                raw: Some(Arc::new(move |_| {
+                    frame_count.fetch_add(1, Ordering::Relaxed);
+                })),
+                speech: None,
+            },
             Arc::new(AtomicBool::new(true)),
             Arc::new(AtomicBool::new(false)),
             ready.clone(),
@@ -846,9 +895,12 @@ mod tests {
                 Some(Arc::new(move |levels| {
                     let _ = level_tx.send(levels);
                 })),
-                Some(Arc::new(move |frame| {
-                    let _ = frame_tx.send(frame.to_vec());
-                })),
+                FrameSinks {
+                    raw: Some(Arc::new(move |frame| {
+                        let _ = frame_tx.send(frame.to_vec());
+                    })),
+                    speech: None,
+                },
                 worker_idle,
                 worker_stop,
                 worker_ready,
@@ -942,7 +994,7 @@ mod tests {
                 Some(Arc::new(Mutex::new(vad))),
                 rx,
                 None,
-                None,
+                FrameSinks::default(),
                 Arc::new(AtomicBool::new(true)),
                 Arc::new(AtomicBool::new(false)),
                 Arc::new((Mutex::new(false), Condvar::new())),
@@ -965,6 +1017,60 @@ mod tests {
         assert_eq!(kept, vec![0.9; 960], "only the speech is kept");
         assert!(speech.heard_speech());
         assert_eq!(speech.quiet_for(), Duration::from_millis(90));
+    }
+
+    #[test]
+    fn a_streaming_tail_keeps_more_silence_but_not_a_later_silence_stop() {
+        use crate::audio_toolkit::vad::SmoothedVad;
+
+        let (tx, rx) = mpsc::channel();
+        let speech = Arc::new(SpeechActivity::default());
+        let worker_speech = speech.clone();
+        let mut smoothed = SmoothedVad::new(Box::new(LoudIsSpeech), 15, 15, 2);
+        smoothed.set_hangover_frames(VadTail::Streaming.hangover_frames());
+        let vad: Box<dyn VoiceActivityDetector> = Box::new(smoothed);
+        let (speech_tx, speech_rx) = mpsc::channel::<Vec<f32>>();
+        let sinks = FrameSinks {
+            raw: None,
+            speech: Some(Arc::new(move |kept: &[f32]| {
+                let _ = speech_tx.send(kept.to_vec());
+            })),
+        };
+        let worker = std::thread::spawn(move || {
+            run_consumer(
+                16_000,
+                Some(Arc::new(Mutex::new(vad))),
+                rx,
+                None,
+                sinks,
+                Arc::new(AtomicBool::new(true)),
+                Arc::new(AtomicBool::new(false)),
+                Arc::new((Mutex::new(false), Condvar::new())),
+                worker_speech,
+            )
+        });
+
+        // Two 30 ms frames of speech, then sixty of silence.
+        tx.send(RecorderEvent::Command(Cmd::Start)).unwrap();
+        tx.send(RecorderEvent::Samples(vec![0.9; 960])).unwrap();
+        tx.send(RecorderEvent::Samples(vec![0.0; 60 * 480]))
+            .unwrap();
+        let (reply_tx, reply_rx) = mpsc::channel();
+        tx.send(RecorderEvent::Command(Cmd::Stop(reply_tx)))
+            .unwrap();
+        tx.send(RecorderEvent::EndOfStream).unwrap();
+        let kept = reply_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        drop(tx);
+        worker.join().unwrap();
+
+        // The onset releases both speech frames, then 55 frames of tail.
+        assert_eq!(kept.len(), (2 + 55) * 480);
+        // The speech sink saw exactly the recording, in order.
+        let streamed: Vec<f32> = speech_rx.try_iter().flatten().collect();
+        assert_eq!(streamed, kept);
+        // The silence clock still starts 15 frames after the last word: 62
+        // frames heard, speech through frame 16.
+        assert_eq!(speech.quiet_for(), Duration::from_millis((62 - 17) * 30));
     }
 
     #[test]
@@ -1011,7 +1117,7 @@ fn run_consumer(
     vad: Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
     sample_rx: mpsc::Receiver<RecorderEvent>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
-    frame_cb: Option<Arc<dyn Fn(&[f32]) + Send + Sync + 'static>>,
+    sinks: FrameSinks,
     idle: Arc<AtomicBool>,
     stop_flag: Arc<AtomicBool>,
     capture_ready: Arc<(Mutex<bool>, Condvar)>,
@@ -1049,15 +1155,24 @@ fn run_consumer(
         4000.0, // vocal_max_hz
     );
 
+    /// Hangover frames that still count as speech for [`SpeechActivity`]:
+    /// the offline tail, whatever the recording's own tail is. A streaming
+    /// model's longer tail keeps more silence in the audio, but must not
+    /// push "Stop after silence" a second further out than it has always
+    /// been.
+    const ACTIVITY_TAIL_FRAMES: usize = vad::VAD_OFFLINE_TAIL_FRAMES;
+
     fn handle_frame(
         samples: &[f32],
-        recording: bool,
         vad: &Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
         out_buf: &mut Vec<f32>,
         speech: &SpeechActivity,
+        sinks: &FrameSinks,
     ) {
-        if !recording {
-            return;
+        // Keep silence in the streaming path: the provider uses it to detect
+        // speech boundaries independently of the batch VAD.
+        if let Some(cb) = &sinks.raw {
+            cb(samples);
         }
 
         // A frame the VAD could not judge is kept, and so is every frame when
@@ -1065,15 +1180,22 @@ fn run_consumer(
         // recording on silence nobody measured.
         let is_speech = if let Some(vad_arc) = vad {
             let mut det = vad_arc.lock().unwrap();
-            match det.push_frame(samples).unwrap_or(VadFrame::Speech(samples)) {
+            let kept = match det.push_frame(samples).unwrap_or(VadFrame::Speech(samples)) {
                 VadFrame::Speech(buf) => {
                     out_buf.extend_from_slice(buf);
+                    if let Some(cb) = &sinks.speech {
+                        cb(buf);
+                    }
                     true
                 }
                 VadFrame::Noise => false,
-            }
+            };
+            kept && det.tail_frames() <= ACTIVITY_TAIL_FRAMES
         } else {
             out_buf.extend_from_slice(samples);
+            if let Some(cb) = &sinks.speech {
+                cb(samples);
+            }
             true
         };
         speech.record(samples.len(), is_speech);
@@ -1114,12 +1236,7 @@ fn run_consumer(
                     }
 
                     frame_resampler.push(&raw, &mut |frame: &[f32]| {
-                        // Keep silence in the streaming path: the provider uses it
-                        // to detect speech boundaries independently of the batch VAD.
-                        if let Some(cb) = &frame_cb {
-                            cb(frame);
-                        }
-                        handle_frame(frame, true, &vad, &mut processed_samples, &speech)
+                        handle_frame(frame, &vad, &mut processed_samples, &speech, &sinks)
                     });
                 }
 
@@ -1178,10 +1295,13 @@ fn run_consumer(
                         match sample_rx.recv_timeout(remaining) {
                             Ok(RecorderEvent::Samples(remaining)) => {
                                 frame_resampler.push(&remaining, &mut |frame: &[f32]| {
-                                    if let Some(cb) = &frame_cb {
-                                        cb(frame);
-                                    }
-                                    handle_frame(frame, true, &vad, &mut processed_samples, &speech)
+                                    handle_frame(
+                                        frame,
+                                        &vad,
+                                        &mut processed_samples,
+                                        &speech,
+                                        &sinks,
+                                    )
                                 });
                             }
                             Ok(RecorderEvent::EndOfStream) => break,
@@ -1198,10 +1318,7 @@ fn run_consumer(
                     }
 
                     frame_resampler.finish(&mut |frame: &[f32]| {
-                        if let Some(cb) = &frame_cb {
-                            cb(frame);
-                        }
-                        handle_frame(frame, true, &vad, &mut processed_samples, &speech)
+                        handle_frame(frame, &vad, &mut processed_samples, &speech, &sinks)
                     });
 
                     let _ = reply_tx.send(std::mem::take(&mut processed_samples));

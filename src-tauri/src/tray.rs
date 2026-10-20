@@ -422,12 +422,23 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
     let models = model_manager.get_available_models();
     let current_model_id = &settings.selected_model;
 
-    let mut downloaded: Vec<_> = models.into_iter().filter(|m| m.is_downloaded).collect();
+    // Only models the menu can switch to: downloaded speech models whose engine
+    // still exists. A retired ONNX model is refused as the selection
+    // (`ensure_selectable`), so listing it made a choice that did nothing; and
+    // the assistant's, cleanup's and the voices' models are not dictation
+    // models at all (`switch_active_model` refuses them too).
+    let mut downloaded: Vec<_> = models
+        .iter()
+        .filter(|m| m.is_downloaded && !m.is_retired && m.engine_type.is_transcription())
+        .cloned()
+        .collect();
     downloaded.sort_by(|a, b| a.name.cmp(&b.name));
 
-    let submenu_label = downloaded
+    // The label names the selection even when it is retired, so the menu
+    // still says which model needs its update.
+    let submenu_label = models
         .iter()
-        .find(|m| m.id == *current_model_id)
+        .find(|m| m.id == *current_model_id && m.is_downloaded)
         .map(|m| m.name.clone())
         .unwrap_or_else(|| strings.model.clone());
 

@@ -594,13 +594,22 @@ fn preceding_token(buf: &str, i: usize) -> &str {
 }
 
 /// Sanitize one chunk, returning `None` when nothing speakable is left.
+///
+/// With audio tags kept, "speakable" is judged without them: a chunk that is
+/// only a tag (`[laughs]` on its own between two sentences, or after the
+/// emoji around it were removed) is refused by ElevenLabs with a 400, "empty
+/// text after removing speaker tags and emojis", which ended the spoken reply
+/// with an error in the middle of a call.
 fn clean_chunk(raw: &str, keep_audio_tags: bool) -> Option<String> {
     let clean = crate::tts::sanitize_for_speech_chunk(raw, keep_audio_tags);
-    if clean.trim().is_empty() {
-        None
+    let speakable = if keep_audio_tags {
+        crate::audio_tags::strip(&clean)
+            .chars()
+            .any(char::is_alphanumeric)
     } else {
-        Some(clean)
-    }
+        !clean.trim().is_empty()
+    };
+    speakable.then_some(clean)
 }
 
 // ---------------------------------------------------------------------------
@@ -1001,6 +1010,19 @@ fn spawn_remote_synthesis(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ElevenLabs refuses a request with nothing to say once tags and emoji
+    /// are removed, so a chunk that is only a tag is never sent on its own.
+    #[test]
+    fn a_chunk_that_is_only_an_audio_tag_is_not_spoken() {
+        assert_eq!(clean_chunk("[laughs]", true), None);
+        assert_eq!(clean_chunk(" [laughs] 😄 ", true), None);
+        assert!(clean_chunk("[laughs] Sure, why not.", true)
+            .is_some_and(|chunk| chunk.contains("[laughs]") && chunk.contains("Sure")));
+        // Ordinary text is spoken whether or not tags are kept.
+        assert!(clean_chunk("Okay.", false).is_some());
+        assert!(clean_chunk("Okay.", true).is_some());
+    }
 
     /// Feed text one character at a time — the worst case for a streaming
     /// splitter, and close to what a fast local model actually produces.
