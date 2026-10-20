@@ -1823,6 +1823,9 @@ const handlers: Record<string, (args: Json) => unknown> = {
   "plugin:app|version": () => "2.0.1",
   "plugin:window|is_maximized": () => false,
   "plugin:os|locale": () => "en-US",
+  // Where the share dialog saves a card for LinkedIn.
+  "plugin:path|resolve_directory": () => "C:/Users/you/Downloads",
+  "plugin:path|join": ({ paths }) => (paths as string[]).join("\\"),
   "plugin:updater|check": () =>
     params.get("update") === "1"
       ? {

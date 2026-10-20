@@ -205,9 +205,13 @@ describe("posting a card", () => {
     );
   });
 
-  test("Facebook opens on the feed, which takes no text from a link", () => {
-    expect(composeUrl("facebook", "anything")).toBe(
-      "https://www.facebook.com/",
+  test("LinkedIn opens its post box with the text in it", () => {
+    const url = composeUrl("linkedin", "I spoke 10 words.");
+    expect(
+      url.startsWith("https://www.linkedin.com/feed/?shareActive=true&text="),
+    ).toBe(true);
+    expect(decodeURIComponent(url.split("text=")[1])).toBe(
+      "I spoke 10 words. https://speakoflow.com",
     );
   });
 });
