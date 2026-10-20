@@ -15,11 +15,14 @@ Simplified or Traditional characters even with the language on Auto.
 
 **Using Parakeet V2 or V3, Canary, Moonshine, SenseVoice, GigaAM or Cohere?**
 Those models ran on an engine SpeakoFlow no longer includes. After updating,
-the first dictation tells you so and opens the Models page, where Download new
-version gets the same model for the new engine and switches to it when it
-lands. Until then a meeting or a History retranscription says which model
-needs its new version instead of starting. Your old files stay until you
-delete them, which Delete old files on the Models page does in one click.
+SpeakoFlow downloads the same model for the new engine on its own and switches
+to it when it lands, so dictation comes back without you doing anything; a
+dictation before then shows the download's progress. If it can't download (no
+connection, or you cancel it), the first dictation tells you so and opens the
+Models page, where Download new version tries again. Until then a meeting or a
+History retranscription says which model needs its new version instead of
+starting. Your old files stay until you delete them, which Delete old files on
+the Models page does in one click.
 
 ### New
 

@@ -80,6 +80,9 @@ interface ModelsStore {
   setLoading: (loading: boolean) => void;
 }
 
+/** Downloads cancelled from this window and not started again since. */
+const cancelledDownloads = new Set<string>();
+
 export const useModelStore = create<ModelsStore>()(
   subscribeWithSelector((set, get) => ({
     models: [],
@@ -260,6 +263,7 @@ export const useModelStore = create<ModelsStore>()(
     },
 
     downloadModel: async (modelId: string) => {
+      cancelledDownloads.delete(modelId);
       try {
         set({ error: null });
         set(
@@ -305,6 +309,7 @@ export const useModelStore = create<ModelsStore>()(
     },
 
     cancelDownload: async (modelId: string) => {
+      cancelledDownloads.add(modelId);
       try {
         set({ error: null });
         const result = await commands.cancelDownload(modelId);
@@ -394,6 +399,13 @@ export const useModelStore = create<ModelsStore>()(
         set(
           produce((state) => {
             state.downloadProgress[progress.model_id] = progress;
+            // A download the app started on its own (the new version of a
+            // retired model, at launch) is downloading too, even if the
+            // model list was read before it began. Not one just cancelled:
+            // its last progress event can arrive after the cancel.
+            if (!cancelledDownloads.has(progress.model_id)) {
+              state.downloadingModels[progress.model_id] = true;
+            }
           }),
         );
 
