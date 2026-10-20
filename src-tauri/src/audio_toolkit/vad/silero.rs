@@ -46,6 +46,12 @@ impl VoiceActivityDetector for SileroVad {
             Ok(VadFrame::Noise)
         }
     }
+
+    /// Clears Silero's LSTM state, so a recording's first frames are judged
+    /// from the start rather than from wherever the last recording left it.
+    fn reset(&mut self) {
+        self.engine.reset();
+    }
 }
 
 impl SpeechScorer for SileroVad {

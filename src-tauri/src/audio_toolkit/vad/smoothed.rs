@@ -143,6 +143,7 @@ impl VoiceActivityDetector for SmoothedVad {
 
     fn reset(&mut self) {
         self.frame_buffer.clear();
+        self.inner_vad.reset();
         self.hangover_counter = 0;
         self.onset_counter = 0;
         self.in_speech = false;
@@ -202,6 +203,29 @@ mod tests {
                 pair[1]
             );
         }
+    }
+
+    #[test]
+    fn reset_reaches_the_detector() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        struct CountsResets(Arc<AtomicUsize>);
+        impl VoiceActivityDetector for CountsResets {
+            fn push_frame<'a>(&'a mut self, _frame: &'a [f32]) -> Result<VadFrame<'a>> {
+                Ok(VadFrame::Noise)
+            }
+            fn reset(&mut self) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        // The recorder resets the smoother at every start; Silero's state must
+        // not carry over from the previous recording.
+        let resets = Arc::new(AtomicUsize::new(0));
+        let mut vad = SmoothedVad::new(Box::new(CountsResets(resets.clone())), 15, 15, 2);
+        vad.reset();
+        assert_eq!(resets.load(Ordering::Relaxed), 1);
     }
 
     #[test]
