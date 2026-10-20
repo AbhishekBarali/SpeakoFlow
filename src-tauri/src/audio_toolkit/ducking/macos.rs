@@ -8,7 +8,7 @@
 //! output is opened, and while the default is a different device every read
 //! is empty and every change is refused. Headphones plugged in mid-recording
 //! are not turned up, and the speakers are put back once they are the default
-//! again. If the id cannot be read, the output follows the default.
+//! again. If the id cannot be read, nothing is lowered.
 
 // Built in tests on every platform, where only the parser is used.
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -17,23 +17,21 @@ use super::{output_within, OutputVolume, Reading, TOOL_DEADLINE};
 use std::process::{Command, Stdio};
 
 struct SystemOutput {
-    /// The default output device when this was opened, `None` if its id could
-    /// not be read.
-    device: Option<u32>,
+    /// The default output device when this was opened.
+    device: u32,
 }
 
 pub(super) fn default_output() -> Option<Box<dyn OutputVolume>> {
-    // Whether this output can be lowered shows in its first reading.
-    Some(Box::new(SystemOutput {
-        device: default_device(),
-    }))
+    // An output that cannot be pinned is not lowered at all. Whether a pinned
+    // one can be lowered shows in its first reading.
+    let device = default_device()?;
+    Some(Box::new(SystemOutput { device }))
 }
 
 impl SystemOutput {
     /// Whether `osascript` still reaches the device this was opened on.
     fn is_pinned_device(&self) -> bool {
-        self.device
-            .is_none_or(|pinned| default_device() == Some(pinned))
+        default_device() == Some(self.device)
     }
 }
 
