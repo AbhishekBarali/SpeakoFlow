@@ -61,6 +61,15 @@ still get the correction pass afterwards.
 
 ### Changed
 
+- **A mouse button sits next to a shortcut's keys, not in place of them.**
+  With mouse buttons on, pressing one in the shortcut editor used to replace
+  the keys it had, so Back turned Ctrl + Win into Back alone. Now the shortcut
+  keeps its keys and the button is added as its other keys, and either one
+  works. In the editor, "Add another" reads "Add mouse button or keys".
+  Turning mouse buttons off no longer moves any shortcut back to its default
+  keys: the button just stops working until it is turned back on. A shortcut
+  that had a button as its only keys gets its keys back on update, with the
+  button kept next to them.
 - **Streaming follows the model, not the overlay style.** A streaming model
   such as Parakeet or Nemotron now streams with the Minimal pill too, so its
   text is ready the moment you stop. The overlay style only decides whether

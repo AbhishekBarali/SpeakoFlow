@@ -871,8 +871,7 @@
         "label": "Maustasten als Tastenkürzel",
         "description": "Nutze die mittlere Maustaste oder die Tasten Zurück und Vor als Tastenkürzel: Klicke auf die Tasten eines Kürzels und drücke dann die Maustaste. Solange sie ein Kürzel ist, tut die Taste sonst nichts.",
         "linux": "Unter Linux funktioniert nur die mittlere Maustaste.",
-        "needsEngine": "Erfordert die Tastatur-Implementierung SpeakoFlow Keys.",
-        "reset": "Tastenkürzel mit einer Maustaste verwenden wieder ihre Standardtasten."
+        "needsEngine": "Erfordert die Tastatur-Implementierung SpeakoFlow Keys."
       },
       "longFormChunking": {
         "title": "Lange Aufnahmen aufteilen",
@@ -3304,6 +3303,11 @@
     "undo": "Rückgängig",
     "addAnother": "Weitere hinzufügen",
     "addAnotherHint": "Diesem Tastenkürzel eine zweite Tastenkombination geben, etwa eine Maustaste",
+    "addButtonOrKeys": "Maustaste oder Tasten hinzufügen",
+    "addButtonOrKeysHint": "Diesem Tastenkürzel zusätzlich zu seinen Tasten eine Maustaste oder eine zweite Tastenkombination geben",
+    "mouseAddedAsOther": "{{button}} funktioniert jetzt auch für {{name}}. {{keys}} funktioniert weiterhin.",
+    "mouseNeedsOtherSlot": "{{name}} hat bereits andere Tasten ({{keys}}). Klicke darauf, um dort eine Maustaste einzustellen.",
+    "mouseNeedsOwnKeys": "Gib {{name}} zuerst Tasten. Eine Maustaste kommt dann zu ihnen hinzu.",
     "remove": "Entfernen",
     "or": "oder",
     "changeOther": "Weitere Tasten für {{name}} ändern",

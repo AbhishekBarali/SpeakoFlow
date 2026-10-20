@@ -865,8 +865,7 @@
         "label": "Dùng nút chuột làm phím tắt",
         "description": "Dùng nút giữa, nút Lùi hoặc nút Tiến của chuột làm phím tắt: bấm vào phím của một phím tắt rồi nhấn nút đó. Khi đã là phím tắt, nút đó không làm gì khác.",
         "linux": "Trên Linux chỉ nút giữa hoạt động.",
-        "needsEngine": "Cần cơ chế bàn phím SpeakoFlow Keys.",
-        "reset": "Các phím tắt dùng nút chuột đã trở về phím mặc định."
+        "needsEngine": "Cần cơ chế bàn phím SpeakoFlow Keys."
       },
       "longFormChunking": {
         "title": "Chia nhỏ bản ghi dài",
@@ -3275,6 +3274,11 @@
     "undo": "Hoàn tác",
     "addAnother": "Thêm phím khác",
     "addAnotherHint": "Gán cho phím tắt này bộ phím thứ hai, ví dụ một nút chuột",
+    "addButtonOrKeys": "Thêm nút chuột hoặc phím",
+    "addButtonOrKeysHint": "Gán cho phím tắt này một nút chuột hoặc bộ phím thứ hai, bên cạnh các phím đã có",
+    "mouseAddedAsOther": "{{button}} giờ cũng dùng được cho {{name}}. {{keys}} vẫn hoạt động.",
+    "mouseNeedsOtherSlot": "{{name}} đã có phím khác ({{keys}}). Nhấp vào đó để đặt nút chuột thay thế.",
+    "mouseNeedsOwnKeys": "Hãy gán phím cho {{name}} trước. Nút chuột sẽ được thêm bên cạnh.",
     "remove": "Xóa",
     "or": "hoặc",
     "changeOther": "Đổi phím khác của phím tắt {{name}}",

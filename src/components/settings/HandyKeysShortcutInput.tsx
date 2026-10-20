@@ -169,7 +169,16 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
             // hands-free key keeps only its key, so it can be recorded
             // while holding the dictation keys or on its own.
             const keysToCommit = keysToSave(shortcutId, currentKeysRef.current);
-            const target = now.slot ?? "primary";
+            const pressed = now.slot ?? "primary";
+            // A mouse button is never a shortcut's own keys: those stay on
+            // the keyboard, and the button joins them as the other keys.
+            // Pressed on the own keys, it used to replace Ctrl + Win with one
+            // button.
+            const button =
+              keysToCommit !== null && hasMouseButton(keysToCommit);
+            const target = button ? "alternate" : pressed;
+            const otherKeysNow =
+              now.bindings[shortcutId]?.alternate_binding?.trim() ?? "";
             const takenBy =
               keysToCommit === null
                 ? null
@@ -179,9 +188,41 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
                     shortcutId,
                     target,
                   );
+            const shortcutName = now.t(
+              `settings.general.shortcut.bindings.${shortcutId}.name`,
+              now.bindings[shortcutId]?.name ?? shortcutId,
+            );
             if (keysToCommit === null) {
               // Modifiers alone: nothing was changed.
               toast.error(now.t("settings.general.handsFree.needsKey"));
+            } else if (button && shortcutId === HANDS_FREE_ID) {
+              // One key on top of the dictation keys, with no other keys.
+              toast.error(now.t("settings.general.handsFree.needsKey"));
+            } else if (
+              button &&
+              !now.bindings[shortcutId]?.current_binding?.trim()
+            ) {
+              // Other keys are only listened for while the shortcut has keys
+              // of its own, so a button alone would do nothing.
+              toast.error(
+                now.t("shortcutEditor.mouseNeedsOwnKeys", {
+                  name: shortcutName,
+                }),
+              );
+            } else if (
+              button &&
+              pressed === "primary" &&
+              otherKeysNow &&
+              !hasMouseButton(otherKeysNow)
+            ) {
+              // Its other keys are keyboard keys someone chose: they are not
+              // replaced without being asked. Clicking them is how.
+              toast.error(
+                now.t("shortcutEditor.mouseNeedsOtherSlot", {
+                  name: shortcutName,
+                  keys: formatKeyCombination(otherKeysNow, now.osType),
+                }),
+              );
             } else if (takenBy === shortcutId) {
               toast.error(
                 now.t("settings.general.shortcut.errors.sameAsOther", {
@@ -202,6 +243,20 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
             } else if (target === "alternate") {
               try {
                 await updateAlternateBinding(shortcutId, keysToCommit);
+                if (pressed === "primary") {
+                  // Pressed on its own keys, which are kept: say where the
+                  // button went, and that nothing else changed.
+                  toast.success(
+                    now.t("shortcutEditor.mouseAddedAsOther", {
+                      button: formatKeyCombination(keysToCommit, now.osType),
+                      name: shortcutName,
+                      keys: formatKeyCombination(
+                        now.originalBinding,
+                        now.osType,
+                      ),
+                    }),
+                  );
+                }
               } catch (error) {
                 console.error("Failed to set the other keys:", error);
                 toast.error(
@@ -473,6 +528,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
                   ? addAnother
                   : undefined
               }
+              mouseButtons={mouseButtons}
             />
           ) : (
             <ShortcutEditActions

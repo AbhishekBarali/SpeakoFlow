@@ -1,10 +1,8 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import { ToggleSwitch } from "../ui/ToggleSwitch";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
-import { hasMouseButton } from "../../lib/utils/keyboard";
 
 interface MouseButtonShortcutsProps {
   descriptionMode?: "inline" | "tooltip";
@@ -14,15 +12,14 @@ interface MouseButtonShortcutsProps {
 /**
  * Experimental: the middle, Back and Forward mouse buttons as shortcut keys.
  *
- * Turning it off moves any shortcut whose own keys are a mouse button back to
- * its default keys (the backend does that, so dictation never ends up with no
- * key), which is why turning it off reloads the settings and says so.
+ * A button is only ever a shortcut's other keys, never its own (the backend
+ * refuses that), so turning this off changes no shortcut: its button is kept
+ * but not listened for, and works again once this is back on.
  */
 export const MouseButtonShortcuts: React.FC<MouseButtonShortcutsProps> =
   React.memo(({ descriptionMode = "tooltip", grouped = false }) => {
     const { t } = useTranslation();
-    const { getSetting, updateSetting, isUpdating, refreshSettings } =
-      useSettings();
+    const { getSetting, updateSetting, isUpdating } = useSettings();
     const os = useOsType();
 
     const enabled = getSetting("mouse_button_shortcuts") ?? false;
@@ -39,22 +36,10 @@ export const MouseButtonShortcuts: React.FC<MouseButtonShortcutsProps> =
       .filter(Boolean)
       .join(" ");
 
-    const onChange = async (on: boolean) => {
-      const bindings = getSetting("bindings") ?? {};
-      const moving = Object.values(bindings).some((binding) =>
-        hasMouseButton(binding?.current_binding),
-      );
-      const saved = await updateSetting("mouse_button_shortcuts", on);
-      if (!on && saved && moving) {
-        await refreshSettings();
-        toast(t("settings.advanced.mouseButtonShortcuts.reset"));
-      }
-    };
-
     return (
       <ToggleSwitch
         checked={enabled}
-        onChange={(on) => void onChange(on)}
+        onChange={(on) => void updateSetting("mouse_button_shortcuts", on)}
         isUpdating={isUpdating("mouse_button_shortcuts")}
         label={t("settings.advanced.mouseButtonShortcuts.label")}
         description={description}

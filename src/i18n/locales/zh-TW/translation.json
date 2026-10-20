@@ -865,8 +865,7 @@
         "label": "將滑鼠按鈕當作快捷鍵",
         "description": "將滑鼠中鍵、上一頁鍵或下一頁鍵當作快捷鍵：點按快捷鍵的按鍵，然後按下該滑鼠按鈕。作為快捷鍵期間，該按鈕不會執行其他動作。",
         "linux": "在 Linux 上只有滑鼠中鍵可用。",
-        "needsEngine": "需要使用 SpeakoFlow Keys 鍵盤實作方式。",
-        "reset": "使用滑鼠按鈕的快捷鍵已恢復為預設按鍵。"
+        "needsEngine": "需要使用 SpeakoFlow Keys 鍵盤實作方式。"
       },
       "longFormChunking": {
         "title": "分割長錄音",
@@ -3275,6 +3274,11 @@
     "undo": "復原",
     "addAnother": "新增另一組",
     "addAnotherHint": "為這個快捷鍵再設一組按鍵，例如滑鼠按鈕",
+    "addButtonOrKeys": "新增滑鼠按鈕或按鍵",
+    "addButtonOrKeysHint": "在現有按鍵之外，為這個快捷鍵再設一個滑鼠按鈕或一組按鍵",
+    "mouseAddedAsOther": "{{button}} 現在也可用於{{name}}。{{keys}} 仍然有效。",
+    "mouseNeedsOtherSlot": "{{name}}已有另一組按鍵（{{keys}}）。點擊它們即可改成滑鼠按鈕。",
+    "mouseNeedsOwnKeys": "請先為{{name}}設定按鍵。滑鼠按鈕會新增在它們旁邊。",
     "remove": "移除",
     "or": "或",
     "changeOther": "變更「{{name}}」快捷鍵的另一組按鍵",
