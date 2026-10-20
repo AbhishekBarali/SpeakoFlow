@@ -90,7 +90,8 @@ pub enum Response {
     Transcript(Transcript),
     Fed {
         update: StreamUpdate,
-        /// Present only when the committed or tentative text changed.
+        /// Present only when the text changed: the committed or tentative
+        /// part, or the full hypothesis.
         text: Option<StreamText>,
     },
     /// The end of a stream. A finalize that transcribe.cpp failed still
