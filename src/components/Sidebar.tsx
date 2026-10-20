@@ -115,7 +115,9 @@ const ListeningStatus: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
           : "bg-muted-soft";
 
   const statusText = !stt.ready
-    ? t("nav.status.setup")
+    ? stt.issue === "needs_update"
+      ? t("nav.status.needsUpdate")
+      : t("nav.status.setup")
     : isCloud
       ? t("nav.status.cloud", { provider: stt.providerLabel ?? "" })
       : state === "loading"

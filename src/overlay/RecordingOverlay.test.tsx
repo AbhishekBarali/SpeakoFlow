@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, expect, jest, mock, test } from "bun:test";
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 type EventHandler = (event: { payload: unknown }) => void;
@@ -175,6 +175,27 @@ test("a still-downloading speech model follows only its own progress", async () 
     download: "parakeet",
   });
   expect(downloadLabel()).toBe("overlay.downloading.title");
+});
+
+test("a speech model that needs its new version says so and offers nothing to click", async () => {
+  await fire("show-overlay", {
+    state: "update",
+    streamingWindow: false,
+    modelName: "Parakeet V3",
+  });
+  const pill = renderer.root.find(
+    (node) =>
+      typeof node.type === "string" &&
+      String(node.props.className ?? "").startsWith("overlay-pill update"),
+  );
+  expect(String(pill.props.className)).toContain("labeled");
+  expect(downloadLabel()).toBe("overlay.update.title");
+  expect(
+    renderer.root.findByProps({ className: "pill-hint" }).props.children,
+  ).toBe("overlay.update.hint");
+  // Status only, and not a recording: no waveform, nothing takes a click.
+  expect(waves()).toHaveLength(0);
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
 });
 
 test("a hop to another display fades out, then back in, and is never left hidden", async () => {
@@ -857,4 +878,74 @@ test("the hands-free card keeps its finish keys off the header", async () => {
   );
   // Still told to a screen reader, and on ✓'s tooltip.
   expect(surface().props["aria-label"]).toBe("overlay.lockedKeys");
+});
+
+/** The card's body hint while nothing has been transcribed yet. */
+const cardHint = () =>
+  renderer.root.findByProps({ className: "card-text card-hint" }).props
+    .children as string;
+
+test("a dictation waiting on its model says Loading model, not Transcribing", async () => {
+  await fire("show-overlay", { state: "recording", streamingWindow: false });
+  await fire("show-overlay", { state: "loading", streamingWindow: false });
+  const label = renderer.root.findByProps({ className: "pill-label" });
+  expect(label.props.children).toBe("overlay.loading");
+  // An open-ended wait: no estimated fill, which would park near its end for
+  // the whole load and then teach the estimate the load as transcription time.
+  const fills = () =>
+    renderer.root.findAll(
+      (node) =>
+        node.props.mode === "working" &&
+        typeof node.props.progress === "function",
+    );
+  expect(fills()).toHaveLength(0);
+  // Back to the usual transcription, and its fill, once the model is in.
+  await fire("show-overlay", { state: "transcribing", streamingWindow: false });
+  expect(
+    renderer.root.findAllByProps({ className: "pill-label" }),
+  ).toHaveLength(0);
+  expect(fills().length).toBeGreaterThan(0);
+});
+
+test("the live card names a slow model load only after it has been slow", async () => {
+  jest.useFakeTimers();
+  try {
+    await fire("show-overlay", {
+      state: "recording",
+      streamingWindow: true,
+      modelLoading: true,
+    });
+    expect(cardHint()).toBe("overlay.listening");
+    await act(async () => {
+      jest.advanceTimersByTime(1999);
+    });
+    expect(cardHint()).toBe("overlay.listening");
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(cardHint()).toBe("overlay.loading");
+    // The model is in: back to the usual invitation.
+    await fire("overlay-model-loading", false);
+    expect(cardHint()).toBe("overlay.listening");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("a quick model load during recording never shows a notice", async () => {
+  jest.useFakeTimers();
+  try {
+    await fire("show-overlay", { state: "recording", streamingWindow: true });
+    await fire("overlay-model-loading", true);
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+    });
+    await fire("overlay-model-loading", false);
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(cardHint()).toBe("overlay.listening");
+  } finally {
+    jest.useRealTimers();
+  }
 });

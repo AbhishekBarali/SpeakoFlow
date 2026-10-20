@@ -16,6 +16,8 @@ This guide covers how to set up the development environment and build SpeakoFlow
 
 - Xcode Command Line Tools
 - Install with: `xcode-select --install`
+- [CMake](https://cmake.org/download/) on `PATH` (`brew install cmake`), which
+  builds the speech engine (transcribe.cpp)
 
 ##### Intel Mac (x86_64)
 
@@ -25,9 +27,11 @@ whisper.cpp/llama.cpp carry open reports of it (and MoltenVK-Vulkan) producing
 corrupted output or failing to build on Intel Macs. Transcription still works;
 small Whisper models are usable, large ones are slow.
 
-Intel Macs also need one extra step. Prebuilt ONNX Runtime binaries are not
-available for `x86_64-apple-darwin`, because pykeio's `ort` dropped that target, so
-ONNX Runtime has to be installed separately and linked dynamically:
+Intel Macs also need one extra step. ONNX Runtime (used by the Silero voice
+activity detector and meeting speaker labels; speech-to-text itself runs on
+transcribe.cpp) has no prebuilt binaries for `x86_64-apple-darwin`, because
+pykeio's `ort` dropped that target, so it has to be installed separately and
+linked dynamically:
 
 ```bash
 brew install onnxruntime
@@ -58,6 +62,18 @@ any release. See [issue #19](https://github.com/AbhishekBarali/SpeakoFlow/issues
 - Microsoft C++ Build Tools
 - Visual Studio 2019/2022 with C++ development tools
 - Or Visual Studio Build Tools 2019/2022
+- [CMake](https://cmake.org/download/) on `PATH` (`winget install Kitware.CMake`)
+- [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) from LunarG
+  (`winget install KhronosGroup.VulkanSDK`), for transcribe.cpp's Vulkan GPU
+  backend on x64. Open a new terminal afterwards so `VULKAN_SDK` is set. If
+  CMake then reports that it cannot find `SPIRV-Headers`, install them with
+  `vcpkg install spirv-headers:x64-windows` and add that vcpkg prefix to
+  `CMAKE_PREFIX_PATH`, which is what CI does. The first build compiles the
+  speech engine and its GPU shaders and takes a while; later builds reuse it.
+  The Windows ARM64 build is CPU-only and needs no Vulkan SDK.
+- The speech engine's CMake build creates paths longer than Windows' 260
+  character limit when the checkout is deep. If it fails on a path, point
+  `CARGO_TARGET_DIR` at a short directory such as `C:\t`, as CI does.
 
 #### Linux
 

@@ -521,11 +521,13 @@
       "singleLanguage": "Supports this language only",
       "multiLanguage": "Multi-language",
       "languageOnly": "{{language}} only",
+      "languageList": "Languages {{model}} understands",
       "translation": "Can translate to English",
       "translate": "Translate to English",
       "streaming": "Streaming",
       "quantization": "Quantization",
-      "legacy": "Older"
+      "legacy": "Older",
+      "retired": "Retired"
     }
   },
   "settings": {
@@ -665,6 +667,15 @@
         "noResults": "No languages found",
         "auto": "Auto"
       },
+      "chineseScript": {
+        "title": "Chinese script",
+        "description": "Write Chinese transcripts in Simplified or Traditional characters. Other languages are left as they are.",
+        "options": {
+          "auto": "As transcribed",
+          "simplified": "Simplified",
+          "traditional": "Traditional"
+        }
+      },
       "pushToTalk": {
         "dictation": "On: it records while you hold the keys. Off: one press starts and the next one stops, so every dictation is hands-free.",
         "assistant": "On: it listens while you hold the keys. Off: one press starts and the next one sends.",
@@ -712,14 +723,27 @@
         "all": "All",
         "multiLanguage": "Multi-language",
         "translation": "Translation",
-        "allLanguages": "All languages"
+        "allLanguages": "All languages",
+        "streamingHint": "Only models that transcribe as you speak",
+        "translate": "Translate",
+        "translateHint": "Only models that can translate speech into English",
+        "noMatch": "No models match these filters",
+        "clear": "Clear filters"
       },
-      "noModelsMatch": "No models match this filter.",
       "searchPlaceholder": "Search models by name…",
       "clearSearch": "Clear search",
       "noSearchResults": "No models named “{{query}}”.",
-      "olderModels": "Older models",
-      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "olderHint": "Older format. {{model}} ({{size}}) is the newer version of this model.",
+      "retiredHint": "Uses an older engine SpeakoFlow no longer includes. Get {{model}} ({{size}}) instead.",
+      "retired": {
+        "notice": "These models used an older engine that SpeakoFlow no longer includes.",
+        "newVersion": "New version: {{model}} · {{size}}",
+        "getNewVersion": "Get new version",
+        "useNewVersion": "Use new version",
+        "deleteOld": "Delete old files ({{size}})",
+        "deleteTitle": "Delete old files",
+        "deleteConfirm": "Delete the old files of these models ({{size}})? New versions you have downloaded are kept."
+      },
       "customModel": {
         "addButton": "Search Hugging Face",
         "searchTitle": "Need a different model?",
@@ -849,28 +873,15 @@
         "linux": "On Linux only the middle button works.",
         "needsEngine": "Needs the SpeakoFlow Keys keyboard implementation."
       },
-      "liveTranscription": {
-        "label": "Live transcription",
-        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Live transcription window",
-        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
+      "longFormChunking": {
+        "title": "Split long recordings",
+        "description": "Long dictations are transcribed in pieces at natural pauses, which keeps models that are not built for long audio accurate."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Whisper acceleration",
-          "description": "Auto uses the GPU when available."
-        },
-        "ort": {
-          "title": "ONNX acceleration",
-          "description": "For Parakeet, Canary, and Moonshine models. DirectML is experimental."
-        },
-        "gpuDevice": {
-          "title": "GPU device",
-          "description": "Auto picks the dedicated GPU.",
-          "auto": "Auto"
-        }
+        "title": "Speech processing",
+        "description": "Auto uses your graphics card, the dedicated one if you have two. Choose Processor if dictation crashes or your graphics driver has problems. It's slower but works everywhere.",
+        "auto": "Auto",
+        "cpu": "Processor (CPU)"
       },
       "startHidden": {
         "label": "Start hidden",
@@ -2251,6 +2262,7 @@
     "preparing": "Getting mic ready…",
     "recording": "Recording",
     "transcribing": "Transcribing…",
+    "loading": "Loading model…",
     "processing": "Cleaning up…",
     "generating": "Writing with Flow…",
     "vision": "Looking at your screen…",
@@ -2284,6 +2296,10 @@
       "title": "Speech model downloading…",
       "percent": "Speech model downloading · {{percent}}%",
       "hint": "Dictation starts working when it's done"
+    },
+    "update": {
+      "title": "{{model}} needs an update",
+      "hint": "The new version is on the Models page"
     },
     "handsFreeHint": "Press {{key}} to go hands-free",
     "lockedKeys": "Recording hands-free. Press {{keys}} to finish",
@@ -2549,6 +2565,7 @@
     "status": {
       "label": "Speech model: {{model}}, {{status}}. Open speech-to-text settings.",
       "setup": "Needs setup",
+      "needsUpdate": "Needs update",
       "cloud": "Cloud · {{provider}}",
       "loading": "Loading…",
       "error": "Couldn't load",
@@ -2729,12 +2746,27 @@
       "today": "Today"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} used an older engine that SpeakoFlow no longer includes.",
+    "newVersion": "Its new version is {{model}}.",
+    "ready": "{{model}} is downloaded and ready.",
+    "noVersion": "Choose another model to keep dictating.",
+    "failed": "Couldn't download {{model}}.",
+    "download": "Download new version ({{size}})",
+    "retry": "Try again",
+    "chooseAnother": "Choose another model",
+    "progressLabel": "Downloading the new version",
+    "dialogTitle": "SpeakoFlow has a new speech engine",
+    "dialogBody": "It's faster and more stable, so you'll run into fewer problems. {{model}} ran on the old engine and needs its new version to keep working.",
+    "later": "Later"
+  },
   "modelsHub": {
     "description": "Each job in SpeakoFlow is done by a model you choose. Run it on this computer for privacy, or in the cloud for speed.",
     "addLocal": "Add a model file",
     "privacyNote": "Models on this computer never send your voice or text anywhere. Cloud models send it to the provider you picked, using your API key.",
     "inUse": "In use",
     "needsSetup": "Needs setup",
+    "needsUpdate": "Needs update",
     "performance": "Performance",
     "where": {
       "device": "On this computer",
@@ -2747,6 +2779,7 @@
       "assistantOff": "Assistant is turned off",
       "noModel": "No model chosen yet",
       "notDownloaded": "Model not downloaded",
+      "needsUpdate": "{{model}} needs an update",
       "noKey": "Add an API key",
       "noEndpoint": "Add an endpoint"
     },

@@ -19,6 +19,7 @@ import {
   RECOMMENDED_SETUP_SPEECH,
   SETUP_MODELS,
   SETUP_SPEECH_OPTIONS,
+  setupStartingModel,
 } from "./recommend";
 import { useSetupQueue } from "./setupQueue";
 import { useHardwareFacts } from "./useHardwareFacts";
@@ -149,6 +150,10 @@ export function SetupStep({
   const initialized = useModelStore((s) => s.initialized);
   const loadModels = useModelStore((s) => s.loadModels);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const starting = useMemo(
+    () => setupStartingModel(models, currentModel),
+    [models, currentModel],
+  );
 
   const options = useMemo<Option[]>(() => {
     const listed: Option[] = SETUP_SPEECH_OPTIONS.flatMap((entry) => {
@@ -167,37 +172,36 @@ export function SetupStep({
     // Someone replaying setup who dictates with a model setup does not list
     // sees that one model too, so Continue can keep it. Only that one: every
     // other installed model stays on the Models page, where its near-namesakes
-    // are told apart.
-    const current = models.find(
-      (m) => m.id === currentModel && m.is_downloaded,
-    );
-    if (current && !listed.some((option) => option.model.id === current.id)) {
+    // are told apart. A retired selection is never that model: its new
+    // version stands in for it (`setupStartingModel`).
+    if (
+      starting &&
+      !listed.some((option) => option.model.id === starting.model.id)
+    ) {
       listed.unshift({
-        model: current,
-        name: getTranslatedModelName(current, t),
-        about: getTranslatedModelDescription(current, t),
-        current: true,
+        model: starting.model,
+        name: getTranslatedModelName(starting.model, t),
+        about: getTranslatedModelDescription(starting.model, t),
+        current: starting.inUse,
       });
     }
     return listed;
-  }, [models, currentModel, t]);
+  }, [models, starting, t]);
 
   const recommendedId = facts
     ? SETUP_MODELS.speech[recommend(facts).speech]
     : null;
-  const installedCurrent = options.find(
-    (option) => option.model.id === currentModel && option.model.is_downloaded,
-  );
+  const startingId = starting?.model.id ?? null;
 
-  // Someone who already dictates keeps their model; everyone else gets the
-  // one for their language.
+  // Someone who already dictates keeps their model (or gets the new version
+  // of a retired one); everyone else gets the one for their language.
   useEffect(() => {
     if (selectedId) return;
-    const initial = installedCurrent?.model.id ?? recommendedId;
+    const initial = startingId ?? recommendedId;
     if (initial && options.some((option) => option.model.id === initial)) {
       setSelectedId(initial);
     }
-  }, [installedCurrent, recommendedId, options, selectedId]);
+  }, [startingId, recommendedId, options, selectedId]);
 
   const selected = options.find((option) => option.model.id === selectedId);
   const failed = initialized && !loading && models.length === 0;

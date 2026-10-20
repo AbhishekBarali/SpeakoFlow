@@ -7,7 +7,15 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Lock, RotateCcw, Undo2, X } from "lucide-react";
+import {
+  Check,
+  CircleArrowDown,
+  Copy,
+  Lock,
+  RotateCcw,
+  Undo2,
+  X,
+} from "lucide-react";
 import { type } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import AudioWaveform from "../components/shared/AudioWaveform";
@@ -38,11 +46,13 @@ import "@/lib/windowActivity.css";
 type OverlayState =
   | "recording"
   | "transcribing"
+  | "loading"
   | "processing"
   | "generating"
   | "vision"
   | "notice"
   | "downloading"
+  | "update"
   | "dismissed"
   | "failed";
 type StreamTextPayload = { committed: string; tentative: string };
@@ -77,6 +87,9 @@ type ShowOverlayPayload = {
   /** For `downloading`: the speech model on its way, whose
    * `model-download-progress` events the pill follows. */
   download?: string;
+  /** For `update`: the selected speech model whose engine is gone, which
+   * the pill names ("Parakeet V3 needs an update"). */
+  modelName?: string;
   /** For `transcribing`: AI cleanup follows, so the fill leaves it room. */
   cleanupNext?: boolean;
   /** For `recording`: the dictation keeps listening after its keys are let go
@@ -97,6 +110,9 @@ type ShowOverlayPayload = {
    * with its click, so a click on a pill that has since been replaced cannot
    * act on a different dictation. */
   epoch?: number;
+  /** For `recording`: the speech model is still loading. Later changes come
+   * as `overlay-model-loading` events. */
+  modelLoading?: boolean;
 };
 type WaveShape = { bars: number; pitch?: number; barWidth?: number };
 type OverlayJustify = "left" | "center" | "right";
@@ -200,13 +216,24 @@ const AT_END_PX = 2;
 const HOLD_LIMIT_MS = 10_000;
 
 /** States that carry a written label instead of leaning on the waveform. The
- * backend widens the window for exactly these (see OVERLAY_LABEL_WIDTH). */
+ * backend widens the window for exactly these (see OVERLAY_LABEL_WIDTH).
+ * `loading` is the wait for the speech model after a dictation ended before it
+ * had loaded (`show_transcribing_overlay`): an open-ended wait, so it gets the
+ * looping ripple rather than an estimated fill. */
 const LABELED: readonly OverlayState[] = [
   "generating",
   "vision",
   "notice",
   "downloading",
+  "update",
+  "loading",
 ];
+
+/** While recording, the live card mentions a model load only once it has run
+ * this long. A warm load finishes well inside it (about 0.2 s on Apple
+ * silicon, 1.5 s on a Windows processor), so the usual case never flashes a
+ * notice mid-sentence; a cold one can take 40 s. From Handy 417dc6a. */
+const SLOW_MODEL_LOAD_MS = 2000;
 
 /** A dismissed or failed dictation offered back: one quiet line and one
  * action. The backend sizes the window to the pill and lets it take the
@@ -329,6 +356,15 @@ const RecordingOverlay: React.FC = () => {
   const readProgress = useRef(() => run.value(performance.now())).current;
   /** When this dictation's recording began, to size the wait that follows. */
   const recordingStartedAt = useRef<number | null>(null);
+  /** How long the recording that just ended was. Kept past its first use
+   * because a model load can come between it and its transcription (the
+   * `loading` state), and the load is no part of the recording. */
+  const recordedSec = useRef<number | null>(null);
+  /** The speech model is loading while this recording runs, and has been for
+   * `SLOW_MODEL_LOAD_MS`: the live card says so where "Listening…" would be,
+   * so speech that is not being transcribed yet does not look ignored. */
+  const [slowModelLoad, setSlowModelLoad] = useState(false);
+  const modelLoadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [state, setState] = useState<OverlayState>("recording");
   const [notice, setNotice] = useState<string | null>(null);
@@ -336,6 +372,8 @@ const RecordingOverlay: React.FC = () => {
    * (null until its first progress event), and which model that is. */
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
   const downloadId = useRef<string | null>(null);
+  /** For an `update` pill: the model that needs its new version. */
+  const [updateModel, setUpdateModel] = useState<string | null>(null);
   /** The dictation keeps listening after its keys are let go. */
   const [handsFree, setHandsFree] = useState(false);
   /** The recording's keys, raw: what finishes it, and what turns it
@@ -531,22 +569,32 @@ const RecordingOverlay: React.FC = () => {
       const stage = WORK_STAGES.find((s) => s === payload.state) as
         | WorkStage
         | undefined;
+      /** The recording is over: keep how long it was, for the transcription
+       * that follows, however long anything in between takes. */
+      const endRecording = () => {
+        const started = recordingStartedAt.current;
+        recordingStartedAt.current = null;
+        if (started !== null) recordedSec.current = (now - started) / 1000;
+      };
       if (payload.state === "recording") {
         run.abandon();
         recordingStartedAt.current = now;
+        recordedSec.current = null;
+      } else if (payload.state === "loading") {
+        // Waiting on the speech model. Nothing here is timed: the load is not
+        // what a transcription costs, and learning it as one would make every
+        // later dictation's fill crawl. The transcription that follows starts
+        // its own fill when the backend switches back to `transcribing`.
+        run.abandon();
+        endRecording();
       } else if (stage) {
-        const started = recordingStartedAt.current;
-        recordingStartedAt.current = null;
+        if (stage === "transcribing") endRecording();
         run.begin(stage, now, {
           // Only transcription knows the recording it follows; cleanup keeps
           // what transcription was given. A recovered dictation has no
           // recording on this pill, so its length is unknown.
           recordingSec:
-            stage === "transcribing"
-              ? started === null
-                ? null
-                : (now - started) / 1000
-              : undefined,
+            stage === "transcribing" ? recordedSec.current : undefined,
           cleanupNext: !!payload.cleanupNext,
           setup:
             stage === "transcribing" ? payload.sttSetup : payload.cleanupSetup,
@@ -555,7 +603,21 @@ const RecordingOverlay: React.FC = () => {
       } else {
         run.abandon();
         recordingStartedAt.current = null;
+        recordedSec.current = null;
       }
+    };
+    /** Follow a speech-model load while recording; only a slow one shows. */
+    const trackModelLoad = (loading: boolean) => {
+      if (modelLoadTimer.current) clearTimeout(modelLoadTimer.current);
+      modelLoadTimer.current = null;
+      if (!loading) {
+        setSlowModelLoad(false);
+        return;
+      }
+      modelLoadTimer.current = setTimeout(() => {
+        modelLoadTimer.current = null;
+        if (recording) setSlowModelLoad(true);
+      }, SLOW_MODEL_LOAD_MS);
     };
     // Register together so a slow registration cannot leave hide unobserved.
     void Promise.all([
@@ -579,12 +641,16 @@ const RecordingOverlay: React.FC = () => {
         setCopyFailed(false);
         visible = true;
         recording = payload.state === "recording";
+        trackModelLoad(recording && !!payload.modelLoading);
         setState(payload.state);
         setNotice(payload.notice ?? null);
         const nextDownload =
           payload.state === "downloading" ? (payload.download ?? null) : null;
         if (nextDownload !== downloadId.current) setDownloadPercent(null);
         downloadId.current = nextDownload;
+        setUpdateModel(
+          payload.state === "update" ? (payload.modelName ?? null) : null,
+        );
         setStreamingWindow(payload.streamingWindow);
         setInteractive(!!payload.interactive);
         setJustify(parseJustify(payload.justify));
@@ -617,11 +683,13 @@ const RecordingOverlay: React.FC = () => {
         // freezes once completed and hidden); a new show starts a new run.
         run.abandon();
         recordingStartedAt.current = null;
+        recordedSec.current = null;
         setRecovering(false);
         setFading(false);
         setHop(false);
         visible = false;
         recording = false;
+        trackModelLoad(false);
         downloadId.current = null;
         setDownloadPercent(null);
         setIsVisible(false);
@@ -703,6 +771,11 @@ const RecordingOverlay: React.FC = () => {
       listen<"out" | "in">("overlay-hop", ({ payload }) => {
         if (visible) setHop(payload === "out");
       }).then(register),
+      // A speech-model load started or finished while this recording runs
+      // (`apply_load_change` in overlay.rs).
+      listen<boolean>("overlay-model-loading", ({ payload }) => {
+        trackModelLoad(recording && payload === true);
+      }).then(register),
       listen<number[]>("mic-level", ({ payload }) => {
         if (!recording) return;
         levels.set(voiceEnergy(payload) === 0 ? EMPTY_LEVELS : payload);
@@ -718,6 +791,7 @@ const RecordingOverlay: React.FC = () => {
       cancelled = true;
       pendingText.current = null;
       if (hopTimer.current) clearTimeout(hopTimer.current);
+      if (modelLoadTimer.current) clearTimeout(modelLoadTimer.current);
       for (const unlisten of unlisteners) unlisten();
     };
   }, []);
@@ -866,8 +940,13 @@ const RecordingOverlay: React.FC = () => {
   const recovery = RECOVERY.includes(state);
   const labeled = LABELED.includes(state);
   const downloading = state === "downloading";
+  const needsUpdate = state === "update";
   const working =
-    state !== "recording" && state !== "notice" && !downloading && !recovery;
+    state !== "recording" &&
+    state !== "notice" &&
+    !downloading &&
+    !needsUpdate &&
+    !recovery;
   // The pointer holds these open (the backend waits on `overlay-hover`): the
   // finished card so it can be read and copied, the recovery pill so it is
   // still there when the pointer reaches it.
@@ -885,11 +964,13 @@ const RecordingOverlay: React.FC = () => {
         ? downloadPercent === null
           ? t("overlay.downloading.title")
           : t("overlay.downloading.percent", { percent: downloadPercent })
-        : recovery
-          ? notice
-            ? t(`overlay.notices.${notice}`)
-            : t(`overlay.recovery.${state}`)
-          : t(`overlay.${state}`);
+        : needsUpdate
+          ? t("overlay.update.title", { model: updateModel ?? "" })
+          : recovery
+            ? notice
+              ? t(`overlay.notices.${notice}`)
+              : t(`overlay.recovery.${state}`)
+            : t(`overlay.${state}`);
   const doneLabel = notice ? t(`overlay.notices.${notice}`) : t("overlay.done");
   // The pill has nowhere to put a second line, so its one label is the invitation
   // to speak. The card keeps the state word in its header and lets the body hold
@@ -1188,7 +1269,11 @@ const RecordingOverlay: React.FC = () => {
               </p>
             ) : (
               isRecording && (
-                <p className="card-text card-hint">{t("overlay.listening")}</p>
+                <p className="card-text card-hint">
+                  {slowModelLoad
+                    ? t("overlay.loading")
+                    : t("overlay.listening")}
+                </p>
               )
             )}
           </div>
@@ -1241,6 +1326,19 @@ const RecordingOverlay: React.FC = () => {
                 <span className="pill-hint">
                   {t("overlay.downloading.hint")}
                 </span>
+              </span>
+            </>
+          ) : needsUpdate ? (
+            <>
+              <CircleArrowDown
+                className="pill-update-icon"
+                size={16}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
+              <span className="pill-download-text" role="status">
+                <span className="pill-label">{busyLabel}</span>
+                <span className="pill-hint">{t("overlay.update.hint")}</span>
               </span>
             </>
           ) : labeled ? (

@@ -78,7 +78,7 @@ SpeakoFlow 內建繁體中文與簡體中文介面，也支援中文語音轉文
 - **Breeze ASR：** 針對臺灣華語調校，也能辨識中英夾雜的口述內容。
 - **Whisper：** 多語言模型，可以辨識中文，也能把其他語言翻譯成英文。
 
-在語言選單中選擇「繁體中文」或「簡體中文」後，SpeakoFlow 會透過 OpenCC 將輸出統一轉成所選的字形，不必手動轉換。
+在語言選單中選擇「繁體中文」或「簡體中文」後，SpeakoFlow 會透過 OpenCC 將輸出統一轉成所選的字形，不必手動轉換。如果語言設為「自動」，可以在「中文字形」中選擇繁體或簡體：只有中文轉寫結果會被轉換，其他語言保持不變。
 
 > **AI 整理的語言限制：** 內建的 SpeakoFlow Mini 整理模型目前只支援英語。中文使用者可以不啟用 AI 整理，或改用支援中文的其他本機或雲端模型。這項限制不影響中文語音辨識。
 
@@ -86,7 +86,7 @@ SpeakoFlow 內建繁體中文與簡體中文介面，也支援中文語音轉文
 
 ### 語音輸入
 
-按住按鍵，說話，放開。文字會出現在游標所在的位置，錄音浮層也能在你說話時即時顯示文字。轉錄透過本機模型在顯示卡或處理器上完成：英語預設使用 Parakeet，Nemotron 支援 28 種語言並能自動偵測，Whisper 支援 99 種語言，模型目錄中共有 65 個語音模型。如果你偏好雲端，ElevenLabs、Deepgram 與 Amazon Transcribe 可以邊說邊出字，OpenAI、Groq、Mistral、Azure AI Speech 與 OpenRouter 也都能使用。
+按住按鍵，說話，放開。文字會出現在游標所在的位置，錄音浮層也能在你說話時即時顯示文字。轉錄透過本機模型在顯示卡或處理器上完成：英語預設使用 Parakeet，Nemotron 支援 28 種語言並能自動偵測，Whisper 支援 99 種語言，模型目錄中共有 69 個語音模型，可以依語言篩選。如果你偏好雲端，ElevenLabs、Deepgram 與 Amazon Transcribe 可以邊說邊出字，OpenAI、Groq、Mistral、Azure AI Speech 與 OpenRouter 也都能使用。
 
 - **復原。** 不小心取消了錄音？浮層會在幾秒內提供「復原」，歷史紀錄也會保留這段錄音，之後仍可復原。轉錄失敗時則會提供「重試」。
 - **照你的方式拼寫。** 把人名與專業術語加入字典，或設定文字取代規則。在 Windows 上，它也能學習你修正過的字詞。
@@ -193,7 +193,7 @@ Esc 只在有工作進行時（例如正在錄音，或正在朗讀回答）才�
 
 | 工作             | 在你的電腦上                                                                                                                                   | 在雲端（使用你的金鑰）                                                                                                                                                                         |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 語音轉文字       | Parakeet、Nemotron、Canary、Cohere Transcribe、Whisper、Moonshine、Voxtral、Qwen3-ASR、GigaAM、Granite Speech、SenseVoice 等（目錄中共 65 個） | ElevenLabs、Deepgram、OpenAI、Groq、Mistral (Voxtral)、Azure AI Speech、Amazon Transcribe、OpenRouter，或任何 OpenAI 相容伺服器                                                                |
+| 語音轉文字       | Parakeet、Nemotron、Canary、Cohere Transcribe、Whisper、Moonshine、Voxtral、Qwen3-ASR、GigaAM、Granite Speech、SenseVoice 等（目錄中共 69 個） | ElevenLabs、Deepgram、OpenAI、Groq、Mistral (Voxtral)、Azure AI Speech、Amazon Transcribe、OpenRouter，或任何 OpenAI 相容伺服器                                                                |
 | 助理與整理       | 內建引擎（llama.cpp，完全離線）、Ollama、LM Studio、用於整理的 SpeakoFlow Mini、Apple 晶片上用於整理的 Apple Intelligence                      | OpenAI、Anthropic、Google Gemini、Azure OpenAI、AWS Bedrock、OpenRouter、Groq、Cerebras、xAI、DeepSeek、Mistral、Moonshot、Together AI、Fireworks AI、Perplexity、Z.AI，或任何 OpenAI 相容端點 |
 | 語音回答         | Kokoro、Kitten、Pocket TTS、Supertonic                                                                                                         | OpenAI、ElevenLabs、OpenRouter、Deepgram、Cartesia、Google Cloud、Azure AI Speech、Groq、xAI、Mistral、Inworld，或你自己的伺服器                                                               |
 | 網路搜尋（選用） |                                                                                                                                                | Serper、Brave、Tavily、Exa、SerpAPI、TinyFish                                                                                                                                                  |
@@ -276,7 +276,7 @@ bun run tauri dev
 
 在 Arch 系列的發行版上，`bun run install:arch` 會建置目前的原始碼，並安裝到 `~/.local`，同時加入桌面項目與 `speak` 指令。各平台的設定方式請見 [BUILD.md](BUILD.md)。
 
-應用程式以 [Tauri 2](https://tauri.app) 打造，後端為 Rust，前端為 React 與 TypeScript。語音辨識使用 transcribe.cpp、whisper.cpp 與 ONNX Runtime，並搭配 Silero VAD；助理與整理使用內建的 llama.cpp 引擎或任何 OpenAI 相容 API；本機語音在應用程式視窗中使用 [Kokoro](https://github.com/hexgrad/kokoro)，在處理器上使用 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)；會議中的說話者標示使用 WeSpeaker 聲紋向量。
+應用程式以 [Tauri 2](https://tauri.app) 打造，後端為 Rust，前端為 React 與 TypeScript。語音辨識使用 [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp)，所有本機模型（包括 Whisper `.bin` 檔案）都由它載入，語音活動偵測使用執行在 ONNX Runtime 上的 Silero VAD；助理與整理使用內建的 llama.cpp 引擎或任何 OpenAI 相容 API；本機語音在應用程式視窗中使用 [Kokoro](https://github.com/hexgrad/kokoro)，在處理器上使用 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)；會議中的說話者標示使用 WeSpeaker 聲紋向量。
 
 ## 比較
 
@@ -368,7 +368,7 @@ SpeakoFlow 依 [MIT License](LICENSE) 發布。
 
 語音輸入核心來自 CJ Pais 開發的 [Handy](https://github.com/cjpais/Handy)，依 MIT 授權使用。感謝 CJ 將它開源。助理、對話、會議、螢幕視覺、使用 Flow 生成、翻譯、語音回答與記憶功能由 SpeakoFlow 自行開發。
 
-也感謝 [Tauri](https://tauri.app)、whisper.cpp、llama.cpp、ONNX Runtime、[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、Silero VAD、WeSpeaker、[Kokoro](https://github.com/hexgrad/kokoro) 以及 Kyutai 的 Pocket TTS。
+也感謝 [Tauri](https://tauri.app)、transcribe.cpp、llama.cpp、ONNX Runtime、[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、Silero VAD、WeSpeaker、[Kokoro](https://github.com/hexgrad/kokoro) 以及 Kyutai 的 Pocket TTS。
 
 雲端轉錄上傳的音訊使用 [LAME](https://lame.sourceforge.io) MP3 編碼器壓縮，透過 [mp3lame-encoder](https://github.com/DoumanAsh/mp3lame-encoder) 呼叫。兩者皆採用 LGPL-3.0 授權，並以靜態方式連結；它們與本應用程式的原始碼都是公開的，因此隨時都能以修改過的 LAME 重新建置。
 

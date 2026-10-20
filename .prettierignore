@@ -14,6 +14,9 @@ src-tauri/gen
 
 # Generated files
 src/bindings.ts
+# Upstream Handy's speech catalog, copied byte for byte (scripts/gen_catalog.py
+# there), so a later sync stays a plain copy.
+src-tauri/src/catalog/catalog.json
 graphify-out
 
 # Misc

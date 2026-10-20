@@ -519,11 +519,13 @@
       "singleLanguage": "이 언어만 지원합니다",
       "multiLanguage": "다국어",
       "languageOnly": "{{language}} 전용",
+      "languageList": "{{model}}이(가) 이해하는 언어",
       "translation": "영어로 번역 가능",
       "translate": "영어로 번역",
       "streaming": "스트리밍",
       "quantization": "양자화",
-      "legacy": "구형"
+      "legacy": "구형",
+      "retired": "지원 종료"
     }
   },
   "settings": {
@@ -663,6 +665,15 @@
         "noResults": "언어를 찾을 수 없습니다",
         "auto": "자동"
       },
+      "chineseScript": {
+        "title": "중국어 문자",
+        "description": "중국어 전사를 간체 또는 번체로 씁니다. 다른 언어는 그대로 둡니다.",
+        "options": {
+          "auto": "전사된 그대로",
+          "simplified": "간체",
+          "traditional": "번체"
+        }
+      },
       "pushToTalk": {
         "dictation": "켜짐: 키를 누르고 있는 동안 녹음합니다. 꺼짐: 한 번 누르면 시작하고 다시 누르면 멈추므로, 모든 받아쓰기가 핸즈프리입니다.",
         "assistant": "켜짐: 키를 누르고 있는 동안 듣습니다. 꺼짐: 한 번 누르면 시작하고 다시 누르면 보냅니다.",
@@ -710,14 +721,27 @@
         "all": "전체",
         "multiLanguage": "다국어",
         "translation": "번역",
-        "allLanguages": "모든 언어"
+        "allLanguages": "모든 언어",
+        "streamingHint": "말하는 동안 받아 적는 모델만 보기",
+        "translate": "번역",
+        "translateHint": "음성을 영어로 번역할 수 있는 모델만 보기",
+        "noMatch": "이 필터에 맞는 모델이 없습니다",
+        "clear": "필터 지우기"
       },
-      "noModelsMatch": "이 필터에 맞는 모델이 없습니다.",
       "searchPlaceholder": "이름으로 모델 검색…",
       "clearSearch": "검색 지우기",
       "noSearchResults": "“{{query}}”라는 이름의 모델이 없습니다.",
-      "olderModels": "구형 모델",
-      "olderModelsHint": "이전 엔진에서 실행됩니다. 여전히 완전히 지원되지만 — 대부분의 사용자에게는 필요하지 않습니다.",
+      "olderHint": "이전 형식입니다. {{model}}({{size}})이 이 모델의 새 버전입니다.",
+      "retiredHint": "SpeakoFlow에 더 이상 포함되지 않는 이전 엔진을 사용합니다. 대신 {{model}}({{size}})을 다운로드하세요.",
+      "retired": {
+        "notice": "이 모델들은 SpeakoFlow에 더 이상 포함되지 않는 이전 엔진을 사용했습니다.",
+        "newVersion": "새 버전: {{model}} · {{size}}",
+        "getNewVersion": "새 버전 받기",
+        "useNewVersion": "새 버전 사용",
+        "deleteOld": "이전 파일 삭제 ({{size}})",
+        "deleteTitle": "이전 파일 삭제",
+        "deleteConfirm": "이 모델들의 이전 파일({{size}})을 삭제할까요? 다운로드한 새 버전은 그대로 남습니다."
+      },
       "customModel": {
         "addButton": "Hugging Face 검색",
         "searchTitle": "다른 모델이 필요하신가요?",
@@ -843,28 +867,15 @@
         "linux": "Linux에서는 가운데 버튼만 쓸 수 있습니다.",
         "needsEngine": "SpeakoFlow Keys 키보드 구현이 필요합니다."
       },
-      "liveTranscription": {
-        "label": "실시간 전사",
-        "description": "말을 멈춘 뒤 한꺼번에 변환하는 대신, 말하는 동안 바로 전사합니다. 실험적 기능입니다."
-      },
-      "liveTranscriptionWindow": {
-        "label": "실시간 전사 창",
-        "description": "실시간 전사가 진행되는 동안 작은 알약 모양 대신, 변환되는 텍스트가 보이는 큰 오버레이 카드를 표시합니다. 실시간 전사가 필요합니다."
+      "longFormChunking": {
+        "title": "긴 녹음 나누기",
+        "description": "긴 받아쓰기를 자연스러운 쉼에서 나눠 전사합니다. 긴 오디오용이 아닌 모델도 정확도를 유지합니다."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Whisper 가속",
-          "description": "자동은 GPU를 사용할 수 있을 때 GPU를 사용합니다."
-        },
-        "ort": {
-          "title": "ONNX 가속",
-          "description": "Parakeet, Canary, Moonshine 모델용입니다. DirectML은 실험적 기능입니다."
-        },
-        "gpuDevice": {
-          "title": "GPU 장치",
-          "description": "자동은 전용 GPU를 선택합니다.",
-          "auto": "자동"
-        }
+        "title": "음성 처리",
+        "description": "자동은 그래픽 카드를 사용하며, 두 개가 있으면 전용 그래픽 카드를 사용합니다. 받아쓰기가 멈추거나 그래픽 드라이버에 문제가 있으면 프로세서를 선택하세요. 더 느리지만 어디서나 작동합니다.",
+        "auto": "자동",
+        "cpu": "프로세서 (CPU)"
       },
       "startHidden": {
         "label": "숨김 상태로 시작",
@@ -2239,6 +2250,7 @@
     "preparing": "마이크 준비 중…",
     "recording": "녹음 중",
     "transcribing": "텍스트로 변환 중…",
+    "loading": "모델 로딩 중…",
     "processing": "정리하는 중…",
     "generating": "Flow로 작성 중…",
     "vision": "화면을 보는 중…",
@@ -2272,6 +2284,10 @@
       "title": "음성 모델 다운로드 중…",
       "percent": "음성 모델 다운로드 중 · {{percent}}%",
       "hint": "다운로드가 끝나면 받아쓰기를 쓸 수 있습니다"
+    },
+    "update": {
+      "title": "{{model}} 업데이트가 필요합니다",
+      "hint": "새 버전은 모델 페이지에 있습니다"
     },
     "handsFreeHint": "{{key}}을(를) 누르면 핸즈프리",
     "lockedKeys": "핸즈프리로 녹음 중. {{keys}}을(를) 누르면 완료됩니다",
@@ -2531,6 +2547,7 @@
     "status": {
       "label": "음성 모델: {{model}}, {{status}}. 음성 인식 설정을 엽니다.",
       "setup": "설정 필요",
+      "needsUpdate": "업데이트 필요",
       "cloud": "클라우드 · {{provider}}",
       "loading": "불러오는 중…",
       "error": "불러오지 못함",
@@ -2706,12 +2723,27 @@
       "today": "오늘"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}}은(는) SpeakoFlow에 더 이상 포함되지 않는 이전 엔진을 사용했습니다.",
+    "newVersion": "새 버전은 {{model}}입니다.",
+    "ready": "{{model}}이(가) 다운로드되어 바로 쓸 수 있습니다.",
+    "noVersion": "받아쓰기를 계속하려면 다른 모델을 고르세요.",
+    "failed": "{{model}}을(를) 다운로드하지 못했습니다.",
+    "download": "새 버전 다운로드 ({{size}})",
+    "retry": "다시 시도",
+    "chooseAnother": "다른 모델 고르기",
+    "progressLabel": "새 버전 다운로드 중",
+    "dialogTitle": "SpeakoFlow에 새 음성 엔진이 들어왔습니다",
+    "dialogBody": "더 빠르고 안정적이라 문제가 줄어듭니다. {{model}}은(는) 이전 엔진에서 실행되었으므로 계속 사용하려면 새 버전이 필요합니다.",
+    "later": "나중에"
+  },
   "modelsHub": {
     "description": "SpeakoFlow의 각 작업은 직접 고른 모델이 처리합니다. 개인 정보 보호를 원하면 이 컴퓨터에서, 속도를 원하면 클라우드에서 실행하세요.",
     "addLocal": "모델 파일 추가",
     "privacyNote": "이 컴퓨터의 모델은 음성이나 텍스트를 어디에도 보내지 않습니다. 클라우드 모델은 사용자의 API 키로 선택한 제공자에게 데이터를 보냅니다.",
     "inUse": "사용 중",
     "needsSetup": "설정 필요",
+    "needsUpdate": "업데이트 필요",
     "performance": "성능",
     "where": {
       "device": "이 컴퓨터에서",
@@ -2724,6 +2756,7 @@
       "assistantOff": "어시스턴트 꺼짐",
       "noModel": "선택한 모델 없음",
       "notDownloaded": "모델이 다운로드되지 않음",
+      "needsUpdate": "{{model}} 업데이트가 필요합니다",
       "noKey": "API 키 추가",
       "noEndpoint": "엔드포인트 추가"
     },

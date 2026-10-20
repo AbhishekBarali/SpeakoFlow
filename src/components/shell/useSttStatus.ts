@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { commands } from "@/bindings";
+import { commands, type ModelInfo } from "@/bindings";
 import type { ModelStateEvent } from "@/lib/types/events";
 import { getModelCategory } from "@/lib/utils/modelCategory";
 import { useModelStore } from "@/stores/modelStore";
@@ -73,6 +73,14 @@ export const useSttLoadState = (): {
 };
 
 /**
+ * Whether a freshly downloaded speech model may become the active one without
+ * the user choosing it: never a retired model or a legacy one.
+ */
+export const isAutoSelectable = (
+  model: Pick<ModelInfo, "is_retired" | "is_legacy">,
+): boolean => !model.is_retired && !model.is_legacy;
+
+/**
  * Switch to a speech model as soon as its download finishes.
  *
  * The footer model selector used to do this as a side effect of being mounted,
@@ -95,6 +103,10 @@ export const useAutoSelectDownloadedModel = (enabled: boolean): void => {
             .getState()
             .models.find((entry) => entry.id === modelId);
           if (model && getModelCategory(model) !== "stt") return;
+          // An older model is never something to switch to: a retired one
+          // cannot run, and a legacy Whisper `.bin` has a newer twin. Neither
+          // can be downloaded any more, so this is a guard, not a path.
+          if (model && !isAutoSelectable(model)) return;
           if (await commands.isRecording()) return;
           await selectModel(modelId);
         } catch {

@@ -39,6 +39,8 @@ import { useSlotDataStore } from "./slotData";
 export type SlotIssue =
   | "no_model"
   | "not_downloaded"
+  /** The model is retired: its engine is gone and it needs its new version. */
+  | "needs_update"
   | "no_key"
   | "no_endpoint"
   | null;
@@ -131,10 +133,14 @@ export const summarizeStt = (
   }
 
   const local = findLocal(models, currentModel);
+  // A retired model can stay the selection after an upgrade, files and all,
+  // but its engine is gone: it is never "ready", and "Model not downloaded"
+  // would send the user to download the one thing that cannot run.
+  const retired = !!local?.is_retired;
   return {
     slot: "stt",
     active: true,
-    ready: !!local?.is_downloaded,
+    ready: !!local?.is_downloaded && !retired,
     where: "device",
     providerId: null,
     providerKind: "stt",
@@ -143,7 +149,13 @@ export const summarizeStt = (
     modelId: local?.id ?? (currentModel || null),
     localModel: local,
     borrowsAssistant: false,
-    issue: !local ? "no_model" : !local.is_downloaded ? "not_downloaded" : null,
+    issue: !local
+      ? "no_model"
+      : retired
+        ? "needs_update"
+        : !local.is_downloaded
+          ? "not_downloaded"
+          : null,
   };
 };
 

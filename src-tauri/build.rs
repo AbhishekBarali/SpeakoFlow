@@ -36,31 +36,21 @@ fn main() {
         }
     }
 
-    // Windows: load `vulkan-1.dll` on first use instead of at process start.
-    //
-    // The whisper.cpp engine inside transcribe-rs is statically linked with its
-    // Vulkan backend, which put `vulkan-1.dll` on the executable's import table.
-    // Windows resolves that table before any of our code runs, so a PC without
-    // the Vulkan runtime (no GPU driver installed, a VM, some older GPUs) got a
-    // system error box and the app never opened (issue #39). Delay-loaded, the
-    // DLL is only touched when Whisper's Vulkan code first runs, and
-    // `managers::transcription::vulkan_runtime_available` keeps that code from
-    // running on a PC without it: the app starts, Parakeet and cloud
-    // transcription work, and a Whisper model explains what it needs. The
-    // Parakeet/transcribe.cpp side already loads its Vulkan backend as an
-    // optional module, so it never needed this.
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
-        && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
-    {
-        println!("cargo:rustc-link-arg=/DELAYLOAD:vulkan-1.dll");
-        println!("cargo:rustc-link-arg=delayimp.lib");
-    }
+    // Windows needs no Vulkan link step: nothing in `speakoflow.exe` imports
+    // `vulkan-1.dll`. transcribe.cpp's Vulkan backend is a loadable module
+    // (`ggml-vulkan.dll`, dynamic-backends) that imports it on its own and is
+    // only loaded by `init_backends_default()`, so a PC without the Vulkan
+    // runtime still starts and runs speech on the processor. The
+    // `/DELAYLOAD:vulkan-1.dll` that used to be here existed for the
+    // statically linked whisper.cpp inside transcribe-rs (issue #39), which is
+    // gone.
 
     // Intel macOS is the one target that links ONNX Runtime DYNAMICALLY: pykeio's
-    // `ort` dropped prebuilt x86_64-apple-darwin binaries, so transcribe-rs's
-    // `onnx` feature has no static ORT to embed there and CI links against a
-    // Homebrew-provided libonnxruntime instead (see BUILD.md and the
-    // "Stage ONNX Runtime for Intel macOS" step in .github/workflows/build.yml).
+    // `ort` (Silero VAD through vad-rs, and meeting diarization) dropped prebuilt
+    // x86_64-apple-darwin binaries, so there is no static ORT to embed there and
+    // CI links against a Homebrew-provided libonnxruntime instead (see BUILD.md
+    // and the "Stage ONNX Runtime for Intel macOS" step in
+    // .github/workflows/build.yml).
     //
     // For a *distributable* .dmg that dylib has to travel inside the bundle, in
     // `SpeakoFlow.app/Contents/Frameworks` (tauri-bundler puts `bundle.macOS.
@@ -87,12 +77,17 @@ fn main() {
     // Must run after transcribe staging because that helper recreates
     // transcribe-libs/. Ships the app-local VC++ runtime on Windows.
     //
-    // NOTE (SpeakoFlow shape-(b) divergence from upstream Handy): we keep
-    // `transcribe-rs 0.3.11` with its statically-embedded ONNX Runtime (+
-    // `ort-directml` on Windows) rather than converging to Handy's shape-(a)
-    // dynamically-linked baseline ORT (see PLAN.md §2 / Session 6). So there is
-    // NO `stage_onnxruntime_dll()` here — ONNX is linked into speakoflow.exe by
-    // transcribe-rs, and no onnxruntime.dll is staged or bundled.
+    // NOTE (SpeakoFlow divergence from upstream Handy): ONNX Runtime stays
+    // statically embedded through `ort`'s default `download-binaries` (it is
+    // only used by Silero VAD and meeting diarization now that transcribe-rs is
+    // gone), rather than Handy's dynamically linked baseline ORT. So there is
+    // NO `stage_onnxruntime_dll()` here: no onnxruntime.dll is staged or
+    // bundled. pyke's prebuilt Windows ORT is always compiled with the DirectML
+    // execution provider (see ort-sys's static_link), so `speakoflow.exe` still
+    // imports `DirectML.dll` and ort-sys's `copy-dylibs` still drops a copy in
+    // the target dir, even though no session registers that provider any more.
+    // Windows 10 1903+ ships `DirectML.dll` in System32, and nothing here
+    // bundles it.
     stage_vc_runtime_dlls();
 
     generate_tray_translations();
@@ -159,7 +154,8 @@ fn stage_transcribe_runtime_libs() {
             let src = entry.path();
             let name = src.file_name().and_then(|s| s.to_str()).unwrap_or("");
             // Match by NAME, not extension: Linux versions its libs
-            // (libtranscribe.so.0, .so.0.0.7) and the loader needs the SONAME, so
+            // (libtranscribe.so.0.4, .so.0.4.0: before 1.0 the SONAME carries
+            // the minor version) and the loader needs the SONAME, so
             // an extension-only filter would copy just the bare dev symlink and
             // ship a broken package. `fs::copy` dereferences the version symlinks
             // into real files.
@@ -186,8 +182,8 @@ fn stage_transcribe_runtime_libs() {
 
 /// Stage the MSVC runtime DLLs into `transcribe-libs/` for app-local deployment.
 ///
-/// SpeakoFlow's native stack (transcribe-cpp's ggml DLLs, and transcribe-rs's
-/// embedded ONNX Runtime) links the VC++ runtime dynamically (/MD). Shipping the
+/// SpeakoFlow's native stack (transcribe-cpp's ggml DLLs, and the ONNX Runtime
+/// `ort` embeds) links the VC++ runtime dynamically (/MD). Shipping the
 /// DLLs beside `speakoflow.exe` covers machines with no redistributable
 /// installed and machines whose system redist is older than the CI toolset.
 ///
