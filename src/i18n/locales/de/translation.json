@@ -3391,8 +3391,8 @@
     }
   },
   "insights": {
-    "description": "Dein Diktat im Zeitverlauf, gezählt auf diesem Computer.",
-    "empty": "Deine Statistiken erscheinen nach deinem ersten Diktat.",
+    "about": "Wie du SpeakoFlow nutzt, gezählt auf diesem Computer.",
+    "nothingYet": "Deine Statistiken erscheinen, sobald du diktierst, dem Assistenten eine Frage stellst oder ein Meeting aufnimmst.",
     "dictations": "Diktate",
     "today": "{{words}} Wörter heute",
     "pages_one": "Etwa {{count}} Seite",
@@ -3402,19 +3402,134 @@
     "streak_other": "{{count}} Tage in Folge",
     "longest_one": "Längste Serie: {{count}} Tag",
     "longest_other": "Längste Serie: {{count}} Tage",
-    "gridLabel_one": "{{words}} Wörter an {{count}} Tag in den letzten sechs Monaten",
-    "gridLabel_other": "{{words}} Wörter an {{count}} Tagen in den letzten sechs Monaten",
+    "streakHint": "Ein Tag zählt, wenn du diktierst, dem Assistenten eine Frage stellst, ein Gespräch führst oder ein Meeting aufnimmst.",
     "gridSummary_one": "{{words}} Wörter an {{count}} Tag in den letzten 6 Monaten",
     "gridSummary_other": "{{words}} Wörter an {{count}} Tagen in den letzten 6 Monaten",
+    "gridSummaryAssistant_one": "{{questions}} an {{count}} Tag in den letzten 6 Monaten",
+    "gridSummaryAssistant_other": "{{questions}} an {{count}} Tagen in den letzten 6 Monaten",
+    "gridSummaryMeetings_one": "{{time}} in Meetings an {{count}} Tag in den letzten 6 Monaten",
+    "gridSummaryMeetings_other": "{{time}} in Meetings an {{count}} Tagen in den letzten 6 Monaten",
     "dayWords_one": "{{formatted}} Wort",
     "dayWords_other": "{{formatted}} Wörter",
-    "dayNone": "Kein Diktat",
+    "dayQuestions_one": "{{formatted}} Frage",
+    "dayQuestions_other": "{{formatted}} Fragen",
+    "dayNoneFor": {
+      "dictation": "Kein Diktat",
+      "assistant": "Keine Fragen",
+      "meetings": "Keine Meetings"
+    },
     "less": "Weniger",
     "more": "Mehr",
     "busiest": "Aktivster Tag",
     "best": "Bester Tag",
     "typical": "Typischer Tag",
-    "typicalSub": "An Tagen, an denen du diktierst"
+    "typicalFor": {
+      "dictation": "An Tagen, an denen du diktierst",
+      "assistant": "An Tagen, an denen du fragst",
+      "meetings": "An Tagen mit einem Meeting"
+    },
+    "activity": {
+      "label": "Angezeigte Aktivität",
+      "dictation": "Diktat",
+      "assistant": "Assistent",
+      "meetings": "Meetings"
+    },
+    "open": "Öffnen",
+    "assistantCard": {
+      "info": "Schnelle Fragen und was du in Gesprächen gesagt hast. Das bleibt gezählt, auch wenn du Gespräche löschst.",
+      "empty": "Stell dem Assistenten eine Frage oder starte ein Gespräch, dann wird es hier gezählt.",
+      "questions_one": "Gestellte Frage",
+      "questions_other": "Gestellte Fragen",
+      "calls_one": "Gespräch",
+      "calls_other": "Gespräche",
+      "callTime": "Zeit in Gesprächen"
+    },
+    "meetingsCard": {
+      "info": "Meetings, die du aufgenommen hast. Sie bleiben gezählt, auch wenn du ein Meeting löschst.",
+      "empty": "Nimm ein Meeting auf, dann wird es hier gezählt.",
+      "meetings_one": "Meeting",
+      "meetings_other": "Meetings",
+      "time": "Aufnahmezeit",
+      "words_one": "Transkribiertes Wort",
+      "words_other": "Transkribierte Wörter"
+    },
+    "share": {
+      "button": "Teilen",
+      "nothingYet": "Sobald du SpeakoFlow genutzt hast, gibt es etwas zu teilen.",
+      "title": "Teile deine Statistiken",
+      "description": "Deine Zahlen als Bild, in der passenden Größe für jede Plattform.",
+      "private": "Auf diesem Computer erstellt. Nichts wird hochgeladen.",
+      "size": "Größe",
+      "formats": {
+        "square": "Quadratisch",
+        "story": "Story",
+        "wide": "Breit"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, für Feeds",
+        "story": "1080 × 1920, für Storys",
+        "wide": "1600 × 900, für Beiträge und Links"
+      },
+      "look": "Stil",
+      "looks": {
+        "paper": "Papier",
+        "graphite": "Graphit",
+        "mint": "Minze",
+        "dusk": "Dämmerung"
+      },
+      "show": "Anzeigen",
+      "include": {
+        "assistant": "Assistent auf der Karte zeigen",
+        "meetings": "Meetings auf der Karte zeigen"
+      },
+      "copy": "Bild kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Das Bild konnte nicht kopiert werden",
+      "save": "Bild speichern",
+      "saved": "Bild gespeichert",
+      "saveFailed": "Das Bild konnte nicht gespeichert werden",
+      "showInFolder": "Im Ordner anzeigen",
+      "drawFailed": "Die Karte konnte nicht erstellt werden. Schließe das Fenster und versuche es erneut.",
+      "since": "Seit {{date}}",
+      "barsCaption_one": "Die letzte Woche, ein Balken pro Tag",
+      "barsCaption_other": "Die letzten {{count}} Wochen, ein Balken pro Tag",
+      "tagline": "Kostenlos · Open Source · Funktioniert offline",
+      "headline": {
+        "dictation": {
+          "lead_one": "Wort gesprochen,",
+          "lead_other": "Wörter gesprochen,",
+          "accent": "nicht getippt."
+        },
+        "assistant": {
+          "lead_one": "Frage,",
+          "lead_other": "Fragen,",
+          "accent": "laut gestellt."
+        },
+        "meetings": {
+          "lead_one": "Meeting aufgenommen,",
+          "lead_other": "Meetings aufgenommen,",
+          "accent": "Notizen inklusive."
+        }
+      },
+      "fact": {
+        "saved": "gespart gegenüber Tippen",
+        "wpm": "Wörter pro Minute",
+        "questions_one": "beantwortete Frage",
+        "questions_other": "beantwortete Fragen",
+        "meetings_one": "protokolliertes Meeting",
+        "meetings_other": "protokollierte Meetings",
+        "meetingTime": "Meetings aufgenommen",
+        "meetingWords_one": "transkribiertes Wort",
+        "meetingWords_other": "transkribierte Wörter",
+        "callTime": "in Gesprächen",
+        "streak_one": "Tag in Folge",
+        "streak_other": "Tage in Folge",
+        "activeDays_one": "Tag im Gespräch mit meinem Computer",
+        "activeDays_other": "Tage im Gespräch mit meinem Computer",
+        "dictations_one": "Diktat",
+        "dictations_other": "Diktate"
+      }
+    }
   },
   "settingsNotice": {
     "restored": "Deine Einstellungen waren beschädigt und wurden aus einer Sicherung wiederhergestellt.",
