@@ -5,6 +5,7 @@ import type {
   AppSettings as Settings,
   AudioDevice,
   AudioTagIntensity,
+  ChineseScript,
   ConversationPace,
   ConversationSensitivity,
   ModelChoice,
@@ -13,8 +14,7 @@ import type {
   RecordingRetentionPeriod,
   Replacement,
   ThinkingLevel,
-  WhisperAcceleratorSetting,
-  OrtAcceleratorSetting,
+  TranscribeAcceleratorSetting,
 } from "@/bindings";
 import { commands } from "@/bindings";
 import { toast } from "sonner";
@@ -269,24 +269,22 @@ const settingUpdaters: {
     commands.changeLazyStreamCloseSetting(value as boolean),
   mouse_button_shortcuts: (value) =>
     commands.changeMouseButtonShortcutsSetting(value as boolean),
-  live_transcription_enabled: (value) =>
-    commands.changeLiveTranscriptionEnabledSetting(value as boolean),
-  live_transcription_window_enabled: (value) =>
-    commands.changeLiveTranscriptionWindowEnabledSetting(value as boolean),
+  chinese_script: (value) =>
+    commands.changeChineseScriptSetting(value as ChineseScript),
+  long_form_chunking: (value) =>
+    commands.changeLongFormChunkingSetting(value as boolean),
   show_tray_icon: (value) =>
     commands.changeShowTrayIconSetting(value as boolean),
   tray_icon_color: (value) =>
     commands.changeTrayIconColorSetting(value as boolean),
   close_behavior: (value) =>
     commands.changeCloseBehaviorSetting(value as string),
-  whisper_accelerator: (value) =>
-    commands.changeWhisperAcceleratorSetting(
-      value as WhisperAcceleratorSetting,
+  transcribe_accelerator: (value) =>
+    commands.changeTranscribeAcceleratorSetting(
+      value as TranscribeAcceleratorSetting,
     ),
-  ort_accelerator: (value) =>
-    commands.changeOrtAcceleratorSetting(value as OrtAcceleratorSetting),
-  whisper_gpu_device: (value) =>
-    commands.changeWhisperGpuDevice(value as number),
+  transcribe_gpu_device: (value) =>
+    commands.changeTranscribeGpuDevice(value as string | null),
   extra_recording_buffer_ms: (value) =>
     commands.changeExtraRecordingBufferSetting(value as number),
 };

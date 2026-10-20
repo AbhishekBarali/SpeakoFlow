@@ -6,16 +6,151 @@ their [GitHub releases](https://github.com/AbhishekBarali/SpeakoFlow/releases).
 
 ## Unreleased
 
+One speech engine under every local model, and all 69 models in Handy's
+catalog to choose from, with filters for streaming, translation and language.
+The old Parakeet V2 and V3 and the other ONNX models move to the new engine
+with one download. Speech now has one Speech processing setting, long
+recordings are split at pauses, and Chinese transcripts can be written in
+Simplified or Traditional characters even with the language on Auto.
+
+**Using Parakeet V2 or V3, Canary, Moonshine, SenseVoice, GigaAM or Cohere?**
+Those models ran on an engine SpeakoFlow no longer includes. After updating, a
+pop-up says so when the app opens: Download new version gets the same model for
+the new engine, faster and more stable, and switches to it when it lands, or
+you can choose another model. Nothing downloads until you choose. If you close
+it, the first dictation tells you again and opens the Models page. Until then a
+meeting or a History retranscription says which model
+needs its new version instead of starting. Your old files stay until you
+delete them, which Delete old files on the Models page does in one click.
+
+### New
+
+**Every model in the catalog.** The Speech to text tab lists all 69 models
+instead of five. Recommended ones still come first.
+
+- Filter by Streaming, Translate, or the language you speak. Filters combine,
+  and when nothing matches, Clear filters puts the full list back.
+- Each row says how many languages the model hears. Click the count for the
+  list.
+- Every download is pinned to one version of the model and checked against its
+  checksum when it finishes. If the download from Hugging Face fails, a copy
+  is fetched from Handy's mirror and checked the same way.
+
+**Speech processing**, in Settings → Advanced → Performance: Auto, a
+specific graphics card, or Processor (CPU). It replaces the Whisper and ONNX
+acceleration settings and is no longer hidden behind Experimental features.
+Auto uses the dedicated graphics card when a computer has two. Processor and
+Auto carry over from the old Whisper setting. A graphics card picked there
+goes back to Auto, because the new engine numbers its devices differently;
+pick it again from the list.
+
+**Split long recordings**, on by default in Settings → Advanced → Performance.
+A dictation longer than 40 seconds is cut at pauses and transcribed in pieces
+of about 30 seconds, which keeps models that aren't built for long audio
+accurate. Whisper and streaming models are never cut.
+
+**Chinese script.** Choose Simplified, Traditional, or As transcribed, under
+the language picker on the Models page and in the cloud settings. It converts
+Chinese only: with Auto language, an English or Japanese dictation is left as
+it was. Picking Simplified or Traditional Chinese as the language converts
+every dictation, as before.
+
+**Custom words reach more models.** Models that accept a vocabulary now get
+your custom words while they transcribe, as Whisper always has. Other models
+still get the correction pass afterwards.
+
 ### Changed
 
-**A mouse button sits next to a shortcut's keys, not in place of them.**
-With mouse buttons on, pressing one in the shortcut editor used to replace the
-keys it had, so Back turned Ctrl + Win into Back alone. Now the shortcut keeps
-its keys and the button is added as its other keys, and either one works. In
-the editor, "Add another" reads "Add mouse button or keys". Turning mouse
-buttons off no longer moves any shortcut back to its default keys: the button
-just stops working until it is turned back on. A shortcut that had a button as
-its only keys gets its keys back on update, with the button kept next to them.
+- **A mouse button sits next to a shortcut's keys, not in place of them.**
+  With mouse buttons on, pressing one in the shortcut editor used to replace
+  the keys it had, so Back turned Ctrl + Win into Back alone. Now the shortcut
+  keeps its keys and the button is added as its other keys, and either one
+  works. In the editor, "Add another" reads "Add mouse button or keys".
+  Turning mouse buttons off no longer moves any shortcut back to its default
+  keys: the button just stops working until it is turned back on. A shortcut
+  that had a button as its only keys gets its keys back on update, with the
+  button kept next to them.
+- **Streaming follows the model, not the overlay style.** A streaming model
+  such as Parakeet or Nemotron now streams with the Minimal pill too, so its
+  text is ready the moment you stop. The overlay style only decides whether
+  you see the running text.
+- **Your language choice is kept** when you switch models. An English-only
+  model uses English, and switching back to a multilingual model brings your
+  choice back. Auto is only offered for models that can detect the language.
+- **Streaming models keep the pauses between sentences** (up to 1.65 seconds
+  of each pause instead of 0.45), so they no longer run sentences together.
+  Stop after silence still counts from the same moment.
+- **Whisper `.bin` files** you already downloaded run on the new engine and
+  are marked Older. Their newer versions are in the catalog.
+- **The x64 build on a Windows on ARM PC** keeps speech on the processor and
+  offers only Processor under Speech processing, because the graphics path
+  is not reliable under emulation.
+
+### Fixed
+
+- **A graphics driver crash could take the whole app down** (#82), or leave a
+  dictation stuck on "Transcribing…". Speech models now run in a separate
+  process: if it crashes or stops responding, SpeakoFlow switches speech to
+  the processor for the rest of the session, finishes the dictation there, and
+  stays open. If even that fails, the pill offers Try again. The old ONNX
+  models, which ran on DirectML, also went with their engine.
+- **Esc during "Transcribing…"** now stops the transcription and offers Undo,
+  instead of reporting a failure. The model stays loaded for the next
+  dictation.
+- **A paste could insert what you had copied before** instead of the
+  dictation, in a busy browser tab or editor. On Windows and macOS your
+  clipboard now goes back only after the app you dictated into has read the
+  dictation, and auto-submit's Enter waits for the same moment.
+- **Words could repeat** when you started speaking again right after a short
+  pause.
+- **Esc could stay taken from every app** after a very short recording, until
+  the next one.
+- **While the speech model was still loading, the pill said "Transcribing…"**
+  and its progress bar ran for the whole load. It now says "Loading model…".
+- **A model set to unload immediately stayed loaded** after a recording with
+  no speech in it.
+- **History could list a dictation twice.**
+- **A cleanup cut off at the model's output limit was pasted half-finished.**
+  The raw transcript is pasted instead.
+- **Removing a filler at the start of a sentence lowercased the next word.**
+  "Um, so I think" came out as "so I think".
+- **Linux: memory grew with every dictation.**
+- **Switching models or Speech processing during a dictation broke it.** The
+  dictation lost its live text and then failed with "Model is not loaded". The
+  switch now waits until the recording ends. The same goes for a model set to
+  unload immediately after another transcription.
+- **Live text could stop partway through a dictation** that started right
+  after another one was cancelled, and the recording was then transcribed a
+  second time from the start.
+- **Esc pressed just after letting go of the keys** still transcribed the
+  whole recording before dismissing it.
+- **AI cleanup never ran again for some reasoning models** (LM Studio without
+  its reasoning parser, older Ollama) once one answer was cut off while the
+  model was still thinking.
+- **A call opened from History or Meetings with an old ONNX model selected**
+  failed on every turn with "Model is not loaded". It now says the model needs
+  its new version.
+- **"Loading model…" could stay on the pill**, and a "Transcribing…" pill could
+  stay up until the next dictation.
+- **Windows: auto-submit came a second late** on computers with a clipboard
+  manager, remote desktop or VM client, and pasting after copying a large
+  Office selection could stall.
+- **An ask started right after a dictation** could send that dictation's
+  Enter while the ask keys were held (Ctrl+Enter), or on macOS leave the
+  dictation on the clipboard in place of yours.
+- **Quitting right after a dictation** could leave the dictation on the
+  clipboard instead of what you had copied.
+- **A spoken reply could stop with an error** when a sentence held only an
+  ElevenLabs audio tag such as `[laughs]`.
+- **The tray's model menu listed models that cannot be used**: retired ONNX
+  models and the assistant's, cleanup's and voice models.
+- **Removing "Um," before a name like iPhone** capitalised it to "IPhone".
+- **A processor without FMA3** crashed its first speech worker every session
+  before falling back to the processor.
+- **macOS: `pkill -USR2 -n speakoflow` did nothing** while a speech model was
+  loaded, because it reached the speech worker instead of the app.
+- **The main window had no title** in the taskbar preview, Alt+Tab, Task
+  Manager and screen readers.
 
 ## 2.1.0
 

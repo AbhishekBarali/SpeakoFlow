@@ -27,11 +27,12 @@ name: "Test Build"
 #     rebuilt from a spec. Until that is wired up, an .rpm would install and then
 #     fail to transcribe, so it is not built.
 #
-#   * windows-11-arm — whisper-rs-sys's build script hard-panics with "Please
-#     install Vulkan SDK and ensure that VULKAN_SDK env variable is set". The
-#     Vulkan/SPIRV setup steps in build.yml are gated to non-aarch64 Windows, so
-#     ARM64 never gets an SDK. Needs either an ARM64 Vulkan SDK in CI or a
-#     target-specific opt-out of the vulkan feature.
+#   * windows-11-arm — not built yet. It used to be impossible: whisper-rs-sys's
+#     build script hard-panicked without VULKAN_SDK, and the Vulkan/SPIRV setup
+#     steps in build.yml are gated to non-aarch64 Windows. whisper-rs went with
+#     transcribe-rs; the remaining engine is a static CPU-only transcribe-cpp
+#     build there (Ninja + clang-cl, see build.yml), which still needs a first
+#     green run before it joins this matrix.
 #
 # CORRECTION (supersedes the Test Build #8 note that Intel macOS was impossible):
 # GitHub retired `macos-13` on 2025-12-04 but REPLACED it with `macos-15-intel`,

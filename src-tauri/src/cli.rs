@@ -44,11 +44,13 @@ pub struct CliArgs {
     pub list_devices: bool,
 
     /// Internal: enumerate the compute devices, print them as one line of JSON,
-    /// and exit. The app spawns itself with this on Linux so that a SIGILL or a
-    /// hang inside the vendored ggml/Vulkan code kills only this short-lived
-    /// child instead of the app at launch (see
-    /// `managers::transcription::probe_devices_out_of_process`). Hidden because
-    /// it is an implementation detail, not a user-facing switch.
+    /// and exit; the machine-readable sibling of `--list-devices`, for scripts
+    /// and audits. (The app used to spawn itself with it on Linux to list GPUs
+    /// out of process; the transcription worker does that on every platform
+    /// now.) Hidden because it is not a user-facing switch.
+    ///
+    /// The transcription worker's own flag (`--transcribe-worker`) is not
+    /// declared here: `main` handles it before these arguments are parsed.
     #[arg(long, hide = true)]
     pub probe_devices: bool,
 }

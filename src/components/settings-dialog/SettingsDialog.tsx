@@ -167,7 +167,7 @@ export const SettingsDialog: React.FC = () => {
         </header>
         <div
           ref={bodyRef}
-          className="min-h-0 flex-1 space-y-7 overflow-y-auto px-8 pb-10"
+          className="settings-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-8 pb-10"
         >
           <ActiveTab key={active.id} />
         </div>

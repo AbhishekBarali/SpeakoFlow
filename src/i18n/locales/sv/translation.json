@@ -521,11 +521,13 @@
       "singleLanguage": "Stöder endast detta språk",
       "multiLanguage": "Flerspråkig",
       "languageOnly": "Endast {{language}}",
+      "languageList": "Språk som {{model}} förstår",
       "translation": "Kan översätta till engelska",
       "translate": "Översätt till engelska",
       "streaming": "Streaming",
       "quantization": "Kvantisering",
-      "legacy": "Äldre"
+      "legacy": "Äldre",
+      "retired": "Utfasad"
     }
   },
   "settings": {
@@ -665,6 +667,15 @@
         "noResults": "Inga språk hittades",
         "auto": "Automatiskt"
       },
+      "chineseScript": {
+        "title": "Kinesisk skrift",
+        "description": "Skriv kinesiska transkriptioner med förenklade eller traditionella tecken. Andra språk lämnas som de är.",
+        "options": {
+          "auto": "Som transkriberat",
+          "simplified": "Förenklad",
+          "traditional": "Traditionell"
+        }
+      },
       "pushToTalk": {
         "dictation": "På: inspelningen pågår medan du håller ned tangenterna. Av: en tryckning startar, nästa stoppar, så varje diktering blir handsfree.",
         "assistant": "På: lyssnar medan du håller ned tangenterna. Av: en tryckning startar, nästa skickar.",
@@ -712,14 +723,27 @@
         "all": "Alla",
         "multiLanguage": "Flerspråkig",
         "translation": "Översättning",
-        "allLanguages": "Alla språk"
+        "allLanguages": "Alla språk",
+        "streamingHint": "Bara modeller som transkriberar medan du pratar",
+        "translate": "Översätt",
+        "translateHint": "Bara modeller som kan översätta tal till engelska",
+        "noMatch": "Inga modeller matchar de här filtren",
+        "clear": "Rensa filter"
       },
-      "noModelsMatch": "Inga modeller matchar detta filter.",
       "searchPlaceholder": "Sök modeller efter namn…",
       "clearSearch": "Rensa sökning",
       "noSearchResults": "Inga modeller heter ”{{query}}”.",
-      "olderModels": "Äldre modeller",
-      "olderModelsHint": "Körs på den tidigare motorn. Fortfarande fullt stödda — de flesta behöver dem inte.",
+      "olderHint": "Äldre format. {{model}} ({{size}}) är den nyare versionen av den här modellen.",
+      "retiredHint": "Använder en äldre motor som SpeakoFlow inte längre har. Hämta {{model}} ({{size}}) i stället.",
+      "retired": {
+        "notice": "De här modellerna använde en äldre motor som SpeakoFlow inte längre har.",
+        "newVersion": "Ny version: {{model}} · {{size}}",
+        "getNewVersion": "Hämta ny version",
+        "useNewVersion": "Använd ny version",
+        "deleteOld": "Radera gamla filer ({{size}})",
+        "deleteTitle": "Radera gamla filer",
+        "deleteConfirm": "Radera de gamla filerna för de här modellerna ({{size}})? Nya versioner du har hämtat finns kvar."
+      },
       "customModel": {
         "addButton": "Sök på Hugging Face",
         "searchTitle": "Behöver du en annan modell?",
@@ -849,28 +873,15 @@
         "linux": "På Linux fungerar bara mittenknappen.",
         "needsEngine": "Kräver tangentbordsimplementeringen SpeakoFlow Keys."
       },
-      "liveTranscription": {
-        "label": "Live-transkribering",
-        "description": "Transkribera talet medan du pratar, i stället för allt på en gång när du slutar. Experimentellt."
-      },
-      "liveTranscriptionWindow": {
-        "label": "Fönster för live-transkribering",
-        "description": "Visa ett större överlagringskort med den löpande texten i stället för den lilla kompakta rutan medan live-transkribering körs. Kräver live-transkribering."
+      "longFormChunking": {
+        "title": "Dela upp långa inspelningar",
+        "description": "Långa dikteringar transkriberas i delar vid naturliga pauser, så att modeller som inte är byggda för långt ljud förblir exakta."
       },
       "acceleration": {
-        "whisper": {
-          "title": "Whisper-acceleration",
-          "description": "Auto använder GPU:n när den är tillgänglig."
-        },
-        "ort": {
-          "title": "ONNX-acceleration",
-          "description": "För Parakeet-, Canary- och Moonshine-modeller. DirectML är experimentellt."
-        },
-        "gpuDevice": {
-          "title": "GPU-enhet",
-          "description": "Auto väljer den dedikerade GPU:n.",
-          "auto": "Automatiskt"
-        }
+        "title": "Talbearbetning",
+        "description": "Automatiskt använder grafikkortet, det dedikerade om du har två. Välj Processor om dikteringen kraschar eller grafikdrivrutinen har problem. Det är långsammare men fungerar överallt.",
+        "auto": "Automatiskt",
+        "cpu": "Processor (CPU)"
       },
       "startHidden": {
         "label": "Starta dold",
@@ -2251,6 +2262,7 @@
     "preparing": "Förbereder mikrofonen…",
     "recording": "Spelar in",
     "transcribing": "Transkriberar…",
+    "loading": "Laddar modell…",
     "processing": "Rensar…",
     "generating": "Skriver med Flow…",
     "vision": "Tittar på din skärm…",
@@ -2284,6 +2296,10 @@
       "title": "Talmodellen laddas ner…",
       "percent": "Talmodellen laddas ner · {{percent}}%",
       "hint": "Dikteringen fungerar när den är klar"
+    },
+    "update": {
+      "title": "{{model}} behöver uppdateras",
+      "hint": "Den nya versionen finns på sidan Modeller"
     },
     "handsFreeHint": "Tryck {{key}} för handsfree",
     "lockedKeys": "Spelar in handsfree. Tryck på {{keys}} för att avsluta",
@@ -2549,6 +2565,7 @@
     "status": {
       "label": "Talmodell: {{model}}, {{status}}. Öppna inställningarna för tal till text.",
       "setup": "Behöver konfigureras",
+      "needsUpdate": "Behöver uppdateras",
       "cloud": "Moln · {{provider}}",
       "loading": "Laddar…",
       "error": "Kunde inte laddas",
@@ -2729,12 +2746,27 @@
       "today": "I dag"
     }
   },
+  "speechUpdate": {
+    "title": "{{model}} använde en äldre motor som SpeakoFlow inte längre har.",
+    "newVersion": "Den nya versionen är {{model}}.",
+    "ready": "{{model}} är hämtad och klar.",
+    "noVersion": "Välj en annan modell för att fortsätta diktera.",
+    "failed": "Det gick inte att hämta {{model}}.",
+    "download": "Hämta ny version ({{size}})",
+    "retry": "Försök igen",
+    "chooseAnother": "Välj en annan modell",
+    "progressLabel": "Hämtar den nya versionen",
+    "dialogTitle": "SpeakoFlow har en ny talmotor",
+    "dialogBody": "Den är snabbare och stabilare, så du stöter på färre problem. {{model}} körde på den gamla motorn och behöver sin nya version för att fortsätta fungera.",
+    "later": "Senare"
+  },
   "modelsHub": {
     "description": "Varje uppgift i SpeakoFlow utförs av en modell du väljer. Kör den på den här datorn för integritet, eller i molnet för hastighet.",
     "addLocal": "Lägg till en modellfil",
     "privacyNote": "Modeller på den här datorn skickar aldrig din röst eller text någonstans. Molnmodeller skickar den till leverantören du valt, med din API-nyckel.",
     "inUse": "Används",
     "needsSetup": "Behöver konfigureras",
+    "needsUpdate": "Behöver uppdateras",
     "performance": "Prestanda",
     "where": {
       "device": "På den här datorn",
@@ -2747,6 +2779,7 @@
       "assistantOff": "Assistenten är avstängd",
       "noModel": "Ingen modell vald än",
       "notDownloaded": "Modellen är inte nedladdad",
+      "needsUpdate": "{{model}} behöver uppdateras",
       "noKey": "Lägg till en API-nyckel",
       "noEndpoint": "Lägg till en slutpunkt"
     },

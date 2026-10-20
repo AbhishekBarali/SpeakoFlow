@@ -1,6 +1,6 @@
 use crate::settings::PostProcessProvider;
 use futures_util::StreamExt;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use once_cell::sync::Lazy;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE, REFERER, USER_AGENT};
 use serde::{Deserialize, Serialize};
@@ -176,11 +176,48 @@ struct ChatCompletionResponse {
 #[derive(Debug, Deserialize)]
 struct ChatChoice {
     message: ChatMessageResponse,
+    /// Why the model stopped. Absent on some gateways, hence the default.
+    #[serde(default)]
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ChatMessageResponse {
     content: Option<String>,
+}
+
+/// One chat completion's answer, and why the model stopped writing it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Completion {
+    pub(crate) content: Option<String>,
+    pub(crate) finish_reason: Option<String>,
+}
+
+impl Completion {
+    /// The model ran out of output tokens before it finished (see
+    /// [`is_truncation`]).
+    pub(crate) fn truncated(&self) -> bool {
+        self.finish_reason.as_deref().is_some_and(is_truncation)
+    }
+}
+
+/// Whether a `finish_reason` means the answer was cut off at an output limit
+/// rather than finished.
+///
+/// OpenAI and every OpenAI-compatible layer the app talks to (llama.cpp,
+/// Ollama, LM Studio, OpenRouter, Groq, Anthropic's and Gemini's compatibility
+/// endpoints, Azure, Bedrock's) say `length`. A few gateways pass the native
+/// reason through instead: Anthropic, Bedrock and Gemini call it `max_tokens`
+/// (Gemini in capitals), and OpenAI's Responses API `max_output_tokens`.
+///
+/// What a caller does with it is its own decision: a cut-off assistant answer
+/// is still worth showing, a cut-off cleanup is not worth pasting (it ends
+/// mid-sentence, with the rest of what the user said gone).
+pub(crate) fn is_truncation(finish_reason: &str) -> bool {
+    matches!(
+        finish_reason.trim().to_ascii_lowercase().as_str(),
+        "length" | "max_tokens" | "max_output_tokens"
+    )
 }
 
 /// Build headers for API requests based on provider type
@@ -574,8 +611,15 @@ pub async fn send_chat_completion(
 pub(crate) enum ChatCompletionError {
     RequestBuild(String),
     Transport(String),
-    HttpStatus { status: u16, detail: String },
+    HttpStatus {
+        status: u16,
+        detail: String,
+    },
     ResponseDecode(String),
+    /// The model stopped at its output limit. Never produced here (an
+    /// assistant answer that ran long is still an answer); a caller that
+    /// cannot use a partial answer turns a truncated [`Completion`] into this.
+    Truncated,
 }
 
 impl std::fmt::Display for ChatCompletionError {
@@ -587,10 +631,12 @@ impl std::fmt::Display for ChatCompletionError {
                 write!(f, "API request failed with status {status}: {detail}")
             }
             Self::ResponseDecode(detail) => write!(f, "Failed to parse API response: {detail}"),
+            Self::Truncated => write!(f, "The answer was cut off at the model's output limit"),
         }
     }
 }
 
+/// [`send_chat_completion_detailed`] for callers that only want the text.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn send_chat_completion_with_schema_typed(
     provider: &PostProcessProvider,
@@ -605,6 +651,40 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
     max_tokens: Option<u32>,
     keep_system_role: bool,
 ) -> Result<Option<String>, ChatCompletionError> {
+    send_chat_completion_detailed(
+        provider,
+        api_key,
+        model,
+        user_content,
+        system_prompt,
+        json_schema,
+        reasoning_effort,
+        reasoning,
+        temperature,
+        max_tokens,
+        keep_system_role,
+    )
+    .await
+    .map(|completion| completion.content)
+}
+
+/// Send one non-streaming chat completion and return the answer together with
+/// the model's `finish_reason`, so a caller can tell a finished answer from
+/// one cut off at the output limit.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn send_chat_completion_detailed(
+    provider: &PostProcessProvider,
+    api_key: String,
+    model: &str,
+    user_content: String,
+    system_prompt: Option<String>,
+    json_schema: Option<Value>,
+    reasoning_effort: Option<String>,
+    reasoning: Option<ReasoningConfig>,
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
+    keep_system_role: bool,
+) -> Result<Completion, ChatCompletionError> {
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
 
@@ -682,8 +762,13 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
 
         return Ok(completion
             .choices
-            .first()
-            .and_then(|choice| choice.message.content.clone()));
+            .into_iter()
+            .next()
+            .map(|choice| Completion {
+                content: choice.message.content,
+                finish_reason: choice.finish_reason,
+            })
+            .unwrap_or_default());
     }
 
     Err(ChatCompletionError::RequestBuild(
@@ -905,6 +990,9 @@ fn render_error_code(code: &Value) -> String {
 #[derive(Debug, Deserialize)]
 struct StreamChoice {
     delta: StreamDelta,
+    /// Set on the last content chunk of a round. Absent elsewhere.
+    #[serde(default)]
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1020,6 +1108,8 @@ struct SseChatAccumulator {
     done: bool,
     /// First in-stream provider error seen, if any (see `StreamErrorEnvelope`).
     error: Option<String>,
+    /// The round's `finish_reason`, once a chunk carries one.
+    finish_reason: Option<String>,
 }
 
 impl SseChatAccumulator {
@@ -1107,6 +1197,12 @@ impl SseChatAccumulator {
         let Some(choice) = parsed.choices.first() else {
             return;
         };
+
+        if let Some(reason) = choice.finish_reason.as_deref() {
+            if !reason.is_empty() {
+                self.finish_reason = Some(reason.to_string());
+            }
+        }
 
         if let Some(token) = choice.delta.content.as_deref() {
             if !token.is_empty() {
@@ -1200,6 +1296,16 @@ async fn read_sse_round(
     }
 
     let stream_error = accumulator.error.take();
+    // Streamed rounds are the assistant's, Flow's and meeting chat's: a reply
+    // that ran into the output limit is still worth showing, so this is only
+    // said in the log, where "the answer stops mid-sentence" can be traced.
+    if accumulator
+        .finish_reason
+        .as_deref()
+        .is_some_and(is_truncation)
+    {
+        info!("LLM stream stopped at the model's output limit; the reply may be cut off");
+    }
     let round = accumulator.finish(&mut on_token);
     // A provider error that arrives mid-stream truncates an answer whose tokens
     // are already on screen; keep that text rather than making the panel go
@@ -2804,5 +2910,68 @@ mod tests {
         let (round, tokens) = decode_sse([wire]);
         assert_eq!(round.text, "still works");
         assert_eq!(tokens, ["still works"]);
+    }
+}
+
+#[cfg(test)]
+mod finish_reason_tests {
+    use super::*;
+
+    #[test]
+    fn output_limit_reasons_count_as_truncation() {
+        for reason in [
+            "length",
+            "LENGTH",
+            "max_tokens",
+            "MAX_TOKENS",
+            " max_output_tokens ",
+        ] {
+            assert!(is_truncation(reason), "{reason}");
+        }
+        for reason in ["stop", "tool_calls", "content_filter", "end_turn", ""] {
+            assert!(!is_truncation(reason), "{reason}");
+        }
+    }
+
+    #[test]
+    fn a_completion_carries_its_finish_reason() {
+        let body =
+            r#"{"choices":[{"message":{"content":"Hello there"},"finish_reason":"length"}]}"#;
+        let parsed: ChatCompletionResponse = serde_json::from_str(body).unwrap();
+        let choice = parsed.choices.into_iter().next().unwrap();
+        let completion = Completion {
+            content: choice.message.content,
+            finish_reason: choice.finish_reason,
+        };
+        assert!(completion.truncated());
+        assert_eq!(completion.content.as_deref(), Some("Hello there"));
+    }
+
+    #[test]
+    fn a_completion_without_a_finish_reason_is_not_truncated() {
+        // Some gateways leave it out; that must parse and read as finished.
+        let body = r#"{"choices":[{"message":{"content":"Hi"}}]}"#;
+        let parsed: ChatCompletionResponse = serde_json::from_str(body).unwrap();
+        assert!(parsed.choices[0].finish_reason.is_none());
+        assert!(!Completion {
+            content: Some("Hi".into()),
+            finish_reason: None,
+        }
+        .truncated());
+    }
+
+    #[test]
+    fn a_stream_records_its_finish_reason_and_keeps_the_text() {
+        let first = serde_json::json!({"choices": [{"delta": {"content": "A long ans"}}]});
+        let last = serde_json::json!({
+            "choices": [{"delta": {"content": "wer"}, "finish_reason": "length"}]
+        });
+        let wire = format!("data: {first}\n\ndata: {last}\n\ndata: [DONE]\n\n");
+        let mut accumulator = SseChatAccumulator::default();
+        let mut on_token = |_: &str| {};
+        accumulator.push(wire.as_bytes(), &mut on_token);
+        assert_eq!(accumulator.finish_reason.as_deref(), Some("length"));
+        // The assistant still shows a long answer in full.
+        assert_eq!(accumulator.finish(&mut on_token).text, "A long answer");
     }
 }

@@ -11,6 +11,8 @@ use crate::settings::{self, get_settings, KeyboardImplementation, ShortcutBindin
 
 use super::combos::{self, Armed};
 use super::handler::handle_shortcut_event;
+#[cfg(not(target_os = "linux"))]
+use super::handy_keys::{CancelChange, CancelReconciler};
 
 /// Initialize shortcuts using Tauri's global-shortcut plugin
 pub fn init_shortcuts(app: &AppHandle) {
@@ -295,29 +297,22 @@ fn unregister_one(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// This engine's Cancel registration; see [`CancelReconciler`].
+#[cfg(not(target_os = "linux"))]
+static CANCEL: CancelReconciler = CancelReconciler::new();
+
 /// Register the cancel shortcut (called when recording starts)
 pub fn register_cancel_shortcut(app: &AppHandle) {
     // Cancel shortcut is disabled on Linux due to instability with dynamic shortcut registration
     #[cfg(target_os = "linux")]
     {
         let _ = app;
-        return;
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Some(cancel_binding) = get_settings(&app_clone).bindings.get("cancel").cloned() {
-                // Empty binding = cancel shortcut disabled.
-                if cancel_binding.current_binding.trim().is_empty() {
-                    return;
-                }
-                if let Err(e) = register_shortcut(&app_clone, cancel_binding) {
-                    error!("Failed to register cancel shortcut: {}", e);
-                }
-            }
-        });
+        CANCEL.request(true);
+        schedule_cancel_reconcile(app);
     }
 }
 
@@ -327,19 +322,58 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
     #[cfg(target_os = "linux")]
     {
         let _ = app;
-        return;
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Some(cancel_binding) = get_settings(&app_clone).bindings.get("cancel").cloned() {
-                // We ignore errors here as it might already be unregistered
-                let _ = unregister_shortcut(&app_clone, cancel_binding);
-            }
-        });
+        CANCEL.request(false);
+        schedule_cancel_reconcile(app);
     }
+}
+
+/// Apply [`CANCEL`]'s latest request off the hotkey thread. Start and stop
+/// each spawn one of these, in no particular order, which is why it applies
+/// the latest request and not its own.
+#[cfg(not(target_os = "linux"))]
+fn schedule_cancel_reconcile(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let binding = get_settings(&app).bindings.get("cancel").cloned();
+        // Empty binding = cancel shortcut disabled.
+        let available = binding
+            .as_ref()
+            .is_some_and(|b| !b.current_binding.trim().is_empty());
+        let result = CANCEL.reconcile(
+            available,
+            || {
+                binding
+                    .as_ref()
+                    .is_some_and(|binding| any_registered(&app, binding))
+            },
+            || match binding.clone() {
+                Some(binding) => register_shortcut(&app, binding),
+                None => Ok(()),
+            },
+            || match binding.clone() {
+                Some(binding) => unregister_shortcut(&app, binding),
+                None => Ok(()),
+            },
+        );
+        match result {
+            Ok(CancelChange::Unchanged) => {}
+            Ok(change) => log::debug!("Cancel shortcut: {change:?}"),
+            Err(e) => error!("Failed to update the cancel shortcut: {}", e),
+        }
+    });
+}
+
+/// Whether any of the keys registering `binding` would arm is registered.
+#[cfg(not(target_os = "linux"))]
+fn any_registered(app: &AppHandle, binding: &ShortcutBinding) -> bool {
+    combos::armed(&get_settings(app), binding, KeyboardImplementation::Tauri)
+        .into_iter()
+        .filter_map(|(_, combo)| normalize_for_tauri(&combo).parse::<Shortcut>().ok())
+        .any(|shortcut| app.global_shortcut().is_registered(shortcut))
 }
 
 #[cfg(test)]
