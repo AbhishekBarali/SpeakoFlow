@@ -117,13 +117,14 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 /// Settle a transaction once: restore the previous clipboard (or leave the
-/// copy) while it is still ours, and send an owed auto-submit. Main thread
-/// only. `enigo` is the input already locked by a paste in progress; without
-/// it the lock is taken briefly.
+/// copy) while it is still ours, and send an owed auto-submit unless
+/// `send_submit` is false. Main thread only. `enigo` is the input already
+/// locked by a paste in progress; without it the lock is taken briefly.
 fn settle(
     pending: &Arc<Mutex<MacPending>>,
     app_handle: &AppHandle,
     enigo: Option<&mut enigo::Enigo>,
+    send_submit: bool,
 ) {
     let mut p = lock(pending);
     if p.settled {
@@ -147,13 +148,20 @@ fn settle(
     info!("Paste: settling, {reason}");
 
     if let (true, Some(key)) = (decision.submit, p.auto_submit) {
-        match enigo {
-            Some(enigo) => {
-                if let Err(e) = crate::clipboard::send_return_key(enigo, key) {
-                    warn!("Paste: could not send the auto-submit key: {e}");
+        if !send_submit {
+            warn!(
+                "Paste: skipped the previous dictation's auto-submit; an ask started \
+                 before its target had read it"
+            );
+        } else {
+            match enigo {
+                Some(enigo) => {
+                    if let Err(e) = crate::clipboard::send_return_key(enigo, key) {
+                        warn!("Paste: could not send the auto-submit key: {e}");
+                    }
                 }
+                None => send_auto_submit_later(app_handle, key),
             }
-            None => send_auto_submit_later(app_handle, key),
         }
     }
 
@@ -189,8 +197,46 @@ fn flush_pending(app_handle: &AppHandle, enigo: &mut enigo::Enigo) {
     let previous = lock(&PENDING).take();
     if let Some(previous) = previous {
         lock(&lock(&previous).state).cancelled = true;
-        settle(&previous, app_handle, Some(enigo));
+        settle(&previous, app_handle, Some(enigo), true);
     }
+}
+
+/// How long a caller off the main thread waits for the main thread to settle
+/// a pending paste. AppKit answers a promise on the main run loop, which is
+/// free between pastes, so this normally takes a few milliseconds.
+const SETTLE_WAIT: Duration = Duration::from_millis(300);
+
+/// Settle the pending transaction, if any, on the main thread, and wait for
+/// it (briefly). Tauri runs `run_on_main_thread` at once when called on the
+/// main thread, so this works from either.
+fn settle_on_main(app_handle: &AppHandle, send_submit: bool) {
+    if lock(&PENDING).is_none() {
+        return;
+    }
+    let (done, settled) = std::sync::mpsc::channel();
+    let app = app_handle.clone();
+    let queued = app_handle.run_on_main_thread(move || {
+        let previous = lock(&PENDING).take();
+        if let Some(previous) = previous {
+            lock(&lock(&previous).state).cancelled = true;
+            settle(&previous, &app, None, send_submit);
+        }
+        let _ = done.send(());
+    });
+    if queued.is_err() || settled.recv_timeout(SETTLE_WAIT).is_err() {
+        warn!("Paste: could not settle the pending paste in time");
+    }
+}
+
+/// See `paste_tx::settle_pending`: before an ask's selection harvest, whose
+/// keys are held, so an owed Enter is dropped.
+pub(super) fn settle_pending(app_handle: &AppHandle) {
+    settle_on_main(app_handle, false);
+}
+
+/// See `paste_tx::settle_before_exit`.
+pub(super) fn settle_before_exit(app_handle: &AppHandle) {
+    settle_on_main(app_handle, true);
 }
 
 fn spawn_waiter(pending: Arc<Mutex<MacPending>>, app_handle: AppHandle) {
@@ -212,7 +258,7 @@ fn spawn_waiter(pending: Arc<Mutex<MacPending>>, app_handle: AppHandle) {
         let for_main = pending.clone();
         let app = app_handle.clone();
         let _ = app_handle.run_on_main_thread(move || {
-            settle(&for_main, &app, None);
+            settle(&for_main, &app, None, true);
             let mut slot = lock(&PENDING);
             if slot
                 .as_ref()

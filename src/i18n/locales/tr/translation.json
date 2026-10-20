@@ -2756,7 +2756,10 @@
     "download": "Yeni sürümü indir ({{size}})",
     "retry": "Tekrar dene",
     "chooseAnother": "Başka bir model seç",
-    "progressLabel": "Yeni sürüm indiriliyor"
+    "progressLabel": "Yeni sürüm indiriliyor",
+    "dialogTitle": "SpeakoFlow'un yeni bir konuşma motoru var",
+    "dialogBody": "Daha hızlı ve daha kararlı, bu yüzden daha az sorunla karşılaşacaksınız. {{model}} eski motorda çalışıyordu ve çalışmaya devam etmesi için yeni sürümüne ihtiyacı var.",
+    "later": "Daha sonra"
   },
   "modelsHub": {
     "description": "SpeakoFlow'daki her işi sizin seçtiğiniz bir model yapar. Gizlilik için bu bilgisayarda, hız için bulutta çalıştırın.",

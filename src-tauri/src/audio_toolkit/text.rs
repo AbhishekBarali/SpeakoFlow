@@ -523,23 +523,36 @@ pub(crate) fn repair_removal_seams(text: &str) -> String {
 }
 
 /// Whether a word appended to `kept` would open a sentence: nothing but
-/// whitespace so far, or the last visible character ends a sentence.
+/// whitespace so far, the last visible character ends a sentence, or it is a
+/// Spanish opening `¿` / `¡`, which starts one.
 fn opens_sentence(kept: &str) -> bool {
     kept.trim_end()
         .chars()
         .next_back()
-        .is_none_or(|c| matches!(c, '.' | '!' | '?' | '…'))
+        .is_none_or(|c| matches!(c, '.' | '!' | '?' | '…' | '¿' | '¡'))
 }
 
 /// Appends `segment` to `kept`. While `capital_owed` is set, the first
-/// alphanumeric character of `segment` is uppercased and the debt is settled.
+/// alphanumeric character of `segment` is uppercased and the debt is settled,
+/// unless that word already has a capital of its own after its first letter
+/// ("iPhone", "eBay", "macOS"): its casing is deliberate, and "IPhone" is
+/// wrong in a way "iPhone" at a sentence start is not.
 fn push_restoring_capital(kept: &mut String, segment: &str, capital_owed: &mut bool) {
     if *capital_owed {
         if let Some((index, first)) = segment.char_indices().find(|(_, c)| c.is_alphanumeric()) {
             *capital_owed = false;
+            let rest = &segment[index + first.len_utf8()..];
+            let word_rest = rest
+                .split(|c: char| !c.is_alphanumeric())
+                .next()
+                .unwrap_or("");
+            if word_rest.chars().any(char::is_uppercase) {
+                kept.push_str(segment);
+                return;
+            }
             kept.push_str(&segment[..index]);
             kept.extend(first.to_uppercase());
-            kept.push_str(&segment[index + first.len_utf8()..]);
+            kept.push_str(rest);
             return;
         }
     }
@@ -1042,6 +1055,16 @@ mod tests {
     fn an_abbreviation_before_a_lowercase_filler_is_not_recapitalised() {
         let result = filter_transcription_output("Use a tool, e.g. uh ripgrep here.", "en", &None);
         assert_eq!(result, "Use a tool, e.g. ripgrep here.");
+    }
+
+    /// A word with its own internal capital keeps its casing when a filler
+    /// in front of it goes: "IPhone" would be a new mistake.
+    #[test]
+    fn a_handed_over_capital_never_rewrites_a_cased_name() {
+        let result = filter_transcription_output("Um, iPhone sales are up.", "en", &None);
+        assert_eq!(result, "iPhone sales are up.");
+        let result = filter_transcription_output("Um, so the iPhone works.", "en", &None);
+        assert_eq!(result, "So the iPhone works.");
     }
 
     #[test]

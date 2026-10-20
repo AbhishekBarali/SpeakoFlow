@@ -2756,7 +2756,10 @@
     "download": "Download new version ({{size}})",
     "retry": "Try again",
     "chooseAnother": "Choose another model",
-    "progressLabel": "Downloading the new version"
+    "progressLabel": "Downloading the new version",
+    "dialogTitle": "SpeakoFlow has a new speech engine",
+    "dialogBody": "It's faster and more stable, so you'll run into fewer problems. {{model}} ran on the old engine and needs its new version to keep working.",
+    "later": "Later"
   },
   "modelsHub": {
     "description": "Each job in SpeakoFlow is done by a model you choose. Run it on this computer for privacy, or in the cloud for speed.",
