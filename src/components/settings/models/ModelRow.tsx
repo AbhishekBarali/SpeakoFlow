@@ -15,7 +15,14 @@ import { ModelMark } from "@/components/shell/SlotVisuals";
 /** What the row's one action is, decided by the caller. */
 export type ModelRowAction =
   | { kind: "download"; onClick: () => void }
-  | { kind: "use"; onClick: () => void; label?: string; ariaLabel?: string }
+  | {
+      kind: "use";
+      onClick: () => void;
+      label?: string;
+      ariaLabel?: string;
+      /** The row's one way forward, drawn as the primary button. */
+      primary?: boolean;
+    }
   | { kind: "inUse" }
   | { kind: "switching" }
   | { kind: "missing"; title?: string }
@@ -81,7 +88,7 @@ export const ModelRow: React.FC<{
 
   return (
     <article
-      className={`transition-colors duration-150 ${current ? "bg-accent/[0.04]" : ""}`}
+      className={`@container transition-colors duration-150 ${current ? "bg-accent/[0.04]" : ""}`}
     >
       <div className="flex items-center gap-3.5 px-4 py-3">
         <ModelMark model={model} size="lg" />
@@ -108,22 +115,29 @@ export const ModelRow: React.FC<{
               {subtitle}
             </p>
           )}
-          {meta && (
+          {(meta || size) && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              {/* In a narrow row the size joins this line, which leaves the
+                  name and its description the room to be read. */}
+              {size && (
+                <span className="tabular-nums @[34rem]:hidden">{size}</span>
+              )}
               {meta}
             </div>
           )}
         </div>
 
         {size && (
-          <span className="hidden shrink-0 text-xs text-muted tabular-nums sm:inline">
+          <span className="hidden shrink-0 text-xs text-muted tabular-nums @[34rem]:inline">
             {size}
           </span>
         )}
 
-        {/* A fixed width, wide enough for the widest action, so the sizes to
-            its left line up down the list whatever each row's action is. */}
-        <div className="flex w-[7.25rem] shrink-0 justify-end">
+        {/* At least as wide as the widest common action, so the sizes to its
+            left line up down the list whatever each row's action is; a longer
+            label ("Get new version" in German) widens it instead of
+            spilling over the size. */}
+        <div className="flex shrink-0 justify-end @[34rem]:min-w-[7.25rem]">
           {action.kind === "download" && (
             <Button variant="secondary" size="sm" onClick={action.onClick}>
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -132,7 +146,7 @@ export const ModelRow: React.FC<{
           )}
           {action.kind === "use" && (
             <Button
-              variant="secondary"
+              variant={action.primary ? "primary" : "secondary"}
               size="sm"
               onClick={action.onClick}
               aria-label={action.ariaLabel}
@@ -274,17 +288,22 @@ export const ScoreDots: React.FC<{ label: string; score: number }> = ({
 
 /** A quiet tag after a model's name: "Assistant", "Recommended", "Live". */
 export const ModelTag: React.FC<{
-  tone?: "accent" | "neutral" | "success";
+  tone?: "accent" | "neutral" | "success" | "warning";
   children: React.ReactNode;
   icon?: React.ComponentType<{ className?: string }>;
-}> = ({ tone = "neutral", children, icon: Icon }) => (
+  /** Hover text, for a tag whose one word needs a sentence behind it. */
+  title?: string;
+}> = ({ tone = "neutral", children, icon: Icon, title }) => (
   <span
+    title={title}
     className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-px text-[0.6875rem] leading-4 font-medium ${
       tone === "accent"
         ? "bg-accent/10 text-accent"
         : tone === "success"
           ? "bg-success/10 text-success"
-          : "border border-hairline-strong text-muted"
+          : tone === "warning"
+            ? "bg-warning/10 text-warning"
+            : "border border-hairline-strong text-muted"
     }`}
   >
     {Icon && <Icon className="h-3 w-3" aria-hidden="true" />}

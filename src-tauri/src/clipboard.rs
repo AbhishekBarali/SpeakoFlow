@@ -162,6 +162,10 @@ pub enum ClipboardSnapshot {
 
 /// Record the clipboard so a harvest can put it back.
 pub fn snapshot_clipboard(app_handle: &AppHandle) -> ClipboardSnapshot {
+    // A dictation still waiting for its target to read it would be recorded
+    // as the user's clipboard, and the harvest would then "restore" it in
+    // place of what the user had. Put theirs back first.
+    crate::paste_tx::settle_pending(app_handle);
     match app_handle.clipboard().read_text() {
         Ok(text) => ClipboardSnapshot::Text(text),
         // An image, a file list, or an empty clipboard. `read_text` cannot tell
@@ -771,7 +775,7 @@ fn paste_direct(
     input::paste_text_direct(enigo, text)
 }
 
-fn send_return_key(enigo: &mut Enigo, key_type: AutoSubmitKey) -> Result<(), String> {
+pub(crate) fn send_return_key(enigo: &mut Enigo, key_type: AutoSubmitKey) -> Result<(), String> {
     // Same reason as every other synthetic sequence: our own keystrokes must not
     // be matched against a global hotkey the user may be holding. See
     // `input::synthesizing`.
@@ -1045,6 +1049,23 @@ pub fn paste_rich_with_behavior(
         _ => text,
     };
 
+    // Auto-submit and "copy to clipboard" are decided now, because a clipboard
+    // transaction carries both out itself once the target has read the text.
+    let wants_submit =
+        behavior.allow_auto_submit && should_send_auto_submit(settings.auto_submit, paste_method);
+    // The copy is the dictation itself, not the spaces Smart spacing fitted
+    // around it for this one field.
+    let copy_after =
+        (settings.clipboard_handling == ClipboardHandling::CopyToClipboard).then(|| {
+            if fitted_by_smart_spacing {
+                text.trim().to_string()
+            } else {
+                text.clone()
+            }
+        });
+    // Set when a clipboard transaction took the paste over.
+    let mut settles_itself = false;
+
     // Perform the paste operation. Capture the result instead of using `?` so we
     // can always run the modifier-release safety net below, even on failure.
     let paste_result: Result<(), String> = match paste_method {
@@ -1059,14 +1080,28 @@ pub fn paste_rich_with_behavior(
             settings.typing_tool,
         ),
         PasteMethod::CtrlV | PasteMethod::CtrlShiftV | PasteMethod::ShiftInsert => {
-            paste_via_clipboard(
+            match paste_via_transaction(
                 &mut enigo,
                 &text,
                 html,
                 &app_handle,
-                &paste_method,
+                paste_method,
                 paste_delay_ms,
-            )
+                wants_submit.then_some(settings.auto_submit_key),
+                copy_after.clone(),
+            ) {
+                Some(result) => {
+                    settles_itself = true;
+                    result
+                }
+                None => paste_via_clipboard(
+                    &mut enigo,
+                    &text,
+                    &app_handle,
+                    &paste_method,
+                    paste_delay_ms,
+                ),
+            }
         }
         PasteMethod::ExternalScript => match settings
             .external_script_path
@@ -1079,15 +1114,14 @@ pub fn paste_rich_with_behavior(
     };
 
     // Auto-submit (Enter / Ctrl+Enter / Cmd+Enter) only when the paste succeeded.
-    let submit_result: Result<(), String> = if paste_result.is_ok()
-        && behavior.allow_auto_submit
-        && should_send_auto_submit(settings.auto_submit, paste_method)
-    {
-        std::thread::sleep(Duration::from_millis(50));
-        send_return_key(&mut enigo, settings.auto_submit_key)
-    } else {
-        Ok(())
-    };
+    // A clipboard transaction sends it itself, once the target read the text.
+    let submit_result: Result<(), String> =
+        if paste_result.is_ok() && wants_submit && !settles_itself {
+            std::thread::sleep(Duration::from_millis(50));
+            send_return_key(&mut enigo, settings.auto_submit_key)
+        } else {
+            Ok(())
+        };
 
     // Safety net: for any method that synthesizes keystrokes, make sure we never
     // leave a modifier (Ctrl/Shift/Alt/Cmd) stuck "pressed" at the OS level if a
@@ -1104,9 +1138,9 @@ pub fn paste_rich_with_behavior(
     // dictation into a field it cannot read. A failed paste, or one that was
     // submitted with Enter, leaves nothing to continue.
     if behavior.smart_spacing.is_some() {
-        let submitted = paste_result.is_ok()
-            && behavior.allow_auto_submit
-            && should_send_auto_submit(settings.auto_submit, paste_method);
+        // A transaction sends Enter only once the target read the paste; it
+        // is recorded as intended, the way the plain paste recorded it.
+        let submitted = paste_result.is_ok() && wants_submit;
         if paste_result.is_ok() && paste_method != PasteMethod::None {
             crate::smart_spacing::record_paste(&text, submitted);
         } else {
@@ -1118,22 +1152,57 @@ pub fn paste_rich_with_behavior(
     paste_result?;
     submit_result?;
 
-    // After pasting, optionally copy to clipboard based on settings. The copy
-    // is the dictation itself, not the spaces Smart spacing fitted around it
-    // for this one field.
-    if settings.clipboard_handling == ClipboardHandling::CopyToClipboard {
-        let clipboard = app_handle.clipboard();
-        let copy = if fitted_by_smart_spacing {
-            text.trim()
-        } else {
-            text.as_str()
-        };
-        clipboard
+    // After pasting, optionally copy to clipboard based on settings. A
+    // transaction leaves the copy itself when it settles: written now, it
+    // would be taken for the user's own copy and the restore skipped.
+    if let (Some(copy), false) = (copy_after, settles_itself) {
+        app_handle
+            .clipboard()
             .write_text(copy)
             .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
     }
 
     Ok(())
+}
+
+/// Paste through a clipboard transaction (`paste_tx`), which puts the user's
+/// clipboard back only after the target has read the dictation, instead of
+/// 50 ms after the keystroke. `None` means it could not start and nothing was
+/// published, so the plain paste should run; Linux always answers `None` and
+/// keeps the plain paste.
+#[cfg_attr(target_os = "linux", allow(unused_variables))]
+fn paste_via_transaction(
+    enigo: &mut Enigo,
+    text: &str,
+    app_handle: &AppHandle,
+    paste_method: PasteMethod,
+    paste_delay_ms: u64,
+    auto_submit: Option<AutoSubmitKey>,
+    leave_on_clipboard: Option<String>,
+) -> Option<Result<(), String>> {
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    {
+        use crate::paste_tx::{PasteRequest, PasteTxError};
+        let request = PasteRequest {
+            text,
+            paste_method,
+            paste_delay: Duration::from_millis(paste_delay_ms),
+            auto_submit,
+            leave_on_clipboard,
+        };
+        match crate::paste_tx::paste(app_handle, enigo, request) {
+            Ok(()) => Some(Ok(())),
+            Err(PasteTxError::Keystroke(e)) => Some(Err(e)),
+            Err(PasteTxError::Unavailable(e)) => {
+                log::warn!("Paste: clipboard transaction unavailable ({e}); using the plain paste");
+                None
+            }
+        }
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        None
+    }
 }
 
 #[cfg(test)]

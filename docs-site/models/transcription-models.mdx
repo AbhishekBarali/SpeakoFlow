@@ -17,7 +17,7 @@ Every tab starts with a **Runs on** switch: "On this computer" or "Cloud". Switc
 
 ## Speech to text
 
-The catalog has 65 speech models. Five are recommended and shown first. The rest live under **Older models**, which opens as soon as you search.
+The catalog has 69 speech models. They are listed in a fixed order, the five recommended ones first, with the models on this computer in their own group above the ones you can download.
 
 ### Recommended models
 
@@ -32,33 +32,44 @@ The catalog has 65 speech models. Five are recommended and shown first. The rest
 Pick **Parakeet** for fast everyday English. Pick **Canary 180M Flash** on a weak machine (it covers English, German, Spanish, and French). Pick **Nemotron** for multilingual dictation with automatic language detection. Pick **Whisper Medium** for the widest language coverage. Pick **Cohere** when accuracy matters more than speed.
 
 <Note>
-  Streaming models can transcribe as you speak, which is what [live
-  transcription](/dictation/live-transcription) needs. Everything else
-  transcribes in one pass when you stop talking.
+  Streaming models transcribe as you speak, so the text is ready the moment you
+  stop. See [Live transcription](/dictation/live-transcription). Everything else
+  transcribes when you stop talking.
 </Note>
 
-### Older models
+### The rest of the catalog
 
-These are fully supported. They run on the previous engine (ONNX and whisper.cpp) rather than the current one and are no longer the first suggestion.
+Below the recommended five are the other families: more Parakeet and Nemotron variants (including Parakeet TDT 0.6B v2 and v3), every Whisper size from Tiny to Large v3 and Large v3 Turbo, Canary, Cohere Transcribe for Arabic, Granite Speech, Voxtral, Qwen3-ASR, Fun-ASR, Moonshine (with English, Arabic, Chinese, Japanese, Korean, Ukrainian, and Vietnamese variants), SenseVoice Small, GigaAM v3 for Russian, Breeze-ASR-25 for Taiwanese Mandarin, MedASR, and MOSS-Transcribe-Diarize.
 
-- **Whisper Small, Medium, Turbo, Large.** Nearly 100 languages. Small, Medium, and Large translate to English. Turbo does not.
-- **Parakeet V2** (English only) and **Parakeet V3** (25 languages, mostly European).
-- **Moonshine Base** and **Moonshine V2 Tiny, Small, Medium.** English only, fast, good with accents. The V2 variants stream.
-- **Canary 1B v2.** 25 European languages. Translates to English.
-- **SenseVoice.** Chinese, English, Japanese, Korean, and Cantonese. Very fast.
-- **GigaAM v3.** Russian only.
-- **Breeze ASR.** Tuned for Taiwanese Mandarin with English code-switching.
+Each row shows how many languages the model hears. A model with one language says so by name. For more than one, click the count to see the full list.
+
+All of them run on the same engine, transcribe.cpp, on your graphics card or processor.
 
 ## Searching and filtering
 
-- **Search by name** to filter the list. Searching also reveals the older models.
-- **Filter by language** with the globe dropdown. It shows only models that claim support for the language you pick.
+- **Search by name** to narrow the list.
+- **Filter by language** with the globe dropdown. It lists every language some model hears, and keeps only the models that hear the one you pick. Simplified and Traditional Chinese count as one language here.
+- **Streaming** keeps only models that transcribe as you speak.
+- **Translate** keeps only models that can translate speech into English.
+
+Filters combine. When nothing matches, **Clear filters** puts the full list back.
+
+## Models from an earlier version
+
+Before SpeakoFlow moved every model to transcribe.cpp, some models came in older formats. What happens to them depends on the format.
+
+- **Whisper `.bin` files** (Whisper Small, Medium, Turbo, Large, and Breeze ASR) still work. A downloaded one is listed with an **Older** tag, because the catalog has the same model in the current format. One you never downloaded is not offered any more.
+- **ONNX models** (Parakeet V2 and V3, Moonshine, SenseVoice, GigaAM, Canary, and Cohere) ran on an engine SpeakoFlow no longer includes, so they can't be used. A downloaded one is listed with a **Retired** tag and **Get new version**, which downloads the same model for the new engine. A note above the list gathers them, with one **Delete old files** button to free the space.
+
+If a retired model was your speech model, it stays selected after the update so you can see what happened. Home and the Speech to text tab show a prompt with **Download new version**, and pressing a voice shortcut shows "needs an update" on the pill and opens that prompt. When the download finishes, the new version becomes your speech model on its own. **Choose another model** takes you to the rest of the catalog instead. Until one of those happens, a meeting or a History retranscription tells you the model needs its new version instead of starting.
 
 ## Downloads
 
 Downloads fetch eight chunks at once and resume where they stopped if interrupted. Progress is written to a `.partial` file, and every retry resumes from there using an HTTP Range request.
 
 Each source is retried up to four times with exponential backoff. A server error, a timeout, or a dropped connection is retried. A permanent error like a 404 moves on to the next source.
+
+Every catalog model is pinned to one version on Hugging Face, and every file is checked against its SHA-256 checksum when the download finishes. A file that does not match is deleted and the download stops with an error you can retry, so a corrupted or changed file never loads. If Hugging Face fails, the download tries a copy on Handy's mirror, which is checked the same way.
 
 Cancelling keeps the partial file, so resuming later picks up where you left off.
 

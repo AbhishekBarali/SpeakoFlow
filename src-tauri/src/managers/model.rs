@@ -1,3 +1,4 @@
+use crate::managers::legacy_models;
 use crate::managers::local_models::{self, DiscoveredModel};
 use crate::settings::{get_settings, write_settings};
 use anyhow::Result;
@@ -411,10 +412,97 @@ pub fn is_cleanup_specialist(model: &str) -> bool {
 /// same rule. The stored copies keep the default; nothing internal reads the
 /// field, because the request path asks [`is_cleanup_specialist`] about the
 /// resolved model string directly.
+///
+/// The legacy flags are derived the same way, from the one table that pairs
+/// an old id with its replacement ([`legacy_models::LEGACY_TWINS`]), so the
+/// model list, selection and download refusal cannot disagree about which
+/// models are older. Code inside the manager that needs them asks
+/// `legacy_models` directly rather than reading the stored copy.
 fn stamped(mut info: ModelInfo) -> ModelInfo {
     info.is_cleanup_specialist =
         is_cleanup_specialist(&info.id) || is_cleanup_specialist(&info.name);
+    info.is_legacy = legacy_models::twin_of(&info.id).is_some();
+    info.is_retired = is_retired_model(&info);
+    info.replacement_id = legacy_models::replacement_id(&info.id);
     info
+}
+
+/// The order models are listed and chosen in, the same rule as Handy's:
+/// the catalog's editorial rank first (whatever the `recommended` flag says,
+/// since rank orders more models than the curated set), then recommended
+/// before not, then more accurate, then faster, then by name. The id breaks
+/// the last tie so the order never depends on the backing `HashMap`.
+///
+/// `get_available_models` returns its list in this order, the default-model
+/// pick uses it, and the frontend's `compareCatalogOrder` is the same rule,
+/// so the list, the default and the Models page cannot disagree.
+pub fn catalog_order(a: &ModelInfo, b: &ModelInfo) -> std::cmp::Ordering {
+    let rank = |m: &ModelInfo| m.recommended_rank.unwrap_or(u32::MAX);
+    rank(a)
+        .cmp(&rank(b))
+        .then_with(|| b.is_recommended.cmp(&a.is_recommended))
+        .then_with(|| b.accuracy_score.total_cmp(&a.accuracy_score))
+        .then_with(|| b.speed_score.total_cmp(&a.speed_score))
+        .then_with(|| a.name.cmp(&b.name))
+        .then_with(|| a.id.cmp(&b.id))
+}
+
+/// Set `model_id`'s language-detection flag. Returns whether it changed.
+#[allow(dead_code)]
+fn apply_language_detection(
+    models: &mut HashMap<String, ModelInfo>,
+    model_id: &str,
+    supports_language_detection: bool,
+) -> bool {
+    match models.get_mut(model_id) {
+        Some(model) if model.supports_language_detection != supports_language_detection => {
+            model.supports_language_detection = supports_language_detection;
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Whether a model can never be loaded again: a retired legacy id, or any
+/// model on one of the removed ONNX engines.
+fn is_retired_model(info: &ModelInfo) -> bool {
+    legacy_models::is_retired(&info.id) || legacy_models::is_retired_engine(&info.engine_type)
+}
+
+/// Refuse to make `info` the active speech model when it can never run.
+///
+/// A retired model stays listed (so its files can be found and deleted) and
+/// stays selected after an upgrade (so the replacement can be offered in its
+/// place), but choosing one is always an error.
+pub fn ensure_selectable(info: &ModelInfo) -> Result<(), String> {
+    if is_retired_model(info) {
+        return Err(format!(
+            "{} uses an engine SpeakoFlow no longer includes and can't be used.{}",
+            info.name,
+            replacement_hint(&info.id)
+        ));
+    }
+    Ok(())
+}
+
+/// Why `info` may not be downloaded, if it may not: every legacy id, Whisper
+/// `.bin` included, since its catalog twin is the same model in the current
+/// format and nothing offers the old one any more.
+fn legacy_download_refusal(info: &ModelInfo) -> Option<String> {
+    legacy_models::twin_of(&info.id)?;
+    Some(format!(
+        "{} is an older version that is no longer offered.{}",
+        info.name,
+        replacement_hint(&info.id)
+    ))
+}
+
+/// " Download <new name> instead." for a legacy id, or nothing.
+fn replacement_hint(legacy_id: &str) -> String {
+    legacy_models::replacement_id(legacy_id)
+        .and_then(|id| crate::catalog::model_for_id(&id))
+        .map(|m| format!(" Download {} instead.", m.name))
+        .unwrap_or_default()
 }
 
 /// For vision (multimodal) LLM models, the companion multimodal projector that
@@ -489,6 +577,26 @@ pub struct ModelInfo {
     /// assistant catalog hides them, because a cleanup fine-tune cannot chat.
     #[serde(default)]
     pub is_cleanup_specialist: bool,
+    /// One of the speech models from before transcribe.cpp, which the catalog
+    /// now lists again as a GGUF (see [`crate::managers::legacy_models`]). An
+    /// older model that is not on disk is offered nowhere. Stamped by
+    /// [`stamped`], like `is_cleanup_specialist`.
+    #[serde(default)]
+    pub is_legacy: bool,
+    /// A legacy model whose engine is gone (the ONNX models). It is kept on
+    /// disk if present, never loaded, and offered its replacement. Stamped.
+    #[serde(default)]
+    pub is_retired: bool,
+    /// For a legacy model, the id of the catalog model that replaces it.
+    /// Stamped.
+    #[serde(default)]
+    pub replacement_id: Option<String>,
+    /// Whether the model can work out the spoken language itself, which is
+    /// what makes "Auto" a real choice for it. From the catalog's
+    /// `lang_detect`, refined by the GGUF header and by the loaded model
+    /// ([`ModelManager::set_runtime_language_detection`]).
+    #[serde(default)]
+    pub supports_language_detection: bool,
     /// Absolute path to a model the user already had on disk, outside the app's
     /// own models directory — either a file they picked or one found in a linked
     /// folder. `None` for every managed model, which resolves to
@@ -713,6 +821,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: true,
             },
         );
 
@@ -746,6 +858,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: true,
             },
         );
 
@@ -778,6 +894,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: true,
             },
         );
 
@@ -804,12 +924,16 @@ impl ModelManager {
                 supports_streaming: false,
                 is_recommended: false,
                 recommended_rank: None,
-                supported_languages: whisper_languages.clone(),
+                supported_languages: whisper_languages,
                 supports_language_selection: true,
                 is_custom: false,
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: true,
             },
         );
 
@@ -837,12 +961,24 @@ impl ModelManager {
                 supports_streaming: false,
                 is_recommended: false,
                 recommended_rank: None,
-                supported_languages: whisper_languages,
+                // Breeze is a Whisper fine-tune for Taiwanese Mandarin with
+                // English code-switching. It used to borrow Whisper's whole
+                // list and claim 99 languages; its catalog twin lists these
+                // two. The script variants are listed for the same reason as
+                // in `whisper_languages`.
+                supported_languages: ["zh", "zh-Hans", "zh-Hant", "en"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
                 supports_language_selection: true,
                 is_custom: false,
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: true,
             },
         );
 
@@ -876,6 +1012,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -923,6 +1063,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -955,6 +1099,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -989,6 +1137,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1023,6 +1175,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1057,6 +1213,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1097,6 +1257,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1132,6 +1296,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1171,6 +1339,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1213,6 +1385,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1253,6 +1429,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1330,6 +1510,10 @@ impl ModelManager {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: true,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1363,7 +1547,7 @@ id: "gemma-3-1b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Qwen3.5 2B — newest small multimodal model (text + vision).
@@ -1395,7 +1579,7 @@ id: "qwen3.5-2b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Qwen3.5 4B - the everyday multimodal recommendation.
@@ -1428,7 +1612,7 @@ id: "qwen3.5-4b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Qwen3.5 9B - stronger answers for higher-memory desktops.
@@ -1462,7 +1646,7 @@ id: "qwen3.5-9b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Qwen3.5 27B - highest-quality curated option for workstations.
@@ -1496,7 +1680,7 @@ id: "qwen3.5-27b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Gemma 4 E2B — current on-device model, optimized for responsiveness.
@@ -1530,7 +1714,7 @@ id: "gemma-4-e2b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Gemma 4 E4B — default conversational balance, with thinking opt-in.
@@ -1564,7 +1748,7 @@ id: "gemma-4-e4b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Gemma 4 12B — stronger answers, with a clear latency tradeoff.
@@ -1598,7 +1782,7 @@ id: "gemma-4-12b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // Gemma 3 4B — Google multimodal (text + vision), clean output.
@@ -1631,7 +1815,7 @@ id: "gemma-3-4b".to_string(),
             supports_language_selection: false,
             is_custom: false,
             local_path: None,
-            local_folder: None, is_cleanup_specialist: false },
+            local_folder: None, is_cleanup_specialist: false, is_legacy: false, is_retired: false, replacement_id: None, supports_language_detection: false },
         );
 
         // ---------------------------------------------------------------
@@ -1669,6 +1853,10 @@ id: "gemma-3-4b".to_string(),
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 
@@ -1706,6 +1894,10 @@ id: "gemma-3-4b".to_string(),
                     local_path: None,
                     local_folder: None,
                     is_cleanup_specialist: false,
+                    is_legacy: false,
+                    is_retired: false,
+                    replacement_id: None,
+                    supports_language_detection: false,
                 },
             );
         }
@@ -1763,7 +1955,10 @@ id: "gemma-3-4b".to_string(),
 
     pub fn get_available_models(&self) -> Vec<ModelInfo> {
         let models = self.available_models.lock().unwrap();
-        models.values().cloned().map(stamped).collect()
+        let mut list: Vec<ModelInfo> = models.values().cloned().map(stamped).collect();
+        drop(models);
+        list.sort_by(catalog_order);
+        list
     }
 
     pub fn get_model_info(&self, model_id: &str) -> Option<ModelInfo> {
@@ -1771,22 +1966,35 @@ id: "gemma-3-4b".to_string(),
         models.get(model_id).cloned().map(stamped)
     }
 
-    /// Insert the transcribe.cpp GGUF models from the bundled catalog
-    /// (`crate::catalog`). Only `recommended` entries are surfaced today — the
-    /// five ranked models from PLAN.md §4 (flipping to show the whole catalog
-    /// is a one-line change: drop the `.filter(|m| m.recommended)`). Each maps
-    /// to a single-file `.gguf` `ModelInfo` on the `TranscribeCpp` engine that
-    /// reuses the existing resume-capable download pipeline.
+    /// The selected speech model, when it is retired: its engine is gone, so
+    /// it can never be loaded. `None` for a model that can run, an empty
+    /// selection, or an id the catalog no longer lists.
+    ///
+    /// A retired selection is kept after an upgrade on purpose (see
+    /// [`Self::startup_selection`]), so every path that would run the local
+    /// model asks this first and says what to do, instead of failing on a
+    /// load that cannot succeed.
+    pub fn retired_selection(&self) -> Option<ModelInfo> {
+        let selected = get_settings(&self.app_handle).selected_model;
+        self.get_model_info(&selected)
+            .filter(|model| model.is_retired)
+    }
+
+    /// Insert every transcribe.cpp GGUF model from the bundled catalog
+    /// (`crate::catalog`). Each maps to a single-file `.gguf` `ModelInfo` on the
+    /// `TranscribeCpp` engine that reuses the existing resume-capable download
+    /// pipeline, fetched at the catalog's pinned revision and verified against
+    /// its `sha256`.
+    ///
+    /// The whole catalog is listed, not just the curated `recommended` few: the
+    /// Models page sorts the recommended ones first and its filters (language,
+    /// streaming, translate) are what make 69 rows usable.
     ///
     /// Internal ids are `"<slug>-gguf"` (matching the Hugging Face repo suffix),
     /// which keeps them distinct from the legacy transcribe-rs ids that share a
-    /// slug (e.g. `canary-180m-flash`) so neither shadows the other (N2).
+    /// slug (e.g. `canary-180m-flash`) so neither shadows the other.
     fn insert_catalog_models(available_models: &mut HashMap<String, ModelInfo>) {
-        for model in crate::catalog::catalog()
-            .models
-            .iter()
-            .filter(|m| m.recommended)
-        {
+        for model in &crate::catalog::catalog().models {
             let Some(file) = model.default_file() else {
                 warn!(
                     "Catalog model {} has no downloadable file; skipping",
@@ -1794,7 +2002,7 @@ id: "gemma-3-4b".to_string(),
                 );
                 continue;
             };
-            let id = format!("{}-gguf", model.slug);
+            let id = model.model_id();
             // Never shadow an existing entry (legacy transcribe-rs or custom).
             if available_models.contains_key(&id) {
                 warn!("Catalog model id '{}' already present; skipping", id);
@@ -1809,11 +2017,14 @@ id: "gemma-3-4b".to_string(),
                 id.clone(),
                 ModelInfo {
                     id,
-                    name: model.name.clone(),
+                    name: model.display_name().to_string(),
                     description: model.description.clone(),
                     filename: file.filename.clone(),
                     url: Some(url),
-                    sha256: None, // catalog carries no per-file hash; verification skipped
+                    // The hash of the file at the pinned revision. A download
+                    // that does not match it is deleted and reported, whichever
+                    // host it came from.
+                    sha256: file.sha256.clone(),
                     size_mb,
                     is_downloaded: false,
                     is_downloading: false,
@@ -1833,6 +2044,10 @@ id: "gemma-3-4b".to_string(),
                     local_path: None,
                     local_folder: None,
                     is_cleanup_specialist: false,
+                    is_legacy: false,
+                    is_retired: false,
+                    replacement_id: None,
+                    supports_language_detection: model.capabilities.lang_detect,
                 },
             );
         }
@@ -1881,6 +2096,25 @@ id: "gemma-3-4b".to_string(),
         }
     }
 
+    /// Reconcile whether a model detects the spoken language, from the loaded
+    /// model (ground truth, like [`Self::set_runtime_capabilities`]). Kept as
+    /// its own setter so that one's signature, which the transcription manager
+    /// already calls, stays as it is. What the language picker offers ("Auto"
+    /// or not) and what an `auto` intent resolves to both read this.
+    pub fn set_runtime_language_detection(
+        &self,
+        model_id: &str,
+        supports_language_detection: bool,
+    ) {
+        let mut models = self.available_models.lock().unwrap();
+        if apply_language_detection(&mut models, model_id, supports_language_detection) {
+            info!(
+                "Reconciled language detection for model {} (detect={})",
+                model_id, supports_language_detection
+            );
+        }
+    }
+
     /// Apply capability hints read from a downloaded GGUF's header to its
     /// registry entry (TranscribeCpp models only). Uses the dependency-free
     /// [`crate::managers::model_capabilities::GgufHeaderProber`]; only fields the
@@ -1913,6 +2147,9 @@ id: "gemma-3-4b".to_string(),
             }
             if let Some(translate) = probe.supports_translation {
                 model.supports_translation = translate;
+            }
+            if let Some(detect) = probe.supports_language_detect {
+                model.supports_language_detection = detect;
             }
             if let Some(langs) = probe.languages {
                 if !langs.is_empty() {
@@ -2138,93 +2375,80 @@ id: "gemma-3-4b".to_string(),
 
     fn auto_select_model_if_needed(&self) -> Result<()> {
         let mut settings = get_settings(&self.app_handle);
-
-        // Clear a stale selection: set but no longer present in the catalog
-        // (e.g. a deleted custom model whose file is gone). This lets the
-        // picker below choose a fresh default instead of leaving a dangling id.
-        if !settings.selected_model.is_empty() {
-            let exists = {
-                let models = self.available_models.lock().unwrap();
-                models.contains_key(&settings.selected_model)
-            };
-
-            if !exists {
-                info!(
-                    "Selected model '{}' not found in available models, clearing selection",
-                    settings.selected_model
-                );
-                settings.selected_model = String::new();
-                write_settings(&self.app_handle, settings.clone());
-            }
-        }
-
-        // Whether the current selection can actually transcribe right now — a
-        // downloaded transcription model. This is false for an empty selection,
-        // for an LLM/TTS id, and (importantly) for the recommended default GGUF
-        // model before it has been downloaded.
-        let selection_usable = {
+        let next = {
             let models = self.available_models.lock().unwrap();
-            models
-                .get(&settings.selected_model)
-                .map(|m| m.is_downloaded && m.engine_type.is_transcription())
-                .unwrap_or(false)
+            Self::startup_selection(&settings.selected_model, &models)
+        };
+        let Some(next) = next else {
+            return Ok(());
         };
 
-        // If the current selection can't transcribe, fall back to the best
-        // *downloaded* transcription model. This is what keeps the existing
-        // default working when the new recommended streaming model isn't
-        // downloaded yet (PLAN.md Session 6 / N1): an upgrading user who already
-        // has a legacy model keeps using it, while a fresh user is simply left
-        // on the recommended id for onboarding to fetch (nothing downloaded →
-        // `None`, so we leave the selection untouched). A valid, downloaded
-        // selection is never overridden, so a user's explicit choice is kept.
-        if !selection_usable {
-            let best = {
-                let models = self.available_models.lock().unwrap();
-                Self::pick_default_transcription_model(&models)
-            };
+        let previous = &settings.selected_model;
+        if legacy_models::is_retired(previous) {
+            info!(
+                "Switching from retired model '{}' to its downloaded replacement '{}'",
+                previous, next
+            );
+        } else if next.is_empty() {
+            info!(
+                "Selected model '{}' not found in available models, clearing selection",
+                previous
+            );
+        } else {
+            info!(
+                "Auto-selecting transcription model: {} (previous selection '{}' unavailable)",
+                next, previous
+            );
+        }
+        settings.selected_model = next;
+        write_settings(&self.app_handle, settings);
+        Ok(())
+    }
 
-            if let Some(model_id) = best {
-                info!(
-                    "Auto-selecting transcription model: {} (previous selection '{}' unavailable)",
-                    model_id, settings.selected_model
-                );
-                settings.selected_model = model_id;
-                write_settings(&self.app_handle, settings);
+    /// What `selected_model` should become at startup, or `None` to leave it.
+    ///
+    /// - A selection that is no longer in the catalog (a deleted custom model)
+    ///   is replaced by the best downloaded model, or cleared.
+    /// - A retired selection moves to its replacement once that is downloaded,
+    ///   and otherwise stays exactly as it is. Falling back to some other model
+    ///   would hide the one thing the user needs to hear, that the model they
+    ///   chose has a new version to download, so it is left for the readiness
+    ///   check to offer.
+    /// - A downloaded transcription model is never overridden, so an explicit
+    ///   choice is kept.
+    /// - Anything else (empty, an LLM/TTS id, the recommended default before it
+    ///   is downloaded) falls back to the best downloaded model. A fresh
+    ///   install has none and keeps the recommended id for onboarding to fetch.
+    fn startup_selection(selected: &str, models: &HashMap<String, ModelInfo>) -> Option<String> {
+        let current = models.get(selected);
+        if !selected.is_empty() && current.is_none() {
+            return Some(Self::pick_default_transcription_model(models).unwrap_or_default());
+        }
+        if let Some(model) = current {
+            if is_retired_model(model) {
+                return legacy_models::replacement_id(&model.id)
+                    .filter(|id| models.get(id).is_some_and(|m| m.is_downloaded));
+            }
+            if model.is_downloaded && model.engine_type.is_transcription() {
+                return None;
             }
         }
-
-        Ok(())
+        Self::pick_default_transcription_model(models)
     }
 
     /// Pick the best *downloaded* transcription model to activate as the
     /// default, or `None` when none is downloaded yet (a fresh install, before
-    /// onboarding). Preference order: recommended rank (1 = top), then the
-    /// recommended flag, then higher accuracy, with the id as a stable
-    /// tie-breaker (so the choice is deterministic despite the backing
-    /// `HashMap`'s arbitrary iteration order). This makes the recommended
-    /// streaming model the active default once it's on disk, but any other
-    /// downloaded transcription model (legacy ONNX/whisper included) is a valid
-    /// fallback — never LLM or TTS models.
+    /// onboarding). Preference follows [`catalog_order`], the same order the
+    /// Models page lists them in, so the recommended streaming model is the
+    /// default once it is on disk. Any other downloaded transcription model,
+    /// an older Whisper `.bin` included, is a valid fallback; a retired model,
+    /// an LLM or a voice never is.
     fn pick_default_transcription_model(models: &HashMap<String, ModelInfo>) -> Option<String> {
         models
             .values()
             .filter(|m| m.is_downloaded && m.engine_type.is_transcription())
-            .min_by(|a, b| {
-                let rank = |m: &ModelInfo| m.recommended_rank.unwrap_or(u32::MAX);
-                rank(a)
-                    .cmp(&rank(b))
-                    // recommended before not-recommended (true sorts first)
-                    .then_with(|| b.is_recommended.cmp(&a.is_recommended))
-                    // higher accuracy first
-                    .then_with(|| {
-                        b.accuracy_score
-                            .partial_cmp(&a.accuracy_score)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    // stable, deterministic final tie-break
-                    .then_with(|| a.id.cmp(&b.id))
-            })
+            .filter(|m| !is_retired_model(m))
+            .min_by(|a, b| catalog_order(a, b))
             .map(|m| m.id.clone())
     }
 
@@ -2347,6 +2571,12 @@ id: "gemma-3-4b".to_string(),
                     local_path: None,
                     local_folder: None,
                     is_cleanup_specialist: false,
+                    is_legacy: false,
+                    is_retired: false,
+                    replacement_id: None,
+                    // Whisper detects the language; an English-only checkpoint
+                    // simply always finds English.
+                    supports_language_detection: true,
                 },
             );
         }
@@ -2416,6 +2646,10 @@ id: "gemma-3-4b".to_string(),
             local_path: None,
             local_folder: None,
             is_cleanup_specialist: false,
+            is_legacy: false,
+            is_retired: false,
+            replacement_id: None,
+            supports_language_detection: false,
         }
     }
 
@@ -2710,6 +2944,10 @@ id: "gemma-3-4b".to_string(),
             local_path: Some(record.path.clone()),
             local_folder: record.folder.clone(),
             is_cleanup_specialist: false,
+            is_legacy: false,
+            is_retired: false,
+            replacement_id: None,
+            supports_language_detection: false,
         }
     }
 
@@ -3064,14 +3302,17 @@ id: "gemma-3-4b".to_string(),
                     "SHA256 mismatch for model {}: expected {}, got {}",
                     model_id, expected, actual
                 );
-                let _ = fs::remove_file(path);
+                // The partial's chunk record goes too: it describes bytes that
+                // were just thrown away, and a resume trusting it would skip
+                // them.
+                remove_partial(path);
                 Err(anyhow::anyhow!(
                     "Download verification failed for model {}: file is corrupt. Please retry.",
                     model_id
                 ))
             }
             Err(e) => {
-                let _ = fs::remove_file(path);
+                remove_partial(path);
                 Err(anyhow::anyhow!(
                     "Failed to verify download for model {}: {}. Please retry.",
                     model_id,
@@ -3168,21 +3409,34 @@ id: "gemma-3-4b".to_string(),
         Ok(())
     }
 
-    /// Ordered list of URLs to try when downloading a model: any reliable
-    /// mirror(s) first, then the canonical (original) source as a fallback.
-    /// The downloader tries each in turn (retrying transient failures), so a
-    /// flaky primary self-heals or falls back automatically.
+    /// Ordered list of URLs to try when downloading a model: SpeakoFlow's own
+    /// mirror first (if one is published), then the canonical source, then
+    /// the catalog's mirrors. The downloader tries each in turn (retrying
+    /// transient failures), so a flaky primary self-heals or falls back.
+    ///
+    /// The catalog mirrors (Handy's static host) come last on purpose: they
+    /// are someone else's bandwidth, offered as the fallback for a Hugging Face
+    /// outage or a network that blocks it, which is how Handy uses them too.
+    /// They are only listed for a file whose hash we hold, and that hash is
+    /// checked after the download whichever host served it, so a mirror can
+    /// never hand us a different file.
     fn download_candidates(model_info: &ModelInfo) -> Vec<String> {
         let mut urls = Vec::new();
         if let Some(mirror) = Self::mirror_url_for(&model_info.id) {
             urls.push(mirror);
         }
         if let Some(url) = &model_info.url {
-            // Avoid trying the same URL twice if a mirror equals the canonical.
-            if !urls.iter().any(|u| u == url) {
-                urls.push(url.clone());
-            }
+            urls.push(url.clone());
         }
+        if model_info.sha256.is_some() {
+            urls.extend(crate::catalog::mirror_urls_for(
+                &model_info.id,
+                &model_info.filename,
+            ));
+        }
+        // Avoid trying the same URL twice if a mirror equals the canonical.
+        let mut seen = HashSet::new();
+        urls.retain(|url| seen.insert(url.clone()));
         urls
     }
 
@@ -3801,6 +4055,14 @@ id: "gemma-3-4b".to_string(),
 
         let model_info =
             model_info.ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+
+        // An older speech model is offered nowhere: its catalog twin is the
+        // same model in the current format. Refusing here as well keeps a stale
+        // UI, a CLI or a saved link from fetching a second copy, and a retired
+        // one could never be loaded at all.
+        if let Some(message) = legacy_download_refusal(&model_info) {
+            return Err(anyhow::anyhow!(message));
+        }
 
         // A local model is already on disk by definition; there is nothing to
         // fetch and no URL to fetch it from. Reachable if the UI ever routes a
@@ -4826,53 +5088,368 @@ mod tests {
         let mut models = HashMap::new();
         ModelManager::insert_catalog_models(&mut models);
 
-        // The 5 ranked recommended models from PLAN.md §4.
-        for slug in [
-            "parakeet-unified-en-0.6b",
-            "nemotron-3.5-asr-streaming-0.6b",
-            "canary-180m-flash",
-            "cohere-transcribe-03-2026",
-            "whisper-medium",
-        ] {
-            let id = format!("{}-gguf", slug);
+        // Every catalog model, not just the curated recommended few.
+        let catalog = crate::catalog::catalog();
+        assert_eq!(models.len(), catalog.models.len());
+        assert_eq!(models.len(), 69);
+        for entry in &catalog.models {
+            let id = entry.model_id();
             let m = models
                 .get(&id)
-                .unwrap_or_else(|| panic!("recommended model {} missing", id));
+                .unwrap_or_else(|| panic!("catalog model {} missing", id));
+            let file = entry.default_file().unwrap();
             assert_eq!(m.engine_type, EngineType::TranscribeCpp);
-            assert!(m.is_recommended, "{} should be recommended", id);
-            assert!(m.recommended_rank.is_some(), "{} should have a rank", id);
             assert!(!m.is_directory, "{} is a single-file GGUF", id);
-            assert!(m.filename.ends_with(".gguf"), "{} filename", id);
-            assert!(
-                m.url
-                    .as_ref()
-                    .is_some_and(|u| u.starts_with("https://huggingface.co/handy-computer/")
-                        && u.ends_with(".gguf")),
-                "{} url",
+            assert_eq!(m.filename, file.filename);
+            // Downloads are verified: the hash of the default file at the pin.
+            assert_eq!(m.sha256, file.sha256, "{} sha256", id);
+            assert!(m.sha256.as_deref().is_some_and(|s| s.len() == 64));
+            let revision = entry.revision.as_deref().unwrap();
+            assert_eq!(
+                m.url.as_deref(),
+                Some(
+                    format!(
+                        "https://huggingface.co/{}/resolve/{}/{}",
+                        entry.id, revision, file.filename
+                    )
+                    .as_str()
+                ),
+                "{} url is pinned to its revision",
+                id
+            );
+            assert_eq!(m.is_recommended, entry.recommended, "{} recommended", id);
+            assert_eq!(m.recommended_rank, entry.recommended_rank, "{} rank", id);
+            assert_eq!(
+                m.supports_language_detection, entry.capabilities.lang_detect,
+                "{} lang_detect",
                 id
             );
             assert!(m.size_mb > 0, "{} size", id);
         }
+        assert_eq!(models.values().filter(|m| m.is_recommended).count(), 5);
 
         // Parakeet Unified EN is the streaming rank-1 English model.
         let parakeet = models.get("parakeet-unified-en-0.6b-gguf").unwrap();
         assert!(parakeet.supports_streaming);
+        assert!(!parakeet.supports_language_detection);
         assert_eq!(parakeet.recommended_rank, Some(1));
         assert_eq!(parakeet.supported_languages, vec!["en".to_string()]);
         assert_eq!(parakeet.size_mb, 731_357_568 / (1024 * 1024));
 
         // The GGUF canary id must be namespaced so it can't shadow the legacy
-        // transcribe-rs `canary-180m-flash` entry (N2, side-by-side).
+        // transcribe-rs `canary-180m-flash` entry.
         assert!(models.contains_key("canary-180m-flash-gguf"));
         assert!(!models.contains_key("canary-180m-flash"));
 
-        // A batch-only model reports no streaming.
-        assert!(
-            !models
-                .get("whisper-medium-gguf")
-                .unwrap()
-                .supports_streaming
+        // A batch-only model reports no streaming; Whisper detects.
+        let whisper = models.get("whisper-medium-gguf").unwrap();
+        assert!(!whisper.supports_streaming);
+        assert!(whisper.supports_language_detection);
+    }
+
+    #[test]
+    fn catalog_downloads_fall_back_to_the_catalog_mirror() {
+        let mut models = HashMap::new();
+        ModelManager::insert_catalog_models(&mut models);
+        let parakeet = models.get(RECOMMENDED_MODEL_ID).unwrap();
+        let candidates = ModelManager::download_candidates(parakeet);
+        assert_eq!(candidates.len(), 2, "{candidates:?}");
+        assert!(candidates[0].starts_with("https://huggingface.co/"));
+        assert!(candidates[1].starts_with("https://blob.handy.computer/handy-computer/"));
+        assert!(candidates[1].ends_with(&parakeet.filename));
+
+        // No hash to check a mirror's bytes against: no mirror.
+        let mut unverified = parakeet.clone();
+        unverified.sha256 = None;
+        assert_eq!(ModelManager::download_candidates(&unverified).len(), 1);
+
+        // A model the catalog does not list gets only its own URL.
+        let mut other = make_stt("medium", false, false, None, 0.5, EngineType::Whisper);
+        other.url = Some("https://example.invalid/medium.bin".to_string());
+        other.sha256 = Some("0".repeat(64));
+        assert_eq!(
+            ModelManager::download_candidates(&other),
+            vec!["https://example.invalid/medium.bin".to_string()]
         );
+    }
+
+    #[test]
+    fn catalog_order_is_rank_then_recommended_then_scores_then_name() {
+        let mut ranked_unrecommended =
+            make_stt("b", false, false, Some(2), 0.1, EngineType::TranscribeCpp);
+        ranked_unrecommended.name = "B".into();
+        let rank_one = make_stt("a", false, true, Some(1), 0.1, EngineType::TranscribeCpp);
+        let recommended = make_stt("c", false, true, None, 0.1, EngineType::TranscribeCpp);
+        let accurate = make_stt("d", false, false, None, 0.9, EngineType::TranscribeCpp);
+        let mut fast = make_stt("e", false, false, None, 0.5, EngineType::TranscribeCpp);
+        fast.speed_score = 0.9;
+        let mut slow_a = make_stt("f", false, false, None, 0.5, EngineType::TranscribeCpp);
+        slow_a.speed_score = 0.1;
+        slow_a.name = "Alpha".into();
+        let mut slow_z = slow_a.clone();
+        slow_z.id = "g".into();
+        slow_z.name = "Zulu".into();
+
+        let mut list = [
+            slow_z,
+            accurate,
+            slow_a,
+            recommended,
+            fast,
+            ranked_unrecommended,
+            rank_one,
+        ];
+        list.sort_by(catalog_order);
+        let ids: Vec<&str> = list.iter().map(|m| m.id.as_str()).collect();
+        // Rank orders even a model outside the recommended set ahead of an
+        // unranked recommended one.
+        assert_eq!(ids, ["a", "b", "c", "d", "e", "f", "g"]);
+    }
+
+    #[test]
+    fn the_whole_catalog_sorts_by_its_ranks_first() {
+        let mut models = HashMap::new();
+        ModelManager::insert_catalog_models(&mut models);
+        let mut list: Vec<ModelInfo> = models.into_values().collect();
+        list.sort_by(catalog_order);
+        let ranks: Vec<Option<u32>> = list.iter().take(10).map(|m| m.recommended_rank).collect();
+        assert_eq!(ranks, (1..=10).map(Some).collect::<Vec<_>>());
+        assert!(list[10..].iter().all(|m| m.recommended_rank.is_none()));
+    }
+
+    #[test]
+    fn legacy_flags_are_stamped_from_the_twin_table() {
+        let whisper = stamped(make_stt(
+            "medium",
+            true,
+            false,
+            None,
+            0.7,
+            EngineType::Whisper,
+        ));
+        assert!(whisper.is_legacy);
+        assert!(!whisper.is_retired, "a Whisper .bin still runs");
+        assert_eq!(
+            whisper.replacement_id.as_deref(),
+            Some("whisper-medium-gguf")
+        );
+
+        let onnx = stamped(make_stt(
+            "parakeet-tdt-0.6b-v3",
+            true,
+            false,
+            None,
+            0.8,
+            EngineType::Parakeet,
+        ));
+        assert!(onnx.is_legacy);
+        assert!(onnx.is_retired);
+        assert_eq!(
+            onnx.replacement_id.as_deref(),
+            Some("parakeet-tdt-0.6b-v3-gguf")
+        );
+
+        let current = stamped(make_stt(
+            RECOMMENDED_MODEL_ID,
+            true,
+            true,
+            Some(1),
+            0.9,
+            EngineType::TranscribeCpp,
+        ));
+        assert!(!current.is_legacy && !current.is_retired);
+        assert_eq!(current.replacement_id, None);
+
+        // A custom Whisper file is not one of ours, so it is not "older".
+        let custom = stamped(make_stt(
+            "my-finetune",
+            true,
+            false,
+            None,
+            0.0,
+            EngineType::Whisper,
+        ));
+        assert!(!custom.is_legacy && !custom.is_retired);
+    }
+
+    #[test]
+    fn every_legacy_replacement_is_a_listed_catalog_model() {
+        let mut models = HashMap::new();
+        ModelManager::insert_catalog_models(&mut models);
+        for twin in legacy_models::LEGACY_TWINS {
+            let replacement = legacy_models::replacement_id(twin.legacy_id).unwrap();
+            assert!(
+                models.contains_key(&replacement),
+                "{} → {} is not listed",
+                twin.legacy_id,
+                replacement
+            );
+        }
+    }
+
+    #[test]
+    fn a_retired_model_cannot_be_selected() {
+        let retired = make_stt(
+            "sense-voice-int8",
+            true,
+            false,
+            None,
+            0.6,
+            EngineType::SenseVoice,
+        );
+        let error = ensure_selectable(&retired).unwrap_err();
+        assert!(error.contains("no longer includes"), "{error}");
+        assert!(
+            error.contains("SenseVoice"),
+            "names the replacement: {error}"
+        );
+
+        assert!(ensure_selectable(&make_stt(
+            "medium",
+            true,
+            false,
+            None,
+            0.7,
+            EngineType::Whisper
+        ))
+        .is_ok());
+        assert!(ensure_selectable(&make_stt(
+            RECOMMENDED_MODEL_ID,
+            true,
+            true,
+            Some(1),
+            0.9,
+            EngineType::TranscribeCpp
+        ))
+        .is_ok());
+    }
+
+    #[test]
+    fn no_legacy_model_can_be_downloaded() {
+        for twin in legacy_models::LEGACY_TWINS {
+            let info = make_stt(twin.legacy_id, false, false, None, 0.5, EngineType::Whisper);
+            let refusal = legacy_download_refusal(&info)
+                .unwrap_or_else(|| panic!("{} must be refused", twin.legacy_id));
+            assert!(refusal.contains("Download "), "{refusal}");
+        }
+        let current = make_stt(
+            RECOMMENDED_MODEL_ID,
+            false,
+            true,
+            Some(1),
+            0.9,
+            EngineType::TranscribeCpp,
+        );
+        assert_eq!(legacy_download_refusal(&current), None);
+    }
+
+    /// The registry an upgrading user has: a retired selection, its
+    /// replacement (downloaded or not), and an unrelated downloaded model.
+    fn upgrade_registry(replacement_downloaded: bool) -> HashMap<String, ModelInfo> {
+        let mut models = HashMap::new();
+        for info in [
+            make_stt(
+                "parakeet-tdt-0.6b-v3",
+                true,
+                false,
+                None,
+                0.8,
+                EngineType::Parakeet,
+            ),
+            make_stt(
+                "parakeet-tdt-0.6b-v3-gguf",
+                replacement_downloaded,
+                false,
+                Some(7),
+                0.85,
+                EngineType::TranscribeCpp,
+            ),
+            make_stt("medium", true, false, None, 0.7, EngineType::Whisper),
+        ] {
+            models.insert(info.id.clone(), info);
+        }
+        models
+    }
+
+    #[test]
+    fn a_retired_selection_moves_to_its_downloaded_replacement() {
+        assert_eq!(
+            ModelManager::startup_selection("parakeet-tdt-0.6b-v3", &upgrade_registry(true))
+                .as_deref(),
+            Some("parakeet-tdt-0.6b-v3-gguf")
+        );
+    }
+
+    #[test]
+    fn a_retired_selection_is_kept_until_its_replacement_is_downloaded() {
+        // Another model is on disk, but switching to it would hide that the
+        // chosen one has a new version; the selection is left for the
+        // readiness check to offer it.
+        assert_eq!(
+            ModelManager::startup_selection("parakeet-tdt-0.6b-v3", &upgrade_registry(false)),
+            None
+        );
+    }
+
+    #[test]
+    fn startup_selection_keeps_falls_back_and_clears() {
+        let models = upgrade_registry(false);
+        // A downloaded selection is kept, an older Whisper .bin included.
+        assert_eq!(ModelManager::startup_selection("medium", &models), None);
+        // Nothing selected: the best downloaded model that can run.
+        assert_eq!(
+            ModelManager::startup_selection("", &models).as_deref(),
+            Some("medium")
+        );
+        // A selection that is not downloaded: the same fallback.
+        assert_eq!(
+            ModelManager::startup_selection("parakeet-tdt-0.6b-v3-gguf", &models).as_deref(),
+            Some("medium")
+        );
+        // A selection that no longer exists is replaced, or cleared when
+        // there is nothing to replace it with.
+        assert_eq!(
+            ModelManager::startup_selection("gone", &models).as_deref(),
+            Some("medium")
+        );
+        assert_eq!(
+            ModelManager::startup_selection("gone", &HashMap::new()).as_deref(),
+            Some("")
+        );
+        // A fresh install with nothing on disk keeps its selection for
+        // onboarding to fetch.
+        let mut fresh = HashMap::new();
+        fresh.insert(
+            RECOMMENDED_MODEL_ID.to_string(),
+            make_stt(
+                RECOMMENDED_MODEL_ID,
+                false,
+                true,
+                Some(1),
+                0.9,
+                EngineType::TranscribeCpp,
+            ),
+        );
+        assert_eq!(
+            ModelManager::startup_selection(RECOMMENDED_MODEL_ID, &fresh),
+            None
+        );
+    }
+
+    #[test]
+    fn language_detection_is_reconciled_without_touching_other_models() {
+        let mut models = HashMap::new();
+        models.insert(
+            "a".to_string(),
+            make_stt("a", true, false, None, 0.5, EngineType::TranscribeCpp),
+        );
+        assert!(apply_language_detection(&mut models, "a", true));
+        assert!(models["a"].supports_language_detection);
+        assert!(
+            !apply_language_detection(&mut models, "a", true),
+            "no change"
+        );
+        assert!(!apply_language_detection(&mut models, "missing", true));
     }
 
     /// Both recommended-default ids must resolve to real, streaming catalog
@@ -4939,6 +5516,10 @@ mod tests {
             local_path: None,
             local_folder: None,
             is_cleanup_specialist: false,
+            is_legacy: false,
+            is_retired: false,
+            replacement_id: None,
+            supports_language_detection: false,
         }
     }
 
@@ -4977,19 +5558,12 @@ mod tests {
     #[test]
     fn pick_default_falls_back_to_downloaded_when_recommended_absent() {
         // The recommended GGUF exists in the catalog but isn't downloaded; the
-        // only downloaded transcription model is a legacy one. The existing
-        // default must keep working (PLAN.md Session 6 / N1).
+        // only downloaded transcription model is an older Whisper `.bin`, which
+        // still runs. The existing default must keep working.
         let mut models = HashMap::new();
         models.insert(
-            "parakeet-tdt-0.6b-v3".to_string(),
-            make_stt(
-                "parakeet-tdt-0.6b-v3",
-                true,
-                false,
-                None,
-                0.80,
-                EngineType::Parakeet,
-            ),
+            "medium".to_string(),
+            make_stt("medium", true, false, None, 0.75, EngineType::Whisper),
         );
         models.insert(
             RECOMMENDED_MODEL_ID.to_string(),
@@ -5005,7 +5579,35 @@ mod tests {
 
         assert_eq!(
             ModelManager::pick_default_transcription_model(&models).as_deref(),
-            Some("parakeet-tdt-0.6b-v3"),
+            Some("medium"),
+        );
+    }
+
+    #[test]
+    fn pick_default_never_picks_a_retired_model() {
+        let mut models = HashMap::new();
+        models.insert(
+            "parakeet-tdt-0.6b-v3".to_string(),
+            make_stt(
+                "parakeet-tdt-0.6b-v3",
+                true,
+                true,
+                Some(1),
+                0.99,
+                EngineType::Parakeet,
+            ),
+        );
+        assert_eq!(
+            ModelManager::pick_default_transcription_model(&models),
+            None
+        );
+        models.insert(
+            "medium".to_string(),
+            make_stt("medium", true, false, None, 0.1, EngineType::Whisper),
+        );
+        assert_eq!(
+            ModelManager::pick_default_transcription_model(&models).as_deref(),
+            Some("medium")
         );
     }
 
@@ -5097,6 +5699,10 @@ mod tests {
                 local_path: None,
                 local_folder: None,
                 is_cleanup_specialist: false,
+                is_legacy: false,
+                is_retired: false,
+                replacement_id: None,
+                supports_language_detection: false,
             },
         );
 

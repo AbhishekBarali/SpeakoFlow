@@ -50,6 +50,11 @@ pub const KNOWN_ARCHES: &[&str] = &[
     "granite_speech_nar",
     "funasr_nano",
     "medasr",
+    // MOSS Transcribe Diarize (catalog v2). Upstream's list also has
+    // `sortformer`, which is deliberately left out here: it only labels
+    // speakers and returns no text, and this list is also what
+    // `local_models` uses to decide that a GGUF is a speech-to-text model.
+    "moss",
 ];
 
 // GGUF metadata keys transcribe-cpp writes for ASR models.

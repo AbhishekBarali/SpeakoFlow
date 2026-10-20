@@ -687,32 +687,96 @@ pub fn apply_recording_mode(app: &AppHandle) {
     state.sync_hands_free_keys(&get_settings(app));
 }
 
+/// Keeps the Cancel shortcut registered exactly while the recording lifecycle
+/// wants it, whatever order the work to get there runs in.
+///
+/// Recording start and stop run on the hotkey thread, which must not wait on
+/// the engine, so each spawns its registration work. Two spawned tasks have no
+/// order: after a very short recording the unregister task could run before
+/// the register task, and Esc then stayed taken from every app until the next
+/// recording, or until quit. So start and stop only record what they want
+/// ([`Self::request`]), synchronously and therefore in order, and every task
+/// applies the latest request rather than the one that spawned it
+/// ([`Self::reconcile`]), comparing against what the engine really holds
+/// instead of a remembered flag that someone else's unregister would make
+/// stale.
+///
+/// One instance per engine (`handy_keys::CANCEL`, `tauri_impl::CANCEL`), since
+/// each engine registers its own keys. Unused outside tests on Linux, where
+/// Cancel is never registered dynamically.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+pub(super) struct CancelReconciler {
+    /// The latest request: should Cancel be registered right now?
+    requested: AtomicBool,
+    /// Serializes reconcile passes, so two cannot both see "not registered"
+    /// and register twice.
+    applying: Mutex<()>,
+}
+
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+impl CancelReconciler {
+    pub(super) const fn new() -> Self {
+        Self {
+            requested: AtomicBool::new(false),
+            applying: Mutex::new(()),
+        }
+    }
+
+    /// Record what the recording lifecycle wants. Cheap and synchronous, so it
+    /// is safe on the hotkey thread; [`Self::reconcile`] does the work.
+    pub(super) fn request(&self, wanted: bool) {
+        self.requested.store(wanted, Ordering::SeqCst);
+    }
+
+    /// Bring the engine in line with the latest request. `available` is false
+    /// when Cancel has no keys (turned off), which reads as "not wanted" so
+    /// keys left over from before it was turned off are still released.
+    /// Returns what was done, for the log; an engine error leaves the state as
+    /// it was for the next pass to retry.
+    pub(super) fn reconcile(
+        &self,
+        available: bool,
+        is_registered: impl FnOnce() -> bool,
+        register: impl FnOnce() -> Result<(), String>,
+        unregister: impl FnOnce() -> Result<(), String>,
+    ) -> Result<CancelChange, String> {
+        let _applying = self.applying.lock().unwrap_or_else(|e| e.into_inner());
+        // Read under the lock: a request made while an earlier pass held it is
+        // what this pass applies.
+        let wanted = available && self.requested.load(Ordering::SeqCst);
+        match (wanted, is_registered()) {
+            (true, false) => register().map(|()| CancelChange::Registered),
+            (false, true) => unregister().map(|()| CancelChange::Unregistered),
+            _ => Ok(CancelChange::Unchanged),
+        }
+    }
+}
+
+/// What one [`CancelReconciler::reconcile`] pass did.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CancelChange {
+    Registered,
+    Unregistered,
+    Unchanged,
+}
+
+/// This engine's Cancel registration; see [`CancelReconciler`].
+#[cfg(not(target_os = "linux"))]
+static CANCEL: CancelReconciler = CancelReconciler::new();
+
 /// Register the cancel shortcut (called when recording starts)
 pub fn register_cancel_shortcut(app: &AppHandle) {
     // Disabled on Linux due to instability
     #[cfg(target_os = "linux")]
     {
         let _ = app;
-        return;
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Some(cancel_binding) = get_settings(&app_clone).bindings.get("cancel").cloned() {
-                // Empty binding = cancel shortcut disabled.
-                if cancel_binding.current_binding.trim().is_empty() {
-                    return;
-                }
-                if let Some(state) = app_clone.try_state::<HandyKeysState>() {
-                    let settings = get_settings(&app_clone);
-                    if let Err(e) = state.arm(&settings, &cancel_binding).into_result("cancel") {
-                        error!("Failed to register cancel shortcut: {}", e);
-                    }
-                }
-            }
-        });
+        CANCEL.request(true);
+        schedule_cancel_reconcile(app);
     }
 }
 
@@ -721,19 +785,51 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
     #[cfg(target_os = "linux")]
     {
         let _ = app;
-        return;
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            // By id: both of Cancel's keys go, whatever they are now.
-            if let Some(state) = app_clone.try_state::<HandyKeysState>() {
-                let _ = state.unregister("cancel");
-            }
-        });
+        CANCEL.request(false);
+        schedule_cancel_reconcile(app);
     }
+}
+
+/// Apply [`CANCEL`]'s latest request off the hotkey thread.
+#[cfg(not(target_os = "linux"))]
+fn schedule_cancel_reconcile(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let Some(state) = app.try_state::<HandyKeysState>() else {
+            return;
+        };
+        let settings = get_settings(&app);
+        let binding = settings.bindings.get("cancel").cloned();
+        // Empty binding = cancel shortcut disabled.
+        let available = binding
+            .as_ref()
+            .is_some_and(|b| !b.current_binding.trim().is_empty());
+        let result = CANCEL.reconcile(
+            available,
+            || {
+                state
+                    .registered
+                    .lock()
+                    .map(|registered| registered.contains_key("cancel"))
+                    .unwrap_or(false)
+            },
+            || match binding.as_ref() {
+                Some(binding) => state.arm(&settings, binding).into_result("cancel"),
+                None => Ok(()),
+            },
+            // By id: both of Cancel's keys go, whatever they are now.
+            || state.unregister("cancel"),
+        );
+        match result {
+            Ok(CancelChange::Unchanged) => {}
+            Ok(change) => debug!("Cancel shortcut: {change:?}"),
+            Err(e) => error!("Failed to update the cancel shortcut: {}", e),
+        }
+    });
 }
 
 /// Register a shortcut: its own keys, and its other keys when it has them.
@@ -808,4 +904,122 @@ pub fn stop_handy_keys_recording(app: AppHandle) -> Result<(), String> {
         .try_state::<HandyKeysState>()
         .ok_or("HandyKeysState not initialized")?;
     state.stop_recording()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CancelChange, CancelReconciler};
+    use std::cell::{Cell, RefCell};
+
+    /// A stand-in engine that records every registration call.
+    #[derive(Default)]
+    struct FakeEngine {
+        registered: Cell<bool>,
+        calls: RefCell<Vec<&'static str>>,
+        fail_next: Cell<bool>,
+    }
+
+    impl FakeEngine {
+        fn reconcile(
+            &self,
+            cancel: &CancelReconciler,
+            available: bool,
+        ) -> Result<CancelChange, String> {
+            cancel.reconcile(
+                available,
+                || self.registered.get(),
+                || self.apply("register", true),
+                || self.apply("unregister", false),
+            )
+        }
+
+        fn apply(&self, call: &'static str, registered: bool) -> Result<(), String> {
+            self.calls.borrow_mut().push(call);
+            if self.fail_next.replace(false) {
+                return Err("engine refused".into());
+            }
+            self.registered.set(registered);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn stop_task_running_before_start_task_still_ends_unregistered() {
+        // A very short recording: start and stop are both requested before
+        // either spawned task runs, and the tasks then run in either order.
+        let cancel = CancelReconciler::new();
+        let engine = FakeEngine::default();
+        cancel.request(true);
+        cancel.request(false);
+
+        // Stop's task first, then start's: both apply the latest request.
+        assert_eq!(engine.reconcile(&cancel, true), Ok(CancelChange::Unchanged));
+        assert_eq!(engine.reconcile(&cancel, true), Ok(CancelChange::Unchanged));
+        assert!(!engine.registered.get());
+        assert!(engine.calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn start_task_running_late_does_not_register_after_stop() {
+        let cancel = CancelReconciler::new();
+        let engine = FakeEngine::default();
+        cancel.request(true);
+        assert_eq!(
+            engine.reconcile(&cancel, true),
+            Ok(CancelChange::Registered)
+        );
+        // The next recording starts and stops before either task runs.
+        cancel.request(false);
+        cancel.request(true);
+        cancel.request(false);
+        assert_eq!(
+            engine.reconcile(&cancel, true),
+            Ok(CancelChange::Unregistered)
+        );
+        assert_eq!(engine.reconcile(&cancel, true), Ok(CancelChange::Unchanged));
+        assert_eq!(engine.reconcile(&cancel, true), Ok(CancelChange::Unchanged));
+        assert!(!engine.registered.get());
+        assert_eq!(*engine.calls.borrow(), vec!["register", "unregister"]);
+    }
+
+    #[test]
+    fn repeated_start_requests_register_once() {
+        let cancel = CancelReconciler::new();
+        let engine = FakeEngine::default();
+        cancel.request(true);
+        cancel.request(true);
+        for _ in 0..3 {
+            let _ = engine.reconcile(&cancel, true);
+        }
+        assert!(engine.registered.get());
+        assert_eq!(*engine.calls.borrow(), vec!["register"]);
+    }
+
+    #[test]
+    fn turned_off_cancel_is_released_even_while_wanted() {
+        let cancel = CancelReconciler::new();
+        let engine = FakeEngine::default();
+        cancel.request(true);
+        let _ = engine.reconcile(&cancel, true);
+        // Cancel was turned off mid-recording: its keys must not linger.
+        assert_eq!(
+            engine.reconcile(&cancel, false),
+            Ok(CancelChange::Unregistered)
+        );
+        assert!(!engine.registered.get());
+    }
+
+    #[test]
+    fn a_failed_pass_is_retried_by_the_next_one() {
+        let cancel = CancelReconciler::new();
+        let engine = FakeEngine::default();
+        cancel.request(true);
+        engine.fail_next.set(true);
+        assert!(engine.reconcile(&cancel, true).is_err());
+        assert!(!engine.registered.get());
+        assert_eq!(
+            engine.reconcile(&cancel, true),
+            Ok(CancelChange::Registered)
+        );
+    }
 }

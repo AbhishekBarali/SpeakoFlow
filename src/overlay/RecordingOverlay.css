@@ -274,6 +274,26 @@
   text-overflow: ellipsis;
 }
 
+/* ── "<Model> needs an update" ──────────────────────────────────────────────
+ * A voice shortcut pressed while the selected speech model is one whose engine
+ * the app no longer includes. The downloading pill's two lines, with a quiet
+ * glyph where its ring would be: nothing is in progress yet, and the main
+ * window opening behind it is where the way forward is. */
+.overlay-pill.update {
+  gap: 10px;
+  padding-inline: 12px 15px;
+}
+.overlay-pill.update .pill-label {
+  white-space: nowrap;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pill-update-icon {
+  flex-shrink: 0;
+  color: var(--ov-muted);
+}
+
 /* ── Recovery pill: "Dismissed · Undo", "Transcription failed · Try again" ──
  * Left behind for a few seconds when a dictation is cancelled or fails, so a
  * slip of the finger costs nothing. It should read as an afterthought, not an

@@ -203,6 +203,9 @@ pub fn change_binding(
     // storing a clash that would only surface later, as a shortcut that does
     // nothing.
     if !removing {
+        if let Some(reason) = combos::own_keys_refusal(&binding) {
+            return Err(reason.to_string());
+        }
         if let Some(reason) = combos::refusal(&settings, &binding, settings.keyboard_implementation)
         {
             return Err(reason.to_string());
@@ -503,27 +506,17 @@ pub fn get_keyboard_implementation(app: AppHandle) -> String {
 
 /// Let mouse buttons be shortcut keys, or stop (Experimental).
 ///
-/// Turned off, a shortcut whose own keys are a mouse button goes back to its
-/// default keys: dictation and the ask always keep a key, and a button nothing
-/// listens for any more is not one. Other keys that are a mouse button are
-/// kept, only not listened for, and work again once this is back on.
+/// A mouse button is only ever a shortcut's other keys
+/// (`combos::own_keys_refusal`), so this changes nothing a shortcut is known
+/// by: turned off, its button is kept but not listened for, the shortcut
+/// carries on with its own keys, and the button works again once this is back
+/// on. Nothing has to be put back on its default keys.
 #[tauri::command]
 #[specta::specta]
 pub fn change_mouse_button_shortcuts_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let before = settings::get_settings(&app);
     let mut settings = before.clone();
     settings.mouse_button_shortcuts = enabled;
-    if !enabled {
-        for binding in settings.bindings.values_mut() {
-            if combos::has_mouse_button(&binding.current_binding) {
-                info!(
-                    "Mouse buttons are off: '{}' goes back to its default keys",
-                    binding.id
-                );
-                binding.current_binding = binding.default_binding.clone();
-            }
-        }
-    }
     settings::write_settings(&app, settings.clone());
 
     // Every shortcut with a mouse button in it starts or stops listening for
@@ -1956,30 +1949,28 @@ pub fn change_lazy_stream_close_setting(app: AppHandle, enabled: bool) -> Result
     Ok(())
 }
 
+/// Set the script Chinese transcripts are written in (Auto, Simplified or
+/// Traditional). Only reaches runs whose language is not already one of the
+/// two Chinese scripts.
 #[tauri::command]
 #[specta::specta]
-pub fn change_live_transcription_enabled_setting(
+pub fn change_chinese_script_setting(
     app: AppHandle,
-    enabled: bool,
+    script: settings::ChineseScript,
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.live_transcription_enabled = enabled;
+    settings.chinese_script = script;
     settings::write_settings(&app, settings);
     Ok(())
 }
 
-/// Toggle the opt-in live-transcription window: when on (and live transcription
-/// is enabled), the recording overlay grows into a readable card showing the
-/// running committed + tentative transcript; when off, the overlay stays the
-/// compact pill. Off by default.
+/// Turn long-form chunking on or off: recordings over 40 seconds on a model
+/// not built for long audio are transcribed in pieces cut at pauses.
 #[tauri::command]
 #[specta::specta]
-pub fn change_live_transcription_window_enabled_setting(
-    app: AppHandle,
-    enabled: bool,
-) -> Result<(), String> {
+pub fn change_long_form_chunking_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.live_transcription_window_enabled = enabled;
+    settings.long_form_chunking = enabled;
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -1994,22 +1985,14 @@ fn parse_overlay_style(s: &str) -> settings::OverlayStyle {
 }
 
 /// Set the recording (dictation) overlay style: none / minimal / live (or auto
-/// to follow the model). Picking Live also enables streaming transcription so
-/// the running transcript can actually appear; Minimal/None turn it back off.
-/// `auto` leaves the streaming toggle alone (the show path resolves per model).
+/// to follow the model). The style only decides what is shown: a model that
+/// streams always streams, so the transcript is ready the moment you stop
+/// whichever style you pick.
 #[tauri::command]
 #[specta::specta]
 pub fn change_overlay_style_setting(app: AppHandle, style: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    let parsed = parse_overlay_style(&style);
-    settings.overlay_style = parsed;
-    match parsed {
-        settings::OverlayStyle::Live => settings.live_transcription_enabled = true,
-        settings::OverlayStyle::Minimal | settings::OverlayStyle::None => {
-            settings.live_transcription_enabled = false
-        }
-        settings::OverlayStyle::Auto => {}
-    }
+    settings.overlay_style = parse_overlay_style(&style);
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -2104,59 +2087,57 @@ pub fn change_close_behavior_setting(app: AppHandle, behavior: String) -> Result
     Ok(())
 }
 
-/// Save accelerator settings, re-apply globals, and unload the model so it
-/// reloads with the new backend on next transcription.
-fn apply_and_reload_accelerator(app: &AppHandle, s: settings::AppSettings) {
+/// Save a speech-processing change and unload the model so the next
+/// transcription loads it on the newly chosen device. An explicit change is
+/// also the user's way of trying the GPU again after the transcription worker
+/// gave up on it (a crash or hang there moves speech to the processor until
+/// then).
+fn apply_and_reload_accelerator(app: &AppHandle, s: settings::AppSettings, reason: &str) {
     settings::write_settings(app, s);
-    crate::managers::transcription::apply_accelerator_settings(app);
 
     let tm = app.state::<std::sync::Arc<crate::managers::transcription::TranscriptionManager>>();
+    tm.retry_transcribe_gpu(reason);
     if tm.is_model_loaded() {
-        if let Err(e) = tm.unload_model() {
-            log::warn!("Failed to unload model after accelerator change: {e}");
-        }
+        // Without waiting for the worker to exit: this command runs on the
+        // main thread, and the exit may queue behind a transcription in
+        // progress. The model reads as unloaded at once, and the next load
+        // queues behind the unload.
+        tm.request_unload();
     }
 }
 
+/// Where local speech-to-text runs: `auto`, `cpu`, or `gpu` (the device in
+/// `transcribe_gpu_device`). The frontend saves the device first, so a `gpu`
+/// choice never lands without one.
 #[tauri::command]
 #[specta::specta]
-pub fn change_whisper_accelerator_setting(
+pub fn change_transcribe_accelerator_setting(
     app: AppHandle,
-    accelerator: settings::WhisperAcceleratorSetting,
+    accelerator: settings::TranscribeAcceleratorSetting,
 ) -> Result<(), String> {
     let mut s = settings::get_settings(&app);
-    s.whisper_accelerator = accelerator;
-    apply_and_reload_accelerator(&app, s);
+    s.transcribe_accelerator = accelerator;
+    apply_and_reload_accelerator(&app, s, "the speech-processing setting changed");
     Ok(())
 }
 
+/// The GPU chosen for speech, as the stable key from `get_available_accelerators`
+/// (`GpuDeviceOption::id`), or `None` for automatic selection.
 #[tauri::command]
 #[specta::specta]
-pub fn change_ort_accelerator_setting(
-    app: AppHandle,
-    accelerator: settings::OrtAcceleratorSetting,
-) -> Result<(), String> {
+pub fn change_transcribe_gpu_device(app: AppHandle, device: Option<String>) -> Result<(), String> {
     let mut s = settings::get_settings(&app);
-    s.ort_accelerator = accelerator;
-    apply_and_reload_accelerator(&app, s);
+    s.transcribe_gpu_device = device;
+    apply_and_reload_accelerator(&app, s, "the GPU chosen for speech changed");
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn change_whisper_gpu_device(app: AppHandle, device: i32) -> Result<(), String> {
-    let mut s = settings::get_settings(&app);
-    s.whisper_gpu_device = device;
-    apply_and_reload_accelerator(&app, s);
-    Ok(())
-}
-
-/// Return which accelerators and GPU devices are available for this build.
+/// Return the speech-processing choices and the GPUs transcribe.cpp can use.
 ///
-/// First-call cost is dominated by enumerating GPU devices through the
-/// whisper.cpp Metal/Vulkan backend, which loads dynamic libraries and
-/// probes hardware. Run it on the blocking pool so the webview thread
-/// stays responsive — see also the startup pre-warm in `lib.rs`.
+/// First-call cost is dominated by registering transcribe.cpp's backends and
+/// enumerating devices, which loads the Vulkan/Metal backend and probes
+/// hardware. Run it on the blocking pool so the webview thread stays
+/// responsive — see also the startup pre-warm in `lib.rs`.
 #[tauri::command]
 #[specta::specta]
 pub async fn get_available_accelerators() -> crate::managers::transcription::AvailableAccelerators {

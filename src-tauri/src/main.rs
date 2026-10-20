@@ -5,13 +5,25 @@ use clap::Parser;
 use speakoflow_app_lib::CliArgs;
 
 fn main() {
-    let cli_args = CliArgs::parse();
-
     // Must run before anything initializes a GPU backend — including the
-    // `--list-devices` / `--probe-devices` probes just below, which load the
-    // Vulkan/Metal ggml backends themselves. Child processes (the llama.cpp
-    // sidecar, the device probe) inherit these variables.
+    // transcription worker just below and the `--list-devices` /
+    // `--probe-devices` probes, which load the Vulkan/Metal ggml backends
+    // themselves. Child processes (the transcription worker, the llama.cpp
+    // sidecar) inherit these variables, and a worker also applies them itself,
+    // which changes nothing when it inherited them.
     apply_gpu_environment_defaults();
+
+    // The transcription worker: speakoflow re-launched by the app's
+    // `engine_supervisor` to run transcribe.cpp in isolation. It must never
+    // reach CLI parsing (its arguments are not the app's), Tauri, the
+    // single-instance plugin (which would hand its arguments to the running
+    // app and exit), portable mode, autostart or the log plugin, so it is
+    // decided on the raw first argument before any of them.
+    if speakoflow_app_lib::engine_supervisor::is_worker_invocation() {
+        std::process::exit(speakoflow_app_lib::engine_supervisor::run_worker());
+    }
+
+    let cli_args = CliArgs::parse();
 
     // `--list-devices` is a headless probe: initialize the transcribe.cpp
     // backends, print the compute devices, and exit WITHOUT launching Tauri.
@@ -22,10 +34,9 @@ fn main() {
         return;
     }
 
-    // `--probe-devices` is the machine-readable sibling of `--list-devices`, and
-    // the child half of the Linux crash-isolated device probe: one JSON line on
-    // stdout, then exit. Must also stay ahead of any window/single-instance
-    // setup — the parent app is already running when this executes.
+    // `--probe-devices` is the machine-readable sibling of `--list-devices`:
+    // one JSON line on stdout, then exit. Must also stay ahead of any
+    // window/single-instance setup.
     if cli_args.probe_devices {
         speakoflow_app_lib::print_device_probe_json();
         return;
@@ -71,11 +82,9 @@ fn apply_gpu_environment_defaults() {
 
     // macOS: turn off ggml-metal residency sets. Their teardown asserts when a
     // native engine outlives Tauri's shutdown sequence, which produced a crash
-    // report on quit (Handy #1902). This build links two Metal ggml copies
-    // (whisper-rs and transcribe-cpp), so it is more exposed than upstream.
-    // ggml treats the variable as presence-based, so opting back in
-    // (SPEAKOFLOW_METAL_RESIDENCY=1) removes an inherited value too. Backport
-    // of Handy 98a4d80c.
+    // report on quit (Handy #1902). ggml treats the variable as
+    // presence-based, so opting back in (SPEAKOFLOW_METAL_RESIDENCY=1) removes
+    // an inherited value too. Backport of Handy 98a4d80c.
     #[cfg(target_os = "macos")]
     {
         if std::env::var("SPEAKOFLOW_METAL_RESIDENCY").as_deref() == Ok("1") {

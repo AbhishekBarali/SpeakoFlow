@@ -93,7 +93,22 @@ pub fn setup_signal_handler(app_handle: AppHandle) {
     #[cfg(not(target_os = "macos"))]
     debug!("Signal handler registered (SIGUSR2; SIGUSR1 is left to WebKitGTK)");
     thread::spawn(move || {
+        // On macOS the transcription worker passes these signals on to the
+        // app (it is also named `speakoflow`, so `pkill` reaches it), and a
+        // `pkill` without `-n` signals both: the same toggle then arrives
+        // twice within a millisecond and would start and stop at once. Nobody
+        // toggles a recording twice inside this window on purpose.
+        const DUPLICATE_WINDOW: std::time::Duration = std::time::Duration::from_millis(250);
+        let mut last: Option<(i32, std::time::Instant)> = None;
         for sig in signals.forever() {
+            let now = std::time::Instant::now();
+            if last
+                .is_some_and(|(seen, at)| seen == sig && now.duration_since(at) < DUPLICATE_WINDOW)
+            {
+                debug!("Ignoring a repeated signal {sig} (delivered to the app and its worker)");
+                continue;
+            }
+            last = Some((sig, now));
             let (binding_id, signal_name) = match sig {
                 #[cfg(target_os = "macos")]
                 SIGUSR1 => ("transcribe_with_post_process", "SIGUSR1"),

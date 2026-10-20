@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Type } from "lucide-react";
 import { commands } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
@@ -13,8 +14,10 @@ import { InfoTip } from "@/components/ui/InfoTip";
 import { ProviderModeToggle } from "@/components/settings/PostProcessingSettingsApi/ProviderModeToggle";
 import { CloudTranscriptionGroup } from "@/components/settings/dictation/CloudTranscriptionGroup";
 import { LanguageSelector } from "@/components/settings/LanguageSelector";
+import { ChineseScript } from "@/components/settings/ChineseScript";
 import { TranslateToEnglish } from "@/components/settings/TranslateToEnglish";
 import { ModelsSettings } from "@/components/settings/models/ModelsSettings";
+import { compareCatalogOrder } from "@/components/settings/models/speechCatalog";
 import { LlmCatalog } from "@/components/settings/assistant/LlmCatalog";
 import { PostProcessingSettingsApi } from "@/components/settings/post-processing/PostProcessingSettings";
 import { PostProcessTimeout } from "@/components/settings/PostProcessTimeout";
@@ -69,10 +72,18 @@ const DeviceSttRows: React.FC<{ onBrowse: () => void }> = ({ onBrowse }) => {
   const currentModel = useModelStore((state) => state.currentModel);
   const selectModel = useModelStore((state) => state.selectModel);
   const [busy, setBusy] = useState(false);
-  const downloaded = models.filter(
-    (model) => getModelCategory(model) === "stt" && model.is_downloaded,
-  );
+  // Only models that can run: a retired one is still on disk until the user
+  // deletes it, but its engine is gone, so it is never offered as a choice.
+  const downloaded = models
+    .filter(
+      (model) =>
+        getModelCategory(model) === "stt" &&
+        model.is_downloaded &&
+        !model.is_retired,
+    )
+    .sort(compareCatalogOrder);
   const current = models.find((model) => model.id === currentModel);
+  const usable = !!current?.is_downloaded && !current.is_retired;
 
   return (
     <>
@@ -85,8 +96,13 @@ const DeviceSttRows: React.FC<{ onBrowse: () => void }> = ({ onBrowse }) => {
             value: model.id,
             label: getTranslatedModelName(model, t),
             icon: <ModelMark model={model} size="sm" />,
+            // An older Whisper `.bin` beside its GGUF twin has the same name,
+            // so the tag is what tells the two apart.
+            hint: model.is_legacy
+              ? t("modelSelector.capabilities.legacy")
+              : undefined,
           }))}
-          value={current?.is_downloaded ? currentModel : null}
+          value={usable ? currentModel : null}
           onChange={(id) => {
             setBusy(true);
             void selectModel(id).finally(() => setBusy(false));
@@ -98,13 +114,23 @@ const DeviceSttRows: React.FC<{ onBrowse: () => void }> = ({ onBrowse }) => {
           footerAction={{ label: t("pickers.download"), onClick: onBrowse }}
         />
       </SettingContainer>
-      {current?.supports_language_selection && (
+      {usable && current?.supports_language_selection && (
         <LanguageSelector
           grouped={true}
           supportedLanguages={current.supported_languages}
+          supportsLanguageDetection={!!current.supports_language_detection}
         />
       )}
-      {current?.supports_translation && <TranslateToEnglish grouped={true} />}
+      {usable && current && (
+        <ChineseScript
+          grouped={true}
+          supportedLanguages={current.supported_languages}
+          supportsLanguageDetection={!!current.supports_language_detection}
+        />
+      )}
+      {usable && current?.supports_translation && (
+        <TranslateToEnglish grouped={true} />
+      )}
     </>
   );
 };
@@ -141,7 +167,17 @@ export const SpeechTab: React.FC = () => {
           />
         </SettingContainer>
         {isCloud ? (
-          <CloudTranscriptionGroup embedded section="setup" />
+          <>
+            <CloudTranscriptionGroup embedded section="setup" />
+            {/* Right after the cloud language rows. Every provider can answer
+                in Chinese, so the row follows the language alone. */}
+            <ChineseScript
+              grouped={true}
+              descriptionMode="inline"
+              icon={Type}
+              tone="sky"
+            />
+          </>
         ) : (
           <DeviceSttRows onBrowse={() => scrollIntoView(catalogRef.current)} />
         )}

@@ -11,6 +11,7 @@
  *            &tab=stt|cleanup|assistant|voice   &settings=<tab>
  *            &stt=device|cloud   &theme=light|dark   &lang=<locale>
  *            &fresh=1 (no history)
+ *            &legacy=0 (no older or retired speech models on disk)
  *            &readme=1 (the README screenshots: everyday dictations, a
  *                       generic meeting, Kokoro already downloaded)
  *            &memory=on (assistant memory switched on)
@@ -38,6 +39,10 @@ const newInstall =
   (!!params.get("onboarding") && params.get("installed") !== "1");
 const fresh = params.get("fresh") === "1" || newInstall;
 const readme = params.get("readme") === "1" && !fresh;
+// `?retired=1`: an upgraded install still set to Parakeet V3, the retired ONNX
+// model on disk, so Home and Models show the update prompt. Dictation runs on
+// this computer, since a cloud setup never loads the local model.
+const retiredSelected = params.get("retired") === "1" && !fresh && !readme;
 const voiceEngine =
   params.get("voice") ?? (newInstall ? "kokoro" : "elevenlabs");
 const onEleven = voiceEngine === "elevenlabs";
@@ -191,6 +196,10 @@ const model = (overrides: Json): Json => ({
   supports_language_selection: false,
   is_custom: false,
   is_cleanup_specialist: false,
+  is_legacy: false,
+  is_retired: false,
+  replacement_id: null,
+  supports_language_detection: false,
   local_path: null,
   local_folder: null,
   ...overrides,
@@ -218,14 +227,17 @@ const models: Json[] = [
     supports_streaming: true,
     is_recommended: true,
     recommended_rank: 2,
-    supported_languages: ["en", "de", "fr", "es", "it"],
+    supported_languages: ["en", "de", "fr", "es", "it", "nb", "zh"],
     supports_language_selection: true,
+    supports_language_detection: true,
   }),
   model({
     id: "canary-180m-flash",
     name: "Canary 180M Flash",
     description: "Tiny and instant. Runs well on any machine.",
     size_mb: 208,
+    is_recommended: true,
+    recommended_rank: 3,
     supports_translation: true,
     supported_languages: ["en", "de", "fr", "es"],
     supports_language_selection: true,
@@ -234,12 +246,119 @@ const models: Json[] = [
     id: "whisper-medium",
     name: "Whisper Medium",
     description: "Good accuracy at a medium speed.",
-    engine_type: "Whisper",
-    size_mb: 469,
+    size_mb: 793,
+    is_recommended: true,
+    recommended_rank: 5,
+    accuracy_score: 0.86,
+    speed_score: 0.5,
     supports_translation: true,
-    supported_languages: ["en", "de", "fr", "es", "ja", "zh"],
+    supported_languages: ["en", "de", "fr", "es", "ja", "zh", "no", "yue"],
     supports_language_selection: true,
+    supports_language_detection: true,
   }),
+  // A few of the catalog models first listed with catalog v2, as
+  // `catalog.json` describes them.
+  model({
+    id: "Voxtral-Mini-4B-Realtime-2602-gguf",
+    name: "Voxtral Mini 4B Realtime",
+    description: "Live multilingual, excellent on powerful machines",
+    size_mb: 3129,
+    recommended_rank: 6,
+    accuracy_score: 0.87,
+    speed_score: 0.11,
+    supports_streaming: true,
+    supported_languages: [
+      "en",
+      "fr",
+      "es",
+      "de",
+      "ru",
+      "zh",
+      "ja",
+      "it",
+      "pt",
+      "nl",
+      "ar",
+      "hi",
+      "ko",
+    ],
+    supports_language_selection: true,
+    supports_language_detection: true,
+  }),
+  model({
+    id: "parakeet-tdt-0.6b-v3-gguf",
+    name: "Parakeet TDT 0.6B v3",
+    description: "Fast and accurate. Supports 25 European languages",
+    size_mb: 705,
+    recommended_rank: 7,
+    accuracy_score: 0.88,
+    speed_score: 0.79,
+    supported_languages: ["bg", "hr", "cs", "da", "nl", "en", "et", "fi"],
+    supports_language_selection: true,
+    supports_language_detection: true,
+  }),
+  model({
+    id: "Qwen3-ASR-0.6B-gguf",
+    name: "Qwen3-ASR 0.6B",
+    description: "Excellent multilingual model",
+    size_mb: 811,
+    recommended_rank: 9,
+    accuracy_score: 0.87,
+    speed_score: 0.63,
+    supported_languages: ["zh", "en", "yue", "ar", "de", "fr", "fil", "ja"],
+    supports_language_selection: true,
+    supports_language_detection: true,
+  }),
+  model({
+    id: "moonshine-streaming-tiny-gguf",
+    name: "Moonshine Streaming Tiny",
+    description: "English speech-to-text with streaming.",
+    size_mb: 48,
+    accuracy_score: 0.74,
+    speed_score: 1,
+    supports_streaming: true,
+  }),
+  // Older models still on disk after an upgrade (`?legacy=0` leaves them
+  // out): a Whisper `.bin` that still runs, and a retired ONNX model whose
+  // engine is gone.
+  ...(params.get("legacy") === "0" || readme
+    ? []
+    : [
+        model({
+          id: "medium",
+          name: "Whisper Medium",
+          description: "Good accuracy, medium speed",
+          filename: "whisper-medium-q4_1.bin",
+          engine_type: "Whisper",
+          size_mb: 469,
+          is_downloaded: true,
+          accuracy_score: 0.75,
+          speed_score: 0.6,
+          supports_translation: true,
+          supported_languages: ["en", "de", "fr", "es", "ja", "zh"],
+          supports_language_selection: true,
+          supports_language_detection: true,
+          is_legacy: true,
+          replacement_id: "whisper-medium",
+        }),
+        model({
+          id: "parakeet-tdt-0.6b-v3",
+          name: "Parakeet V3",
+          description: "Fast and accurate",
+          filename: "parakeet-tdt-0.6b-v3-int8",
+          engine_type: "Parakeet",
+          is_directory: true,
+          size_mb: 478,
+          is_downloaded: true,
+          accuracy_score: 0.8,
+          speed_score: 0.85,
+          supported_languages: ["bg", "hr", "cs", "da", "nl", "en"],
+          supports_language_selection: true,
+          is_legacy: true,
+          is_retired: true,
+          replacement_id: "parakeet-tdt-0.6b-v3-gguf",
+        }),
+      ]),
   model({
     id: "speakoflow-mini",
     name: "SpeakoFlow Mini",
@@ -558,7 +677,8 @@ const settings: Json = {
   keyboard_implementation: previewOs === "linux" ? "tauri" : "handy_keys",
   audio_feedback: false,
   theme: params.get("theme") ?? "light",
-  stt_engine_mode: params.get("stt") === "device" ? "local" : "cloud",
+  stt_engine_mode:
+    params.get("stt") === "device" || retiredSelected ? "local" : "cloud",
   cloud_stt_provider_id: params.get("cloudProvider") ?? "elevenlabs",
   cloud_stt_models: {
     elevenlabs: "scribe_v2_realtime",
@@ -570,9 +690,13 @@ const settings: Json = {
   cloud_stt_send_custom_words: true,
   cloud_stt_no_verbatim: false,
   selected_language: "auto",
+  chinese_script: "auto",
+  long_form_chunking: true,
   app_language: params.get("lang") ?? "en",
   translate_to_english: false,
-  selected_model: "parakeet-unified-en-0.6b",
+  selected_model: retiredSelected
+    ? "parakeet-tdt-0.6b-v3"
+    : "parakeet-unified-en-0.6b",
   custom_words: fresh
     ? []
     : ["Abhishek Barali", "SpeakoFlow", "firecrawl", "Gintama", "Tauri"],
@@ -1515,17 +1639,21 @@ const handlers: Record<string, (args: Json) => unknown> = {
   }),
   get_system_memory_gb: () => 32,
   get_available_accelerators: () => ({
-    whisper: ["auto", "cpu", "gpu"],
-    ort: ["cpu"],
+    transcribe: ["auto", "cpu", "gpu"],
     gpu_devices: [
       {
-        id: 0,
+        id: '["vulkan","id","0000:01:00.0"]',
         name: "NVIDIA GeForce RTX 4070 Ti SUPER",
         kind: "dedicated",
         total_vram_mb: 16076,
       },
+      {
+        id: '["vulkan","id","0000:12:00.0"]',
+        name: "AMD Radeon(TM) Graphics",
+        kind: "integrated",
+        total_vram_mb: 16180,
+      },
     ],
-    transcribe_cpp_devices: [],
   }),
   // Two screens, so the floating panel's screen picker is on show.
   list_assistant_displays: () => [
@@ -1547,6 +1675,13 @@ const handlers: Record<string, (args: Json) => unknown> = {
     },
   ],
   get_model_folders: () => [],
+  rescan_local_models: () => 0,
+  delete_model: ({ modelId }) => {
+    const entry = models.find((m) => m.id === modelId);
+    if (entry) entry.is_downloaded = false;
+    if (settings.selected_model === modelId) settings.selected_model = "";
+    return null;
+  },
   download_model: ({ modelId }) => simulateDownload(modelId as string),
   cancel_download: ({ modelId }) => {
     activeDownloads.get(modelId as string)?.cancel();

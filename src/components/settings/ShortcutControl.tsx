@@ -47,6 +47,11 @@ export const ShortcutEditActions: React.FC<{
   onTurnOff?: () => void;
   /** Start recording other keys for the shortcut. */
   onAddAnother?: () => void;
+  /**
+   * Mouse buttons can be the other keys here (they are on, on the engine
+   * that hears them), so "Add another" says so.
+   */
+  mouseButtons?: boolean;
   /** Remove the other keys being changed. */
   onRemove?: () => void;
 }> = ({
@@ -58,6 +63,7 @@ export const ShortcutEditActions: React.FC<{
   onUseDefault,
   onTurnOff,
   onAddAnother,
+  mouseButtons = false,
   onRemove,
 }) => {
   const { t } = useTranslation();
@@ -91,8 +97,12 @@ export const ShortcutEditActions: React.FC<{
   if (onAddAnother) {
     actions.push({
       id: "add",
-      label: t("shortcutEditor.addAnother"),
-      title: t("shortcutEditor.addAnotherHint"),
+      label: mouseButtons
+        ? t("shortcutEditor.addButtonOrKeys")
+        : t("shortcutEditor.addAnother"),
+      title: mouseButtons
+        ? t("shortcutEditor.addButtonOrKeysHint")
+        : t("shortcutEditor.addAnotherHint"),
       onClick: onAddAnother,
     });
   }
