@@ -3280,6 +3280,7 @@ fn run_cat_turn(
     files: &[FileAttachment],
     images: &[String],
     thumbnails: Vec<String>,
+    count_question: bool,
 ) {
     {
         let conversation = app.state::<AssistantConversation>();
@@ -3292,6 +3293,9 @@ fn run_cat_turn(
     }
     emit_conversation(app);
     persist_assistant_session(app);
+    if count_question {
+        crate::insights::record_question(app);
+    }
 
     let reply = random_meow();
     {
@@ -3872,7 +3876,7 @@ pub async fn run_assistant_turn(
     images: Vec<String>,
     files: Vec<FileAttachment>,
 ) {
-    run_assistant_turn_inner(app, user_text, images, files, None).await;
+    run_assistant_turn_inner(app, user_text, images, files, None, true).await;
 }
 
 pub async fn run_conversation_turn(
@@ -3880,15 +3884,18 @@ pub async fn run_conversation_turn(
     text: String,
     ticket: crate::voice_conversation::VoiceTicket,
 ) {
-    run_assistant_turn_inner(app, text, Vec::new(), Vec::new(), Some(ticket)).await;
+    run_assistant_turn_inner(app, text, Vec::new(), Vec::new(), Some(ticket), true).await;
 }
 
+/// `count_question` is false when the question was already counted, as when
+/// an answer is regenerated.
 async fn run_assistant_turn_inner(
     app: AppHandle,
     user_text: String,
     images: Vec<String>,
     files: Vec<FileAttachment>,
     voice_ticket: Option<crate::voice_conversation::VoiceTicket>,
+    count_question: bool,
 ) {
     if voice_ticket.is_none()
         && app
@@ -3983,7 +3990,15 @@ async fn run_assistant_turn_inner(
     // search, no vision — it just meows. Handle it up front so it works even
     // when no LLM provider/model is configured.
     if settings.active_character_is_cat() {
-        run_cat_turn(&app, &settings, &user_text, &files, &images, thumbnails);
+        run_cat_turn(
+            &app,
+            &settings,
+            &user_text,
+            &files,
+            &images,
+            thumbnails,
+            count_question,
+        );
         return;
     }
 
@@ -4112,6 +4127,9 @@ async fn run_assistant_turn_inner(
         drop(history);
         emit_conversation(&app);
         persist_assistant_session(&app);
+        if count_question {
+            crate::insights::record_question(&app);
+        }
     }
 
     // If the user pressed Stop up to here, abort before spending a model call.
@@ -5115,7 +5133,8 @@ pub async fn regenerate_last(app: AppHandle) {
     emit_conversation(&app);
     match text {
         Some(t) if !t.is_empty() => {
-            run_assistant_turn(app, t, Vec::new(), Vec::new()).await;
+            // The question was counted when it was first asked.
+            run_assistant_turn_inner(app, t, Vec::new(), Vec::new(), None, false).await;
         }
         _ => emit_state(&app, "idle"),
     }

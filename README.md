@@ -181,7 +181,11 @@ write yourself.
 ### Also in the app
 
 - **Insights.** Words dictated, your speaking speed, time saved compared with
-  typing at 40 words a minute, and six months of activity with streaks.
+  typing at 40 words a minute, questions asked and time on calls with the
+  assistant, meetings recorded, and six months of activity with streaks. Share
+  turns it into a set of cards, one insight each, to copy, save, post to X or
+  LinkedIn, or send through your system's share sheet, in square, story or
+  wide; they are made on your computer and nothing is uploaded.
 - **History.** Your dictations, questions, and conversations. Play a recording
   back, transcribe it again, recover a dismissed one, or
   continue a chat as a conversation. Old recordings can delete themselves after

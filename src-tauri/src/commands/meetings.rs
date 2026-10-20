@@ -214,6 +214,8 @@ pub async fn stop_meeting(
     .map_err(|e| format!("Stopping the meeting panicked: {e}"))??;
 
     let _ = app.emit(MEETINGS_UPDATED_EVENT, ());
+    // The meeting now has a length, so it counts in Insights.
+    crate::insights::notify_updated(&app);
 
     // The call is over, so label the speakers and summarize it (unless notes are
     // switched off). Not awaited: this is a sequence of model calls that can take
@@ -896,6 +898,8 @@ pub async fn delete_meeting(
     }
 
     let _ = app.emit(MEETINGS_UPDATED_EVENT, ());
+    // Deleting took the meeting's last usage snapshot.
+    crate::insights::notify_updated(&app);
     Ok(())
 }
 

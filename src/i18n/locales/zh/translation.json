@@ -3374,24 +3374,148 @@
     }
   },
   "insights": {
-    "description": "您一段时间以来的语音输入情况，在这台电脑上统计。",
-    "empty": "完成第一次语音输入后，这里会显示您的统计数据。",
-    "dictations": "语音输入次数",
-    "today": "今天 {{words}} 字",
+    "about": "您使用 SpeakoFlow 的情况，在这台电脑上统计。",
+    "nothingYet": "使用语音输入、向助手提问或录制会议后，这里会显示您的统计。",
+    "goHome": "查看快捷键",
+    "figures": {
+      "dictations": "语音输入次数",
+      "questions": "提问次数",
+      "meetings": "录音的会议"
+    },
+    "activityTitle": "活动",
     "pages_other": "约 {{count}} 页",
-    "fasterThanTyping": "比打字快 {{times}} 倍",
-    "streak_other": "连续 {{count}} 天",
     "longest_other": "最长：{{count}} 天",
-    "gridLabel_other": "过去六个月中 {{count}} 天共 {{words}} 字",
+    "streakHint": "当天只要语音输入、向助手提问、进行对话或录制会议，就算一天。",
     "gridSummary_other": "过去 6 个月中 {{count}} 天共 {{words}} 字",
+    "gridSummaryAssistant_other": "过去 6 个月中 {{count}} 天共 {{questions}}",
+    "gridSummaryMeetings_other": "过去 6 个月中 {{count}} 天共开会 {{time}}",
+    "gridSummaryAll_other": "过去 6 个月中活跃 {{count}} 天",
     "dayWords_other": "{{formatted}} 字",
-    "dayNone": "无语音输入",
+    "dayQuestions_other": "{{formatted}} 个问题",
+    "dayMeetings": "开会 {{time}}",
+    "dayNoneFor": {
+      "all": "无活动",
+      "dictation": "无语音输入",
+      "assistant": "无提问",
+      "meetings": "无会议"
+    },
     "less": "少",
     "more": "多",
     "busiest": "最忙的一天",
     "best": "最佳单日",
     "typical": "典型的一天",
-    "typicalSub": "在有语音输入的日子"
+    "typicalFor": {
+      "dictation": "在有语音输入的日子",
+      "assistant": "在有提问的日子",
+      "meetings": "在有会议的日子"
+    },
+    "activity": {
+      "label": "要显示的活动",
+      "all": "全部",
+      "dictation": "语音输入",
+      "assistant": "助手",
+      "meetings": "会议"
+    },
+    "assistantCard": {
+      "info": "快速提问，以及您在对话中说的话。删除对话后，这些仍会计入统计。",
+      "noCalls": "还没有对话"
+    },
+    "meetingsCard": {
+      "info": "您录制的会议。删除会议后，这些仍会计入统计。"
+    },
+    "share": {
+      "button": "分享",
+      "nothingYet": "用过 SpeakoFlow 之后，就有内容可以分享了。",
+      "title": "分享您的统计",
+      "private": "在这台电脑上生成，不会上传任何内容。",
+      "size": "尺寸",
+      "formats": {
+        "square": "方形",
+        "story": "竖版",
+        "wide": "横版"
+      },
+      "formatHints": {
+        "square": "1080 × 1080，适合信息流",
+        "story": "1080 × 1920，适合快拍",
+        "wide": "1600 × 900，适合帖子和链接"
+      },
+      "previous": "上一张卡片",
+      "next": "下一张卡片",
+      "cardsLabel": "卡片",
+      "position": "第 {{index}} 张，共 {{count}} 张",
+      "copy": "复制图片",
+      "copied": "已复制",
+      "copyFailed": "无法复制图片",
+      "save": "保存图片",
+      "saved": "图片已保存",
+      "saveFailed": "无法保存图片",
+      "showInFolder": "在文件夹中显示",
+      "postOn": "发布到 {{site}}",
+      "copiedForPost": "卡片已复制。在新帖子中按 {{keys}} 即可添加。",
+      "savedForPost": "卡片已保存到“下载”文件夹。{{site}} 不支持粘贴图片，请在新帖子中用图片按钮添加。",
+      "openSite": "打开 {{site}}",
+      "openFailed": "无法打开 {{site}}",
+      "more": "更多应用",
+      "sheetTitle": "我的 SpeakoFlow 统计",
+      "shareFailed": "无法打开分享",
+      "drawFailed": "无法绘制卡片。请关闭后重试。",
+      "tagline": "免费 · 开源 · 离线可用",
+      "cards": {
+        "highlights": {
+          "title": "我的 SpeakoFlow 高光时刻",
+          "words_other": "说出的字",
+          "streak_other": "连续天数",
+          "wpm": "字/分钟",
+          "questions_other": "次提问",
+          "meetings_other": "场会议录音",
+          "saved": "比打字节省"
+        },
+        "words": {
+          "title": "动口，不动手",
+          "label_other": "说出的字",
+          "pages_other": "约 {{count}} 页",
+          "books_other": "相当于 {{count}} 本小说"
+        },
+        "speed": {
+          "title": "我说话有多快",
+          "label": "字/分钟",
+          "note": "比打字快 {{times}}×",
+          "you": "说话",
+          "typing": "一般打字"
+        },
+        "saved": {
+          "title": "节省的时间",
+          "label": "省下的打字时间",
+          "workdays_other": "约 {{count}} 个工作日"
+        },
+        "streak": {
+          "title": "停不下来",
+          "unit_other": "天",
+          "longest_other": "最长连续：{{count}} 天",
+          "best": "这是我的最长纪录"
+        },
+        "assistant": {
+          "title": "我的助手",
+          "label_other": "次提问",
+          "calls_other": "{{count}} 次对话，聊了 {{time}}"
+        },
+        "meetings": {
+          "title": "我的会议",
+          "label_other": "场会议录音",
+          "note": "录了 {{time}}，整理出 {{words}} 字",
+          "time": "录制并整理了 {{time}}"
+        },
+        "activity": {
+          "title": "六个月，说个不停",
+          "label_other": "活跃天数"
+        }
+      },
+      "post": {
+        "dictation_other": "我用 SpeakoFlow 对着电脑说了 {{formatted}} 个字，一个都不用打。",
+        "asks_other": "我向 SpeakoFlow 的助手问了 {{formatted}} 个问题，全程不用切换标签页。",
+        "meetings_other": "SpeakoFlow 已经帮我录了 {{formatted}} 场会议，还替我写好了笔记。"
+      }
+    }
   },
   "settingsNotice": {
     "restored": "你的设置已损坏，已从备份中恢复。",

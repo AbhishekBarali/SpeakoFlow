@@ -3374,24 +3374,148 @@
     }
   },
   "insights": {
-    "description": "시간에 따른 받아쓰기 기록으로, 이 컴퓨터에서 집계합니다.",
-    "empty": "첫 받아쓰기를 마치면 인사이트가 표시됩니다.",
-    "dictations": "받아쓰기 횟수",
-    "today": "오늘 {{words}}단어",
+    "about": "SpeakoFlow 사용 현황으로, 이 컴퓨터에서 집계합니다.",
+    "nothingYet": "받아쓰기를 하거나, 어시스턴트에게 묻거나, 회의를 녹음하면 인사이트가 표시됩니다.",
+    "goHome": "단축키 보기",
+    "figures": {
+      "dictations": "받아쓰기 횟수",
+      "questions": "질문한 횟수",
+      "meetings": "녹음한 회의"
+    },
+    "activityTitle": "활동",
     "pages_other": "약 {{count}}페이지",
-    "fasterThanTyping": "타이핑보다 {{times}}배 빠름",
-    "streak_other": "{{count}}일 연속",
     "longest_other": "최장 기록: {{count}}일",
-    "gridLabel_other": "최근 6개월 동안 {{count}}일에 걸쳐 {{words}}단어",
+    "streakHint": "받아쓰기, 어시스턴트에게 질문, 대화, 회의 녹음 중 하나라도 한 날은 하루로 계산됩니다.",
     "gridSummary_other": "최근 6개월 동안 {{count}}일, {{words}}단어",
+    "gridSummaryAssistant_other": "최근 6개월 동안 {{count}}일, {{questions}}",
+    "gridSummaryMeetings_other": "최근 6개월 동안 {{count}}일, 회의 {{time}}",
+    "gridSummaryAll_other": "최근 6개월 동안 {{count}}일 활동",
     "dayWords_other": "{{formatted}}단어",
-    "dayNone": "받아쓰기 없음",
+    "dayQuestions_other": "질문 {{formatted}}개",
+    "dayMeetings": "회의 {{time}}",
+    "dayNoneFor": {
+      "all": "활동 없음",
+      "dictation": "받아쓰기 없음",
+      "assistant": "질문 없음",
+      "meetings": "회의 없음"
+    },
     "less": "적음",
     "more": "많음",
     "busiest": "가장 바쁜 날",
     "best": "최고 기록",
     "typical": "평소",
-    "typicalSub": "받아쓰기한 날 기준"
+    "typicalFor": {
+      "dictation": "받아쓰기한 날 기준",
+      "assistant": "질문한 날 기준",
+      "meetings": "회의가 있었던 날 기준"
+    },
+    "activity": {
+      "label": "표시할 활동",
+      "all": "전체",
+      "dictation": "받아쓰기",
+      "assistant": "어시스턴트",
+      "meetings": "회의"
+    },
+    "assistantCard": {
+      "info": "빠른 질문과, 대화 중에 한 말을 셉니다. 대화를 삭제해도 집계는 그대로 남습니다.",
+      "noCalls": "아직 대화가 없습니다"
+    },
+    "meetingsCard": {
+      "info": "녹음한 회의입니다. 회의를 삭제해도 집계는 그대로 남습니다."
+    },
+    "share": {
+      "button": "공유",
+      "nothingYet": "SpeakoFlow를 사용하고 나면 공유할 내용이 생깁니다.",
+      "title": "인사이트 공유",
+      "private": "이 컴퓨터에서 만듭니다. 아무것도 업로드되지 않습니다.",
+      "size": "크기",
+      "formats": {
+        "square": "정사각형",
+        "story": "스토리",
+        "wide": "와이드"
+      },
+      "formatHints": {
+        "square": "1080 × 1080, 피드용",
+        "story": "1080 × 1920, 스토리용",
+        "wide": "1600 × 900, 게시물과 링크용"
+      },
+      "previous": "이전 카드",
+      "next": "다음 카드",
+      "cardsLabel": "카드",
+      "position": "{{count}}개 중 {{index}}번째 카드",
+      "copy": "이미지 복사",
+      "copied": "복사됨",
+      "copyFailed": "이미지를 복사하지 못했습니다",
+      "save": "이미지 저장",
+      "saved": "이미지를 저장했습니다",
+      "saveFailed": "이미지를 저장하지 못했습니다",
+      "showInFolder": "폴더에서 보기",
+      "postOn": "{{site}}에 게시",
+      "copiedForPost": "카드를 복사했어요. 새 게시물에서 {{keys}}를 눌러 추가하세요.",
+      "savedForPost": "카드를 다운로드 폴더에 저장했어요. {{site}}는 붙여넣은 이미지를 받지 않으니 새 게시물의 사진 버튼으로 추가하세요.",
+      "openSite": "{{site}} 열기",
+      "openFailed": "{{site}} 페이지를 열지 못했습니다",
+      "more": "다른 앱",
+      "sheetTitle": "나의 SpeakoFlow 인사이트",
+      "shareFailed": "공유를 열지 못했습니다",
+      "drawFailed": "카드를 그리지 못했습니다. 닫고 다시 시도하세요.",
+      "tagline": "무료 · 오픈 소스 · 오프라인 작동",
+      "cards": {
+        "highlights": {
+          "title": "나의 SpeakoFlow 하이라이트",
+          "words_other": "말한 단어",
+          "streak_other": "일 연속",
+          "wpm": "분당 단어",
+          "questions_other": "번의 질문",
+          "meetings_other": "녹음한 회의",
+          "saved": "타이핑 대비 절약"
+        },
+        "words": {
+          "title": "타이핑 말고, 말로.",
+          "label_other": "말한 단어",
+          "pages_other": "약 {{count}}페이지 분량",
+          "books_other": "소설 {{count}}권 분량"
+        },
+        "speed": {
+          "title": "내가 말하는 속도",
+          "label": "분당 단어 수",
+          "note": "타이핑보다 {{times}}× 빠름",
+          "you": "말하기",
+          "typing": "평균 타이핑"
+        },
+        "saved": {
+          "title": "절약한 시간",
+          "label": "타이핑에 쓰지 않은 시간",
+          "workdays_other": "근무일 약 {{count}}일"
+        },
+        "streak": {
+          "title": "연속 기록 행진 중",
+          "unit_other": "일 연속",
+          "longest_other": "최장 기록: {{count}}일",
+          "best": "지금이 나의 최장 기록"
+        },
+        "assistant": {
+          "title": "나의 어시스턴트",
+          "label_other": "번의 질문",
+          "calls_other": "대화 {{count}}회, {{time}} 동안 이야기"
+        },
+        "meetings": {
+          "title": "나의 회의",
+          "label_other": "녹음한 회의",
+          "note": "{{time}} 녹음, {{words}}단어로 정리",
+          "time": "{{time}} 녹음하고 글로 정리"
+        },
+        "activity": {
+          "title": "말로 채운 6개월",
+          "label_other": "활동 일수"
+        }
+      },
+      "post": {
+        "dictation_other": "SpeakoFlow로 지금까지 {{formatted}}단어를 타이핑하는 대신 컴퓨터에 말로 입력했어요.",
+        "asks_other": "탭을 전환하지 않고 SpeakoFlow 어시스턴트에게 {{formatted}}번 질문했어요.",
+        "meetings_other": "SpeakoFlow가 회의 {{formatted}}건을 녹음하고 노트까지 써 줬어요."
+      }
+    }
   },
   "settingsNotice": {
     "restored": "설정이 손상되어 백업에서 복원했습니다.",
