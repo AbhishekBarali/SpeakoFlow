@@ -892,7 +892,10 @@ impl Owner {
             Command::Load(spec, reply) => {
                 let _ = reply.send(self.load(spec));
             }
-            Command::Unload { reply, .. } => {
+            Command::Unload { reply, now } => {
+                if now {
+                    self.drop_deferred();
+                }
                 self.unload();
                 self.unloads_done += 1;
                 let _ = reply.send(());
@@ -937,6 +940,31 @@ impl Owner {
     }
 
     /// Answer deferred runs whose caller cancelled them while they waited.
+    /// Answer everything that was waiting for the live stream, without running
+    /// it. Quitting stops the worker without waiting for the stream, which
+    /// then reads as ended; a model switch queued behind it would otherwise run
+    /// next and start a fresh worker after the app had stopped this one, which
+    /// during an in-app update is a running copy of the app the installer is
+    /// about to replace.
+    fn drop_deferred(&mut self) {
+        for command in std::mem::take(&mut self.deferred) {
+            match command {
+                Command::Load(_, reply) => {
+                    let _ = reply.send(Err(engine_stopped()));
+                }
+                Command::Unload { reply, .. } => {
+                    self.unloads_done += 1;
+                    let _ = reply.send(());
+                }
+                Command::Transcribe { reply, .. } => {
+                    let _ = reply.send(Err(EngineError::Cancelled));
+                }
+                // Only loads, unloads and batch runs are ever deferred.
+                _ => {}
+            }
+        }
+    }
+
     fn answer_cancelled_deferred(&mut self) {
         self.deferred.retain(|command| match command {
             Command::Transcribe {
@@ -2641,6 +2669,46 @@ mod live_tests {
         let finalized = stream.finalize(false).expect("finalize").expect("result");
         assert!(!finalized.text.display().trim().is_empty());
         assert!(unloading.wait_timeout(Duration::from_secs(10)));
+    }
+
+    /// Quitting does not wait for a live stream, and a model switch that was
+    /// waiting for that stream is answered instead of starting a new worker
+    /// once the app has stopped this one.
+    #[test]
+    #[ignore = "needs the built app, a streaming model and a recording"]
+    fn live_quitting_drops_a_load_waiting_for_a_stream() {
+        set_fault(None, false);
+        let pcm = recording();
+        let engine = EngineSupervisor::new(true);
+        let model_path = model("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf");
+        engine.load(spec(model_path.clone())).expect("load");
+        let stream = engine
+            .start_stream(
+                RunOptions::default(),
+                StreamOptions::default(),
+                CancelToken::new(),
+                |_| {},
+            )
+            .expect("stream");
+        for chunk in pcm[..pcm.len() / 2].chunks(1280) {
+            stream.feed(chunk.to_vec());
+        }
+        let switching = {
+            let engine = engine.clone();
+            std::thread::spawn(move || engine.load(spec(model_path)))
+        };
+        // Let the load reach the queue and be deferred behind the stream.
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(engine.unload_now().wait_timeout(Duration::from_secs(10)));
+        let switched = switching.join().expect("load thread");
+        assert!(
+            switched.is_err(),
+            "the waiting load is refused: {switched:?}"
+        );
+        drop(stream);
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(engine.loaded().is_none());
+        assert_eq!(worker_count(), 0, "no worker started after quitting");
     }
 
     /// (f) The worker exits when the supervisor is dropped (its stdin closes),
