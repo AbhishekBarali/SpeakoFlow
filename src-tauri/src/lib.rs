@@ -35,6 +35,7 @@ mod secret_store;
 mod selection;
 mod settings;
 mod settings_file;
+mod share_sheet;
 mod shortcut;
 mod signal_handle;
 mod smart_spacing;
@@ -1172,6 +1173,7 @@ pub fn run(cli_args: CliArgs) {
             insights::get_insights,
             insights::save_insights_card,
             insights::copy_insights_card,
+            insights::share_insights_card,
             commands::assistant::assistant_send_text,
             commands::assistant::assistant_read_file,
             commands::assistant::assistant_read_image,

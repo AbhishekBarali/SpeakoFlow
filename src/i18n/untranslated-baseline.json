@@ -247,8 +247,6 @@
       "feedback.screenshots.preview",
       "home.stats.none",
       "insights.activity.meetings",
-      "insights.meetingsCard.meetings_one",
-      "insights.meetingsCard.meetings_other",
       "insights.share.formats.story",
       "meetings.detail.title",
       "meetings.newTitle",
@@ -504,7 +502,6 @@
       "insights.dayQuestions_one",
       "insights.dayQuestions_other",
       "insights.share.formats.story",
-      "insights.share.looks.graphite",
       "meetings.discuss.messages_many",
       "meetings.discuss.messages_one",
       "meetings.discuss.messages_other",
@@ -634,9 +631,6 @@
       "voiceEngines.names.xai"
     ],
     "englishFromOtherKey": [
-      "insights.assistantCard.calls_many",
-      "insights.assistantCard.calls_one",
-      "insights.assistantCard.calls_other",
       "meetings.tabs.transcript",
       "meetingsPage.transcript",
       "overlay.transcript"
@@ -1068,6 +1062,7 @@
       "feedback.kind.bug",
       "home.stats.duration.minutes",
       "home.stats.none",
+      "insights.share.cardsLabel",
       "insights.share.formats.story",
       "modelSelector.downloadSpeed",
       "onboarding.cleanup.cardTitle",
@@ -1236,7 +1231,6 @@
       "home.stats.duration.minutes",
       "home.stats.none",
       "insights.share.formats.story",
-      "insights.share.looks.mint",
       "meetings.summary.templates.standup",
       "modelSelector.capabilities.streaming",
       "modelSelector.downloadSpeed",

@@ -1652,6 +1652,7 @@ const handlers: Record<string, (args: Json) => unknown> = {
   get_insights: () => insightsData(),
   save_insights_card: () => null,
   copy_insights_card: () => null,
+  share_insights_card: () => null,
   list_meetings: () => ({ meetings, has_more: false }),
   get_meeting: ({ meetingId }) =>
     structuredClone(meetings.find((entry) => entry.id === meetingId) ?? null),

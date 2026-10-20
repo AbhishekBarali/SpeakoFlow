@@ -3394,11 +3394,10 @@
     "about": "How you use SpeakoFlow, counted on this computer.",
     "nothingYet": "Your insights appear once you dictate, ask the assistant or record a meeting.",
     "goHome": "See your shortcuts",
-    "dictations": "Dictations",
-    "today": "{{words}} words today",
+    "dictationsSoFar_one": "{{formatted}} dictation so far",
+    "dictationsSoFar_other": "{{formatted}} dictations so far",
     "pages_one": "About {{count}} page",
     "pages_other": "About {{count}} pages",
-    "fasterThanTyping": "{{times}}× faster than typing",
     "streak_one": "{{count}} day streak",
     "streak_other": "{{count}} day streak",
     "longest_one": "Longest: {{count}} day",
@@ -3433,8 +3432,6 @@
       "assistant": "On days you ask",
       "meetings": "On days with a meeting"
     },
-    "activeDays": "Days active",
-    "activeDaysSub": "In the last 6 months",
     "activity": {
       "label": "Activity to show",
       "all": "All",
@@ -3442,30 +3439,19 @@
       "assistant": "Assistant",
       "meetings": "Meetings"
     },
-    "open": "Open",
     "assistantCard": {
       "info": "Quick asks, and what you said on calls. These stay counted when you delete conversations.",
       "empty": "Ask the assistant something, or start a call, and it's counted here.",
-      "questions_one": "Question asked",
-      "questions_other": "Questions asked",
-      "calls_one": "Call",
-      "calls_other": "Calls",
-      "callTime": "Time on calls"
+      "noCalls": "No calls yet"
     },
     "meetingsCard": {
       "info": "Meetings you recorded. These stay counted when you delete a meeting.",
-      "empty": "Record a meeting and it's counted here.",
-      "meetings_one": "Meeting",
-      "meetings_other": "Meetings",
-      "time": "Time recorded",
-      "words_one": "Word transcribed",
-      "words_other": "Words transcribed"
+      "empty": "Record a meeting and it's counted here."
     },
     "share": {
       "button": "Share",
       "nothingYet": "There's something to share once you've used SpeakoFlow.",
       "title": "Share your insights",
-      "description": "Your numbers as an image, sized for wherever you post it.",
       "private": "Made on this computer. Nothing is uploaded.",
       "size": "Size",
       "formats": {
@@ -3478,18 +3464,10 @@
         "story": "1080 × 1920, for stories",
         "wide": "1600 × 900, for posts and links"
       },
-      "look": "Look",
-      "looks": {
-        "paper": "Paper",
-        "graphite": "Graphite",
-        "mint": "Mint",
-        "dusk": "Dusk"
-      },
-      "show": "Show",
-      "include": {
-        "assistant": "Show the assistant on the card",
-        "meetings": "Show meetings on the card"
-      },
+      "previous": "Previous card",
+      "next": "Next card",
+      "cardsLabel": "Cards",
+      "position": "Card {{index}} of {{count}}",
       "copy": "Copy image",
       "copied": "Copied",
       "copyFailed": "Couldn't copy the image",
@@ -3497,45 +3475,85 @@
       "saved": "Image saved",
       "saveFailed": "Couldn't save the image",
       "showInFolder": "Show in folder",
-      "drawFailed": "The card couldn't be drawn. Close this and try again.",
-      "since": "Since {{date}}",
-      "barsCaption_one": "The last {{count}} week, one bar a day",
-      "barsCaption_other": "The last {{count}} weeks, one bar a day",
+      "postOn": "Post on {{site}}",
+      "readyToPaste": "Image copied",
+      "pasteNow": "Paste it into your post with {{keys}}.",
+      "openFailed": "Couldn't open {{site}}",
+      "more": "More apps",
+      "sheetTitle": "My SpeakoFlow insights",
+      "shareFailed": "Couldn't open Share",
+      "drawFailed": "The cards couldn't be drawn. Close this and try again.",
       "tagline": "Free · Open source · Works offline",
-      "headline": {
-        "dictation": {
-          "lead_one": "word spoken,",
-          "lead_other": "words spoken,",
-          "accent": "not typed."
+      "cards": {
+        "highlights": {
+          "title": "My SpeakoFlow highlights",
+          "words_one": "word spoken",
+          "words_other": "words spoken",
+          "streak_one": "day streak",
+          "streak_other": "day streak",
+          "wpm": "words per minute",
+          "questions_one": "question asked",
+          "questions_other": "questions asked",
+          "meetings_one": "meeting recorded",
+          "meetings_other": "meetings recorded",
+          "saved": "saved vs. typing"
         },
-        "asks": {
-          "lead_one": "question asked,",
-          "lead_other": "questions asked,",
-          "accent": "no tab switching."
+        "words": {
+          "title": "Spoken, not typed",
+          "label_one": "word spoken",
+          "label_other": "words spoken",
+          "pages_one": "About {{count}} page",
+          "pages_other": "About {{count}} pages",
+          "books_one": "As long as a whole novel",
+          "books_other": "As long as {{count}} novels"
+        },
+        "speed": {
+          "title": "How fast I speak",
+          "label": "words per minute",
+          "note": "{{times}}× faster than typing",
+          "you": "Speaking",
+          "typing": "Typical typing"
+        },
+        "saved": {
+          "title": "Time saved",
+          "label": "not spent typing",
+          "note": "Compared with typing at {{wpm}} words a minute"
+        },
+        "streak": {
+          "title": "On a roll",
+          "unit_one": "day",
+          "unit_other": "days",
+          "longest_one": "Longest streak: {{count}} day",
+          "longest_other": "Longest streak: {{count}} days",
+          "best": "My longest streak yet"
+        },
+        "assistant": {
+          "title": "My assistant",
+          "label_one": "question asked",
+          "label_other": "questions asked",
+          "calls_one": "{{count}} call, {{time}} talking",
+          "calls_other": "{{count}} calls, {{time}} talking"
         },
         "meetings": {
-          "lead_one": "meeting recorded,",
-          "lead_other": "meetings recorded,",
-          "accent": "notes written for me."
+          "title": "My meetings",
+          "label_one": "meeting recorded",
+          "label_other": "meetings recorded",
+          "note": "{{time}} recorded, {{words}} words written up",
+          "time": "{{time}} recorded and written up"
+        },
+        "activity": {
+          "title": "Six months of talking",
+          "label_one": "day active",
+          "label_other": "days active"
         }
       },
-      "fact": {
-        "saved": "saved vs. typing",
-        "wpm": "words a minute",
-        "questionsAsked_one": "question asked",
-        "questionsAsked_other": "questions asked",
-        "meetings_one": "meeting written up",
-        "meetings_other": "meetings written up",
-        "meetingTime": "of meetings recorded",
-        "meetingWords_one": "word transcribed",
-        "meetingWords_other": "words transcribed",
-        "callTime": "talking on calls",
-        "streak_one": "day streak",
-        "streak_other": "day streak",
-        "activeDays_one": "day talking to my computer",
-        "activeDays_other": "days talking to my computer",
-        "dictations_one": "dictation",
-        "dictations_other": "dictations"
+      "post": {
+        "dictation_one": "I've spoken {{formatted}} word to my computer instead of typing it, with SpeakoFlow.",
+        "dictation_other": "I've spoken {{formatted}} words to my computer instead of typing them, with SpeakoFlow.",
+        "asks_one": "I've asked SpeakoFlow's assistant {{formatted}} question without switching tabs.",
+        "asks_other": "I've asked SpeakoFlow's assistant {{formatted}} questions without switching tabs.",
+        "meetings_one": "SpeakoFlow has recorded {{formatted}} meeting and written the notes for me.",
+        "meetings_other": "SpeakoFlow has recorded {{formatted}} meetings and written the notes for me."
       }
     }
   },

@@ -3,26 +3,33 @@ import type { Insights } from "@/bindings";
 import {
   formatCount,
   formatShortDuration,
+  TYPING_WPM,
   timeSavedSeconds,
   wordsPerMinute,
 } from "../home/usageMath";
 import {
+  activitySeries,
   assistantQuestions,
-  featureSeries,
+  buildHeatmap,
+  pagesFor,
   recentValues,
-  type Feature,
+  type HeatLevel,
 } from "./insightsMath";
 
 /**
- * What the share card says, kept apart from how it is drawn (`shareCard.ts`)
- * so it can be tested without fonts, images or a canvas.
+ * What the share cards say, kept apart from how they are drawn
+ * (`shareCard.ts`) so it can be tested without fonts, images or a canvas.
+ *
+ * Sharing is a deck of cards, one insight each, the way a person would tell
+ * it: how much they have said, how fast, how much time it saved, how many
+ * days in a row, and what the assistant and meetings did. A card exists only
+ * when its number is worth showing, so a new user is never handed a card
+ * that says zero.
  */
 
 export type CardFormat = "square" | "story" | "wide";
-export type CardLook = "paper" | "graphite" | "mint" | "dusk";
 
 export const CARD_FORMATS: CardFormat[] = ["square", "story", "wide"];
-export const CARD_LOOKS: CardLook[] = ["paper", "graphite", "mint", "dusk"];
 
 export const CARD_SIZES: Record<CardFormat, { width: number; height: number }> =
   {
@@ -31,45 +38,82 @@ export const CARD_SIZES: Record<CardFormat, { width: number; height: number }> =
     wide: { width: 1600, height: 900 },
   };
 
-/** Days in the voiceprint: twelve weeks. */
-export const VOICEPRINT_DAYS = 84;
+export type CardKind =
+  | "highlights"
+  | "words"
+  | "speed"
+  | "saved"
+  | "streak"
+  | "assistant"
+  | "meetings"
+  | "activity";
 
-/** Where the card sends people. Not translated: it is an address. */
-export const CARD_SITE = "speakoflow.com";
+/** Where a post links to. The cards themselves carry only the logo: an
+ *  address printed on an image cannot be clicked. */
+export const SHARE_URL = "https://speakoflow.com";
 
-export interface CardFact {
+/** Words in a novel, near enough, for "as long as a novel". */
+export const NOVEL_WORDS = 80_000;
+
+/** Weeks of activity a card can show; each size draws as many as fit. */
+export const ACTIVITY_WEEKS = 26;
+
+export interface CardFigure {
   value: string;
   label: string;
 }
 
-export interface CardContent {
-  /** The headline figure, formatted. */
-  value: string;
-  /** The words after it, in ink. */
-  lead: string;
-  /** The end of the sentence, in the accent colour. */
-  accent: string;
-  /** Supporting figures, most telling first; each layout takes what it fits. */
-  facts: CardFact[];
-  /** The voiceprint: one value per day, oldest first. */
-  bars: number[];
-  barsCaption: string;
-  period: string;
+export interface SpeedCompare {
+  you: number;
+  typing: number;
+  youLabel: string;
+  typingLabel: string;
+}
+
+export interface ActivityGrid {
+  /** One column per week, oldest first, seven days each; -1 is a day still
+   *  to come. */
+  weeks: Array<Array<HeatLevel | -1>>;
+  /** The first column of each month, with its short name. */
+  months: Array<{ col: number; label: string }>;
+}
+
+export interface CardSlide {
+  kind: CardKind;
+  title: string;
+  /** The card's figure, when it has one. */
+  value?: string;
+  /** A word set beside the figure, as in "12 days". */
+  unit?: string;
+  /** What the figure counts, under it. */
+  label?: string;
+  /** One sentence under that. */
+  note?: string;
+  /** The highlights card's figures. */
+  items?: CardFigure[];
+  /** The speed card's comparison with typing. */
+  compare?: SpeedCompare;
+  /** The activity card's grid. */
+  activity?: ActivityGrid;
+  /** What a post that carries this card says, before the link. */
+  post: string;
+  /** The card as one sentence, for screen readers. */
+  alt: string;
+}
+
+export interface CardDeck {
+  slides: CardSlide[];
   tagline: string;
-  /** The whole card as one sentence, for screen readers. */
-  label: string;
+  /** The last seven days, oldest first, each 0 to 1 of the busiest: the
+   *  heights of the voice bars every card is drawn with. */
+  week: number[];
 }
 
-export interface CardInclude {
-  assistant: boolean;
-  meetings: boolean;
-}
-
-/** The headline figure in full ("99,812"): it is the number being shown off. */
-const headlineNumber = (value: number, locale: string): string => {
+/** A figure in full ("101,412"): it is the number being shown off. */
+const fullNumber = (value: number, locale: string): string => {
   try {
     return new Intl.NumberFormat(locale, {
-      notation: value >= 1_000_000 ? "compact" : "standard",
+      notation: value >= 10_000_000 ? "compact" : "standard",
       maximumFractionDigits: 1,
     }).format(value);
   } catch {
@@ -77,167 +121,263 @@ const headlineNumber = (value: number, locale: string): string => {
   }
 };
 
-/**
- * Which feature the card is about. Dictation, once there is enough of it to
- * show; otherwise whichever other feature was used.
- */
-export const leadActivity = (
-  insights: Insights,
-  include: CardInclude,
-): Feature | null => {
-  const words = insights.dictation.total_words;
-  const questions = include.assistant ? assistantQuestions(insights) : 0;
-  const meetings = include.meetings ? insights.meetings.meetings : 0;
-  if (words >= 100 || (words > 0 && questions === 0 && meetings === 0)) {
-    return "dictation";
-  }
-  if (questions > 0) return "assistant";
-  if (meetings > 0) return "meetings";
-  return words > 0 ? "dictation" : null;
-};
-
-/** The headline strings for each lead feature. */
-const HEADLINE_KEYS: Record<Feature, string> = {
-  dictation: "dictation",
-  assistant: "asks",
-  meetings: "meetings",
-};
-
-/** Everything the card says, or null when there is nothing to show yet. */
-export const buildCardContent = (
+/** Every card worth sharing for these numbers, in the order they are told. */
+export const buildCardDeck = (
   insights: Insights,
   t: TFunction,
   locale: string,
-  include: CardInclude,
   now: Date = new Date(),
-): CardContent | null => {
-  const lead = leadActivity(insights, include);
-  if (!lead) return null;
-
+): CardDeck => {
   const { dictation, assistant, meetings } = insights;
+  const words = dictation.total_words;
   const questions = assistantQuestions(insights);
+  const wpm = words > 0 ? wordsPerMinute(dictation) : null;
+  const saved = words > 0 ? timeSavedSeconds(dictation) : 0;
+  const streak = insights.current_streak_days;
   const count = (value: number) => formatCount(value, locale);
+  const full = (value: number) => fullNumber(value, locale);
 
-  let value: number;
-  switch (lead) {
-    case "dictation":
-      value = dictation.total_words;
-      break;
-    case "assistant":
-      value = questions;
-      break;
-    case "meetings":
-      value = meetings.meetings;
-      break;
-  }
+  const postFor = (key: "dictation" | "asks" | "meetings", value: number) =>
+    t(`insights.share.post.${key}`, { count: value, formatted: full(value) });
+  const leadPost =
+    words > 0
+      ? postFor("dictation", words)
+      : questions > 0
+        ? postFor("asks", questions)
+        : postFor("meetings", meetings.meetings);
+  const alt = (...parts: Array<string | undefined>) =>
+    parts.filter(Boolean).join(". ");
 
-  const facts: CardFact[] = [];
-  const saved = timeSavedSeconds(dictation);
-  const wpm = wordsPerMinute(dictation);
-  if (dictation.total_words > 0 && saved >= 60) {
-    facts.push({
-      value: formatShortDuration(saved, t),
-      label: t("insights.share.fact.saved"),
+  const slides: CardSlide[] = [];
+
+  // Highlights: up to four figures, the ones there are.
+  const items: CardFigure[] = [];
+  if (words > 0) {
+    items.push({
+      value: full(words),
+      label: t("insights.share.cards.highlights.words", { count: words }),
     });
   }
-  if (include.assistant && questions > 0 && lead !== "assistant") {
-    facts.push({
-      value: count(questions),
-      label: t("insights.share.fact.questionsAsked", { count: questions }),
+  if (streak >= 1) {
+    items.push({
+      value: count(streak),
+      label: t("insights.share.cards.highlights.streak", { count: streak }),
     });
   }
-  if (include.meetings && meetings.meetings > 0 && lead !== "meetings") {
-    facts.push({
-      value: count(meetings.meetings),
-      label: t("insights.share.fact.meetings", { count: meetings.meetings }),
-    });
-  }
-  if (lead === "meetings" && meetings.seconds >= 60) {
-    facts.push({
-      value: formatShortDuration(meetings.seconds, t),
-      label: t("insights.share.fact.meetingTime"),
-    });
-  }
-  if (lead === "meetings" && meetings.words > 0) {
-    facts.push({
-      value: count(meetings.words),
-      label: t("insights.share.fact.meetingWords", { count: meetings.words }),
-    });
-  }
-  if (lead === "assistant" && assistant.call_seconds >= 60) {
-    facts.push({
-      value: formatShortDuration(assistant.call_seconds, t),
-      label: t("insights.share.fact.callTime"),
-    });
-  }
-  if (wpm !== null && dictation.total_words > 0) {
-    facts.push({
+  if (wpm !== null) {
+    items.push({
       value: String(wpm),
-      label: t("insights.share.fact.wpm"),
+      label: t("insights.share.cards.highlights.wpm"),
     });
   }
-  if (insights.current_streak_days >= 2) {
-    facts.push({
-      value: count(insights.current_streak_days),
-      label: t("insights.share.fact.streak", {
-        count: insights.current_streak_days,
+  if (questions > 0) {
+    items.push({
+      value: full(questions),
+      label: t("insights.share.cards.highlights.questions", {
+        count: questions,
       }),
     });
   }
-  if (insights.active_days >= 2) {
-    facts.push({
-      value: count(insights.active_days),
-      label: t("insights.share.fact.activeDays", {
-        count: insights.active_days,
+  if (meetings.meetings > 0) {
+    items.push({
+      value: full(meetings.meetings),
+      label: t("insights.share.cards.highlights.meetings", {
+        count: meetings.meetings,
       }),
     });
   }
-  if (lead === "dictation" && dictation.total_dictations > 0) {
-    facts.push({
-      value: count(dictation.total_dictations),
-      label: t("insights.share.fact.dictations", {
-        count: dictation.total_dictations,
-      }),
+  if (saved >= 60) {
+    items.push({
+      value: formatShortDuration(saved, t),
+      label: t("insights.share.cards.highlights.saved"),
+    });
+  }
+  const shown = items.slice(0, 4);
+  if (shown.length >= 2) {
+    const title = t("insights.share.cards.highlights.title");
+    slides.push({
+      kind: "highlights",
+      title,
+      items: shown,
+      post: leadPost,
+      alt: alt(title, ...shown.map((item) => `${item.value} ${item.label}`)),
     });
   }
 
-  const first = insights.first_day
-    ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(insights.first_day)
-    : null;
-  let period = "";
-  if (first) {
+  if (words > 0) {
+    const title = t("insights.share.cards.words.title");
+    const label = t("insights.share.cards.words.label", { count: words });
+    const note =
+      words >= NOVEL_WORDS
+        ? t("insights.share.cards.words.books", {
+            count: Math.floor(words / NOVEL_WORDS),
+          })
+        : pagesFor(words) >= 1
+          ? t("insights.share.cards.words.pages", { count: pagesFor(words) })
+          : undefined;
+    slides.push({
+      kind: "words",
+      title,
+      value: full(words),
+      label,
+      note,
+      post: postFor("dictation", words),
+      alt: alt(title, `${full(words)} ${label}`, note),
+    });
+  }
+
+  if (wpm !== null) {
+    const title = t("insights.share.cards.speed.title");
+    const label = t("insights.share.cards.speed.label");
+    const note =
+      wpm > TYPING_WPM
+        ? t("insights.share.cards.speed.note", {
+            times: (wpm / TYPING_WPM).toFixed(1),
+          })
+        : undefined;
+    slides.push({
+      kind: "speed",
+      title,
+      value: String(wpm),
+      label,
+      note,
+      compare: {
+        you: wpm,
+        typing: TYPING_WPM,
+        youLabel: t("insights.share.cards.speed.you"),
+        typingLabel: t("insights.share.cards.speed.typing"),
+      },
+      post: postFor("dictation", words),
+      alt: alt(title, `${wpm} ${label}`, note),
+    });
+  }
+
+  if (saved >= 60) {
+    const title = t("insights.share.cards.saved.title");
+    const label = t("insights.share.cards.saved.label");
+    const note = t("insights.share.cards.saved.note", { wpm: TYPING_WPM });
+    const value = formatShortDuration(saved, t);
+    slides.push({
+      kind: "saved",
+      title,
+      value,
+      label,
+      note,
+      post: postFor("dictation", words),
+      alt: alt(title, `${value} ${label}`, note),
+    });
+  }
+
+  if (streak >= 2) {
+    const title = t("insights.share.cards.streak.title");
+    const unit = t("insights.share.cards.streak.unit", { count: streak });
+    const note =
+      insights.longest_streak_days > streak
+        ? t("insights.share.cards.streak.longest", {
+            count: insights.longest_streak_days,
+          })
+        : t("insights.share.cards.streak.best");
+    slides.push({
+      kind: "streak",
+      title,
+      value: count(streak),
+      unit,
+      note,
+      post: leadPost,
+      alt: alt(title, `${count(streak)} ${unit}`, note),
+    });
+  }
+
+  if (questions > 0) {
+    const title = t("insights.share.cards.assistant.title");
+    const label = t("insights.share.cards.assistant.label", {
+      count: questions,
+    });
+    const note =
+      assistant.calls > 0
+        ? t("insights.share.cards.assistant.calls", {
+            count: assistant.calls,
+            time: formatShortDuration(assistant.call_seconds, t),
+          })
+        : undefined;
+    slides.push({
+      kind: "assistant",
+      title,
+      value: full(questions),
+      label,
+      note,
+      post: postFor("asks", questions),
+      alt: alt(title, `${full(questions)} ${label}`, note),
+    });
+  }
+
+  if (meetings.meetings > 0) {
+    const title = t("insights.share.cards.meetings.title");
+    const label = t("insights.share.cards.meetings.label", {
+      count: meetings.meetings,
+    });
+    const note =
+      meetings.seconds >= 60
+        ? meetings.words > 0
+          ? t("insights.share.cards.meetings.note", {
+              time: formatShortDuration(meetings.seconds, t),
+              words: count(meetings.words),
+            })
+          : t("insights.share.cards.meetings.time", {
+              time: formatShortDuration(meetings.seconds, t),
+            })
+        : undefined;
+    slides.push({
+      kind: "meetings",
+      title,
+      value: full(meetings.meetings),
+      label,
+      note,
+      post: postFor("meetings", meetings.meetings),
+      alt: alt(title, `${full(meetings.meetings)} ${label}`, note),
+    });
+  }
+
+  const map = buildHeatmap(
+    activitySeries(insights, "all"),
+    ACTIVITY_WEEKS,
+    now,
+  );
+  if (map.activeDays >= 2) {
+    const title = t("insights.share.cards.activity.title");
+    const label = t("insights.share.cards.activity.label", {
+      count: map.activeDays,
+    });
+    let monthName: Intl.DateTimeFormat | null = null;
     try {
-      period = t("insights.share.since", {
-        date: new Intl.DateTimeFormat(locale, {
-          month: "long",
-          year: "numeric",
-        }).format(new Date(Number(first[1]), Number(first[2]) - 1, 1)),
-      });
+      monthName = new Intl.DateTimeFormat(locale, { month: "short" });
     } catch {
-      period = "";
+      monthName = null;
     }
+    slides.push({
+      kind: "activity",
+      title,
+      value: count(map.activeDays),
+      label,
+      activity: {
+        weeks: map.weeks.map((column) =>
+          column.map((cell) => (cell.future ? -1 : cell.level)),
+        ),
+        months: map.months.map(({ col, date }) => ({
+          col,
+          label: monthName ? monthName.format(date) : "",
+        })),
+      },
+      post: leadPost,
+      alt: alt(title, `${count(map.activeDays)} ${label}`),
+    });
   }
 
-  const key = HEADLINE_KEYS[lead];
-  const headline = {
-    value: headlineNumber(value, locale),
-    lead: t(`insights.share.headline.${key}.lead`, { count: value }),
-    accent: t(`insights.share.headline.${key}.accent`, { count: value }),
-  };
-  const summary = [
-    `${headline.value} ${headline.lead} ${headline.accent}`,
-    ...facts.slice(0, 4).map((fact) => `${fact.value} ${fact.label}`),
-  ].join(". ");
-
+  const recent = recentValues(activitySeries(insights, "all"), 7, now);
+  const busiest = Math.max(...recent);
   return {
-    ...headline,
-    facts,
-    bars: recentValues(featureSeries(insights, lead), VOICEPRINT_DAYS, now),
-    barsCaption: t("insights.share.barsCaption", {
-      count: VOICEPRINT_DAYS / 7,
-    }),
-    period,
+    slides,
     tagline: t("insights.share.tagline"),
-    label: `${summary}. ${CARD_SITE}`,
+    week: recent.map((value) => (busiest > 0 ? value / busiest : 0)),
   };
 };

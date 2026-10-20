@@ -3423,12 +3423,12 @@
     "about": "Votre utilisation de SpeakoFlow, comptabilisée sur cet ordinateur.",
     "nothingYet": "Vos statistiques apparaîtront dès que vous dicterez, poserez une question à l'assistant ou enregistrerez une réunion.",
     "goHome": "Voir vos raccourcis",
-    "dictations": "Dictées",
-    "today": "{{words}} mots aujourd'hui",
+    "dictationsSoFar_one": "{{formatted}} dictée jusqu'à présent",
+    "dictationsSoFar_many": "{{formatted}} de dictées jusqu'à présent",
+    "dictationsSoFar_other": "{{formatted}} dictées jusqu'à présent",
     "pages_one": "Environ {{count}} page",
     "pages_many": "Environ {{count}} de pages",
     "pages_other": "Environ {{count}} pages",
-    "fasterThanTyping": "{{times}}× plus rapide que la saisie au clavier",
     "streak_one": "{{count}} jour d'affilée",
     "streak_many": "{{count}} de jours d'affilée",
     "streak_other": "{{count}} jours d'affilée",
@@ -3471,8 +3471,6 @@
       "assistant": "Les jours où vous posez des questions",
       "meetings": "Les jours de réunion"
     },
-    "activeDays": "Jours d'activité",
-    "activeDaysSub": "Ces 6 derniers mois",
     "activity": {
       "label": "Activité à afficher",
       "all": "Tout",
@@ -3480,34 +3478,19 @@
       "assistant": "Assistant",
       "meetings": "Réunions"
     },
-    "open": "Ouvrir",
     "assistantCard": {
       "info": "Vos questions rapides et ce que vous avez dit en conversation. Le décompte est conservé même si vous supprimez des conversations.",
       "empty": "Posez une question à l'assistant ou lancez une conversation : tout est compté ici.",
-      "questions_one": "Question posée",
-      "questions_many": "Questions posées",
-      "questions_other": "Questions posées",
-      "calls_one": "Conversation",
-      "calls_many": "Conversations",
-      "calls_other": "Conversations",
-      "callTime": "Temps en conversation"
+      "noCalls": "Aucune conversation pour l'instant"
     },
     "meetingsCard": {
       "info": "Les réunions que vous avez enregistrées. Le décompte est conservé même si vous supprimez une réunion.",
-      "empty": "Enregistrez une réunion et elle sera comptée ici.",
-      "meetings_one": "Réunion",
-      "meetings_many": "Réunions",
-      "meetings_other": "Réunions",
-      "time": "Temps enregistré",
-      "words_one": "Mot transcrit",
-      "words_many": "Mots transcrits",
-      "words_other": "Mots transcrits"
+      "empty": "Enregistrez une réunion et elle sera comptée ici."
     },
     "share": {
       "button": "Partager",
       "nothingYet": "Vous aurez quelque chose à partager une fois que vous aurez utilisé SpeakoFlow.",
       "title": "Partagez vos statistiques",
-      "description": "Vos chiffres sous forme d'image, au format adapté à l'endroit où vous la publiez.",
       "private": "Créée sur cet ordinateur. Rien n'est envoyé en ligne.",
       "size": "Taille",
       "formats": {
@@ -3520,18 +3503,10 @@
         "story": "1080 × 1920, pour les stories",
         "wide": "1600 × 900, pour les publications et les liens"
       },
-      "look": "Style",
-      "looks": {
-        "paper": "Papier",
-        "graphite": "Graphite",
-        "mint": "Menthe",
-        "dusk": "Crépuscule"
-      },
-      "show": "Afficher",
-      "include": {
-        "assistant": "Afficher l'assistant sur la carte",
-        "meetings": "Afficher les réunions sur la carte"
-      },
+      "previous": "Carte précédente",
+      "next": "Carte suivante",
+      "cardsLabel": "Cartes",
+      "position": "Carte {{index}} sur {{count}}",
       "copy": "Copier l'image",
       "copied": "Copiée",
       "copyFailed": "Impossible de copier l'image",
@@ -3539,55 +3514,101 @@
       "saved": "Image enregistrée",
       "saveFailed": "Impossible d'enregistrer l'image",
       "showInFolder": "Afficher dans le dossier",
-      "drawFailed": "Impossible de générer la carte. Fermez cette fenêtre et réessayez.",
-      "since": "Depuis {{date}}",
-      "barsCaption_one": "La dernière semaine, une barre par jour",
-      "barsCaption_many": "Les {{count}} dernières semaines, une barre par jour",
-      "barsCaption_other": "Les {{count}} dernières semaines, une barre par jour",
+      "postOn": "Publier sur {{site}}",
+      "readyToPaste": "Image copiée",
+      "pasteNow": "Collez-la dans votre publication avec {{keys}}.",
+      "openFailed": "Impossible d'ouvrir {{site}}",
+      "more": "Autres applications",
+      "sheetTitle": "Mes statistiques SpeakoFlow",
+      "shareFailed": "Impossible d'ouvrir le partage",
+      "drawFailed": "Impossible de générer les cartes. Fermez cette fenêtre et réessayez.",
       "tagline": "Gratuit · Open source · Fonctionne hors ligne",
-      "headline": {
-        "dictation": {
-          "lead_one": "mot prononcé,",
-          "lead_many": "de mots prononcés,",
-          "lead_other": "mots prononcés,",
-          "accent": "sans clavier."
+      "cards": {
+        "highlights": {
+          "title": "Mon bilan SpeakoFlow",
+          "words_one": "mot dicté",
+          "words_many": "mots dictés",
+          "words_other": "mots dictés",
+          "streak_one": "jour d'affilée",
+          "streak_many": "jours d'affilée",
+          "streak_other": "jours d'affilée",
+          "wpm": "mots par minute",
+          "questions_one": "question posée",
+          "questions_many": "questions posées",
+          "questions_other": "questions posées",
+          "meetings_one": "réunion enregistrée",
+          "meetings_many": "réunions enregistrées",
+          "meetings_other": "réunions enregistrées",
+          "saved": "de saisie en moins"
         },
-        "asks": {
-          "lead_one": "question posée,",
-          "lead_many": "de questions posées,",
-          "lead_other": "questions posées,",
-          "accent": "sans changer d'onglet."
+        "words": {
+          "title": "Dicté, pas tapé",
+          "label_one": "mot dicté",
+          "label_many": "mots dictés",
+          "label_other": "mots dictés",
+          "pages_one": "Environ {{count}} page",
+          "pages_many": "Environ {{count}} de pages",
+          "pages_other": "Environ {{count}} pages",
+          "books_one": "L'équivalent d'un roman entier",
+          "books_many": "L'équivalent de {{count}} de romans",
+          "books_other": "L'équivalent de {{count}} romans"
+        },
+        "speed": {
+          "title": "Ma vitesse de parole",
+          "label": "mots par minute",
+          "note": "{{times}}× plus rapide qu'au clavier",
+          "you": "À l'oral",
+          "typing": "Frappe moyenne"
+        },
+        "saved": {
+          "title": "Temps gagné",
+          "label": "de saisie évitée",
+          "note": "Par rapport à une saisie à {{wpm}} mots par minute"
+        },
+        "streak": {
+          "title": "Sur ma lancée",
+          "unit_one": "jour",
+          "unit_many": "jours",
+          "unit_other": "jours",
+          "longest_one": "Record : {{count}} jour",
+          "longest_many": "Record : {{count}} de jours",
+          "longest_other": "Record : {{count}} jours",
+          "best": "Ma plus longue série à ce jour"
+        },
+        "assistant": {
+          "title": "Mon assistant",
+          "label_one": "question posée",
+          "label_many": "questions posées",
+          "label_other": "questions posées",
+          "calls_one": "{{count}} conversation, {{time}} de discussion",
+          "calls_many": "{{count}} de conversations, {{time}} de discussion",
+          "calls_other": "{{count}} conversations, {{time}} de discussion"
         },
         "meetings": {
-          "lead_one": "réunion enregistrée,",
-          "lead_many": "de réunions enregistrées,",
-          "lead_other": "réunions enregistrées,",
-          "accent": "notes prises pour moi."
+          "title": "Mes réunions",
+          "label_one": "réunion enregistrée",
+          "label_many": "réunions enregistrées",
+          "label_other": "réunions enregistrées",
+          "note": "{{time}} d'audio, {{words}} mots transcrits",
+          "time": "{{time}} d'audio enregistré et transcrit"
+        },
+        "activity": {
+          "title": "Six mois à parler",
+          "label_one": "jour actif",
+          "label_many": "jours actifs",
+          "label_other": "jours actifs"
         }
       },
-      "fact": {
-        "saved": "de gagné face au clavier",
-        "wpm": "mots par minute",
-        "questionsAsked_one": "question posée",
-        "questionsAsked_many": "de questions posées",
-        "questionsAsked_other": "questions posées",
-        "meetings_one": "réunion résumée",
-        "meetings_many": "de réunions résumées",
-        "meetings_other": "réunions résumées",
-        "meetingTime": "de réunions enregistrées",
-        "meetingWords_one": "mot transcrit",
-        "meetingWords_many": "de mots transcrits",
-        "meetingWords_other": "mots transcrits",
-        "callTime": "en conversation",
-        "streak_one": "jour d'affilée",
-        "streak_many": "de jours d'affilée",
-        "streak_other": "jours d'affilée",
-        "activeDays_one": "jour à parler à mon ordinateur",
-        "activeDays_many": "de jours à parler à mon ordinateur",
-        "activeDays_other": "jours à parler à mon ordinateur",
-        "dictations_one": "dictée",
-        "dictations_many": "de dictées",
-        "dictations_other": "dictées"
+      "post": {
+        "dictation_one": "J'ai dicté {{formatted}} mot à mon ordinateur au lieu de le taper, grâce à SpeakoFlow.",
+        "dictation_many": "J'ai dicté {{formatted}} de mots à mon ordinateur au lieu de les taper, grâce à SpeakoFlow.",
+        "dictation_other": "J'ai dicté {{formatted}} mots à mon ordinateur au lieu de les taper, grâce à SpeakoFlow.",
+        "asks_one": "J'ai posé {{formatted}} question à l'assistant de SpeakoFlow sans changer d'onglet.",
+        "asks_many": "J'ai posé {{formatted}} de questions à l'assistant de SpeakoFlow sans changer d'onglet.",
+        "asks_other": "J'ai posé {{formatted}} questions à l'assistant de SpeakoFlow sans changer d'onglet.",
+        "meetings_one": "SpeakoFlow a enregistré {{formatted}} réunion et pris les notes à ma place.",
+        "meetings_many": "SpeakoFlow a enregistré {{formatted}} de réunions et pris les notes à ma place.",
+        "meetings_other": "SpeakoFlow a enregistré {{formatted}} réunions et pris les notes à ma place."
       }
     }
   },

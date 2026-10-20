@@ -1912,6 +1912,20 @@ async copyInsightsCard(pngBase64: string) : Promise<Result<null, string>> {
 }
 },
 /**
+ * Hand a share card to the system's share sheet (Windows' Share panel, the
+ * macOS Share menu beside `anchor`). The image is written to the app's cache
+ * first, under a name the receiving app may show, because the sheet passes
+ * files rather than pixels.
+ */
+async shareInsightsCard(pngBase64: string, title: string, anchor: ShareAnchor) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("share_insights_card", { pngBase64, title, anchor }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Send a typed message to the assistant (keyboard alternative to voice).
  * 
  * A typed quick ask is one job, exactly like a spoken one, so it starts from an
@@ -5819,6 +5833,12 @@ export type SettingsNoticeKind =
  * Saving has been failing. Cleared by the next save that works.
  */
 "save_failing"
+/**
+ * Where the button that opened the sheet is, in the webview's CSS pixels
+ * from its top left. The macOS menu opens beside it; Windows places its
+ * panel itself.
+ */
+export type ShareAnchor = { x: number; y: number; width: number; height: number }
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string; 
 /**
  * A second set of keys that does exactly what `current_binding` does, or

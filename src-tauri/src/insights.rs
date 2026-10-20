@@ -246,6 +246,42 @@ pub fn copy_insights_card(app: AppHandle, png_base64: String) -> Result<(), Stri
         .map_err(|e| format!("Could not copy the image: {e}"))
 }
 
+/// Hand a share card to the system's share sheet (Windows' Share panel, the
+/// macOS Share menu beside `anchor`). The image is written to the app's cache
+/// first, under a name the receiving app may show, because the sheet passes
+/// files rather than pixels.
+#[tauri::command]
+#[specta::specta]
+pub async fn share_insights_card(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    png_base64: String,
+    title: String,
+    anchor: crate::share_sheet::ShareAnchor,
+) -> Result<(), String> {
+    let bytes = decode_card(&png_base64)?;
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("share");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not prepare the image: {e}"))?;
+    let mut file = dir.join("SpeakoFlow insights.png");
+    // An app may still be reading the last one; a fresh name never collides.
+    if std::fs::write(&file, &bytes).is_err() {
+        file = dir.join(format!(
+            "SpeakoFlow insights {}.png",
+            chrono::Local::now().format("%Y-%m-%d %H%M%S")
+        ));
+        std::fs::write(&file, &bytes).map_err(|e| format!("Could not prepare the image: {e}"))?;
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::share_sheet::show(&window, &file, &title, anchor)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

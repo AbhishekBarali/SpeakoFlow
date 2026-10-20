@@ -3394,11 +3394,10 @@
     "about": "SpeakoFlow'u nasıl kullandığınız, bu bilgisayarda sayılır.",
     "nothingYet": "Dikte ettiğinizde, asistana sorduğunuzda ya da bir toplantı kaydettiğinizde istatistikleriniz görünür.",
     "goHome": "Kısayolları göster",
-    "dictations": "Dikteler",
-    "today": "Bugün {{words}} kelime",
+    "dictationsSoFar_one": "Şu ana kadar {{formatted}} dikte",
+    "dictationsSoFar_other": "Şu ana kadar {{formatted}} dikte",
     "pages_one": "Yaklaşık {{count}} sayfa",
     "pages_other": "Yaklaşık {{count}} sayfa",
-    "fasterThanTyping": "Klavyeyle yazmaktan {{times}}× daha hızlı",
     "streak_one": "{{count}} günlük seri",
     "streak_other": "{{count}} günlük seri",
     "longest_one": "En uzun: {{count}} gün",
@@ -3433,8 +3432,6 @@
       "assistant": "Soru sorduğunuz günlerde",
       "meetings": "Toplantı olan günlerde"
     },
-    "activeDays": "Aktif günler",
-    "activeDaysSub": "Son 6 ayda",
     "activity": {
       "label": "Gösterilecek etkinlik",
       "all": "Tümü",
@@ -3442,30 +3439,19 @@
       "assistant": "Asistan",
       "meetings": "Toplantılar"
     },
-    "open": "Aç",
     "assistantCard": {
       "info": "Hızlı sorular ve sesli sohbetlerde söyledikleriniz. Sohbetleri silseniz de sayılmaya devam eder.",
       "empty": "Asistana bir şey sorun ya da bir sohbet başlatın; burada sayılır.",
-      "questions_one": "Sorulan soru",
-      "questions_other": "Sorulan sorular",
-      "calls_one": "Sohbet",
-      "calls_other": "Sohbetler",
-      "callTime": "Sohbet süresi"
+      "noCalls": "Henüz sesli sohbet yok"
     },
     "meetingsCard": {
       "info": "Kaydettiğiniz toplantılar. Bir toplantıyı silseniz de sayılmaya devam eder.",
-      "empty": "Bir toplantı kaydedin; burada sayılır.",
-      "meetings_one": "Toplantı",
-      "meetings_other": "Toplantılar",
-      "time": "Kayıt süresi",
-      "words_one": "Yazıya dökülen kelime",
-      "words_other": "Yazıya dökülen kelimeler"
+      "empty": "Bir toplantı kaydedin; burada sayılır."
     },
     "share": {
       "button": "Paylaş",
       "nothingYet": "SpeakoFlow'u kullanmaya başladığınızda paylaşacak bir şeyiniz olur.",
       "title": "İstatistiklerinizi paylaşın",
-      "description": "Rakamlarınız bir görsel olarak, paylaşacağınız yere uygun boyutta.",
       "private": "Bu bilgisayarda oluşturulur. Hiçbir şey yüklenmez.",
       "size": "Boyut",
       "formats": {
@@ -3478,18 +3464,10 @@
         "story": "1080 × 1920, hikâyeler için",
         "wide": "1600 × 900, gönderiler ve bağlantılar için"
       },
-      "look": "Görünüm",
-      "looks": {
-        "paper": "Kâğıt",
-        "graphite": "Grafit",
-        "mint": "Nane",
-        "dusk": "Alacakaranlık"
-      },
-      "show": "Göster",
-      "include": {
-        "assistant": "Kartta asistanı göster",
-        "meetings": "Kartta toplantıları göster"
-      },
+      "previous": "Önceki kart",
+      "next": "Sonraki kart",
+      "cardsLabel": "Kartlar",
+      "position": "Kart {{index}} / {{count}}",
       "copy": "Görseli kopyala",
       "copied": "Kopyalandı",
       "copyFailed": "Görsel kopyalanamadı",
@@ -3497,45 +3475,85 @@
       "saved": "Görsel kaydedildi",
       "saveFailed": "Görsel kaydedilemedi",
       "showInFolder": "Klasörde göster",
-      "drawFailed": "Kart çizilemedi. Bunu kapatıp tekrar deneyin.",
-      "since": "{{date}} tarihinden beri",
-      "barsCaption_one": "Son {{count}} hafta, her gün bir çubuk",
-      "barsCaption_other": "Son {{count}} hafta, her gün bir çubuk",
+      "postOn": "{{site}} üzerinde paylaş",
+      "readyToPaste": "Görsel kopyalandı",
+      "pasteNow": "{{keys}} ile gönderinize yapıştırın.",
+      "openFailed": "{{site}} açılamadı",
+      "more": "Diğer uygulamalar",
+      "sheetTitle": "SpeakoFlow istatistiklerim",
+      "shareFailed": "Paylaşım penceresi açılamadı",
+      "drawFailed": "Kartlar çizilemedi. Bunu kapatıp tekrar deneyin.",
       "tagline": "Ücretsiz · Açık kaynak · Çevrimdışı çalışır",
-      "headline": {
-        "dictation": {
-          "lead_one": "kelime söyledim,",
-          "lead_other": "kelime söyledim,",
-          "accent": "yazmadım."
+      "cards": {
+        "highlights": {
+          "title": "SpeakoFlow özetim",
+          "words_one": "konuşulan kelime",
+          "words_other": "konuşulan kelime",
+          "streak_one": "günlük seri",
+          "streak_other": "günlük seri",
+          "wpm": "dakika başına kelime",
+          "questions_one": "asistana sorulan soru",
+          "questions_other": "asistana sorulan soru",
+          "meetings_one": "kaydedilen toplantı",
+          "meetings_other": "kaydedilen toplantı",
+          "saved": "yazmaya kıyasla kazanıldı"
         },
-        "asks": {
-          "lead_one": "soru sordum,",
-          "lead_other": "soru sordum,",
-          "accent": "sekme değiştirmeden."
+        "words": {
+          "title": "Konuştum, yazmadım",
+          "label_one": "konuşulan kelime",
+          "label_other": "konuşulan kelime",
+          "pages_one": "Yaklaşık {{count}} sayfa",
+          "pages_other": "Yaklaşık {{count}} sayfa",
+          "books_one": "Koca bir roman uzunluğunda",
+          "books_other": "{{count}} roman uzunluğunda"
+        },
+        "speed": {
+          "title": "Konuşma hızım",
+          "label": "dakika başına kelime",
+          "note": "Yazmaktan {{times}}× daha hızlı",
+          "you": "Konuşma",
+          "typing": "Ortalama yazma"
+        },
+        "saved": {
+          "title": "Kazandığım zaman",
+          "label": "klavye başında geçmedi",
+          "note": "Dakikada {{wpm}} kelime yazmaya kıyasla"
+        },
+        "streak": {
+          "title": "Durmak yok",
+          "unit_one": "gün",
+          "unit_other": "gün",
+          "longest_one": "En uzun seri: {{count}} gün",
+          "longest_other": "En uzun seri: {{count}} gün",
+          "best": "Şimdiye kadarki en uzun serim"
+        },
+        "assistant": {
+          "title": "Asistanım",
+          "label_one": "sorduğum soru",
+          "label_other": "sorduğum soru",
+          "calls_one": "{{count}} sesli sohbet, {{time}} konuşma",
+          "calls_other": "{{count}} sesli sohbet, {{time}} konuşma"
         },
         "meetings": {
-          "lead_one": "toplantı kaydettim,",
-          "lead_other": "toplantı kaydettim,",
-          "accent": "notlar benim yerime yazıldı."
+          "title": "Toplantılarım",
+          "label_one": "kaydettiğim toplantı",
+          "label_other": "kaydettiğim toplantı",
+          "note": "{{time}} kayıt, {{words}} kelime yazıya döküldü",
+          "time": "{{time}} kaydedildi ve yazıya döküldü"
+        },
+        "activity": {
+          "title": "Altı aylık konuşma",
+          "label_one": "aktif gün",
+          "label_other": "aktif gün"
         }
       },
-      "fact": {
-        "saved": "yazmaya kıyasla kazanıldı",
-        "wpm": "dakika başına kelime",
-        "questionsAsked_one": "sorulan soru",
-        "questionsAsked_other": "sorulan soru",
-        "meetings_one": "notu çıkarılan toplantı",
-        "meetings_other": "notu çıkarılan toplantı",
-        "meetingTime": "kaydedilen toplantı",
-        "meetingWords_one": "yazıya dökülen kelime",
-        "meetingWords_other": "yazıya dökülen kelime",
-        "callTime": "sesli sohbet",
-        "streak_one": "günlük seri",
-        "streak_other": "günlük seri",
-        "activeDays_one": "gün bilgisayarımla konuştum",
-        "activeDays_other": "gün bilgisayarımla konuştum",
-        "dictations_one": "dikte",
-        "dictations_other": "dikte"
+      "post": {
+        "dictation_one": "SpeakoFlow sayesinde {{formatted}} kelimeyi bilgisayarıma yazmak yerine söyledim.",
+        "dictation_other": "SpeakoFlow sayesinde {{formatted}} kelimeyi bilgisayarıma yazmak yerine söyledim.",
+        "asks_one": "Sekme değiştirmeden SpeakoFlow'un asistanına {{formatted}} soru sordum.",
+        "asks_other": "Sekme değiştirmeden SpeakoFlow'un asistanına {{formatted}} soru sordum.",
+        "meetings_one": "SpeakoFlow {{formatted}} toplantımı kaydetti ve notlarını benim yerime yazdı.",
+        "meetings_other": "SpeakoFlow {{formatted}} toplantımı kaydetti ve notlarını benim yerime yazdı."
       }
     }
   },

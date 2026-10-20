@@ -3394,11 +3394,10 @@
     "about": "Hur du använder SpeakoFlow, räknat på den här datorn.",
     "nothingYet": "Din statistik visas när du har dikterat, frågat assistenten eller spelat in ett möte.",
     "goHome": "Visa dina kortkommandon",
-    "dictations": "Dikteringar",
-    "today": "{{words}} ord i dag",
+    "dictationsSoFar_one": "{{formatted}} diktering hittills",
+    "dictationsSoFar_other": "{{formatted}} dikteringar hittills",
     "pages_one": "Ungefär {{count}} sida",
     "pages_other": "Ungefär {{count}} sidor",
-    "fasterThanTyping": "{{times}}× snabbare än att skriva",
     "streak_one": "{{count}} dag i rad",
     "streak_other": "{{count}} dagar i rad",
     "longest_one": "Längst: {{count}} dag",
@@ -3433,8 +3432,6 @@
       "assistant": "Dagar du frågar",
       "meetings": "Dagar med möte"
     },
-    "activeDays": "Aktiva dagar",
-    "activeDaysSub": "De senaste 6 månaderna",
     "activity": {
       "label": "Aktivitet att visa",
       "all": "Allt",
@@ -3442,30 +3439,19 @@
       "assistant": "Assistent",
       "meetings": "Möten"
     },
-    "open": "Öppna",
     "assistantCard": {
       "info": "Snabba frågor och det du sa i konversationer. De räknas kvar även när du tar bort konversationer.",
       "empty": "Fråga assistenten något eller starta en konversation, så räknas det här.",
-      "questions_one": "Ställd fråga",
-      "questions_other": "Ställda frågor",
-      "calls_one": "Konversation",
-      "calls_other": "Konversationer",
-      "callTime": "Konversationstid"
+      "noCalls": "Inga konversationer än"
     },
     "meetingsCard": {
       "info": "Möten du har spelat in. De räknas kvar även när du tar bort ett möte.",
-      "empty": "Spela in ett möte, så räknas det här.",
-      "meetings_one": "Möte",
-      "meetings_other": "Möten",
-      "time": "Inspelad tid",
-      "words_one": "Transkriberat ord",
-      "words_other": "Transkriberade ord"
+      "empty": "Spela in ett möte, så räknas det här."
     },
     "share": {
       "button": "Dela",
       "nothingYet": "Det finns något att dela när du har använt SpeakoFlow.",
       "title": "Dela din statistik",
-      "description": "Dina siffror som en bild, i rätt storlek för där du lägger upp den.",
       "private": "Skapas på den här datorn. Inget laddas upp.",
       "size": "Storlek",
       "formats": {
@@ -3478,18 +3464,10 @@
         "story": "1080 × 1920, för stories",
         "wide": "1600 × 900, för inlägg och länkar"
       },
-      "look": "Utseende",
-      "looks": {
-        "paper": "Papper",
-        "graphite": "Grafit",
-        "mint": "Mint",
-        "dusk": "Skymning"
-      },
-      "show": "Visa",
-      "include": {
-        "assistant": "Visa assistenten på kortet",
-        "meetings": "Visa möten på kortet"
-      },
+      "previous": "Föregående kort",
+      "next": "Nästa kort",
+      "cardsLabel": "Kort",
+      "position": "Kort {{index}} av {{count}}",
       "copy": "Kopiera bild",
       "copied": "Kopierat",
       "copyFailed": "Det gick inte att kopiera bilden",
@@ -3497,45 +3475,85 @@
       "saved": "Bilden sparades",
       "saveFailed": "Det gick inte att spara bilden",
       "showInFolder": "Visa i mapp",
-      "drawFailed": "Kortet kunde inte ritas. Stäng och försök igen.",
-      "since": "Sedan {{date}}",
-      "barsCaption_one": "Den senaste veckan, en stapel per dag",
-      "barsCaption_other": "De senaste {{count}} veckorna, en stapel per dag",
+      "postOn": "Publicera på {{site}}",
+      "readyToPaste": "Bilden kopierades",
+      "pasteNow": "Klistra in den i ditt inlägg med {{keys}}.",
+      "openFailed": "Det gick inte att öppna {{site}}",
+      "more": "Fler appar",
+      "sheetTitle": "Min SpeakoFlow-statistik",
+      "shareFailed": "Det gick inte att öppna Dela",
+      "drawFailed": "Korten kunde inte ritas. Stäng och försök igen.",
       "tagline": "Gratis · Öppen källkod · Fungerar offline",
-      "headline": {
-        "dictation": {
-          "lead_one": "ord jag sa,",
-          "lead_other": "ord jag sa,",
-          "accent": "inte skrev."
+      "cards": {
+        "highlights": {
+          "title": "Mitt SpeakoFlow i siffror",
+          "words_one": "talat ord",
+          "words_other": "talade ord",
+          "streak_one": "dag i rad",
+          "streak_other": "dagar i rad",
+          "wpm": "ord per minut",
+          "questions_one": "ställd fråga",
+          "questions_other": "ställda frågor",
+          "meetings_one": "inspelat möte",
+          "meetings_other": "inspelade möten",
+          "saved": "sparat mot att skriva"
         },
-        "asks": {
-          "lead_one": "fråga ställd,",
-          "lead_other": "frågor ställda,",
-          "accent": "utan att byta flik."
+        "words": {
+          "title": "Talat, inte skrivet",
+          "label_one": "talat ord",
+          "label_other": "talade ord",
+          "pages_one": "Ungefär {{count}} sida",
+          "pages_other": "Ungefär {{count}} sidor",
+          "books_one": "Lika långt som en hel roman",
+          "books_other": "Lika långt som {{count}} romaner"
+        },
+        "speed": {
+          "title": "Så snabbt pratar jag",
+          "label": "ord per minut",
+          "note": "{{times}}× snabbare än att skriva",
+          "you": "Prata",
+          "typing": "Typiskt skrivande"
+        },
+        "saved": {
+          "title": "Tid jag sparat",
+          "label": "inte vid tangentbordet",
+          "note": "Jämfört med att skriva {{wpm}} ord per minut"
+        },
+        "streak": {
+          "title": "På rulle",
+          "unit_one": "dag i rad",
+          "unit_other": "dagar i rad",
+          "longest_one": "Längsta svit: {{count}} dag",
+          "longest_other": "Längsta svit: {{count}} dagar",
+          "best": "Min längsta svit hittills"
+        },
+        "assistant": {
+          "title": "Min assistent",
+          "label_one": "fråga jag ställt",
+          "label_other": "frågor jag ställt",
+          "calls_one": "{{count}} konversation, {{time}} samtalstid",
+          "calls_other": "{{count}} konversationer, {{time}} samtalstid"
         },
         "meetings": {
-          "lead_one": "möte inspelat,",
-          "lead_other": "möten inspelade,",
-          "accent": "anteckningar skrivna åt mig."
+          "title": "Mina möten",
+          "label_one": "inspelat möte",
+          "label_other": "inspelade möten",
+          "note": "{{time}} inspelat, {{words}} ord nedskrivna",
+          "time": "{{time}} inspelat och nedskrivet"
+        },
+        "activity": {
+          "title": "Sex månader av prat",
+          "label_one": "aktiv dag",
+          "label_other": "aktiva dagar"
         }
       },
-      "fact": {
-        "saved": "sparat jämfört med att skriva",
-        "wpm": "ord i minuten",
-        "questionsAsked_one": "fråga ställd",
-        "questionsAsked_other": "frågor ställda",
-        "meetings_one": "möte nedskrivet",
-        "meetings_other": "möten nedskrivna",
-        "meetingTime": "inspelade möten",
-        "meetingWords_one": "ord transkriberat",
-        "meetingWords_other": "ord transkriberade",
-        "callTime": "pratat i konversationer",
-        "streak_one": "dag i rad",
-        "streak_other": "dagar i rad",
-        "activeDays_one": "dag jag pratat med min dator",
-        "activeDays_other": "dagar jag pratat med min dator",
-        "dictations_one": "diktering",
-        "dictations_other": "dikteringar"
+      "post": {
+        "dictation_one": "Med SpeakoFlow har jag pratat in {{formatted}} ord på datorn i stället för att skriva det.",
+        "dictation_other": "Med SpeakoFlow har jag pratat in {{formatted}} ord på datorn i stället för att skriva dem.",
+        "asks_one": "Jag har ställt {{formatted}} fråga till SpeakoFlows assistent utan att byta flik.",
+        "asks_other": "Jag har ställt {{formatted}} frågor till SpeakoFlows assistent utan att byta flik.",
+        "meetings_one": "SpeakoFlow har spelat in {{formatted}} möte och skrivit anteckningarna åt mig.",
+        "meetings_other": "SpeakoFlow har spelat in {{formatted}} möten och skrivit anteckningarna åt mig."
       }
     }
   },

@@ -3394,11 +3394,10 @@
     "about": "Wie du SpeakoFlow nutzt, gezählt auf diesem Computer.",
     "nothingYet": "Deine Statistiken erscheinen, sobald du diktierst, dem Assistenten eine Frage stellst oder ein Meeting aufnimmst.",
     "goHome": "Deine Tastenkürzel ansehen",
-    "dictations": "Diktate",
-    "today": "{{words}} Wörter heute",
+    "dictationsSoFar_one": "{{formatted}} Diktat bisher",
+    "dictationsSoFar_other": "{{formatted}} Diktate bisher",
     "pages_one": "Etwa {{count}} Seite",
     "pages_other": "Etwa {{count}} Seiten",
-    "fasterThanTyping": "{{times}}× schneller als Tippen",
     "streak_one": "{{count}} Tag in Folge",
     "streak_other": "{{count}} Tage in Folge",
     "longest_one": "Längste Serie: {{count}} Tag",
@@ -3433,8 +3432,6 @@
       "assistant": "An Tagen, an denen du fragst",
       "meetings": "An Tagen mit einem Meeting"
     },
-    "activeDays": "Aktive Tage",
-    "activeDaysSub": "In den letzten 6 Monaten",
     "activity": {
       "label": "Angezeigte Aktivität",
       "all": "Alle",
@@ -3442,30 +3439,19 @@
       "assistant": "Assistent",
       "meetings": "Meetings"
     },
-    "open": "Öffnen",
     "assistantCard": {
       "info": "Schnelle Fragen und was du in Gesprächen gesagt hast. Das bleibt gezählt, auch wenn du Gespräche löschst.",
       "empty": "Stell dem Assistenten eine Frage oder starte ein Gespräch, dann wird es hier gezählt.",
-      "questions_one": "Gestellte Frage",
-      "questions_other": "Gestellte Fragen",
-      "calls_one": "Gespräch",
-      "calls_other": "Gespräche",
-      "callTime": "Zeit in Gesprächen"
+      "noCalls": "Noch keine Gespräche"
     },
     "meetingsCard": {
       "info": "Meetings, die du aufgenommen hast. Sie bleiben gezählt, auch wenn du ein Meeting löschst.",
-      "empty": "Nimm ein Meeting auf, dann wird es hier gezählt.",
-      "meetings_one": "Meeting",
-      "meetings_other": "Meetings",
-      "time": "Aufnahmezeit",
-      "words_one": "Transkribiertes Wort",
-      "words_other": "Transkribierte Wörter"
+      "empty": "Nimm ein Meeting auf, dann wird es hier gezählt."
     },
     "share": {
       "button": "Teilen",
       "nothingYet": "Sobald du SpeakoFlow genutzt hast, gibt es etwas zu teilen.",
       "title": "Teile deine Statistiken",
-      "description": "Deine Zahlen als Bild, in der passenden Größe für jede Plattform.",
       "private": "Auf diesem Computer erstellt. Nichts wird hochgeladen.",
       "size": "Größe",
       "formats": {
@@ -3478,18 +3464,10 @@
         "story": "1080 × 1920, für Storys",
         "wide": "1600 × 900, für Beiträge und Links"
       },
-      "look": "Stil",
-      "looks": {
-        "paper": "Papier",
-        "graphite": "Graphit",
-        "mint": "Minze",
-        "dusk": "Dämmerung"
-      },
-      "show": "Anzeigen",
-      "include": {
-        "assistant": "Assistent auf der Karte zeigen",
-        "meetings": "Meetings auf der Karte zeigen"
-      },
+      "previous": "Vorherige Karte",
+      "next": "Nächste Karte",
+      "cardsLabel": "Karten",
+      "position": "Karte {{index}} von {{count}}",
       "copy": "Bild kopieren",
       "copied": "Kopiert",
       "copyFailed": "Das Bild konnte nicht kopiert werden",
@@ -3497,45 +3475,85 @@
       "saved": "Bild gespeichert",
       "saveFailed": "Das Bild konnte nicht gespeichert werden",
       "showInFolder": "Im Ordner anzeigen",
-      "drawFailed": "Die Karte konnte nicht erstellt werden. Schließe das Fenster und versuche es erneut.",
-      "since": "Seit {{date}}",
-      "barsCaption_one": "Die letzte Woche, ein Balken pro Tag",
-      "barsCaption_other": "Die letzten {{count}} Wochen, ein Balken pro Tag",
+      "postOn": "Auf {{site}} posten",
+      "readyToPaste": "Bild kopiert",
+      "pasteNow": "Füge es mit {{keys}} in deinen Beitrag ein.",
+      "openFailed": "{{site}} konnte nicht geöffnet werden",
+      "more": "Weitere Apps",
+      "sheetTitle": "Meine SpeakoFlow-Statistiken",
+      "shareFailed": "Teilen konnte nicht geöffnet werden",
+      "drawFailed": "Die Karten konnten nicht erstellt werden. Schließe das Fenster und versuche es erneut.",
       "tagline": "Kostenlos · Open Source · Funktioniert offline",
-      "headline": {
-        "dictation": {
-          "lead_one": "Wort gesprochen,",
-          "lead_other": "Wörter gesprochen,",
-          "accent": "nicht getippt."
+      "cards": {
+        "highlights": {
+          "title": "Meine SpeakoFlow-Highlights",
+          "words_one": "gesprochenes Wort",
+          "words_other": "gesprochene Wörter",
+          "streak_one": "Tag in Folge",
+          "streak_other": "Tage in Folge",
+          "wpm": "Wörter pro Minute",
+          "questions_one": "gestellte Frage",
+          "questions_other": "gestellte Fragen",
+          "meetings_one": "aufgenommenes Meeting",
+          "meetings_other": "aufgenommene Meetings",
+          "saved": "Tippzeit gespart"
         },
-        "asks": {
-          "lead_one": "Frage gestellt,",
-          "lead_other": "Fragen gestellt,",
-          "accent": "ohne Tab-Wechsel."
+        "words": {
+          "title": "Gesprochen, nicht getippt",
+          "label_one": "gesprochenes Wort",
+          "label_other": "gesprochene Wörter",
+          "pages_one": "Etwa {{count}} Seite",
+          "pages_other": "Etwa {{count}} Seiten",
+          "books_one": "So lang wie ein ganzer Roman",
+          "books_other": "So lang wie {{count}} Romane"
+        },
+        "speed": {
+          "title": "So schnell spreche ich",
+          "label": "Wörter pro Minute",
+          "note": "{{times}}× schneller als Tippen",
+          "you": "Sprechen",
+          "typing": "Typisches Tippen"
+        },
+        "saved": {
+          "title": "Zeit gespart",
+          "label": "nicht mit Tippen verbracht",
+          "note": "Im Vergleich zum Tippen mit {{wpm}} Wörtern pro Minute"
+        },
+        "streak": {
+          "title": "Ich bleib dran",
+          "unit_one": "Tag",
+          "unit_other": "Tage",
+          "longest_one": "Längste Serie: {{count}} Tag",
+          "longest_other": "Längste Serie: {{count}} Tage",
+          "best": "Meine bisher längste Serie"
+        },
+        "assistant": {
+          "title": "Mein Assistent",
+          "label_one": "gestellte Frage",
+          "label_other": "gestellte Fragen",
+          "calls_one": "{{count}} Gespräch, {{time}} Sprechzeit",
+          "calls_other": "{{count}} Gespräche, {{time}} Sprechzeit"
         },
         "meetings": {
-          "lead_one": "Meeting aufgenommen,",
-          "lead_other": "Meetings aufgenommen,",
-          "accent": "Notizen inklusive."
+          "title": "Meine Meetings",
+          "label_one": "aufgenommenes Meeting",
+          "label_other": "aufgenommene Meetings",
+          "note": "{{time}} aufgenommen, {{words}} Wörter protokolliert",
+          "time": "{{time}} aufgenommen und protokolliert"
+        },
+        "activity": {
+          "title": "Sechs Monate Reden",
+          "label_one": "aktiver Tag",
+          "label_other": "aktive Tage"
         }
       },
-      "fact": {
-        "saved": "gespart gegenüber Tippen",
-        "wpm": "Wörter pro Minute",
-        "questionsAsked_one": "gestellte Frage",
-        "questionsAsked_other": "gestellte Fragen",
-        "meetings_one": "protokolliertes Meeting",
-        "meetings_other": "protokollierte Meetings",
-        "meetingTime": "Meetings aufgenommen",
-        "meetingWords_one": "transkribiertes Wort",
-        "meetingWords_other": "transkribierte Wörter",
-        "callTime": "in Gesprächen",
-        "streak_one": "Tag in Folge",
-        "streak_other": "Tage in Folge",
-        "activeDays_one": "Tag im Gespräch mit meinem Computer",
-        "activeDays_other": "Tage im Gespräch mit meinem Computer",
-        "dictations_one": "Diktat",
-        "dictations_other": "Diktate"
+      "post": {
+        "dictation_one": "Ich habe meinem Computer {{formatted}} Wort diktiert, statt es zu tippen – mit SpeakoFlow.",
+        "dictation_other": "Ich habe meinem Computer schon {{formatted}} Wörter diktiert, statt sie zu tippen – mit SpeakoFlow.",
+        "asks_one": "Ich habe dem Assistenten von SpeakoFlow {{formatted}} Frage gestellt, ohne den Tab zu wechseln.",
+        "asks_other": "Ich habe dem Assistenten von SpeakoFlow schon {{formatted}} Fragen gestellt, ohne den Tab zu wechseln.",
+        "meetings_one": "SpeakoFlow hat {{formatted}} Meeting für mich aufgenommen und die Notizen geschrieben.",
+        "meetings_other": "SpeakoFlow hat schon {{formatted}} Meetings für mich aufgenommen und die Notizen geschrieben."
       }
     }
   },

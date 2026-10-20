@@ -3365,10 +3365,8 @@
     "about": "SpeakoFlowの利用状況です。集計はこのPC上で行われます。",
     "nothingYet": "音声入力、アシスタントへの質問、会議の録音のいずれかを行うと、インサイトが表示されます。",
     "goHome": "ショートカットを見る",
-    "dictations": "音声入力の回数",
-    "today": "今日 {{words}} 語",
+    "dictationsSoFar_other": "これまでに{{formatted}}回の音声入力",
     "pages_other": "約{{count}}ページ",
-    "fasterThanTyping": "タイピングの{{times}}倍の速さ",
     "streak_other": "{{count}}日連続",
     "longest_other": "最長：{{count}}日",
     "streakHint": "音声入力、アシスタントへの質問、会話、会議の録音のどれかをした日が1日としてカウントされます。",
@@ -3395,8 +3393,6 @@
       "assistant": "質問した日の平均",
       "meetings": "会議があった日の平均"
     },
-    "activeDays": "利用日数",
-    "activeDaysSub": "過去6か月間",
     "activity": {
       "label": "表示するアクティビティ",
       "all": "すべて",
@@ -3404,26 +3400,19 @@
       "assistant": "アシスタント",
       "meetings": "会議"
     },
-    "open": "開く",
     "assistantCard": {
       "info": "アシスタントへの質問と、会話での発言を数えています。会話を削除しても、カウントは残ります。",
       "empty": "アシスタントに質問するか会話を始めると、ここでカウントされます。",
-      "questions_other": "質問した回数",
-      "calls_other": "会話の回数",
-      "callTime": "会話した時間"
+      "noCalls": "会話はまだありません"
     },
     "meetingsCard": {
       "info": "録音した会議です。会議を削除しても、カウントは残ります。",
-      "empty": "会議を録音すると、ここでカウントされます。",
-      "meetings_other": "会議の回数",
-      "time": "録音時間",
-      "words_other": "文字起こしした語数"
+      "empty": "会議を録音すると、ここでカウントされます。"
     },
     "share": {
       "button": "共有",
       "nothingYet": "SpeakoFlowを使うと、共有できる内容ができます。",
       "title": "インサイトを共有",
-      "description": "あなたの数字を画像に。投稿先に合わせたサイズで作れます。",
       "private": "このPC上で作成します。何もアップロードされません。",
       "size": "サイズ",
       "formats": {
@@ -3436,18 +3425,10 @@
         "story": "1080 × 1920、ストーリーズ向け",
         "wide": "1600 × 900、投稿やリンク向け"
       },
-      "look": "デザイン",
-      "looks": {
-        "paper": "ペーパー",
-        "graphite": "グラファイト",
-        "mint": "ミント",
-        "dusk": "夕暮れ"
-      },
-      "show": "表示",
-      "include": {
-        "assistant": "カードにアシスタントを表示",
-        "meetings": "カードに会議を表示"
-      },
+      "previous": "前のカード",
+      "next": "次のカード",
+      "cardsLabel": "カード",
+      "position": "{{count}}枚中{{index}}枚目のカード",
       "copy": "画像をコピー",
       "copied": "コピーしました",
       "copyFailed": "画像をコピーできませんでした",
@@ -3455,35 +3436,69 @@
       "saved": "画像を保存しました",
       "saveFailed": "画像を保存できませんでした",
       "showInFolder": "フォルダーで表示",
+      "postOn": "{{site}}に投稿",
+      "readyToPaste": "画像をコピーしました",
+      "pasteNow": "{{keys}}で投稿に貼り付けてください。",
+      "openFailed": "{{site}}を開けませんでした",
+      "more": "その他のアプリ",
+      "sheetTitle": "私のSpeakoFlowインサイト",
+      "shareFailed": "共有を開けませんでした",
       "drawFailed": "カードを描画できませんでした。閉じてもう一度お試しください。",
-      "since": "{{date}}から",
-      "barsCaption_other": "過去{{count}}週間、1本が1日分",
       "tagline": "無料 · オープンソース · オフラインで動作",
-      "headline": {
-        "dictation": {
-          "lead_other": "語を、声で書いた。",
-          "accent": "キーは打たずに。"
+      "cards": {
+        "highlights": {
+          "title": "私のSpeakoFlowハイライト",
+          "words_other": "話した語数",
+          "streak_other": "日連続",
+          "wpm": "語/分",
+          "questions_other": "件の質問",
+          "meetings_other": "件の会議を録音",
+          "saved": "タイピングより短縮"
         },
-        "asks": {
-          "lead_other": "件の質問を、",
-          "accent": "タブを切り替えずに。"
+        "words": {
+          "title": "打たずに、話す。",
+          "label_other": "話した語数",
+          "pages_other": "約{{count}}ページ分",
+          "books_other": "小説{{count}}冊分"
+        },
+        "speed": {
+          "title": "私の話すスピード",
+          "label": "1分あたりの語数",
+          "note": "タイピングより{{times}}×速い",
+          "you": "話す",
+          "typing": "平均的なタイピング"
+        },
+        "saved": {
+          "title": "短縮できた時間",
+          "label": "タイピングせずに済んだ時間",
+          "note": "1分あたり{{wpm}}語でタイピングした場合との比較"
+        },
+        "streak": {
+          "title": "絶好調",
+          "unit_other": "日連続",
+          "longest_other": "最長記録：{{count}}日",
+          "best": "自己最長記録を更新中"
+        },
+        "assistant": {
+          "title": "私のアシスタント",
+          "label_other": "件の質問",
+          "calls_other": "{{count}}回の会話で計{{time}}"
         },
         "meetings": {
-          "lead_other": "件の会議を録音。",
-          "accent": "メモはおまかせ。"
+          "title": "私の会議",
+          "label_other": "件の会議を録音",
+          "note": "{{time}}を録音、{{words}}語を文字に",
+          "time": "{{time}}を録音して文字に"
+        },
+        "activity": {
+          "title": "話し続けた6か月",
+          "label_other": "活動日数"
         }
       },
-      "fact": {
-        "saved": "タイピングより短縮",
-        "wpm": "1分あたりの語数",
-        "questionsAsked_other": "件の質問をした",
-        "meetings_other": "件の会議をメモに",
-        "meetingTime": "会議の録音時間",
-        "meetingWords_other": "語を文字起こし",
-        "callTime": "アシスタントとの会話",
-        "streak_other": "日連続",
-        "activeDays_other": "日、パソコンと話した",
-        "dictations_other": "回の音声入力"
+      "post": {
+        "dictation_other": "SpeakoFlowで、これまで{{formatted}}語をタイピングせずに声でパソコンに入力しました。",
+        "asks_other": "SpeakoFlowのアシスタントに、タブを切り替えずに{{formatted}}件の質問をしました。",
+        "meetings_other": "SpeakoFlowがこれまで{{formatted}}件の会議を録音して、メモまで書いてくれました。"
       }
     }
   },
