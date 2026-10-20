@@ -2802,7 +2802,10 @@
     "download": "Stáhnout novou verzi ({{size}})",
     "retry": "Zkusit znovu",
     "chooseAnother": "Vybrat jiný model",
-    "progressLabel": "Stahování nové verze"
+    "progressLabel": "Stahování nové verze",
+    "dialogTitle": "SpeakoFlow má nový řečový engine",
+    "dialogBody": "Je rychlejší a stabilnější, takže narazíte na méně problémů. {{model}} běžel na starém enginu a potřebuje svou novou verzi, aby dál fungoval.",
+    "later": "Později"
   },
   "modelsHub": {
     "description": "Každou úlohu v SpeakoFlow obstarává model, který si vyberete. Spusťte ho na tomto počítači kvůli soukromí, nebo v cloudu kvůli rychlosti.",

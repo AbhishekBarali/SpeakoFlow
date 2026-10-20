@@ -2733,7 +2733,10 @@
     "download": "下载新版本（{{size}}）",
     "retry": "重试",
     "chooseAnother": "选择其他模型",
-    "progressLabel": "正在下载新版本"
+    "progressLabel": "正在下载新版本",
+    "dialogTitle": "SpeakoFlow 换上了新的语音引擎",
+    "dialogBody": "它更快、更稳定，遇到的问题会更少。{{model}} 运行在旧引擎上，需要下载新版本才能继续使用。",
+    "later": "稍后"
   },
   "modelsHub": {
     "description": "SpeakoFlow 中的每项工作都由您选择的模型完成。在这台电脑上运行更私密，在云端运行更快速。",

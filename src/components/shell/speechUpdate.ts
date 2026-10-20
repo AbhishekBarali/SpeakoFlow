@@ -24,15 +24,23 @@ interface SpeechUpdateReveal {
   requested: number;
   /** Requests a prompt has scrolled into view for. */
   answered: number;
+  /** The update pop-up was closed with "Later" (or Escape). It stays closed
+   *  for this run of the app, until a dictation is refused for the same
+   *  reason, which is a request and opens it again. */
+  dialogClosed: boolean;
   request: () => void;
   /** Claim the pending request, if any. True when the caller should scroll. */
   answer: () => boolean;
+  closeDialog: () => void;
 }
 
 export const useSpeechUpdateReveal = create<SpeechUpdateReveal>((set, get) => ({
   requested: 0,
   answered: 0,
-  request: () => set((state) => ({ requested: state.requested + 1 })),
+  dialogClosed: false,
+  request: () =>
+    set((state) => ({ requested: state.requested + 1, dialogClosed: false })),
+  closeDialog: () => set({ dialogClosed: true }),
   answer: () => {
     const { requested, answered } = get();
     if (requested === answered) return false;

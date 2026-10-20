@@ -2802,7 +2802,10 @@
     "download": "Pobierz nową wersję ({{size}})",
     "retry": "Spróbuj ponownie",
     "chooseAnother": "Wybierz inny model",
-    "progressLabel": "Pobieranie nowej wersji"
+    "progressLabel": "Pobieranie nowej wersji",
+    "dialogTitle": "SpeakoFlow ma nowy silnik mowy",
+    "dialogBody": "Jest szybszy i stabilniejszy, więc napotkasz mniej problemów. {{model}} działał na starym silniku i potrzebuje nowej wersji, aby dalej działać.",
+    "later": "Później"
   },
   "modelsHub": {
     "description": "Każde zadanie w SpeakoFlow wykonuje wybrany przez Ciebie model. Uruchom go na tym komputerze dla prywatności albo w chmurze dla szybkości.",

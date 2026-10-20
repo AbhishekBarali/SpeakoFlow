@@ -2756,7 +2756,10 @@
     "download": "Hämta ny version ({{size}})",
     "retry": "Försök igen",
     "chooseAnother": "Välj en annan modell",
-    "progressLabel": "Hämtar den nya versionen"
+    "progressLabel": "Hämtar den nya versionen",
+    "dialogTitle": "SpeakoFlow har en ny talmotor",
+    "dialogBody": "Den är snabbare och stabilare, så du stöter på färre problem. {{model}} körde på den gamla motorn och behöver sin nya version för att fortsätta fungera.",
+    "later": "Senare"
   },
   "modelsHub": {
     "description": "Varje uppgift i SpeakoFlow utförs av en modell du väljer. Kör den på den här datorn för integritet, eller i molnet för hastighet.",

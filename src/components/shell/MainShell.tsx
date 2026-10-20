@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/Sidebar";
 import UpdateChecker from "@/components/update-checker";
 import { FeedbackHost } from "@/components/feedback/FeedbackDialog";
 import { SettingsDialog } from "@/components/settings-dialog/SettingsDialog";
+import { RetiredSelectionDialog } from "@/components/settings/models/RetiredSelectionPrompt";
 import {
   INITIAL_NAVIGATION,
   NavigationProvider,
@@ -52,6 +53,8 @@ export const MainShell: React.FC<{ initialNavigation?: NavigationState }> = ({
       </div>
       <SettingsDialog />
       <FeedbackHost />
+      {/* After an update that retired the selected speech model. */}
+      <RetiredSelectionDialog />
       {/* Background update checks and the tray's "Check for updates…". What
           they find is shown by the sidebar's UpdatePill and Settings → About. */}
       <UpdateChecker />

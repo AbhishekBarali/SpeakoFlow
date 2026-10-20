@@ -2779,7 +2779,10 @@
     "download": "Télécharger la nouvelle version ({{size}})",
     "retry": "Réessayer",
     "chooseAnother": "Choisir un autre modèle",
-    "progressLabel": "Téléchargement de la nouvelle version"
+    "progressLabel": "Téléchargement de la nouvelle version",
+    "dialogTitle": "SpeakoFlow a un nouveau moteur vocal",
+    "dialogBody": "Il est plus rapide et plus stable, vous rencontrerez donc moins de problèmes. {{model}} utilisait l'ancien moteur et a besoin de sa nouvelle version pour continuer à fonctionner.",
+    "later": "Plus tard"
   },
   "modelsHub": {
     "description": "Dans SpeakoFlow, chaque tâche est confiée à un modèle de votre choix. Exécutez-le sur cet ordinateur pour la confidentialité, ou dans le cloud pour la rapidité.",
