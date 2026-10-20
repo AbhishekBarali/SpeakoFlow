@@ -59,6 +59,18 @@ every dictation, as before.
 your custom words while they transcribe, as Whisper always has. Other models
 still get the correction pass afterwards.
 
+**Insights covers the assistant and meetings.** Beside dictation, Insights
+now shows questions asked, calls and time on calls, and meetings recorded with
+their length and words. The activity grid switches between the three, and the
+streak counts a day when you used any of them; Home shows the same streak.
+These totals are kept on their own, so deleting conversations or meetings
+does not lower them, and what you already had is counted from the first launch.
+
+**Share your insights.** Share on the Insights page turns your numbers into an
+image in the website's look: Square, Story or Wide, in Paper, Graphite, Mint or
+Dusk, with the last twelve weeks drawn as a waveform. Save it or copy it to
+post anywhere. It is made on your computer; nothing is uploaded.
+
 ### Changed
 
 - **A mouse button sits next to a shortcut's keys, not in place of them.**

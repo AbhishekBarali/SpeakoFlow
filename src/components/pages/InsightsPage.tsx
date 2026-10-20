@@ -1,29 +1,42 @@
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { UsageStats } from "@/bindings";
-import { Page, PageHeader } from "@/components/ui/Page";
+import { ArrowRight, MessageCircle, Share2, Users } from "lucide-react";
+import type { Insights } from "@/bindings";
+import { Page, PageHeader, TextLink } from "@/components/ui/Page";
+import { Button } from "@/components/ui/Button";
 import { InfoTip } from "@/components/ui/InfoTip";
-import { useUsageStats } from "./home/StatsStrip";
+import { Segmented } from "@/components/ui/Segmented";
+import { useNavigation } from "@/components/shell/navigation";
+import { useSettings } from "@/hooks/useSettings";
 import {
   formatCount,
   formatDuration,
+  formatShortDuration,
   TYPING_WPM,
   timeSavedSeconds,
   wordsPerMinute,
 } from "./home/usageMath";
 import {
+  activitySeries,
+  assistantQuestions,
   averageActiveDay,
   bestDay,
   buildHeatmap,
   busiestWeekday,
+  hasActivity,
   pagesFor,
   parseDayKey,
+  type Activity,
   type HeatCell,
   type HeatLevel,
 } from "./insights/insightsMath";
+import { useInsights } from "./insights/useInsights";
+import { ShareDialog } from "./insights/ShareDialog";
 
 /** Weeks in the activity grid: about six months. */
 const WEEKS = 26;
+
+const ACTIVITIES: Activity[] = ["dictation", "assistant", "meetings"];
 
 const LEVEL_CLASSES: Record<HeatLevel, string> = {
   0: "bg-ink/[0.06]",
@@ -52,16 +65,41 @@ const StatCard: React.FC<{
 );
 
 /**
- * Six months of dictation, one square per day, darker for more words. The
- * grid sweeps in when the page opens; hovering a day names it and its count in
- * the line under the grid rather than in a floating tooltip.
+ * How one activity's day is said: words dictated, questions asked, or time in
+ * meetings.
  */
-const ActivityGrid: React.FC<{ stats: UsageStats }> = ({ stats }) => {
+const useDayValue = () => {
   const { t, i18n } = useTranslation();
+  return (activity: Activity, value: number): string => {
+    const formatted = formatCount(value, i18n.language);
+    switch (activity) {
+      case "dictation":
+        return t("insights.dayWords", { count: value, formatted });
+      case "assistant":
+        return t("insights.dayQuestions", { count: value, formatted });
+      case "meetings":
+        return formatDuration(value, t);
+    }
+  };
+};
+
+/**
+ * Six months, one square per day, darker for more use. Dictation by default;
+ * the assistant and meetings are a switch away once they have been used. The
+ * streak above it counts a day when anything was said to the app.
+ */
+const ActivityGrid: React.FC<{
+  insights: Insights;
+  activity: Activity;
+  activities: Activity[];
+  onActivityChange: (activity: Activity) => void;
+}> = ({ insights, activity, activities, onActivityChange }) => {
+  const { t, i18n } = useTranslation();
+  const dayValue = useDayValue();
   const [hovered, setHovered] = useState<HeatCell | null>(null);
   const map = useMemo(
-    () => buildHeatmap(stats.recent_days ?? [], WEEKS),
-    [stats.recent_days],
+    () => buildHeatmap(activitySeries(insights, activity), WEEKS),
+    [insights, activity],
   );
   const monthFormat = useMemo(
     () => new Intl.DateTimeFormat(i18n.language, { month: "short" }),
@@ -85,15 +123,54 @@ const ActivityGrid: React.FC<{ stats: UsageStats }> = ({ stats }) => {
     row % 2 === 1 ? weekdayFormat.format(cell.date) : "",
   );
 
+  const summary = (() => {
+    switch (activity) {
+      case "dictation":
+        return t("insights.gridSummary", {
+          words: formatCount(map.total, i18n.language),
+          count: map.activeDays,
+        });
+      case "assistant":
+        return t("insights.gridSummaryAssistant", {
+          questions: dayValue("assistant", map.total),
+          count: map.activeDays,
+        });
+      case "meetings":
+        return t("insights.gridSummaryMeetings", {
+          time: formatDuration(map.total, t),
+          count: map.activeDays,
+        });
+    }
+  })();
+  const noneLabel = t(`insights.dayNoneFor.${activity}`);
+
   return (
     <section className="rounded-2xl border border-hairline bg-surface p-5 elev-card">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-[1.0625rem] font-semibold text-ink">
-          {t("insights.streak", { count: stats.current_streak_days })}
-        </h2>
-        <p className="text-xs text-muted">
-          {t("insights.longest", { count: stats.longest_streak_days })}
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h2 className="flex items-center gap-1.5 text-[1.0625rem] font-semibold text-ink">
+            {t("insights.streak", { count: insights.current_streak_days })}
+            <InfoTip text={t("insights.streakHint")} />
+          </h2>
+          <p className="text-xs text-muted">
+            {t("insights.longest", { count: insights.longest_streak_days })}
+          </p>
+        </div>
+        {activities.length > 1 && (
+          <Segmented<Activity>
+            size="sm"
+            label={t("insights.activity.label")}
+            value={activity}
+            onChange={(next) => {
+              setHovered(null);
+              onActivityChange(next);
+            }}
+            options={activities.map((value) => ({
+              value,
+              label: t(`insights.activity.${value}`),
+            }))}
+          />
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -125,10 +202,7 @@ const ActivityGrid: React.FC<{ stats: UsageStats }> = ({ stats }) => {
           </div>
           <div
             role="img"
-            aria-label={t("insights.gridLabel", {
-              words: formatCount(map.total, i18n.language),
-              count: map.activeDays,
-            })}
+            aria-label={summary}
             onMouseLeave={() => setHovered(null)}
             className="grid grid-flow-col grid-rows-7 gap-1"
             style={{
@@ -138,7 +212,7 @@ const ActivityGrid: React.FC<{ stats: UsageStats }> = ({ stats }) => {
             {map.weeks.map((column, col) =>
               column.map((cell, row) => (
                 <div
-                  key={cell.key}
+                  key={`${activity}-${cell.key}`}
                   onMouseEnter={() => setHovered(cell.future ? null : cell)}
                   className={`heat-cell aspect-square rounded-[4px] transition-[box-shadow] duration-150 ${
                     cell.future
@@ -161,18 +235,12 @@ const ActivityGrid: React.FC<{ stats: UsageStats }> = ({ stats }) => {
                 {dayFormat.format(hovered.date)}
               </span>
               {" · "}
-              {hovered.words > 0
-                ? t("insights.dayWords", {
-                    count: hovered.words,
-                    formatted: formatCount(hovered.words, i18n.language),
-                  })
-                : t("insights.dayNone")}
+              {hovered.value > 0
+                ? dayValue(activity, hovered.value)
+                : noneLabel}
             </>
           ) : (
-            t("insights.gridSummary", {
-              words: formatCount(map.total, i18n.language),
-              count: map.activeDays,
-            })
+            summary
           )}
         </p>
         <div
@@ -207,23 +275,21 @@ const Highlight: React.FC<{ label: string; value: string; sub?: string }> = ({
   </div>
 );
 
-/**
- * Insights: how much you have said, how fast, and when — the numbers Home
- * only glances at. Everything is counted on this computer.
- */
-export const InsightsPage: React.FC = () => {
+/** The busiest weekday, best day and typical day of the activity in view. */
+const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
+  insights,
+  activity,
+}) => {
   const { t, i18n } = useTranslation();
-  const stats = useUsageStats();
-  const wpm = stats ? wordsPerMinute(stats) : null;
-
+  const dayValue = useDayValue();
   const highlights = useMemo(() => {
-    const days = stats?.recent_days ?? [];
+    const days = activitySeries(insights, activity);
     return {
       weekday: busiestWeekday(days),
       best: bestDay(days),
       average: averageActiveDay(days),
     };
-  }, [stats?.recent_days]);
+  }, [insights, activity]);
 
   const weekdayName = (index: number) =>
     new Intl.DateTimeFormat(i18n.language, { weekday: "long" }).format(
@@ -242,29 +308,172 @@ export const InsightsPage: React.FC = () => {
   };
 
   return (
-    <Page>
-      <PageHeader
-        title={t("nav.insights")}
-        description={t("insights.description")}
+    <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-3">
+      <Highlight
+        label={t("insights.busiest")}
+        value={
+          highlights.weekday !== null
+            ? weekdayName(highlights.weekday)
+            : t("home.stats.none")
+        }
       />
+      <Highlight
+        label={t("insights.best")}
+        value={
+          highlights.best
+            ? dayValue(activity, highlights.best.value)
+            : t("home.stats.none")
+        }
+        sub={highlights.best ? longDate(highlights.best.day) : undefined}
+      />
+      <Highlight
+        label={t("insights.typical")}
+        value={
+          highlights.average > 0
+            ? dayValue(activity, highlights.average)
+            : t("home.stats.none")
+        }
+        sub={t(`insights.typicalFor.${activity}`)}
+      />
+    </div>
+  );
+};
 
-      {!stats ? (
+/**
+ * One feature beyond dictation: its name, the way to its page, and three
+ * figures side by side. Before it has been used it says how to start instead
+ * of showing a row of zeros.
+ */
+const FeatureCard: React.FC<{
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  info: string;
+  open: { label: string; onClick: () => void };
+  figures: Array<{ value: string; label: string }>;
+  empty: string | null;
+}> = ({ icon: Icon, title, info, open, figures, empty }) => (
+  <section className="flex min-w-0 flex-col rounded-2xl border border-hairline bg-surface px-5 py-4 elev-card">
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span
+          aria-hidden="true"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-surface-strong text-ink/70"
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <h2 className="truncate text-[0.9375rem] font-semibold text-ink">
+          {title}
+        </h2>
+        <InfoTip text={info} />
+      </div>
+      <TextLink onClick={open.onClick} className="-me-1.5 shrink-0">
+        {open.label}
+        <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
+      </TextLink>
+    </div>
+    {empty ? (
+      <p className="mt-4 text-sm text-muted text-pretty">{empty}</p>
+    ) : (
+      <dl className="mt-4 grid grid-cols-3 divide-x divide-hairline rtl:divide-x-reverse">
+        {figures.map((figure) => (
+          <div
+            key={figure.label}
+            className="flex min-w-0 flex-col-reverse px-3 first:ps-0 last:pe-0 @4xl:px-4"
+          >
+            <dt className="mt-1 truncate text-xs text-muted">{figure.label}</dt>
+            <dd className="truncate text-[1.3125rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
+              {figure.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    )}
+  </section>
+);
+
+/**
+ * Insights: how much you have said to SpeakoFlow, how fast, and when, across
+ * dictation, the assistant and meetings — and a card to share it. Everything
+ * is counted on this computer.
+ */
+export const InsightsPage: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  const { navigate } = useNavigation();
+  const { settings } = useSettings();
+  const insights = useInsights();
+  const [activity, setActivity] = useState<Activity>("dictation");
+  const [sharing, setSharing] = useState(false);
+
+  const used = useMemo(
+    () =>
+      insights
+        ? ACTIVITIES.filter((value) => hasActivity(insights, value))
+        : [],
+    [insights],
+  );
+  // The grid shows dictation unless it was never used; a choice of something
+  // with nothing to show falls back too.
+  const shown: Activity = used.includes(activity)
+    ? activity
+    : (used[0] ?? "dictation");
+
+  const header = (
+    <PageHeader
+      title={t("nav.insights")}
+      description={t("insights.about")}
+      actions={
+        <Button
+          onClick={() => setSharing(true)}
+          disabled={used.length === 0}
+          title={used.length === 0 ? t("insights.share.nothingYet") : undefined}
+        >
+          <Share2 className="h-4 w-4" aria-hidden="true" />
+          {t("insights.share.button")}
+        </Button>
+      }
+    />
+  );
+
+  if (!insights) {
+    return (
+      <Page>
+        {header}
         <div
           aria-hidden="true"
           className="h-[26rem] animate-pulse rounded-2xl border border-hairline bg-surface-muted"
         />
-      ) : stats.total_words === 0 ? (
+      </Page>
+    );
+  }
+
+  if (used.length === 0) {
+    return (
+      <Page>
+        {header}
         <p className="rounded-2xl border border-dashed border-hairline-strong px-5 py-8 text-center text-sm text-muted">
-          {t("insights.empty")}
+          {t("insights.nothingYet")}
         </p>
-      ) : (
-        <div className="space-y-4">
+      </Page>
+    );
+  }
+
+  const { dictation, assistant, meetings } = insights;
+  const wpm = wordsPerMinute(dictation);
+  const questions = assistantQuestions(insights);
+  const assistantOn = settings?.assistant_enabled ?? true;
+  const showAssistant = assistantOn || used.includes("assistant");
+
+  return (
+    <Page>
+      {header}
+      <div className="space-y-4">
+        {used.includes("dictation") && (
           <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
             <StatCard
               label={t("home.stats.wordsLabel")}
-              value={formatCount(stats.total_words, i18n.language)}
+              value={formatCount(dictation.total_words, i18n.language)}
               sub={t("insights.pages", {
-                count: pagesFor(stats.total_words),
+                count: pagesFor(dictation.total_words),
               })}
             />
             <StatCard
@@ -281,55 +490,105 @@ export const InsightsPage: React.FC = () => {
             />
             <StatCard
               label={t("home.stats.savedLabel")}
-              value={formatDuration(timeSavedSeconds(stats), t)}
+              value={formatDuration(timeSavedSeconds(dictation), t)}
               info={t("home.stats.savedHint", { wpm: TYPING_WPM })}
             />
             <StatCard
               label={t("insights.dictations")}
-              value={formatCount(stats.total_dictations, i18n.language)}
+              value={formatCount(dictation.total_dictations, i18n.language)}
               sub={t("insights.today", {
-                words: formatCount(stats.today_words, i18n.language),
+                words: formatCount(dictation.today_words, i18n.language),
               })}
             />
           </div>
+        )}
 
-          <ActivityGrid stats={stats} />
-
-          <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-3">
-            <Highlight
-              label={t("insights.busiest")}
-              value={
-                highlights.weekday !== null
-                  ? weekdayName(highlights.weekday)
-                  : t("home.stats.none")
+        <div
+          className={`grid grid-cols-1 gap-3 ${showAssistant ? "@3xl:grid-cols-2" : ""}`}
+        >
+          {showAssistant && (
+            <FeatureCard
+              icon={MessageCircle}
+              title={t("insights.activity.assistant")}
+              info={t("insights.assistantCard.info")}
+              open={{
+                label: t("insights.open"),
+                onClick: () => navigate("assistant"),
+              }}
+              empty={
+                used.includes("assistant")
+                  ? null
+                  : t("insights.assistantCard.empty")
               }
+              figures={[
+                {
+                  value: formatCount(questions, i18n.language),
+                  label: t("insights.assistantCard.questions", {
+                    count: questions,
+                  }),
+                },
+                {
+                  value: formatCount(assistant.calls, i18n.language),
+                  label: t("insights.assistantCard.calls", {
+                    count: assistant.calls,
+                  }),
+                },
+                {
+                  value: formatShortDuration(assistant.call_seconds, t),
+                  label: t("insights.assistantCard.callTime"),
+                },
+              ]}
             />
-            <Highlight
-              label={t("insights.best")}
-              value={
-                highlights.best
-                  ? t("insights.dayWords", {
-                      count: highlights.best.words,
-                      formatted: formatCount(
-                        highlights.best.words,
-                        i18n.language,
-                      ),
-                    })
-                  : t("home.stats.none")
-              }
-              sub={highlights.best ? longDate(highlights.best.day) : undefined}
-            />
-            <Highlight
-              label={t("insights.typical")}
-              value={t("insights.dayWords", {
-                count: highlights.average,
-                formatted: formatCount(highlights.average, i18n.language),
-              })}
-              sub={t("insights.typicalSub")}
-            />
-          </div>
+          )}
+          <FeatureCard
+            icon={Users}
+            title={t("insights.activity.meetings")}
+            info={t("insights.meetingsCard.info")}
+            open={{
+              label: t("insights.open"),
+              onClick: () => navigate("meetings"),
+            }}
+            empty={
+              used.includes("meetings")
+                ? null
+                : t("insights.meetingsCard.empty")
+            }
+            figures={[
+              {
+                value: formatCount(meetings.meetings, i18n.language),
+                label: t("insights.meetingsCard.meetings", {
+                  count: meetings.meetings,
+                }),
+              },
+              {
+                value: formatShortDuration(meetings.seconds, t),
+                label: t("insights.meetingsCard.time"),
+              },
+              {
+                value: formatCount(meetings.words, i18n.language),
+                label: t("insights.meetingsCard.words", {
+                  count: meetings.words,
+                }),
+              },
+            ]}
+          />
         </div>
-      )}
+
+        <ActivityGrid
+          insights={insights}
+          activity={shown}
+          activities={used}
+          onActivityChange={setActivity}
+        />
+
+        <Highlights insights={insights} activity={shown} />
+      </div>
+
+      <ShareDialog
+        open={sharing}
+        onClose={() => setSharing(false)}
+        insights={insights}
+      />
     </Page>
   );
 };

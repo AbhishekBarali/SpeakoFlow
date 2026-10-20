@@ -175,6 +175,94 @@ const usageStats = (): Json => {
   };
 };
 
+/**
+ * `get_insights`: the dictation above, plus an assistant asked a few times on
+ * most working days with a call now and then, and a weekly meeting. `?usage=`
+ * narrows it: `dictation` (dictation only), `assistant` or `meetings` (that
+ * feature alone, no dictation), `none` (nothing yet).
+ */
+const insightsData = (): Json => {
+  const only = params.get("usage");
+  const empty: {
+    recent_days: Array<{ day: string }>;
+    [key: string]: unknown;
+  } = {
+    total_dictations: 0,
+    total_words: 0,
+    timed_words: 0,
+    total_audio_seconds: 0,
+    today_words: 0,
+    today_dictations: 0,
+    current_streak_days: 0,
+    longest_streak_days: 0,
+    active_days: 0,
+    recent_days: [],
+  };
+  const dictation =
+    fresh || only === "none" || only === "assistant" || only === "meetings"
+      ? empty
+      : (usageStats() as typeof empty);
+  const days = (usageStats() as { recent_days: Array<{ day: string }> })
+    .recent_days;
+  const withAssistant = !fresh && (only === null || only === "assistant");
+  const withMeetings = !fresh && (only === null || only === "meetings");
+
+  const assistantDays = withAssistant
+    ? days
+        .filter((_, index) => index % 3 !== 1)
+        .map((day, index) => {
+          const calls = index % 6 === 2 ? 1 : 0;
+          return {
+            day: day.day,
+            asks: 1 + (index % 4),
+            call_turns: calls * (6 + (index % 5)),
+            calls,
+            call_seconds: calls * (240 + (index % 7) * 60),
+          };
+        })
+    : [];
+  const meetingDays = withMeetings
+    ? days
+        .filter((day) => new Date(`${day.day}T12:00:00`).getDay() === 2)
+        .map((day, index) => ({
+          day: day.day,
+          meetings: 1,
+          seconds: 1500 + (index % 4) * 600,
+          words: 3600 + (index % 4) * 1400,
+        }))
+    : [];
+  const sum = <T extends Record<string, unknown>>(rows: T[], key: keyof T) =>
+    rows.reduce((total, row) => total + Number(row[key]), 0);
+  const active = new Set([
+    ...dictation.recent_days.map((day) => day.day),
+    ...assistantDays.map((day) => day.day),
+    ...meetingDays.map((day) => day.day),
+  ]);
+  return {
+    dictation,
+    assistant: {
+      asks: sum(assistantDays, "asks"),
+      call_turns: sum(assistantDays, "call_turns"),
+      calls: sum(assistantDays, "calls"),
+      call_seconds: sum(assistantDays, "call_seconds"),
+      active_days: assistantDays.map((day) => day.day),
+      recent_days: assistantDays,
+    },
+    meetings: {
+      meetings: meetingDays.length,
+      seconds: sum(meetingDays, "seconds"),
+      words: sum(meetingDays, "words"),
+      longest_seconds: Math.max(0, ...meetingDays.map((day) => day.seconds)),
+      active_days: meetingDays.map((day) => day.day),
+      recent_days: meetingDays,
+    },
+    current_streak_days: active.size ? 12 : 0,
+    longest_streak_days: active.size ? 19 : 0,
+    active_days: active.size,
+    first_day: [...active].sort()[0] ?? null,
+  };
+};
+
 const model = (overrides: Json): Json => ({
   description: "",
   filename: `${overrides.id}.gguf`,
@@ -1561,6 +1649,9 @@ const handlers: Record<string, (args: Json) => unknown> = {
           recent_days: [],
         }
       : usageStats(),
+  get_insights: () => insightsData(),
+  save_insights_card: () => null,
+  copy_insights_card: () => null,
   list_meetings: () => ({ meetings, has_more: false }),
   get_meeting: ({ meetingId }) =>
     structuredClone(meetings.find((entry) => entry.id === meetingId) ?? null),

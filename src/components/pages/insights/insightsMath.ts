@@ -1,4 +1,4 @@
-import type { UsageDay } from "@/bindings";
+import type { Insights } from "@/bindings";
 
 /**
  * Arithmetic behind the Insights page, kept pure so it is testable. Dates are
@@ -8,12 +8,68 @@ import type { UsageDay } from "@/bindings";
 
 export type HeatLevel = 0 | 1 | 2 | 3 | 4;
 
+/** What the activity grid and the highlights can be about. */
+export type Activity = "dictation" | "assistant" | "meetings";
+
+/** One day's figure for one activity. */
+export interface DayValue {
+  /** Local calendar date, `YYYY-MM-DD`. */
+  day: string;
+  value: number;
+}
+
+/**
+ * Each day's figure for an activity, as the backend sent it (days without any
+ * use are left out): words dictated, questions put to the assistant (quick asks
+ * and things said on calls), or seconds of meetings.
+ */
+export const activitySeries = (
+  insights: Insights,
+  activity: Activity,
+): DayValue[] => {
+  switch (activity) {
+    case "dictation":
+      return (insights.dictation.recent_days ?? []).map((day) => ({
+        day: day.day,
+        value: day.words,
+      }));
+    case "assistant":
+      return (insights.assistant.recent_days ?? []).map((day) => ({
+        day: day.day,
+        value: day.asks + day.call_turns,
+      }));
+    case "meetings":
+      return (insights.meetings.recent_days ?? []).map((day) => ({
+        day: day.day,
+        value: day.seconds,
+      }));
+  }
+};
+
+/** Questions put to the assistant: quick asks plus things said on calls. */
+export const assistantQuestions = (insights: Insights): number =>
+  insights.assistant.asks + insights.assistant.call_turns;
+
+/** Whether an activity has ever been used. */
+export const hasActivity = (
+  insights: Insights,
+  activity: Activity,
+): boolean => {
+  switch (activity) {
+    case "dictation":
+      return insights.dictation.total_words > 0;
+    case "assistant":
+      return assistantQuestions(insights) > 0 || insights.assistant.calls > 0;
+    case "meetings":
+      return insights.meetings.meetings > 0;
+  }
+};
+
 export interface HeatCell {
-  /** Local calendar date, `YYYY-MM-DD` — the same key `UsageDay.day` uses. */
+  /** Local calendar date, `YYYY-MM-DD` — the same key `DayValue.day` uses. */
   key: string;
   date: Date;
-  words: number;
-  dictations: number;
+  value: number;
   level: HeatLevel;
   isToday: boolean;
   /** After today: drawn as an empty slot, never as a quiet day. */
@@ -25,11 +81,11 @@ export interface Heatmap {
   weeks: HeatCell[][];
   /** Columns where a new month starts, for the labels above the grid. */
   months: Array<{ col: number; date: Date }>;
-  /** Most words on a single day in the grid. */
+  /** The highest single day in the grid. */
   max: number;
-  /** Words across the grid. */
+  /** The sum across the grid. */
   total: number;
-  /** Days in the grid with at least one dictation. */
+  /** Days in the grid with any use. */
   activeDays: number;
 }
 
@@ -51,9 +107,9 @@ export const parseDayKey = (key: string): Date | null => {
 };
 
 /** Relative to the busiest day, in quarters; any activity is at least 1. */
-export const heatLevel = (words: number, max: number): HeatLevel => {
-  if (words <= 0 || max <= 0) return 0;
-  const ratio = words / max;
+export const heatLevel = (value: number, max: number): HeatLevel => {
+  if (value <= 0 || max <= 0) return 0;
+  const ratio = value / max;
   if (ratio > 0.75) return 4;
   if (ratio > 0.5) return 3;
   if (ratio > 0.25) return 2;
@@ -65,7 +121,7 @@ export const heatLevel = (words: number, max: number): HeatLevel => {
  * Days the backend left out (it only sends days with activity) are zero.
  */
 export const buildHeatmap = (
-  recent: UsageDay[],
+  recent: DayValue[],
   weeks: number,
   now: Date = new Date(),
 ): Heatmap => {
@@ -94,16 +150,14 @@ export const buildHeatmap = (
       const key = localDayKey(date);
       const future = date.getTime() > today.getTime();
       const day = future ? undefined : byDay.get(key);
-      const words = Math.max(0, day?.words ?? 0);
-      const dictations = Math.max(0, day?.dictations ?? 0);
-      if (words > max) max = words;
-      total += words;
-      if (dictations > 0) activeDays += 1;
+      const value = Math.max(0, day?.value ?? 0);
+      if (value > max) max = value;
+      total += value;
+      if (value > 0) activeDays += 1;
       column.push({
         key,
         date,
-        words,
-        dictations,
+        value,
         level: 0,
         isToday: key === todayKey,
         future,
@@ -112,7 +166,7 @@ export const buildHeatmap = (
     columns.push(column);
   }
   for (const column of columns) {
-    for (const cell of column) cell.level = heatLevel(cell.words, max);
+    for (const cell of column) cell.level = heatLevel(cell.value, max);
   }
 
   // A label where a column's first day falls in a new month. The first
@@ -132,31 +186,53 @@ export const buildHeatmap = (
   return { weeks: columns, months, max, total, activeDays };
 };
 
-/** 0 (Sunday) – 6 (Saturday): the weekday with the most words, or null. */
-export const busiestWeekday = (days: UsageDay[]): number | null => {
+/** 0 (Sunday) – 6 (Saturday): the weekday with the most use, or null. */
+export const busiestWeekday = (days: DayValue[]): number | null => {
   const totals = new Array<number>(7).fill(0);
   for (const day of days) {
     const date = parseDayKey(day.day);
-    if (date && day.words > 0) totals[date.getDay()] += day.words;
+    if (date && day.value > 0) totals[date.getDay()] += day.value;
   }
   const best = Math.max(...totals);
   return best > 0 ? totals.indexOf(best) : null;
 };
 
-/** The single day with the most words, or null when there is none. */
-export const bestDay = (days: UsageDay[]): UsageDay | null =>
-  days.reduce<UsageDay | null>(
+/** The single day with the most use, or null when there is none. */
+export const bestDay = (days: DayValue[]): DayValue | null =>
+  days.reduce<DayValue | null>(
     (best, day) =>
-      day.words > 0 && (!best || day.words > best.words) ? day : best,
+      day.value > 0 && (!best || day.value > best.value) ? day : best,
     null,
   );
 
-/** Words on a typical day you dictate, rounded; 0 when there are none. */
-export const averageActiveDay = (days: UsageDay[]): number => {
-  const active = days.filter((day) => day.dictations > 0 && day.words > 0);
+/** A typical day of use, averaged over the days with any; 0 when none. */
+export const averageActiveDay = (days: DayValue[]): number => {
+  const active = days.filter((day) => day.value > 0);
   if (active.length === 0) return 0;
-  const words = active.reduce((sum, day) => sum + day.words, 0);
-  return Math.round(words / active.length);
+  const total = active.reduce((sum, day) => sum + day.value, 0);
+  return Math.round(total / active.length);
+};
+
+/**
+ * The last `count` local days ending today, oldest first, each with its value
+ * (zero for a day without use). For the share card's voiceprint.
+ */
+export const recentValues = (
+  recent: DayValue[],
+  count: number,
+  now: Date = new Date(),
+): number[] => {
+  const byDay = new Map(recent.map((day) => [day.day, day.value]));
+  const values: number[] = [];
+  for (let offset = count - 1; offset >= 0; offset -= 1) {
+    const date = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - offset,
+    );
+    values.push(Math.max(0, byDay.get(localDayKey(date)) ?? 0));
+  }
+  return values;
 };
 
 /** A printed page holds about this many words. */

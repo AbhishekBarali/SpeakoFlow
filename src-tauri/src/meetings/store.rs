@@ -141,7 +141,38 @@ static MIGRATIONS: &[M] = &[
         -- migration rather than something the app does at launch.
         INSERT INTO meeting_segments_fts (meeting_segments_fts) VALUES ('rebuild');",
     ),
+    // Migration 3: lifetime meeting usage, for Insights.
+    //
+    // One row per meeting ever recorded, deliberately without a foreign key:
+    // deleting a meeting frees its hour of audio, and must not also take the
+    // meeting out of the user's totals. `seconds` is known once capture ends and
+    // `words` once the meeting is complete (see `MeetingStore::usage`); both are
+    // NULL until then. Meetings that exist today are seeded here; ones deleted
+    // before this migration left nothing to count.
+    M::up(
+        "CREATE TABLE IF NOT EXISTS meeting_usage (
+            meeting_id INTEGER PRIMARY KEY,
+            started_at INTEGER NOT NULL,
+            seconds INTEGER,
+            words INTEGER
+        );
+
+        INSERT OR IGNORE INTO meeting_usage (meeting_id, started_at, seconds)
+        SELECT id, started_at,
+               CASE WHEN ended_at IS NOT NULL THEN MAX(0, ended_at - started_at) END
+        FROM meetings;",
+    ),
 ];
+
+/// One meeting as Insights counts it: when it started, how long it ran and how
+/// many words its transcript holds. A meeting that has since been deleted keeps
+/// the last values it was counted with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MeetingUsageRow {
+    pub started_at: i64,
+    pub seconds: i64,
+    pub words: i64,
+}
 
 /// Page size for transcript reads. Chosen to be comfortably more than one
 /// screenful so the virtualised list has lookahead, and small enough that the
@@ -256,6 +287,10 @@ impl MeetingStore {
             ],
         )?;
         let id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT OR IGNORE INTO meeting_usage (meeting_id, started_at) VALUES (?1, ?2)",
+            params![id, started_at],
+        )?;
 
         // Seed the two channel-derived speakers immediately. Doing it here
         // rather than lazily means the UI always has something to render and
@@ -776,6 +811,9 @@ impl MeetingStore {
             .optional()?
             .unwrap_or((None, None));
 
+        // The last chance to count what this meeting was: its transcript goes
+        // with it.
+        snapshot_usage(&tx, Some(meeting_id), true)?;
         tx.execute("DELETE FROM meetings WHERE id = ?1", params![meeting_id])?;
         tx.commit()?;
 
@@ -791,6 +829,39 @@ impl MeetingStore {
             paths.push(self.audio_path(&file));
         }
         Ok(paths)
+    }
+
+    /* ─────────────────────────── usage ─────────────────────────── */
+
+    /// Every meeting Insights counts, deleted ones included: those whose
+    /// capture has ended, oldest first.
+    ///
+    /// The stored lengths and word counts are first brought up to date from the
+    /// meetings that still exist, so one finished since the last look is counted
+    /// in full. That write is best effort: a meeting being recorded holds the
+    /// write lock in bursts, and failing to refresh must cost a stale count, not
+    /// the Insights page.
+    pub fn usage(&self) -> Result<Vec<MeetingUsageRow>> {
+        let conn = self.open()?;
+        conn.busy_timeout(std::time::Duration::from_secs(2))?;
+        if let Err(e) = snapshot_usage(&conn, None, false) {
+            warn!("Could not refresh meeting usage: {e}");
+        }
+        let mut stmt = conn.prepare(
+            "SELECT started_at, seconds, COALESCE(words, 0) FROM meeting_usage
+              WHERE seconds IS NOT NULL
+              ORDER BY started_at",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(MeetingUsageRow {
+                    started_at: row.get(0)?,
+                    seconds: row.get(1)?,
+                    words: row.get(2)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 
     /* ─────────────────────────── speakers ─────────────────────────── */
@@ -947,6 +1018,51 @@ pub struct DiarizedSpan {
     pub confidence: Option<f32>,
 }
 
+/// Copy what a meeting is counted with from the meeting itself into
+/// `meeting_usage`: its length once capture has ended, and the words of its
+/// transcript once it is complete, or in any state when `any_status` is set (a
+/// meeting about to be deleted is as finished as it will ever be). `only`
+/// restricts both to one meeting. Word counts are kept once taken, since a
+/// finished transcript does not change.
+fn snapshot_usage(conn: &Connection, only: Option<i64>, any_status: bool) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE meeting_usage
+            SET seconds = (SELECT MAX(0, m.ended_at - m.started_at)
+                             FROM meetings m WHERE m.id = meeting_usage.meeting_id)
+          WHERE meeting_id IN (SELECT id FROM meetings WHERE ended_at IS NOT NULL)
+            AND (?1 IS NULL OR meeting_id = ?1)",
+        params![only],
+    )?;
+
+    let pending: Vec<i64> = conn
+        .prepare(
+            "SELECT u.meeting_id FROM meeting_usage u
+               JOIN meetings m ON m.id = u.meeting_id
+              WHERE u.words IS NULL
+                AND (?1 IS NULL OR u.meeting_id = ?1)
+                AND (?2 OR m.status = ?3)",
+        )?
+        .query_map(
+            params![only, any_status, MeetingStatus::Complete.as_db_str()],
+            |row| row.get(0),
+        )?
+        .collect::<rusqlite::Result<_>>()?;
+
+    let mut texts = conn.prepare("SELECT text FROM meeting_segments WHERE meeting_id = ?1")?;
+    for meeting_id in pending {
+        let mut words = 0i64;
+        let mut rows = texts.query(params![meeting_id])?;
+        while let Some(row) = rows.next()? {
+            words += crate::managers::history::count_words(&row.get::<_, String>(0)?);
+        }
+        conn.execute(
+            "UPDATE meeting_usage SET words = ?2 WHERE meeting_id = ?1",
+            params![meeting_id, words],
+        )?;
+    }
+    Ok(())
+}
+
 fn row_to_segment(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingSegment> {
     let source: String = row.get(2)?;
     Ok(MeetingSegment {
@@ -1090,6 +1206,93 @@ mod tests {
             text: text.to_string(),
             confidence: None,
         }
+    }
+
+    // ---- lifetime usage ----
+
+    #[test]
+    fn a_meeting_is_counted_once_capture_ends_and_its_words_once_complete() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Sync", 1_000, None).unwrap();
+        store
+            .append_segments(
+                id,
+                &[
+                    segment(SpeakerSource::Mic, 0, 1_000, "ship it on Friday"),
+                    segment(SpeakerSource::System, 1_000, 2_000, "agreed, Friday"),
+                ],
+            )
+            .unwrap();
+        assert!(store.usage().unwrap().is_empty(), "still recording");
+
+        store.finish_capture(id, 1_000 + 1_800, None, None).unwrap();
+        assert_eq!(
+            store.usage().unwrap(),
+            vec![MeetingUsageRow {
+                started_at: 1_000,
+                seconds: 1_800,
+                words: 0
+            }],
+            "words wait for the transcript to be final"
+        );
+
+        store.complete_meeting(id).unwrap();
+        assert_eq!(store.usage().unwrap()[0].words, 6);
+    }
+
+    #[test]
+    fn a_deleted_meeting_stays_in_the_totals() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Retro", 5_000, None).unwrap();
+        store
+            .append_segments(id, &[segment(SpeakerSource::Mic, 0, 900, "one two three")])
+            .unwrap();
+        store.finish_capture(id, 5_600, None, None).unwrap();
+        // Deleted while still processing: whatever transcript exists is counted.
+        store.delete_meeting(id).unwrap();
+
+        assert!(store.get_meeting(id).unwrap().is_none());
+        assert_eq!(
+            store.usage().unwrap(),
+            vec![MeetingUsageRow {
+                started_at: 5_000,
+                seconds: 600,
+                words: 3
+            }]
+        );
+    }
+
+    #[test]
+    fn meetings_recorded_before_usage_existed_are_seeded() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("meetings.db");
+        let mut conn = Connection::open(&path).unwrap();
+        Migrations::new(MIGRATIONS[..2].to_vec())
+            .to_latest(&mut conn)
+            .unwrap();
+        conn.execute(
+            "INSERT INTO meetings (title, started_at, ended_at, status)
+             VALUES ('Old', 100, 700, 'complete'), ('Cut off', 900, NULL, 'interrupted')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let audio_dir = dir.path().join("meetings");
+        fs::create_dir_all(&audio_dir).unwrap();
+        let store = MeetingStore {
+            db_path: path,
+            audio_dir,
+        };
+        store.init().unwrap();
+        assert_eq!(
+            store.usage().unwrap(),
+            vec![MeetingUsageRow {
+                started_at: 100,
+                seconds: 600,
+                words: 0
+            }]
+        );
     }
 
     #[test]

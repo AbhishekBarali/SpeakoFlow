@@ -732,10 +732,11 @@ async getKeyboardImplementation() : Promise<string> {
 /**
  * Let mouse buttons be shortcut keys, or stop (Experimental).
  * 
- * Turned off, a shortcut whose own keys are a mouse button goes back to its
- * default keys: dictation and the ask always keep a key, and a button nothing
- * listens for any more is not one. Other keys that are a mouse button are
- * kept, only not listened for, and work again once this is back on.
+ * A mouse button is only ever a shortcut's other keys
+ * (`combos::own_keys_refusal`), so this changes nothing a shortcut is known
+ * by: turned off, its button is kept but not listened for, the shortcut
+ * carries on with its own keys, and the button works again once this is back
+ * on. Nothing has to be put back on its default keys.
  */
 async changeMouseButtonShortcutsSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
@@ -1875,6 +1876,42 @@ async getUsageStats() : Promise<Result<UsageStats, string>> {
 }
 },
 /**
+ * Dictation, the assistant and meetings, counted for the Insights page.
+ */
+async getInsights() : Promise<Result<Insights, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_insights") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Save a share card, rendered by the page, to the path the user chose in the
+ * save dialog.
+ */
+async saveInsightsCard(path: string, pngBase64: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_insights_card", { path, pngBase64 }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Put a share card on the clipboard as an image, for a webview whose own
+ * clipboard refuses images (WebKit without `ClipboardItem`, or a write that
+ * lost its user activation).
+ */
+async copyInsightsCard(pngBase64: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("copy_insights_card", { pngBase64 }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Send a typed message to the assistant (keyboard alternative to voice).
  * 
  * A typed quick ask is one job, exactly like a spoken one, so it starts from an
@@ -2054,21 +2091,6 @@ async listAssistantDisplays() : Promise<Result<DisplayChoice[], string>> {
 }
 },
 /**
- * Write an answer into the application the user asked from.
- * 
- * This is the Insert button. When the question was about selected text and that
- * selection is still live, the paste replaces it, because that is simply what a
- * paste over a selection does. When there was no selection, it lands at the
- * caret.
- * 
- * Deliberately a button rather than something automatic. `SetForegroundWindow`
- * restores *focus* but not a *selection*: most native edit controls keep their
- * selection across a focus change, but some collapse it to a caret on blur, and
- * `contenteditable` in browsers varies. In those cases a "replace" silently
- * becomes an "insert" and the user ends up with both the original text and the
- * rewrite. That cannot be detected before pasting, so the destructive version
- * stays an explicit act the user takes while looking at the answer.
- * 
  * Paste behaviour matches Flow's rather than dictation's: no trailing space and
  * no auto-submit, because this is a finished artifact being placed, not speech
  * being typed.
@@ -2087,6 +2109,21 @@ async assistantInsertText(text: string, html: string | null) : Promise<Result<nu
 }
 },
 /**
+ * Write an answer into the application the user asked from.
+ * 
+ * This is the Insert button. When the question was about selected text and that
+ * selection is still live, the paste replaces it, because that is simply what a
+ * paste over a selection does. When there was no selection, it lands at the
+ * caret.
+ * 
+ * Deliberately a button rather than something automatic. `SetForegroundWindow`
+ * restores *focus* but not a *selection*: most native edit controls keep their
+ * selection across a focus change, but some collapse it to a caret on blur, and
+ * `contenteditable` in browsers varies. In those cases a "replace" silently
+ * becomes an "insert" and the user ends up with both the original text and the
+ * rewrite. That cannot be detected before pasting, so the destructive version
+ * stays an explicit act the user takes while looking at the answer.
+ * 
  * Copy an answer through the app's own clipboard, not the webview's: HTML
  * beside the Markdown when `html` is given, the Markdown alone otherwise.
  * 
@@ -4576,6 +4613,28 @@ export type AssistantSearchDepth =
  * or three searches from different angles.
  */
 "high"
+/**
+ * Lifetime assistant use: quick asks, and calls with what was said on them.
+ * Like [`UsageStats`], these survive conversations being deleted or pruned.
+ */
+export type AssistantUsage = { asks: number; call_turns: number; calls: number; call_seconds: number; 
+/**
+ * Every day with any assistant use, ascending.
+ */
+active_days: string[]; 
+/**
+ * Days within the last `USAGE_RECENT_WINDOW_DAYS` local days including
+ * today, ascending. Days without use are omitted.
+ */
+recent_days: AssistantUsageDay[] }
+/**
+ * One local day of assistant use, for the Insights activity grid.
+ */
+export type AssistantUsageDay = { 
+/**
+ * Local calendar date, `%Y-%m-%d`.
+ */
+day: string; asks: number; call_turns: number; calls: number; call_seconds: number }
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 /**
  * How much an ElevenLabs v3/v4 voice performs when audio tags are on
@@ -5123,6 +5182,23 @@ export type ImplementationChangeResult = { success: boolean;
  */
 reset_bindings: string[] }
 /**
+ * Everything the Insights page shows.
+ */
+export type Insights = { dictation: UsageStats; assistant: AssistantUsage; meetings: MeetingUsage; 
+/**
+ * Consecutive days with any use, ending today or yesterday (see
+ * [`compute_streaks`]).
+ */
+current_streak_days: number; longest_streak_days: number; 
+/**
+ * Days with any use.
+ */
+active_days: number; 
+/**
+ * The first day anything was counted, `%Y-%m-%d`.
+ */
+first_day: string | null }
+/**
  * What the SpeakoFlow keys engine is missing. Each needs its own fix.
  */
 export type KeyboardAccessGap = 
@@ -5347,6 +5423,31 @@ export type MeetingStatus =
  * transcribed is intact and readable.
  */
 "interrupted"
+/**
+ * Lifetime meetings: how many, how long, and how much was said in them.
+ */
+export type MeetingUsage = { meetings: number; seconds: number; 
+/**
+ * Words in the transcripts, everyone's, not only the user's.
+ */
+words: number; longest_seconds: number; 
+/**
+ * Every day a meeting started on, ascending.
+ */
+active_days: string[]; 
+/**
+ * Days within the recent window, ascending. Days without a meeting are
+ * omitted.
+ */
+recent_days: MeetingUsageDay[] }
+/**
+ * One local day of meetings, for the Insights activity grid.
+ */
+export type MeetingUsageDay = { 
+/**
+ * Local calendar date the meetings started on, `%Y-%m-%d`.
+ */
+day: string; meetings: number; seconds: number; words: number }
 /**
  * How sure we are about a remembered fact. Facts the user stated explicitly
  * are `High`; facts the model inferred from a conversation are `Low`. Feeds
