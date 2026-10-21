@@ -7,6 +7,8 @@ import {
   isOffered,
   matchesFilters,
   NO_FILTERS,
+  RECOMMENDED_FOR_LANGUAGE,
+  recommendedModels,
 } from "./speechCatalog";
 
 const model = (overrides: Partial<ModelInfo> & { id: string }): ModelInfo => ({
@@ -135,5 +137,126 @@ describe("filterLanguages", () => {
         }),
       ]),
     ).toEqual(["en", "no", "zh", "yue"]);
+  });
+});
+
+describe("recommendedModels", () => {
+  const ids = (list: ModelInfo[]) => list.map((m) => m.id);
+  const parakeet = model({
+    id: "parakeet",
+    is_recommended: true,
+    recommended_rank: 1,
+    supported_languages: ["en", "de"],
+  });
+  const whisperMedium = model({
+    id: "whisper-medium",
+    is_recommended: true,
+    recommended_rank: 2,
+    supported_languages: ["en", "ru", "ne"],
+  });
+  const canary = model({
+    id: "canary",
+    accuracy_score: 0.9,
+    speed_score: 0.5,
+    supported_languages: ["en", "ru"],
+  });
+  const fastSmall = model({
+    id: "fast-small",
+    accuracy_score: 0.5,
+    speed_score: 0.9,
+    supported_languages: ["ru"],
+  });
+  // Most accurate, but too slow to keep up: the balanced score puts it last.
+  const huge = model({
+    id: "huge",
+    accuracy_score: 0.95,
+    speed_score: 0.1,
+    supported_languages: ["ru"],
+  });
+  const catalog = [huge, fastSmall, canary, whisperMedium, parakeet];
+
+  test("all languages: the catalog's own picks, in catalog order", () => {
+    expect(ids(recommendedModels(catalog, "all"))).toEqual([
+      "parakeet",
+      "whisper-medium",
+    ]);
+  });
+
+  test("one language keeps only the picks that hear it", () => {
+    const enPicks = [
+      parakeet,
+      whisperMedium,
+      model({
+        id: "nemotron",
+        is_recommended: true,
+        recommended_rank: 3,
+        supported_languages: ["en"],
+      }),
+    ];
+    // Three picks hear English, so nothing is topped up.
+    expect(ids(recommendedModels([...enPicks, canary], "en"))).toEqual([
+      "parakeet",
+      "whisper-medium",
+      "nemotron",
+    ]);
+    // Only Parakeet hears German, and no other model does.
+    expect(ids(recommendedModels(catalog, "de"))).toEqual(["parakeet"]);
+  });
+
+  test(`tops up to ${RECOMMENDED_FOR_LANGUAGE} by accuracy and speed together`, () => {
+    // canary 0.74, fast-small 0.66, huge 0.61: the most accurate model loses
+    // to two that can keep up.
+    expect(ids(recommendedModels(catalog, "ru"))).toEqual([
+      "whisper-medium",
+      "canary",
+      "fast-small",
+    ]);
+  });
+
+  test("a score tie falls back to catalog order", () => {
+    const tied = [
+      model({ id: "b", name: "Beta", supported_languages: ["ne"] }),
+      model({ id: "a", name: "Alpha", supported_languages: ["ne"] }),
+    ];
+    expect(ids(recommendedModels(tied, "ne"))).toEqual(["a", "b"]);
+  });
+
+  test("a language only non-picks hear still gets a short list", () => {
+    expect(ids(recommendedModels(catalog, "ne"))).toEqual(["whisper-medium"]);
+    expect(
+      ids(
+        recommendedModels(
+          [
+            model({
+              id: "x",
+              supported_languages: ["ne"],
+              accuracy_score: 0.4,
+            }),
+            model({
+              id: "y",
+              supported_languages: ["ne"],
+              accuracy_score: 0.8,
+            }),
+          ],
+          "ne",
+        ),
+      ),
+    ).toEqual(["y", "x"]);
+  });
+
+  test("never recommends a legacy, retired, custom or local model", () => {
+    const own = [
+      model({ id: "legacy", is_legacy: true, accuracy_score: 1 }),
+      model({ id: "retired", is_retired: true, accuracy_score: 1 }),
+      model({ id: "custom", is_custom: true, accuracy_score: 1 }),
+      model({ id: "local", local_path: "/models/x.gguf", accuracy_score: 1 }),
+      model({
+        id: "retired-pick",
+        is_recommended: true,
+        is_retired: true,
+      }),
+    ];
+    expect(recommendedModels(own, "all")).toEqual([]);
+    expect(recommendedModels(own, "en")).toEqual([]);
   });
 });

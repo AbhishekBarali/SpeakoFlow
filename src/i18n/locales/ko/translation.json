@@ -700,6 +700,13 @@
       "description": "모델은 정확도와 속도를 맞바꿉니다 — 사용 중인 컴퓨터에 맞는 것을 고르세요.",
       "yourModels": "다운로드된 모델",
       "availableModels": "다운로드 가능",
+      "view": {
+        "label": "표시할 모델",
+        "all": "모든 모델"
+      },
+      "recommendedFor": "{{language}} 추천 모델",
+      "recommendedAllDownloaded": "추천 모델을 모두 다운로드했습니다.",
+      "browseAll": "모든 모델 보기",
       "downloaded": "다운로드됨",
       "available": "다운로드 가능",
       "deleteConfirm": "{{modelName}}을(를) 삭제하시겠습니까? 다시 사용하려면 새로 다운로드해야 합니다.",
@@ -1275,8 +1282,7 @@
           "description": "말하는 언어입니다. 여기 있는 모든 제공자는 같은 언어로 결과를 돌려줍니다. 미리 알려 주면 정확도가 올라가고, 자동을 선택하면 제공자가 언어를 직접 감지합니다."
         },
         "translate": {
-          "supported": "{{provider}}는 말한 언어 대신 영어로 결과를 돌려줄 수 있습니다. 영어만 가능하며, 다른 언어로 번역하는 전사 API는 없습니다.",
-          "unsupported": "{{provider}}는 말한 언어로만 전사하고 번역 엔드포인트가 없어 여기서는 사용할 수 없습니다. 기기 내 엔진이나 OpenAI, Groq, 직접 운영하는 Whisper 서버에서는 작동합니다."
+          "supported": "{{provider}}는 말한 언어 대신 영어로 결과를 돌려줄 수 있습니다. 영어만 가능하며, 다른 언어로 번역하는 전사 API는 없습니다."
         },
         "test": {
           "title": "연결 테스트",
@@ -3379,6 +3385,7 @@
     "goHome": "단축키 보기",
     "figures": {
       "dictations": "받아쓰기 횟수",
+      "dictationsInfo": "길이와 관계없이 받아쓰기 한 번을 1회로 셉니다.",
       "questions": "질문한 횟수",
       "meetings": "녹음한 회의"
     },

@@ -706,6 +706,13 @@
       "description": "Modely vyměňují přesnost za rychlost — vyberte ten, který se hodí pro váš počítač.",
       "yourModels": "Stažené modely",
       "availableModels": "Dostupné ke stažení",
+      "view": {
+        "label": "Které modely zobrazit",
+        "all": "Všechny modely"
+      },
+      "recommendedFor": "Doporučené: {{language}}",
+      "recommendedAllDownloaded": "Všechny doporučené modely už máte.",
+      "browseAll": "Procházet všechny modely",
       "downloaded": "Staženo",
       "available": "Dostupné ke stažení",
       "deleteConfirm": "Opravdu chcete smazat {{modelName}}? Abyste ho mohli znovu použít, budete ho muset znovu stáhnout.",
@@ -1293,8 +1300,7 @@
           "description": "Jazyk, kterým mluvíte. Každý zdejší poskytovatel odpovídá ve stejném jazyce — když ho uvedete předem, zlepší se přesnost, a volba Automaticky nechá jazyk rozpoznat sama."
         },
         "translate": {
-          "supported": "{{provider}} umí místo jazyka, kterým jste mluvili, vrátit angličtinu. Pouze angličtinu — žádné přepisové API nepřekládá do jiného jazyka.",
-          "unsupported": "{{provider}} přepisuje v jazyce, kterým mluvíte, a nemá koncový bod pro překlad, takže tady to nepůjde. Funguje to s modulem v zařízení a u OpenAI, Groq nebo vlastního serveru Whisper."
+          "supported": "{{provider}} umí místo jazyka, kterým jste mluvili, vrátit angličtinu. Pouze angličtinu — žádné přepisové API nepřekládá do jiného jazyka."
         },
         "test": {
           "title": "Otestovat připojení",
@@ -3465,7 +3471,8 @@
     "nothingYet": "Přehledy se zobrazí, jakmile začnete diktovat, ptát se asistenta nebo nahrávat schůzky.",
     "goHome": "Zobrazit zkratky",
     "figures": {
-      "dictations": "Diktování",
+      "dictations": "Počet diktování",
+      "dictationsInfo": "Každé diktování se počítá jednou, ať je jakkoli dlouhé.",
       "questions": "Položené otázky",
       "meetings": "Nahrané schůzky"
     },

@@ -62,6 +62,8 @@ export const ModelRow: React.FC<{
   badges?: React.ReactNode;
   /** A line of capabilities under the subtitle. */
   meta?: React.ReactNode;
+  /** Accuracy and speed, 0–1, drawn as two bars in their own column. */
+  scores?: ModelScores | null;
   size?: string;
   action: ModelRowAction;
   menu?: MenuItem[];
@@ -76,6 +78,7 @@ export const ModelRow: React.FC<{
   subtitle,
   badges,
   meta,
+  scores,
   size,
   action,
   menu,
@@ -85,6 +88,8 @@ export const ModelRow: React.FC<{
 }) => {
   const { t } = useTranslation();
   const percent = Math.max(0, Math.min(100, progress?.percent ?? 0));
+  const shownScores =
+    scores && (scores.accuracy > 0 || scores.speed > 0) ? scores : null;
 
   return (
     <article
@@ -115,17 +120,31 @@ export const ModelRow: React.FC<{
               {subtitle}
             </p>
           )}
-          {(meta || size) && (
+          {(meta || size || shownScores) && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-              {/* In a narrow row the size joins this line, which leaves the
-                  name and its description the room to be read. */}
+              {/* In a narrow row the size and the scores join this line,
+                  which leaves the name and its description the room to be
+                  read. */}
               {size && (
                 <span className="tabular-nums @[34rem]:hidden">{size}</span>
               )}
               {meta}
+              {shownScores && (
+                <span className="contents @[44rem]:hidden">
+                  <ScoreBars scores={shownScores} inline />
+                </span>
+              )}
             </div>
           )}
         </div>
+
+        {/* Their own column in a wide row, so the bars line up down the list
+            and two models compare at a glance. */}
+        {shownScores && (
+          <div className="hidden shrink-0 @[44rem]:block">
+            <ScoreBars scores={shownScores} />
+          </div>
+        )}
 
         {size && (
           <span className="hidden shrink-0 text-xs text-muted tabular-nums @[34rem]:inline">
@@ -260,28 +279,79 @@ export const ModelRow: React.FC<{
   );
 };
 
-/** Accuracy or speed as five quiet dots: a comparison, not a number to read. */
-export const ScoreDots: React.FC<{ label: string; score: number }> = ({
-  label,
-  score,
+/** A model's accuracy and speed, each 0–1 (0 when the catalog has none). */
+export interface ModelScores {
+  accuracy: number;
+  speed: number;
+}
+
+/**
+ * Accuracy and speed as two thin bars: a comparison, not a number to read.
+ * They used to be five dots each, and ten dots on every one of 69 rows piled
+ * up into noise; one line per score reads at a glance and shows the small
+ * differences five dots rounded away.
+ *
+ * Stacked in a column of their own on a wide row, so every row's bars sit in
+ * the same place; side by side on the capability line when the row is narrow
+ * (`inline`).
+ */
+export const ScoreBars: React.FC<{ scores: ModelScores; inline?: boolean }> = ({
+  scores,
+  inline = false,
 }) => {
-  const filled = Math.max(0, Math.min(5, Math.round(score * 5)));
+  const { t } = useTranslation();
+  const rows = [
+    {
+      key: "accuracy",
+      label: t("onboarding.modelCard.accuracy"),
+      score: scores.accuracy,
+    },
+    {
+      key: "speed",
+      label: t("onboarding.modelCard.speed"),
+      score: scores.speed,
+    },
+  ].filter((row) => row.score > 0);
   return (
     <span
-      className="inline-flex items-center gap-1.5"
-      role="img"
-      aria-label={`${label}: ${filled}/5`}
-      title={`${label}: ${filled}/5`}
+      className={
+        inline
+          ? "inline-flex items-center gap-x-3"
+          : "grid grid-cols-[auto_4.5rem] items-center gap-x-2.5 gap-y-1.5"
+      }
     >
-      <span className="capitalize">{label}</span>
-      <span aria-hidden="true" className="flex gap-[3px]">
-        {Array.from({ length: 5 }, (_, index) => (
+      {rows.map((row) => {
+        const pct = Math.max(0, Math.min(100, Math.round(row.score * 100)));
+        const meter = (
           <span
-            key={index}
-            className={`h-1.5 w-1.5 rounded-full ${index < filled ? "bg-ink/55" : "bg-ink/15"}`}
-          />
-        ))}
-      </span>
+            role="meter"
+            aria-label={row.label}
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            title={`${row.label}: ${Math.round(pct / 10)}/10`}
+            className={`block h-1 overflow-hidden rounded-full bg-ink/10 ${inline ? "w-12" : "w-full"}`}
+          >
+            <span
+              className="block h-full rounded-full bg-accent/75"
+              style={{ width: `${pct}%` }}
+            />
+          </span>
+        );
+        return inline ? (
+          <span key={row.key} className="inline-flex items-center gap-1.5">
+            <span className="capitalize">{row.label}</span>
+            {meter}
+          </span>
+        ) : (
+          <React.Fragment key={row.key}>
+            <span className="text-[0.6875rem] leading-none text-muted capitalize">
+              {row.label}
+            </span>
+            {meter}
+          </React.Fragment>
+        );
+      })}
     </span>
   );
 };

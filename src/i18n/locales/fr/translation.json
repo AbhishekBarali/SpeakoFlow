@@ -704,6 +704,13 @@
       "description": "Les modèles échangent la précision contre la vitesse — choisissez-en un adapté à votre machine.",
       "yourModels": "Modèles téléchargés",
       "availableModels": "Disponibles au téléchargement",
+      "view": {
+        "label": "Modèles à afficher",
+        "all": "Tous les modèles"
+      },
+      "recommendedFor": "Recommandés : {{language}}",
+      "recommendedAllDownloaded": "Vous avez déjà tous les modèles recommandés.",
+      "browseAll": "Parcourir tous les modèles",
       "downloaded": "Téléchargés",
       "available": "Disponibles au téléchargement",
       "deleteConfirm": "Voulez-vous vraiment supprimer {{modelName}} ? Vous devrez le télécharger à nouveau pour l'utiliser.",
@@ -1287,8 +1294,7 @@
           "description": "La langue que vous parlez. Tous les fournisseurs ici répondent dans cette même langue : l'indiquer à l'avance améliore la précision, et Auto le laisse détecter la langue lui-même."
         },
         "translate": {
-          "supported": "{{provider}} peut renvoyer de l'anglais au lieu de la langue parlée. Uniquement l'anglais : aucune API de transcription ne traduit vers une autre langue.",
-          "unsupported": "{{provider}} transcrit dans la langue que vous parlez et n'a pas de point de terminaison de traduction, donc cette option ne peut pas fonctionner ici. Elle fonctionne avec le moteur local, ainsi qu'avec OpenAI, Groq ou un serveur Whisper auto-hébergé."
+          "supported": "{{provider}} peut renvoyer de l'anglais au lieu de la langue parlée. Uniquement l'anglais : aucune API de transcription ne traduit vers une autre langue."
         },
         "test": {
           "title": "Tester la connexion",
@@ -3436,7 +3442,8 @@
     "nothingYet": "Vos statistiques apparaîtront dès que vous dicterez, poserez une question à l'assistant ou enregistrerez une réunion.",
     "goHome": "Voir vos raccourcis",
     "figures": {
-      "dictations": "Dictées",
+      "dictations": "Nombre de dictées",
+      "dictationsInfo": "Chaque dictée compte une fois, quelle que soit sa durée.",
       "questions": "Questions posées",
       "meetings": "Réunions enregistrées"
     },

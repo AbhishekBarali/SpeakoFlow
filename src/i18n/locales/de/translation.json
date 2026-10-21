@@ -702,6 +702,13 @@
       "description": "Modelle tauschen Genauigkeit gegen Geschwindigkeit — wähle eins, das zu deinem Rechner passt.",
       "yourModels": "Heruntergeladene Modelle",
       "availableModels": "Zum Download verfügbar",
+      "view": {
+        "label": "Welche Modelle angezeigt werden",
+        "all": "Alle Modelle"
+      },
+      "recommendedFor": "Empfohlen für {{language}}",
+      "recommendedAllDownloaded": "Du hast bereits alle empfohlenen Modelle.",
+      "browseAll": "Alle Modelle ansehen",
       "downloaded": "Heruntergeladen",
       "available": "Zum Download verfügbar",
       "deleteConfirm": "Möchtest du {{modelName}} wirklich löschen? Um es wieder zu nutzen, musst du es erneut herunterladen.",
@@ -1281,8 +1288,7 @@
           "description": "Die Sprache, die du sprichst. Jeder Anbieter hier antwortet in genau dieser Sprache – wenn du sie vorab angibst, wird die Genauigkeit besser, und mit „Automatisch“ erkennt er die Sprache selbst."
         },
         "translate": {
-          "supported": "{{provider}} kann statt der gesprochenen Sprache Englisch zurückgeben. Nur Englisch – keine Transkriptions-API übersetzt in eine andere Sprache.",
-          "unsupported": "{{provider}} transkribiert in der Sprache, die du sprichst, und hat keinen Übersetzungsendpunkt, deshalb geht das hier nicht. Es funktioniert mit der Engine auf dem Gerät sowie mit OpenAI, Groq oder einem selbst gehosteten Whisper-Server."
+          "supported": "{{provider}} kann statt der gesprochenen Sprache Englisch zurückgeben. Nur Englisch – keine Transkriptions-API übersetzt in eine andere Sprache."
         },
         "test": {
           "title": "Verbindung testen",
@@ -3407,7 +3413,8 @@
     "nothingYet": "Deine Statistiken erscheinen, sobald du diktierst, dem Assistenten eine Frage stellst oder ein Meeting aufnimmst.",
     "goHome": "Deine Tastenkürzel ansehen",
     "figures": {
-      "dictations": "Diktate",
+      "dictations": "Anzahl Diktate",
+      "dictationsInfo": "Jedes Diktat zählt einmal, egal wie lang es ist.",
       "questions": "Gestellte Fragen",
       "meetings": "Aufgenommene Meetings"
     },

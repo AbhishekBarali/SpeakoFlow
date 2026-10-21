@@ -704,6 +704,13 @@
       "description": "Os modelos trocam precisão por velocidade — escolha um que caiba na sua máquina.",
       "yourModels": "Modelos baixados",
       "availableModels": "Disponíveis para download",
+      "view": {
+        "label": "Quais modelos mostrar",
+        "all": "Todos os modelos"
+      },
+      "recommendedFor": "Recomendados: {{language}}",
+      "recommendedAllDownloaded": "Você já tem todos os modelos recomendados.",
+      "browseAll": "Ver todos os modelos",
       "downloaded": "Baixados",
       "available": "Disponíveis para download",
       "deleteConfirm": "Tem certeza de que deseja excluir {{modelName}}? Você precisará baixá-lo novamente para usá-lo.",
@@ -1287,8 +1294,7 @@
           "description": "O idioma em que você fala. Todos os provedores aqui respondem nesse mesmo idioma — informá-lo de antemão melhora a precisão, e Automático deixa o provedor detectar o idioma sozinho."
         },
         "translate": {
-          "supported": "O {{provider}} pode devolver o texto em inglês em vez do idioma que você falou. Só inglês — nenhuma API de transcrição traduz para outro idioma.",
-          "unsupported": "O {{provider}} transcreve no idioma em que você fala e não tem endpoint de tradução, então isto não funciona aqui. Funciona no motor do dispositivo e no OpenAI, no Groq ou em um servidor Whisper próprio."
+          "supported": "O {{provider}} pode devolver o texto em inglês em vez do idioma que você falou. Só inglês — nenhuma API de transcrição traduz para outro idioma."
         },
         "test": {
           "title": "Testar conexão",
@@ -3436,7 +3442,8 @@
     "nothingYet": "Suas estatísticas aparecem assim que você dita, faz uma pergunta ao assistente ou grava uma reunião.",
     "goHome": "Ver seus atalhos",
     "figures": {
-      "dictations": "Ditados",
+      "dictations": "Número de ditados",
+      "dictationsInfo": "Cada ditado conta uma vez, seja qual for a duração.",
       "questions": "Perguntas feitas",
       "meetings": "Reuniões gravadas"
     },
