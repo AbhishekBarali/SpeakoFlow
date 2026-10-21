@@ -2610,6 +2610,7 @@
       "intro": "Alla kortkommandon fungerar i alla appar. Klicka på ett kortkommando för att spela in ett nytt.",
       "dictation": "Diktering",
       "assistant": "Assistent",
+      "mouse": "Mus",
       "cleanupOff": "Slå på AI-rensning för att få det här kortkommandot.",
       "assistantOff": "Assistenten är avstängd, så dess kortkommandon gör ingenting."
     },

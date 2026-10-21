@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  appNotes,
   buildManifest,
   classifyDmg,
   classifyUpdaterAsset,
@@ -310,6 +311,69 @@ describe("notesForApp (the update card renders markdown with HTML off)", () => {
     });
     expect(manifest.notes).not.toContain("<br");
     expect(manifest.notes).toBe("Intro.\n\n### New\n\n- Thing.  \n");
+  });
+});
+
+describe("appNotes (the card's own text in the release body)", () => {
+  const page = [
+    "<!-- app-notes",
+    "### New",
+    "",
+    "- **Mouse buttons** are a normal setting now.",
+    "-->",
+    "",
+    "## SpeakoFlow 2.2.0",
+    "",
+    "Everything, in detail.",
+    "",
+    "| Your computer | Download this |",
+    "| --- | --- |",
+    "",
+    "```bash",
+    "xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app",
+    "```",
+  ].join("\n");
+
+  test("the card gets only the block, never the download table", () => {
+    expect(appNotes(page)).toBe(
+      "### New\n\n- **Mouse buttons** are a normal setting now.\n",
+    );
+  });
+
+  test("a body without the block is used whole, as before", () => {
+    const body = "## SpeakoFlow 2.1.0\n\n- A thing.\n";
+    expect(appNotes(body)).toBe(body);
+  });
+
+  test("an empty block falls back to the whole body", () => {
+    const body = "<!-- app-notes\n\n-->\n\n## Notes\n";
+    expect(appNotes(body)).toBe(body);
+  });
+
+  test("Windows line endings and a block lower down are found", () => {
+    const body = "Intro.\r\n\r\n<!-- app-notes\r\n- One.\r\n-->\r\nMore.";
+    expect(appNotes(body)).toBe("- One.\n");
+  });
+
+  test("a mention of the marker mid-line is not a block", () => {
+    const body = "Write `<!-- app-notes` on its own line.\n-->\n";
+    expect(appNotes(body)).toBe(body);
+  });
+
+  test("buildManifest puts only the block in latest.json", () => {
+    const manifest = buildManifest({
+      version: "2.2.0",
+      notes: page,
+      pubDate: "2026-10-21T00:00:00.000Z",
+      repo: "AbhishekBarali/SpeakoFlow",
+      tag: "v2.2.0",
+      assetNames: [],
+      signatures: new Map(),
+    });
+    expect(manifest.notes).toBe(
+      "### New\n\n- **Mouse buttons** are a normal setting now.\n",
+    );
+    expect(manifest.notes).not.toContain("xattr");
   });
 });
 

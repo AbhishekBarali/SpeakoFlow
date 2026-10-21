@@ -10,6 +10,12 @@ name: "Updater manifest"
 # the published bytes, so a manifest that an installed app would reject is
 # never published.
 #
+# The update card shows latest.json's notes. When the release body has an
+# `<!-- app-notes ... -->` block (hidden on GitHub), the card gets only that
+# block; otherwise it gets the whole body. Write the block when the release
+# page carries download tables or install steps, which have no place in an
+# update the app is already installing.
+#
 # Once latest.json is uploaded, the .sig files the build attached are deleted:
 # the signatures are inside latest.json now, and installed apps never download
 # a .sig, so they would only clutter the release's file list.
