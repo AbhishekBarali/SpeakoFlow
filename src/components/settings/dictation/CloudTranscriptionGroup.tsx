@@ -308,9 +308,9 @@ export const CloudTranscriptionGroup: React.FC<{
 
   // Whether "Translate to English" has anywhere to go on this provider. Only the
   // OpenAI schema has a translation route, and its output language is fixed to
-  // English — no cloud transcription endpoint here can translate into an
-  // arbitrary language, so the row says which of the two situations applies
-  // rather than offering a switch that would do nothing.
+  // English. Where there is no route the row is not shown at all: a greyed-out
+  // switch with a paragraph on why it cannot work was a row about something
+  // the user cannot use.
   const supportsTranslation = provider?.supports_translation ?? false;
 
   const engineRow = (
@@ -599,22 +599,17 @@ export const CloudTranscriptionGroup: React.FC<{
         </Alert>
       )}
 
-      <TranslateToEnglish
-        descriptionMode="inline"
-        grouped={true}
-        icon={Languages}
-        tone="violet"
-        disabled={!supportsTranslation}
-        description={
-          supportsTranslation
-            ? t("settings.dictation.cloud.translate.supported", {
-                provider: provider?.label ?? "",
-              })
-            : t("settings.dictation.cloud.translate.unsupported", {
-                provider: provider?.label ?? "",
-              })
-        }
-      />
+      {supportsTranslation && (
+        <TranslateToEnglish
+          descriptionMode="inline"
+          grouped={true}
+          icon={Languages}
+          tone="violet"
+          description={t("settings.dictation.cloud.translate.supported", {
+            provider: provider?.label ?? "",
+          })}
+        />
+      )}
     </>
   );
 

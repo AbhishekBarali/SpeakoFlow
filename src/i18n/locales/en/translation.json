@@ -702,6 +702,13 @@
       "description": "Models trade accuracy for speed — pick one that fits your machine.",
       "yourModels": "Downloaded models",
       "availableModels": "Available to download",
+      "view": {
+        "label": "Which models to show",
+        "all": "All models"
+      },
+      "recommendedFor": "Recommended for {{language}}",
+      "recommendedAllDownloaded": "You already have every recommended model.",
+      "browseAll": "Browse all models",
       "downloaded": "Downloaded",
       "available": "Available to download",
       "deleteConfirm": "Are you sure you want to delete {{modelName}}? You'll need to download it again to use it.",
@@ -1281,8 +1288,7 @@
           "description": "The language you speak. Every provider here answers in that same language — telling it up front improves accuracy, and Auto lets it detect the language itself."
         },
         "translate": {
-          "supported": "{{provider}} can return English instead of the language you spoke. Only English — no transcription API translates into another language.",
-          "unsupported": "{{provider}} transcribes in the language you speak and has no translation endpoint, so this cannot run here. It works on the on-device engine, and on OpenAI, Groq, or a self-hosted Whisper server."
+          "supported": "{{provider}} can return English instead of the language you spoke. Only English — no transcription API translates into another language."
         },
         "test": {
           "title": "Test connection",
@@ -3407,7 +3413,8 @@
     "nothingYet": "Your insights appear once you dictate, ask the assistant or record a meeting.",
     "goHome": "See your shortcuts",
     "figures": {
-      "dictations": "Dictations",
+      "dictations": "Times dictated",
+      "dictationsInfo": "Each dictation counts once, however long it is.",
       "questions": "Questions asked",
       "meetings": "Meetings recorded"
     },

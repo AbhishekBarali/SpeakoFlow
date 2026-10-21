@@ -700,6 +700,13 @@
       "description": "Các mô hình đánh đổi độ chính xác lấy tốc độ — hãy chọn mô hình phù hợp với máy của bạn.",
       "yourModels": "Mô hình đã tải",
       "availableModels": "Có thể tải xuống",
+      "view": {
+        "label": "Mô hình hiển thị",
+        "all": "Tất cả mô hình"
+      },
+      "recommendedFor": "Đề xuất cho {{language}}",
+      "recommendedAllDownloaded": "Bạn đã có tất cả mô hình đề xuất.",
+      "browseAll": "Xem tất cả mô hình",
       "downloaded": "Đã tải xuống",
       "available": "Có thể tải xuống",
       "deleteConfirm": "Bạn có chắc muốn xóa {{modelName}}? Bạn sẽ cần tải lại để sử dụng.",
@@ -1275,8 +1282,7 @@
           "description": "Ngôn ngữ bạn nói. Mọi nhà cung cấp ở đây đều trả kết quả bằng chính ngôn ngữ đó — báo trước giúp tăng độ chính xác, còn Tự động để họ tự nhận biết ngôn ngữ."
         },
         "translate": {
-          "supported": "{{provider}} có thể trả về tiếng Anh thay vì ngôn ngữ bạn đã nói. Chỉ tiếng Anh — không API chuyển đổi giọng nói nào dịch sang ngôn ngữ khác.",
-          "unsupported": "{{provider}} chuyển đổi theo ngôn ngữ bạn nói và không có endpoint dịch, nên không thể dùng ở đây. Tính năng này hoạt động với công cụ trên thiết bị, và trên OpenAI, Groq hoặc một máy chủ Whisper tự vận hành."
+          "supported": "{{provider}} có thể trả về tiếng Anh thay vì ngôn ngữ bạn đã nói. Chỉ tiếng Anh — không API chuyển đổi giọng nói nào dịch sang ngôn ngữ khác."
         },
         "test": {
           "title": "Kiểm tra kết nối",
@@ -3379,6 +3385,7 @@
     "goHome": "Xem phím tắt",
     "figures": {
       "dictations": "Lượt đọc chính tả",
+      "dictationsInfo": "Mỗi lượt đọc chính tả được tính một lần, dù dài hay ngắn.",
       "questions": "Câu hỏi đã hỏi",
       "meetings": "Cuộc họp đã ghi âm"
     },

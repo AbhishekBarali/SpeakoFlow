@@ -702,6 +702,13 @@
       "description": "Modellerna byter noggrannhet mot hastighet — välj en som passar din dator.",
       "yourModels": "Nedladdade modeller",
       "availableModels": "Tillgängliga att ladda ner",
+      "view": {
+        "label": "Vilka modeller som visas",
+        "all": "Alla modeller"
+      },
+      "recommendedFor": "Rekommenderade: {{language}}",
+      "recommendedAllDownloaded": "Du har redan alla rekommenderade modeller.",
+      "browseAll": "Bläddra bland alla modeller",
       "downloaded": "Nedladdad",
       "available": "Tillgängliga att ladda ner",
       "deleteConfirm": "Vill du verkligen ta bort {{modelName}}? Du måste ladda ner den igen för att använda den.",
@@ -1281,8 +1288,7 @@
           "description": "Språket du talar. Alla leverantörer här svarar på samma språk — att ange det i förväg förbättrar noggrannheten, och med Auto känner den igen språket själv."
         },
         "translate": {
-          "supported": "{{provider}} kan returnera engelska i stället för språket du talade. Bara engelska — inget transkriberings-API översätter till något annat språk.",
-          "unsupported": "{{provider}} transkriberar på språket du talar och har ingen översättningsslutpunkt, så detta kan inte köras här. Det fungerar med motorn på enheten och med OpenAI, Groq eller en egen Whisper-server."
+          "supported": "{{provider}} kan returnera engelska i stället för språket du talade. Bara engelska — inget transkriberings-API översätter till något annat språk."
         },
         "test": {
           "title": "Testa anslutningen",
@@ -3407,7 +3413,8 @@
     "nothingYet": "Din statistik visas när du har dikterat, frågat assistenten eller spelat in ett möte.",
     "goHome": "Visa dina kortkommandon",
     "figures": {
-      "dictations": "Dikteringar",
+      "dictations": "Antal dikteringar",
+      "dictationsInfo": "Varje diktering räknas en gång, oavsett hur lång den är.",
       "questions": "Ställda frågor",
       "meetings": "Inspelade möten"
     },

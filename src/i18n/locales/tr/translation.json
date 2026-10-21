@@ -702,6 +702,13 @@
       "description": "Modeller doğruluktan ödün vererek hız kazanır — makinenize uyanı seçin.",
       "yourModels": "İndirilen modeller",
       "availableModels": "İndirilebilir",
+      "view": {
+        "label": "Gösterilecek modeller",
+        "all": "Tüm modeller"
+      },
+      "recommendedFor": "{{language}} için önerilen",
+      "recommendedAllDownloaded": "Önerilen modellerin hepsine zaten sahipsiniz.",
+      "browseAll": "Tüm modellere göz at",
       "downloaded": "İndirildi",
       "available": "İndirilebilir",
       "deleteConfirm": "{{modelName}} modelini silmek istediğinizden emin misiniz? Kullanmak için tekrar indirmeniz gerekecek.",
@@ -1281,8 +1288,7 @@
           "description": "Konuştuğunuz dil. Buradaki her sağlayıcı aynı dilde yanıt verir — bunu baştan belirtmek doğruluğu artırır; Otomatik ise dili kendisinin algılamasını sağlar."
         },
         "translate": {
-          "supported": "{{provider}}, konuştuğunuz dil yerine İngilizce döndürebilir. Yalnızca İngilizce — hiçbir transkripsiyon API'si başka bir dile çeviri yapmaz.",
-          "unsupported": "{{provider}} konuştuğunuz dilde yazıya döker ve bir çeviri uç noktası yoktur, bu yüzden bu özellik burada çalışamaz. Cihaz içi motorda ve OpenAI, Groq ya da kendi barındırdığınız bir Whisper sunucusunda çalışır."
+          "supported": "{{provider}}, konuştuğunuz dil yerine İngilizce döndürebilir. Yalnızca İngilizce — hiçbir transkripsiyon API'si başka bir dile çeviri yapmaz."
         },
         "test": {
           "title": "Bağlantıyı test et",
@@ -3407,7 +3413,8 @@
     "nothingYet": "Dikte ettiğinizde, asistana sorduğunuzda ya da bir toplantı kaydettiğinizde istatistikleriniz görünür.",
     "goHome": "Kısayolları göster",
     "figures": {
-      "dictations": "Dikteler",
+      "dictations": "Dikte sayısı",
+      "dictationsInfo": "Her dikte, uzunluğu ne olursa olsun bir kez sayılır.",
       "questions": "Sorulan sorular",
       "meetings": "Kaydedilen toplantılar"
     },

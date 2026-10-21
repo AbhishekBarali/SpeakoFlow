@@ -10,18 +10,14 @@ interface TranslateToEnglishProps {
   icon?: SettingIcon;
   tone?: SettingTone;
   /**
-   * Shown under the label. Used by the cloud group to say what this engine can
-   * and cannot do, since "Translate to English" is a Whisper task on the local
-   * side and a separate `/audio/translations` route on the cloud side — and
-   * several cloud providers have neither.
+   * Shown under the label. Used by the cloud group to say what this engine
+   * does, since "Translate to English" is a Whisper task on the local side and
+   * a separate `/audio/translations` route on the cloud side. Callers render
+   * the row only where translation is available (a local model with
+   * `supports_translation`, a cloud provider with a translation route); a
+   * locked, greyed-out switch read as broken.
    */
   description?: string;
-  /**
-   * Locked off. The row still renders on purpose: hiding it would leave a user
-   * who knows the feature exists hunting for a switch that is simply not
-   * available for the provider they picked.
-   */
-  disabled?: boolean;
 }
 
 export const TranslateToEnglish: React.FC<TranslateToEnglishProps> = React.memo(
@@ -31,7 +27,6 @@ export const TranslateToEnglish: React.FC<TranslateToEnglishProps> = React.memo(
     icon,
     tone,
     description,
-    disabled = false,
   }) => {
     const { t } = useTranslation();
     const { getSetting, updateSetting, isUpdating } = useSettings();
@@ -40,10 +35,9 @@ export const TranslateToEnglish: React.FC<TranslateToEnglishProps> = React.memo(
 
     return (
       <ToggleSwitch
-        checked={!disabled && translateToEnglish}
+        checked={translateToEnglish}
         onChange={(enabled) => updateSetting("translate_to_english", enabled)}
         isUpdating={isUpdating("translate_to_english")}
-        disabled={disabled}
         label={t("settings.advanced.translateToEnglish.label")}
         description={description}
         icon={icon}
