@@ -157,6 +157,34 @@ export function assetUrl(repo: string, tag: string, name: string): string {
 const BR_TAG = /<br\s*\/?>/gi;
 const BR_ONLY_LINE = /^\s*<br\s*\/?>\s*$/i;
 const FENCE = /^\s*(```|~~~)/;
+const APP_NOTES = /^<!--[ \t]*app-notes[ \t]*\n([\s\S]*?)^-->[ \t]*$/m;
+
+/**
+ * The update card's own text, when the release body carries it.
+ *
+ * The release page tells the whole story: every change, which file to
+ * download, the SmartScreen and Gatekeeper steps. The update card has room
+ * for a short list, and with the page copied into it (2.1.0) it showed the
+ * download table and Terminal commands to people who were already updating.
+ * So a release body can hold the card's text in a comment, which GitHub does
+ * not display:
+ *
+ *     <!-- app-notes
+ *     ### New
+ *     - ...
+ *     -->
+ *
+ * Both markers sit on lines of their own. With the block, the card gets only
+ * what is inside it; without one, it gets the whole body, as before. Editing
+ * the block on a release that already has latest.json takes a re-run of
+ * updater-manifest.yml.
+ */
+export function appNotes(body: string): string {
+  const match = APP_NOTES.exec(body.replace(/\r\n?/g, "\n"));
+  if (!match) return body;
+  const notes = match[1].trim();
+  return notes ? `${notes}\n` : body;
+}
 
 /**
  * The release body is written for GitHub, which renders raw HTML, and a
@@ -241,7 +269,7 @@ export function buildManifest(input: BuildManifestInput): UpdaterManifest {
       platforms[primary] = platforms[key];
   }
 
-  const cardNotes = notesForApp(input.notes);
+  const cardNotes = notesForApp(appNotes(input.notes));
   const notes =
     cardNotes.length > MAX_NOTES_CHARS
       ? `${cardNotes.slice(0, MAX_NOTES_CHARS).trimEnd()}\n\n…`
