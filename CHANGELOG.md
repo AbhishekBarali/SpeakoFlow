@@ -4,14 +4,18 @@ What changed in each SpeakoFlow release. The release page on GitHub carries the
 highlights; this file has the full list. Versions before 2.0.0 are described on
 their [GitHub releases](https://github.com/AbhishekBarali/SpeakoFlow/releases).
 
-## Unreleased
+## 2.2.0
 
-One speech engine under every local model, and all 69 models in Handy's
-catalog to choose from, with filters for streaming, translation and language.
-The old Parakeet V2 and V3 and the other ONNX models move to the new engine
-with one download. Speech now has one Speech processing setting, long
-recordings are split at pauses, and Chinese transcripts can be written in
-Simplified or Traditional characters even with the language on Auto.
+A new speech engine under every local model, with all 69 models in Handy's
+catalog to choose from and the recommended ones first. Other audio can be
+lowered instead of muted while you dictate, Insights covers the assistant and
+meetings and can be shared as cards, and mouse buttons are an ordinary
+shortcut setting on Windows and macOS. Speech now has one Speech processing
+setting, long recordings are split at pauses, and Chinese transcripts can be
+written in Simplified or Traditional characters even with the language on Auto.
+
+**On 2.0.0 or later?** The app offers this update by itself. On 1.4 or
+earlier, download 2.2.0 once and install it over the old version.
 
 **Using Parakeet V2 or V3, Canary, Moonshine, SenseVoice, GigaAM or Cohere?**
 Those models ran on an engine SpeakoFlow no longer includes. After updating, a
@@ -25,11 +29,17 @@ delete them, which Delete old files on the Models page does in one click.
 
 ### New
 
-**Every model in the catalog.** The Speech to text tab lists all 69 models
-instead of five. Recommended ones still come first.
+**Every model in the catalog.** The Speech to text tab opens on Recommended:
+the models you have, then the recommended ones you don't. All models lists all 69.
 
-- Filter by Streaming, Translate, or the language you speak. Filters combine,
-  and when nothing matches, Clear filters puts the full list back.
+- Pick a language next to it, and Recommended shows the models that suit it.
+  When fewer than three of the usual five do, the best other models for that
+  language are added, ranked by accuracy and speed together.
+- Accuracy and speed are bars in their own columns, so they line up down the
+  list.
+- In All models, filter by Streaming, Translate, or the language you speak.
+  Filters combine, and when nothing matches, Clear filters puts the full list
+  back.
 - Each row says how many languages the model hears. Click the count for the
   list.
 - Every download is pinned to one version of the model and checked against its
@@ -94,6 +104,17 @@ made on your computer; nothing is uploaded.
 
 ### Changed
 
+- **Mouse buttons as shortcuts is no longer experimental** on Windows and
+  macOS. The switch is in Settings → Shortcuts → Mouse, and the middle, Back
+  and Forward buttons work there. On Linux it stays under Experimental, because
+  it needs the SpeakoFlow Keys engine and only the middle button works.
+- **Insights is quieter.** Each figure is a label and a number, and the line
+  that sat under it ("4.3× faster than typing", "Longest: 5 days") is in the
+  (i) beside the label. "Dictations" is now "Times dictated".
+- **Cloud speech settings show only what applies.** Translate to English is
+  hidden for providers that cannot translate, instead of a greyed-out switch.
+  Chinese script on Auto language shows when the app is in Chinese or a script
+  was already chosen.
 - **A mouse button sits next to a shortcut's keys, not in place of them.**
   With mouse buttons on, pressing one in the shortcut editor used to replace
   the keys it had, so Back turned Ctrl + Win into Back alone. Now the shortcut
@@ -121,6 +142,16 @@ made on your computer; nothing is uploaded.
 
 ### Fixed
 
+- **Assistant answers pasted as raw Markdown** in Word, Outlook, Gmail and
+  Google Docs: `**bold**` and a literal `1.` instead of bold text and a list.
+  Copy and Insert now give those apps the formatting, and Notepad, terminals,
+  code editors, GitHub and Slack still get the Markdown text.
+- **Linux: shortcuts stopped working for the rest of the session** after a
+  keyboard reconnected, the computer woke from sleep, or another program added
+  an input device. Super could also stay held after the app was opened with a
+  Super shortcut, as on Hyprland. Both were in the SpeakoFlow Keys engine, which
+  now takes over only keyboards, and only while no key on them is held. Thanks
+  to @ishangautam7.
 - **Moonshine Streaming cut dictations short or pasted the wrong words.** A
   55-second dictation could paste as "So I was thinking of", and "Our
   surprising is not that bad" as "Are". These models revise earlier words as
@@ -200,6 +231,18 @@ made on your computer; nothing is uploaded.
   loaded, because it reached the speech worker instead of the app.
 - **The main window had no title** in the taskbar preview, Alt+Tab, Task
   Manager and screen readers.
+
+### Downloads
+
+| Platform             | File                                                                |
+| -------------------- | ------------------------------------------------------------------- |
+| Windows              | `SpeakoFlow_2.2.0_x64-setup.exe` (or the `.msi`)                    |
+| macOS, Apple silicon | `SpeakoFlow_2.2.0_aarch64.dmg`                                      |
+| macOS, Intel         | `SpeakoFlow_2.2.0_x64.dmg`                                          |
+| Linux x86_64         | `SpeakoFlow_2.2.0_amd64.deb` or `SpeakoFlow_2.2.0_amd64.AppImage`   |
+| Linux ARM64          | `SpeakoFlow_2.2.0_arm64.deb` or `SpeakoFlow_2.2.0_aarch64.AppImage` |
+
+Every commit: [v2.1.0...v2.2.0](https://github.com/AbhishekBarali/SpeakoFlow/compare/v2.1.0...v2.2.0)
 
 ## 2.1.0
 
