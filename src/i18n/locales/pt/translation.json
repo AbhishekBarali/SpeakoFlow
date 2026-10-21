@@ -2628,6 +2628,7 @@
       "intro": "Todos os atalhos funcionam em qualquer app. Clique em um atalho para gravar um novo.",
       "dictation": "Ditado",
       "assistant": "Assistente",
+      "mouse": "Mouse",
       "cleanupOff": "Ative a limpeza com IA para ter este atalho.",
       "assistantOff": "O assistente está desativado, então os atalhos dele não fazem nada."
     },

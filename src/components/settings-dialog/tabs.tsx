@@ -200,6 +200,14 @@ export const ShortcutsTab: React.FC = () => {
           </ShortcutRow>
         )}
       </SettingsGroup>
+
+      {/* On Linux mouse buttons need the experimental keys engine and only
+          the middle button reaches it, so there it stays under Experimental. */}
+      {!isLinux && (
+        <SettingsGroup title={t("settingsDialog.shortcuts.mouse")}>
+          <MouseButtonShortcuts descriptionMode="tooltip" grouped={true} />
+        </SettingsGroup>
+      )}
     </>
   );
 };
@@ -331,6 +339,7 @@ export const AdvancedTab: React.FC = () => {
   const { t } = useTranslation();
   const { getSetting } = useSettings();
   const experimentalEnabled = getSetting("experimental_enabled") || false;
+  const isLinux = type() === "linux";
   return (
     <>
       <SettingsGroup title={t("settingsDialog.advanced.performance")}>
@@ -349,7 +358,10 @@ export const AdvancedTab: React.FC = () => {
             descriptionMode="tooltip"
             grouped={true}
           />
-          <MouseButtonShortcuts descriptionMode="tooltip" grouped={true} />
+          {/* Everywhere else it lives in Settings → Shortcuts. */}
+          {isLinux && (
+            <MouseButtonShortcuts descriptionMode="tooltip" grouped={true} />
+          )}
           <LazyStreamClose descriptionMode="tooltip" grouped={true} />
         </SettingsGroup>
       )}

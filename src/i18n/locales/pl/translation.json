@@ -2646,6 +2646,7 @@
       "intro": "Każdy skrót działa w dowolnej aplikacji. Kliknij skrót, aby nagrać nowy.",
       "dictation": "Dyktowanie",
       "assistant": "Asystent",
+      "mouse": "Mysz",
       "cleanupOff": "Włącz czyszczenie AI, aby korzystać z tego skrótu.",
       "assistantOff": "Asystent jest wyłączony, więc jego skróty nic nie robią."
     },

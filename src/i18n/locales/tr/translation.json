@@ -2610,6 +2610,7 @@
       "intro": "Her kısayol tüm uygulamalarda çalışır. Yenisini kaydetmek için bir kısayola tıklayın.",
       "dictation": "Dikte",
       "assistant": "Asistan",
+      "mouse": "Fare",
       "cleanupOff": "Bu kısayolu kullanmak için yapay zekâ temizlemeyi açın.",
       "assistantOff": "Asistan kapalı, bu yüzden kısayolları hiçbir şey yapmaz."
     },
