@@ -2610,6 +2610,7 @@
       "intro": "Jedes Tastenkürzel funktioniert in jeder App. Klicke auf ein Tastenkürzel, um ein neues aufzunehmen.",
       "dictation": "Diktat",
       "assistant": "Assistent",
+      "mouse": "Maus",
       "cleanupOff": "Schalte die KI-Bereinigung ein, um dieses Tastenkürzel zu nutzen.",
       "assistantOff": "Der Assistent ist ausgeschaltet, daher bewirken seine Tastenkürzel nichts."
     },

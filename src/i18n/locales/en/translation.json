@@ -2610,6 +2610,7 @@
       "intro": "Every shortcut works in any app. Click a shortcut to record a new one.",
       "dictation": "Dictation",
       "assistant": "Assistant",
+      "mouse": "Mouse",
       "cleanupOff": "Turn on AI cleanup to get this shortcut.",
       "assistantOff": "The assistant is turned off, so its shortcuts do nothing."
     },

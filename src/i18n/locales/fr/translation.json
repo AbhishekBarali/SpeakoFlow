@@ -2628,6 +2628,7 @@
       "intro": "Chaque raccourci fonctionne dans toutes les applications. Cliquez sur un raccourci pour en enregistrer un nouveau.",
       "dictation": "Dictée",
       "assistant": "Assistant",
+      "mouse": "Souris",
       "cleanupOff": "Activez le nettoyage IA pour obtenir ce raccourci.",
       "assistantOff": "L'assistant est désactivé : ses raccourcis n'ont aucun effet."
     },

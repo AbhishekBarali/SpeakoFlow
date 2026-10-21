@@ -103,9 +103,16 @@ pub fn refusal(
         );
     }
     if !settings.mouse_button_shortcuts {
+        // Only Linux still keeps the switch under Experimental.
+        #[cfg(target_os = "linux")]
         return Some(
             "Mouse buttons are turned off. Turn on \"Mouse buttons as shortcuts\" in \
              Settings → Advanced → Experimental.",
+        );
+        #[cfg(not(target_os = "linux"))]
+        return Some(
+            "Mouse buttons are turned off. Turn on \"Mouse buttons as shortcuts\" in \
+             Settings → Shortcuts.",
         );
     }
     None

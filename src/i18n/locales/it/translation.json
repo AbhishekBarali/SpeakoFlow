@@ -2628,6 +2628,7 @@
       "intro": "Ogni scorciatoia funziona in qualsiasi app. Fai clic su una scorciatoia per registrarne una nuova.",
       "dictation": "Dettatura",
       "assistant": "Assistente",
+      "mouse": "Mouse",
       "cleanupOff": "Attiva la pulizia IA per avere questa scorciatoia.",
       "assistantOff": "L'assistente è disattivato, quindi le sue scorciatoie non fanno nulla."
     },
