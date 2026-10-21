@@ -477,15 +477,18 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
 
   // The short list's download suggestions: the recommended models for the
   // chosen language that are not on this computer yet (the ones that are
-  // already sit under "Downloaded models").
-  const recommendedToDownload = useMemo(
+  // already sit under "Downloaded models"). The full recommendation is kept
+  // too, so "all downloaded" is only said when there was something to
+  // download: a language only a user's own model hears has no
+  // recommendation at all.
+  const recommended = useMemo(
     () =>
-      shortList
-        ? recommendedModels(offeredSpeechModels, filters.language).filter(
-            (model) => !isOnDisk(model),
-          )
-        : [],
-    [shortList, offeredSpeechModels, filters.language, isOnDisk],
+      shortList ? recommendedModels(offeredSpeechModels, filters.language) : [],
+    [shortList, offeredSpeechModels, filters.language],
+  );
+  const recommendedToDownload = useMemo(
+    () => recommended.filter((model) => !isOnDisk(model)),
+    [recommended, isOnDisk],
   );
 
   // Retired models still on disk, for the notice above the list. Not
@@ -843,21 +846,21 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
         <div className="space-y-8">
           {downloadedModels.length > 0 &&
             renderSection(t("settings.models.yourModels"), downloadedModels)}
-          {recommendedToDownload.length > 0 ? (
-            renderSection(
-              filters.language === "all"
-                ? t("onboarding.recommended")
-                : t("settings.models.recommendedFor", {
-                    language: selectedLanguageLabel,
-                  }),
-              recommendedToDownload,
-              true,
-            )
-          ) : (
-            <p className="px-1 text-sm text-muted">
-              {t("settings.models.recommendedAllDownloaded")}
-            </p>
-          )}
+          {recommendedToDownload.length > 0
+            ? renderSection(
+                filters.language === "all"
+                  ? t("onboarding.recommended")
+                  : t("settings.models.recommendedFor", {
+                      language: selectedLanguageLabel,
+                    }),
+                recommendedToDownload,
+                true,
+              )
+            : recommended.length > 0 && (
+                <p className="px-1 text-sm text-muted">
+                  {t("settings.models.recommendedAllDownloaded")}
+                </p>
+              )}
           <div className="flex justify-center">
             <Button
               variant="secondary"
