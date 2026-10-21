@@ -36,3 +36,32 @@ export function showsChineseScript(
     modelSupportsLanguage(languages, "yue")
   );
 }
+
+/**
+ * Whether the row is worth a line in Settings for this person, on top of
+ * `showsChineseScript` (which mirrors the backend and decides whether the
+ * setting can do anything at all).
+ *
+ * Chinese or Cantonese as the language always shows it. On Auto the setting
+ * can reach Chinese, but for everyone who never speaks it, it was a row about
+ * a script they will never see, on every cloud provider and every multilingual
+ * model. So on Auto it shows only when the app itself is in Chinese, or when a
+ * script has already been chosen, so a choice that is in effect is never
+ * hidden from the person who made it.
+ */
+export function offersChineseScript(
+  intent: string,
+  supportedLanguages: ReadonlyArray<string> | undefined,
+  supportsLanguageDetection: boolean,
+  context: { uiLanguage: string; scriptChosen: boolean },
+): boolean {
+  if (
+    !showsChineseScript(intent, supportedLanguages, supportsLanguageDetection)
+  ) {
+    return false;
+  }
+  const spoken = baseLanguage(intent);
+  if (spoken === "zh" || spoken === "yue") return true;
+  const ui = baseLanguage(context.uiLanguage);
+  return context.scriptChosen || ui === "zh" || ui === "yue";
+}

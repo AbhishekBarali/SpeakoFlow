@@ -5,7 +5,7 @@ import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
 import type { SettingIcon, SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
-import { showsChineseScript } from "./chineseScriptRule";
+import { offersChineseScript } from "./chineseScriptRule";
 
 interface ChineseScriptProps {
   descriptionMode?: "inline" | "tooltip";
@@ -21,7 +21,8 @@ const SCRIPTS: ChineseScriptValue[] = ["auto", "simplified", "traditional"];
 
 /**
  * The script Chinese transcripts are written in. Rendered under the language
- * picker, and only where it can change something (see `showsChineseScript`).
+ * picker, only where it can change something (`showsChineseScript`) and only
+ * for someone it concerns (`offersChineseScript`).
  */
 export const ChineseScript: React.FC<ChineseScriptProps> = ({
   descriptionMode = "tooltip",
@@ -31,17 +32,25 @@ export const ChineseScript: React.FC<ChineseScriptProps> = ({
   icon,
   tone,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { getSetting, updateSetting, isUpdating } = useSettings();
 
   const intent = getSetting("selected_language") || "auto";
+  const selected = getSetting("chinese_script") ?? "auto";
   if (
-    !showsChineseScript(intent, supportedLanguages, supportsLanguageDetection)
+    !offersChineseScript(
+      intent,
+      supportedLanguages,
+      supportsLanguageDetection,
+      {
+        uiLanguage: i18n.language,
+        scriptChosen: selected !== "auto",
+      },
+    )
   ) {
     return null;
   }
 
-  const selected = getSetting("chinese_script") ?? "auto";
   const options = SCRIPTS.map((value) => ({
     value,
     label: t(`settings.general.chineseScript.options.${value}`),

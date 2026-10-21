@@ -704,6 +704,13 @@
       "description": "Los modelos sacrifican precisión por velocidad: elige uno que se adapte a tu equipo.",
       "yourModels": "Modelos descargados",
       "availableModels": "Disponibles para descargar",
+      "view": {
+        "label": "Qué modelos mostrar",
+        "all": "Todos los modelos"
+      },
+      "recommendedFor": "Recomendados: {{language}}",
+      "recommendedAllDownloaded": "Ya tienes todos los modelos recomendados.",
+      "browseAll": "Ver todos los modelos",
       "downloaded": "Descargados",
       "available": "Disponibles para descargar",
       "deleteConfirm": "¿Seguro que quieres eliminar {{modelName}}? Tendrás que descargarlo de nuevo para usarlo.",
@@ -1287,8 +1294,7 @@
           "description": "El idioma en el que hablas. Todos estos proveedores responden en ese mismo idioma: indicarlo de antemano mejora la precisión, y Automático deja que lo detecte por sí mismo."
         },
         "translate": {
-          "supported": "{{provider}} puede devolver el texto en inglés en lugar del idioma en que hablaste. Solo en inglés: ninguna API de transcripción traduce a otros idiomas.",
-          "unsupported": "{{provider}} transcribe en el idioma en que hablas y no tiene endpoint de traducción, así que esto no funciona aquí. Funciona con el motor en el dispositivo y con OpenAI, Groq o un servidor Whisper propio."
+          "supported": "{{provider}} puede devolver el texto en inglés en lugar del idioma en que hablaste. Solo en inglés: ninguna API de transcripción traduce a otros idiomas."
         },
         "test": {
           "title": "Probar la conexión",
@@ -3436,7 +3442,8 @@
     "nothingYet": "Tus estadísticas aparecerán cuando dictes, le preguntes algo al asistente o grabes una reunión.",
     "goHome": "Ver tus atajos",
     "figures": {
-      "dictations": "Dictados",
+      "dictations": "Número de dictados",
+      "dictationsInfo": "Cada dictado cuenta una vez, dure lo que dure.",
       "questions": "Preguntas hechas",
       "meetings": "Reuniones grabadas"
     },

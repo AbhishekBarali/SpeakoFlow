@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import {
+  ArrowRight,
   ChevronDown,
   Globe,
   HardDrive,
@@ -37,13 +38,13 @@ import {
 } from "@/lib/utils/modelTranslation";
 import { commands, type ModelInfo } from "@/bindings";
 import { Button } from "@/components/ui/Button";
+import { Segmented } from "@/components/ui/Segmented";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AddCustomModelDialog } from "./AddCustomModelDialog";
 import { AddLocalModelDialog } from "./AddLocalModelDialog";
 import {
   ModelRow,
   ModelTag,
-  ScoreDots,
   type ModelRowAction,
   type ModelRowProgress,
 } from "./ModelRow";
@@ -56,7 +57,9 @@ import {
   isStreamingModel,
   matchesFilters,
   NO_FILTERS,
+  recommendedModels,
   type SpeechFilters,
+  type SpeechView,
 } from "./speechCatalog";
 import { useReplaceRetired } from "./useReplaceRetired";
 
@@ -109,6 +112,10 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
   const [localDialogOpen, setLocalDialogOpen] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
   const [filters, setFilters] = useState<SpeechFilters>(NO_FILTERS);
+  // Speech models open on the short list. All 69 at once, half of them
+  // near-namesakes (a Moonshine per language, Whisper in every size), was
+  // more than anyone could choose from.
+  const [speechView, setSpeechView] = useState<SpeechView>("recommended");
   const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
   const [languageSearch, setLanguageSearch] = useState("");
   const [rescanning, setRescanning] = useState(false);
@@ -407,17 +414,26 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     }
   };
 
+  const isSpeech = categoryFilter === "stt";
+  // The speech catalog's short list: the user's models and the recommended
+  // ones, narrowed only by the language. Search and the streaming and
+  // translate filters belong to the full list.
+  const shortList = isSpeech && speechView === "recommended";
+
   // Filter by category, then (for transcription) by what may be offered and
   // the toolbar filters, then by the free-text search (the translated display
   // name and the raw catalog name, so either works).
   const filteredModels = useMemo(() => {
-    const query = nameSearch.trim().toLowerCase();
+    const query = shortList ? "" : nameSearch.trim().toLowerCase();
+    const applied: SpeechFilters = shortList
+      ? { ...NO_FILTERS, language: filters.language }
+      : filters;
     const source =
       categoryFilter === "stt"
         ? offeredSpeechModels
         : models.filter((model) => getModelCategory(model) === categoryFilter);
     return source.filter((model) => {
-      if (categoryFilter === "stt" && !matchesFilters(model, filters)) {
+      if (categoryFilter === "stt" && !matchesFilters(model, applied)) {
         return false;
       }
       if (query) {
@@ -431,7 +447,15 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
       }
       return true;
     });
-  }, [models, offeredSpeechModels, filters, categoryFilter, nameSearch, t]);
+  }, [
+    models,
+    offeredSpeechModels,
+    filters,
+    categoryFilter,
+    nameSearch,
+    shortList,
+    t,
+  ]);
 
   // Downloaded (custom and on-the-way included) above available, each in
   // catalog order, with the model doing this tab's job at the very top.
@@ -450,6 +474,22 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     available.sort(compareCatalogOrder);
     return { downloadedModels: downloaded, availableModels: available };
   }, [filteredModels, isOnDisk, isActiveModel]);
+
+  // The short list's download suggestions: the recommended models for the
+  // chosen language that are not on this computer yet (the ones that are
+  // already sit under "Downloaded models"). The full recommendation is kept
+  // too, so "all downloaded" is only said when there was something to
+  // download: a language only a user's own model hears has no
+  // recommendation at all.
+  const recommended = useMemo(
+    () =>
+      shortList ? recommendedModels(offeredSpeechModels, filters.language) : [],
+    [shortList, offeredSpeechModels, filters.language],
+  );
+  const recommendedToDownload = useMemo(
+    () => recommended.filter((model) => !isOnDisk(model)),
+    [recommended, isOnDisk],
+  );
 
   // Retired models still on disk, for the notice above the list. Not
   // affected by the toolbar filters: they are something to act on, not
@@ -489,8 +529,8 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     }
   };
 
-  const isSearching = nameSearch.trim() !== "";
-  const filtering = categoryFilter === "stt" && hasFilters(filters);
+  const isSearching = !shortList && nameSearch.trim() !== "";
+  const filtering = isSpeech && !shortList && hasFilters(filters);
   const hasAnyResults =
     downloadedModels.length > 0 || availableModels.length > 0;
   const clearFilters = () => {
@@ -498,7 +538,7 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     setNameSearch("");
   };
 
-  const renderRow = (model: ModelInfo) => {
+  const renderRow = (model: ModelInfo, hideRecommended: boolean) => {
     const state = rowState(model);
     return (
       <CatalogRow
@@ -508,21 +548,148 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
         percent={state.percent}
         speed={state.speed}
         replacement={model.is_legacy ? replacementFor(model) : undefined}
+        hideRecommended={hideRecommended}
         actions={actions}
       />
     );
   };
 
-  /** A section of the catalog: a quiet heading over one bordered list. */
-  const renderSection = (title: React.ReactNode, list: ModelInfo[]) => (
+  /**
+   * A section of the catalog: a quiet heading over one bordered list. Under a
+   * "Recommended" heading every row would carry the same tag, so it is left
+   * off there.
+   */
+  const renderSection = (
+    title: React.ReactNode,
+    list: ModelInfo[],
+    hideRecommended = false,
+  ) => (
     <section className="space-y-2.5">
       <h2 className="px-1 text-[0.8125rem] font-semibold text-muted">
         {title}
       </h2>
       <div className="divide-y divide-hairline rounded-2xl border border-hairline bg-surface elev-card">
-        {list.map(renderRow)}
+        {list.map((model) => renderRow(model, hideRecommended))}
       </div>
     </section>
+  );
+
+  const searchBox = (
+    <div className="flex min-w-[12rem] flex-1 basis-[14rem] items-center gap-2 px-3 py-2 bg-surface border border-hairline rounded-lg focus-within:border-ink transition-colors">
+      <Search className="w-4 h-4 shrink-0 text-muted-soft" />
+      <input
+        type="text"
+        value={nameSearch}
+        onChange={(e) => setNameSearch(e.target.value)}
+        placeholder={t("settings.models.searchPlaceholder")}
+        aria-label={t("settings.models.searchPlaceholder")}
+        className="flex-1 min-w-0 bg-transparent text-[13px] text-ink focus:outline-none placeholder:text-muted-soft"
+      />
+      {nameSearch && (
+        <button
+          type="button"
+          onClick={() => setNameSearch("")}
+          aria-label={t("settings.models.clearSearch")}
+          className="shrink-0 text-muted-soft hover:text-ink transition-colors cursor-pointer"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+
+  // The language the user speaks: on the short list it picks the
+  // recommendations for that language, on the full list it filters it.
+  const languageFilter = (
+    <div className="relative" ref={languageDropdownRef}>
+      <button
+        type="button"
+        onClick={() => setLanguageDropdownOpen(!languageDropdownOpen)}
+        aria-expanded={languageDropdownOpen}
+        className={`flex h-9 items-center gap-1.5 px-3 text-[13px] font-medium rounded-lg transition-colors cursor-pointer ${
+          filters.language !== "all"
+            ? "bg-accent/10 text-accent"
+            : "bg-surface-strong text-muted hover:text-ink"
+        }`}
+      >
+        <Globe className="w-3.5 h-3.5" aria-hidden="true" />
+        <span className="max-w-[120px] truncate">{selectedLanguageLabel}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className={`w-3.5 h-3.5 transition-transform ${
+            languageDropdownOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {languageDropdownOpen && (
+        <div className="absolute top-full start-0 mt-1 w-56 bg-surface border border-hairline rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="p-2 border-b border-hairline">
+            <input
+              ref={languageSearchInputRef}
+              type="text"
+              value={languageSearch}
+              onChange={(e) => setLanguageSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && filteredLanguages.length > 0) {
+                  setFilters((f) => ({
+                    ...f,
+                    language: filteredLanguages[0].value,
+                  }));
+                  setLanguageDropdownOpen(false);
+                  setLanguageSearch("");
+                } else if (e.key === "Escape") {
+                  setLanguageDropdownOpen(false);
+                  setLanguageSearch("");
+                }
+              }}
+              placeholder={t("settings.general.language.searchPlaceholder")}
+              className="w-full px-2.5 py-1.5 text-sm bg-surface border border-hairline-strong rounded-lg focus:outline-none focus:border-ink"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setFilters((f) => ({ ...f, language: "all" }));
+                setLanguageDropdownOpen(false);
+                setLanguageSearch("");
+              }}
+              className={`w-full px-3 py-1.5 text-sm text-start rounded-lg transition-colors ${
+                filters.language === "all"
+                  ? "bg-surface-strong text-ink font-medium"
+                  : "hover:bg-surface-strong"
+              }`}
+            >
+              {t("settings.models.filters.allLanguages")}
+            </button>
+            {filteredLanguages.map((lang) => (
+              <button
+                key={lang.value}
+                type="button"
+                onClick={() => {
+                  setFilters((f) => ({ ...f, language: lang.value }));
+                  setLanguageDropdownOpen(false);
+                  setLanguageSearch("");
+                }}
+                className={`w-full px-3 py-1.5 text-sm text-start rounded-lg transition-colors ${
+                  filters.language === lang.value
+                    ? "bg-surface-strong text-ink font-medium"
+                    : "hover:bg-surface-strong"
+                }`}
+              >
+                {lang.label}
+              </button>
+            ))}
+            {filteredLanguages.length === 0 && (
+              <div className="px-3 py-2 text-sm text-muted-soft text-center">
+                {t("settings.general.language.noResults")}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   if (loading) {
@@ -587,153 +754,33 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
         />
       )}
 
-      {/* Toolbar: name search, then (stt) the language, streaming and
-          translate filters, then the local-model buttons. Kept above the
-          sections so it is always reachable, even with no results, and
-          wrapping on a narrow window so nothing runs off the pane. */}
-      <div className="@container">
+      {/* Toolbar. For speech models: which list (the recommended short list
+          or every model) and the language the user speaks; search and the
+          streaming and translate filters only on the full list, which is
+          the one long enough to need them. Other categories keep their one
+          row of search. The local-model buttons end the first row either
+          way, and everything wraps on a narrow window so nothing runs off
+          the pane. */}
+      <div className="@container space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-[12rem] flex-1 basis-[14rem] items-center gap-2 px-3 py-2 bg-surface border border-hairline rounded-lg focus-within:border-ink transition-colors">
-            <Search className="w-4 h-4 shrink-0 text-muted-soft" />
-            <input
-              type="text"
-              value={nameSearch}
-              onChange={(e) => setNameSearch(e.target.value)}
-              placeholder={t("settings.models.searchPlaceholder")}
-              aria-label={t("settings.models.searchPlaceholder")}
-              className="flex-1 min-w-0 bg-transparent text-[13px] text-ink focus:outline-none placeholder:text-muted-soft"
-            />
-            {nameSearch && (
-              <button
-                type="button"
-                onClick={() => setNameSearch("")}
-                aria-label={t("settings.models.clearSearch")}
-                className="shrink-0 text-muted-soft hover:text-ink transition-colors cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-          {categoryFilter === "stt" && (
+          {isSpeech ? (
             <>
-              <div className="relative" ref={languageDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setLanguageDropdownOpen(!languageDropdownOpen)}
-                  aria-expanded={languageDropdownOpen}
-                  className={`flex h-9 items-center gap-1.5 px-3 text-[13px] font-medium rounded-lg transition-colors cursor-pointer ${
-                    filters.language !== "all"
-                      ? "bg-accent/10 text-accent"
-                      : "bg-surface-strong text-muted hover:text-ink"
-                  }`}
-                >
-                  <Globe className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span className="max-w-[120px] truncate">
-                    {selectedLanguageLabel}
-                  </span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className={`w-3.5 h-3.5 transition-transform ${
-                      languageDropdownOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {languageDropdownOpen && (
-                  <div className="absolute top-full start-0 mt-1 w-56 bg-surface border border-hairline rounded-xl shadow-lg z-50 overflow-hidden">
-                    <div className="p-2 border-b border-hairline">
-                      <input
-                        ref={languageSearchInputRef}
-                        type="text"
-                        value={languageSearch}
-                        onChange={(e) => setLanguageSearch(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            filteredLanguages.length > 0
-                          ) {
-                            setFilters((f) => ({
-                              ...f,
-                              language: filteredLanguages[0].value,
-                            }));
-                            setLanguageDropdownOpen(false);
-                            setLanguageSearch("");
-                          } else if (e.key === "Escape") {
-                            setLanguageDropdownOpen(false);
-                            setLanguageSearch("");
-                          }
-                        }}
-                        placeholder={t(
-                          "settings.general.language.searchPlaceholder",
-                        )}
-                        className="w-full px-2.5 py-1.5 text-sm bg-surface border border-hairline-strong rounded-lg focus:outline-none focus:border-ink"
-                      />
-                    </div>
-                    <div className="max-h-48 overflow-y-auto p-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilters((f) => ({ ...f, language: "all" }));
-                          setLanguageDropdownOpen(false);
-                          setLanguageSearch("");
-                        }}
-                        className={`w-full px-3 py-1.5 text-sm text-start rounded-lg transition-colors ${
-                          filters.language === "all"
-                            ? "bg-surface-strong text-ink font-medium"
-                            : "hover:bg-surface-strong"
-                        }`}
-                      >
-                        {t("settings.models.filters.allLanguages")}
-                      </button>
-                      {filteredLanguages.map((lang) => (
-                        <button
-                          key={lang.value}
-                          type="button"
-                          onClick={() => {
-                            setFilters((f) => ({ ...f, language: lang.value }));
-                            setLanguageDropdownOpen(false);
-                            setLanguageSearch("");
-                          }}
-                          className={`w-full px-3 py-1.5 text-sm text-start rounded-lg transition-colors ${
-                            filters.language === lang.value
-                              ? "bg-surface-strong text-ink font-medium"
-                              : "hover:bg-surface-strong"
-                          }`}
-                        >
-                          {lang.label}
-                        </button>
-                      ))}
-                      {filteredLanguages.length === 0 && (
-                        <div className="px-3 py-2 text-sm text-muted-soft text-center">
-                          {t("settings.general.language.noResults")}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <FilterToggle
-                icon={Radio}
-                label={t("modelSelector.capabilities.streaming")}
-                hint={t("settings.models.filters.streamingHint")}
-                pressed={filters.streaming}
-                onToggle={() =>
-                  setFilters((f) => ({ ...f, streaming: !f.streaming }))
-                }
+              <Segmented<SpeechView>
+                label={t("settings.models.view.label")}
+                value={speechView}
+                onChange={setSpeechView}
+                options={[
+                  { value: "recommended", label: t("onboarding.recommended") },
+                  { value: "all", label: t("settings.models.view.all") },
+                ]}
               />
-              <FilterToggle
-                icon={Languages}
-                label={t("settings.models.filters.translate")}
-                hint={t("settings.models.filters.translateHint")}
-                pressed={filters.translate}
-                onToggle={() =>
-                  setFilters((f) => ({ ...f, translate: !f.translate }))
-                }
-              />
+              {languageFilter}
             </>
+          ) : (
+            searchBox
           )}
           {categoryFilter !== "tts" && (
-            <>
+            <div className="ms-auto flex items-center gap-2">
               <IconButton
                 icon={RefreshCw}
                 label={t("settings.models.localModel.rescan")}
@@ -741,8 +788,8 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
                 busy={rescanning}
                 onClick={() => void handleRescan()}
               />
-              {/* Icon-only in a narrow pane, so the filters, rescan and this
-                share one line under the search instead of three. */}
+              {/* Icon-only in a narrow pane, so it shares a line with the
+                  view and language instead of taking one of its own. */}
               <Button
                 variant="secondary"
                 size="sm"
@@ -767,12 +814,68 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
                   {t("settings.models.customModel.addButton")}
                 </Button>
               )}
-            </>
+            </div>
           )}
         </div>
+        {isSpeech && !shortList && (
+          <div className="flex flex-wrap items-center gap-2">
+            {searchBox}
+            <FilterToggle
+              icon={Radio}
+              label={t("modelSelector.capabilities.streaming")}
+              hint={t("settings.models.filters.streamingHint")}
+              pressed={filters.streaming}
+              onToggle={() =>
+                setFilters((f) => ({ ...f, streaming: !f.streaming }))
+              }
+            />
+            <FilterToggle
+              icon={Languages}
+              label={t("settings.models.filters.translate")}
+              hint={t("settings.models.filters.translateHint")}
+              pressed={filters.translate}
+              onToggle={() =>
+                setFilters((f) => ({ ...f, translate: !f.translate }))
+              }
+            />
+          </div>
+        )}
       </div>
 
-      {hasAnyResults ? (
+      {shortList ? (
+        <div className="space-y-8">
+          {downloadedModels.length > 0 &&
+            renderSection(t("settings.models.yourModels"), downloadedModels)}
+          {recommendedToDownload.length > 0
+            ? renderSection(
+                filters.language === "all"
+                  ? t("onboarding.recommended")
+                  : t("settings.models.recommendedFor", {
+                      language: selectedLanguageLabel,
+                    }),
+                recommendedToDownload,
+                true,
+              )
+            : recommended.length > 0 && (
+                <p className="px-1 text-sm text-muted">
+                  {t("settings.models.recommendedAllDownloaded")}
+                </p>
+              )}
+          <div className="flex justify-center">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setSpeechView("all")}
+            >
+              {t("settings.models.browseAll")}
+              <ArrowRight
+                className="h-3.5 w-3.5 rtl:rotate-180"
+                aria-hidden="true"
+              />
+            </Button>
+          </div>
+        </div>
+      ) : hasAnyResults ? (
         <div className="space-y-8">
           {downloadedModels.length > 0 &&
             renderSection(t("settings.models.yourModels"), downloadedModels)}
@@ -816,6 +919,8 @@ interface CatalogRowProps extends RowState {
   model: ModelInfo;
   /** For an older model, the catalog model that replaces it. */
   replacement?: ReplacementState;
+  /** Under a "Recommended" heading, where the tag would repeat on every row. */
+  hideRecommended?: boolean;
   actions: RowActions;
 }
 
@@ -836,7 +941,15 @@ const sameReplacement = (
  * download's progress ticks (ten a second) re-render one row, not the list.
  */
 const CatalogRow = React.memo<CatalogRowProps>(
-  ({ model, status, percent, speed, replacement, actions }) => {
+  ({
+    model,
+    status,
+    percent,
+    speed,
+    replacement,
+    hideRecommended = false,
+    actions,
+  }) => {
     const { t } = useTranslation();
     const category = getModelCategory(model);
     const { name, quant } = splitLocalModelName(
@@ -953,9 +1066,11 @@ const CatalogRow = React.memo<CatalogRowProps>(
                 </ModelTag>
               )
             )}
-            {model.is_recommended && status !== "active" && (
-              <ModelTag>{t("onboarding.recommended")}</ModelTag>
-            )}
+            {model.is_recommended &&
+              !hideRecommended &&
+              status !== "active" && (
+                <ModelTag>{t("onboarding.recommended")}</ModelTag>
+              )}
           </>
         }
         meta={
@@ -971,20 +1086,13 @@ const CatalogRow = React.memo<CatalogRowProps>(
                   {t("modelSelector.capabilities.translate")}
                 </span>
               )}
-              {model.accuracy_score > 0 && (
-                <ScoreDots
-                  label={t("onboarding.modelCard.accuracy")}
-                  score={model.accuracy_score}
-                />
-              )}
-              {model.speed_score > 0 && (
-                <ScoreDots
-                  label={t("onboarding.modelCard.speed")}
-                  score={model.speed_score}
-                />
-              )}
             </>
           ) : undefined
+        }
+        scores={
+          category === "stt" && !retired
+            ? { accuracy: model.accuracy_score, speed: model.speed_score }
+            : null
         }
         action={action}
         menu={
@@ -1016,6 +1124,7 @@ const CatalogRow = React.memo<CatalogRowProps>(
     prev.status === next.status &&
     prev.percent === next.percent &&
     prev.speed === next.speed &&
+    prev.hideRecommended === next.hideRecommended &&
     prev.actions === next.actions &&
     sameReplacement(prev.replacement, next.replacement),
 );

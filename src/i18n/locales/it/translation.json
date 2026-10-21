@@ -704,6 +704,13 @@
       "description": "I modelli scambiano accuratezza per velocità: scegline uno adatto al tuo computer.",
       "yourModels": "Modelli scaricati",
       "availableModels": "Disponibili per il download",
+      "view": {
+        "label": "Quali modelli mostrare",
+        "all": "Tutti i modelli"
+      },
+      "recommendedFor": "Raccomandati: {{language}}",
+      "recommendedAllDownloaded": "Hai già tutti i modelli raccomandati.",
+      "browseAll": "Sfoglia tutti i modelli",
       "downloaded": "Scaricati",
       "available": "Disponibili per il download",
       "deleteConfirm": "Vuoi davvero eliminare {{modelName}}? Per usarlo dovrai scaricarlo di nuovo.",
@@ -1287,8 +1294,7 @@
           "description": "La lingua che parli. Ogni provider qui risponde nella stessa lingua: indicarla in anticipo migliora la precisione, e Automatico lascia che la rilevi da solo."
         },
         "translate": {
-          "supported": "{{provider}} può restituire l'inglese invece della lingua che hai parlato. Solo l'inglese: nessuna API di trascrizione traduce in un'altra lingua.",
-          "unsupported": "{{provider}} trascrive nella lingua che parli e non ha un endpoint di traduzione, quindi qui non può funzionare. Funziona con il motore sul dispositivo e con OpenAI, Groq o un server Whisper self-hosted."
+          "supported": "{{provider}} può restituire l'inglese invece della lingua che hai parlato. Solo l'inglese: nessuna API di trascrizione traduce in un'altra lingua."
         },
         "test": {
           "title": "Verifica connessione",
@@ -3436,7 +3442,8 @@
     "nothingYet": "Le tue statistiche compariranno quando detterai, farai una domanda all'assistente o registrerai una riunione.",
     "goHome": "Vedi le tue scorciatoie",
     "figures": {
-      "dictations": "Dettature",
+      "dictations": "Numero di dettature",
+      "dictationsInfo": "Ogni dettatura conta una volta, qualunque sia la sua durata.",
       "questions": "Domande fatte",
       "meetings": "Riunioni registrate"
     },

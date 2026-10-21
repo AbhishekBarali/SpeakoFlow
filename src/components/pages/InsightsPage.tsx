@@ -72,13 +72,38 @@ const SUMMARY_FILLS = [
   "var(--insights-flow-3)",
 ];
 
+/**
+ * What an (i) beside a figure says: the extra fact about it first ("4.3×
+ * faster than typing", "Longest: 5 days"), then what the figure counts.
+ * Either can be missing; with neither there is no (i).
+ */
+const FigureTip: React.FC<{ note?: string; info?: string }> = ({
+  note,
+  info,
+}) => {
+  if (!note && !info) return null;
+  if (!note) return <InfoTip text={info} />;
+  return (
+    <InfoTip
+      text={
+        <>
+          <span className="block font-medium text-ink">{note}</span>
+          {info && <span className="mt-1 block text-muted">{info}</span>}
+        </>
+      }
+    />
+  );
+};
+
 /** The first thing the page says: the one number that sums up the most,
  *  large, over the ribbon the share cards are drawn with. */
-const Summary: React.FC<{ label: string; value: string; note?: string }> = ({
-  label,
-  value,
-  note,
-}) => (
+const Summary: React.FC<{
+  label: string;
+  value: string;
+  note?: string;
+  /** Behind the (i) beside the label, e.g. today's words. */
+  extra?: string;
+}> = ({ label, value, note, extra }) => (
   <section className="insights-summary relative overflow-hidden rounded-3xl border border-hairline elev-card">
     <FlowArt
       spec={SUMMARY_FLOW}
@@ -88,7 +113,10 @@ const Summary: React.FC<{ label: string; value: string; note?: string }> = ({
       className="absolute inset-0 h-full w-full"
     />
     <div className="relative px-8 pt-8 pb-9">
-      <h2 className="text-sm font-medium text-ink/75">{label}</h2>
+      <h2 className="flex items-center gap-1 text-sm font-medium text-ink/75">
+        {label}
+        {extra && <InfoTip text={extra} />}
+      </h2>
       <p className="insights-figure mt-2 text-[3.75rem] leading-none text-ink tabular-nums">
         {value}
       </p>
@@ -101,14 +129,19 @@ interface Figure {
   key: string;
   label: string;
   value: string;
+  /** One extra fact about the figure, shown behind its (i), never under it. */
   note?: string;
+  /** What the figure counts, behind the same (i). */
   info?: string;
 }
 
 /**
  * The rest of the numbers, three to a row in one card with hairlines between
- * them: a label, the figure, and one quiet line about it. A row with fewer
- * than three shares its width out, so there is never an empty cell.
+ * them: a label and the figure, nothing else. Anything more about a figure
+ * (how it compares, the record, what it counts) sits behind the (i) beside
+ * its label: a quiet line under every figure made the card read as a wall of
+ * text. A row with fewer than three shares its width out, so there is never
+ * an empty cell.
  */
 const Figures: React.FC<{ figures: Figure[] }> = ({ figures }) => {
   if (figures.length === 0) return null;
@@ -129,7 +162,7 @@ const Figures: React.FC<{ figures: Figure[] }> = ({ figures }) => {
               <div key={figure.key} className="min-w-0 bg-surface px-6 py-5">
                 <h3 className="flex items-center gap-1 text-[0.8125rem] text-muted">
                   <span className="truncate">{figure.label}</span>
-                  {figure.info && <InfoTip text={figure.info} />}
+                  <FigureTip note={figure.note} info={figure.info} />
                 </h3>
                 <p
                   className="mt-1.5 truncate text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums"
@@ -137,11 +170,6 @@ const Figures: React.FC<{ figures: Figure[] }> = ({ figures }) => {
                 >
                   {figure.value}
                 </p>
-                {figure.note && (
-                  <p className="mt-1 text-[0.8125rem] text-muted text-pretty">
-                    {figure.note}
-                  </p>
-                )}
               </div>
             ))}
           </div>
@@ -268,15 +296,13 @@ const Highlights: React.FC<{ insights: Insights; activity: Activity }> = ({
     >
       {rows.map((row) => (
         <div key={row.label} className="min-w-0">
-          <dt className="text-[0.8125rem] text-muted">{row.label}</dt>
+          <dt className="flex items-center gap-1 text-[0.8125rem] text-muted">
+            {row.label}
+            {row.sub && <InfoTip text={row.sub} />}
+          </dt>
           <dd className="mt-0.5 truncate text-[0.9375rem] font-semibold text-ink">
             {row.value}
           </dd>
-          {row.sub && (
-            <dd className="mt-0.5 text-[0.8125rem] text-muted text-pretty">
-              {row.sub}
-            </dd>
-          )}
         </div>
       ))}
     </dl>
@@ -609,6 +635,15 @@ export const InsightsPage: React.FC = () => {
                   count: Math.floor(words / NOVEL_WORDS),
                 })
               : t("insights.pages", { count: pagesFor(words) }),
+          // Today's words belong with the words, not under the count of
+          // dictations, where "139 / 94 words today" read as two unrelated
+          // numbers.
+          extra:
+            dictation.today_words > 0
+              ? t("home.stats.today", {
+                  words: formatCount(dictation.today_words, lang),
+                })
+              : undefined,
         }
       : lead === "assistant"
         ? {
@@ -659,16 +694,13 @@ export const InsightsPage: React.FC = () => {
     info: t("insights.streakHint"),
   });
   if (used.includes("dictation")) {
+    // "Times dictated", not "Dictations": beside "Words dictated" the old
+    // label read as a second word count.
     figures.push({
       key: "dictations",
       label: t("insights.figures.dictations"),
       value: formatCount(dictation.total_dictations, lang),
-      note:
-        dictation.today_words > 0
-          ? t("home.stats.today", {
-              words: formatCount(dictation.today_words, lang),
-            })
-          : undefined,
+      info: t("insights.figures.dictationsInfo"),
     });
   }
   if (used.includes("assistant") && lead !== "assistant") {

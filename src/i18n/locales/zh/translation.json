@@ -700,6 +700,13 @@
       "description": "模型在准确度和速度之间取舍——挑一个适合您电脑的。",
       "yourModels": "已下载的模型",
       "availableModels": "可供下载",
+      "view": {
+        "label": "显示哪些模型",
+        "all": "全部模型"
+      },
+      "recommendedFor": "推荐：{{language}}",
+      "recommendedAllDownloaded": "推荐的模型您都已下载。",
+      "browseAll": "浏览全部模型",
       "downloaded": "已下载",
       "available": "可供下载",
       "deleteConfirm": "确定要删除 {{modelName}} 吗？之后需要重新下载才能使用。",
@@ -1275,8 +1282,7 @@
           "description": "您说的语言。这里的每个提供商都会用同一种语言返回结果——预先告知可提高准确度，选择“自动”则由它自行识别语言。"
         },
         "translate": {
-          "supported": "{{provider}} 可以返回英语，而不是您所说的语言。仅限英语——没有任何转录 API 能翻译成其他语言。",
-          "unsupported": "{{provider}} 会用您所说的语言转录，没有翻译端点，因此这里无法使用此功能。它可在设备端引擎，以及 OpenAI、Groq 或自托管的 Whisper 服务器上使用。"
+          "supported": "{{provider}} 可以返回英语，而不是您所说的语言。仅限英语——没有任何转录 API 能翻译成其他语言。"
         },
         "test": {
           "title": "测试连接",
@@ -3379,6 +3385,7 @@
     "goHome": "查看快捷键",
     "figures": {
       "dictations": "语音输入次数",
+      "dictationsInfo": "每次语音输入计一次，无论长短。",
       "questions": "提问次数",
       "meetings": "录音的会议"
     },

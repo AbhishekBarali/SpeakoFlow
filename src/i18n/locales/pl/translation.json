@@ -706,6 +706,13 @@
       "description": "Modele wymieniają dokładność na szybkość — wybierz taki, który pasuje do Twojego komputera.",
       "yourModels": "Pobrane modele",
       "availableModels": "Dostępne do pobrania",
+      "view": {
+        "label": "Które modele pokazać",
+        "all": "Wszystkie modele"
+      },
+      "recommendedFor": "Polecane: {{language}}",
+      "recommendedAllDownloaded": "Masz już wszystkie polecane modele.",
+      "browseAll": "Przeglądaj wszystkie modele",
       "downloaded": "Pobrane",
       "available": "Dostępne do pobrania",
       "deleteConfirm": "Czy na pewno chcesz usunąć {{modelName}}? Aby go używać, trzeba będzie pobrać go ponownie.",
@@ -1293,8 +1300,7 @@
           "description": "Język, w którym mówisz. Każdy z tych dostawców odpowiada w tym samym języku — podanie go z góry poprawia dokładność, a Auto pozwala wykryć język automatycznie."
         },
         "translate": {
-          "supported": "{{provider}} może zwrócić tekst po angielsku zamiast w języku, w którym mówiłeś. Tylko po angielsku — żadne API transkrypcji nie tłumaczy na inne języki.",
-          "unsupported": "{{provider}} transkrybuje w języku, w którym mówisz, i nie ma punktu końcowego do tłumaczenia, więc ta opcja tu nie zadziała. Działa z silnikiem na urządzeniu oraz z OpenAI, Groq lub własnym serwerem Whisper."
+          "supported": "{{provider}} może zwrócić tekst po angielsku zamiast w języku, w którym mówiłeś. Tylko po angielsku — żadne API transkrypcji nie tłumaczy na inne języki."
         },
         "test": {
           "title": "Test połączenia",
@@ -3465,7 +3471,8 @@
     "nothingYet": "Statystyki pojawią się, gdy zaczniesz dyktować, pytać asystenta lub nagrywać spotkania.",
     "goHome": "Zobacz swoje skróty",
     "figures": {
-      "dictations": "Dyktowania",
+      "dictations": "Liczba dyktowań",
+      "dictationsInfo": "Każde dyktowanie liczy się raz, niezależnie od długości.",
       "questions": "Zadane pytania",
       "meetings": "Nagrane spotkania"
     },
