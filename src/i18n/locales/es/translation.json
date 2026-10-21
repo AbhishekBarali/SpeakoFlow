@@ -2628,6 +2628,7 @@
       "intro": "Todos los atajos funcionan en cualquier aplicación. Haz clic en un atajo para grabar uno nuevo.",
       "dictation": "Dictado",
       "assistant": "Asistente",
+      "mouse": "Ratón",
       "cleanupOff": "Activa la limpieza con IA para usar este atajo.",
       "assistantOff": "El asistente está desactivado, así que sus atajos no hacen nada."
     },

@@ -2592,6 +2592,7 @@
       "intro": "Mọi phím tắt đều hoạt động trong mọi ứng dụng. Nhấp vào một phím tắt để ghi phím mới.",
       "dictation": "Đọc chính tả",
       "assistant": "Trợ lý",
+      "mouse": "Chuột",
       "cleanupOff": "Bật Dọn dẹp bằng AI để dùng phím tắt này.",
       "assistantOff": "Trợ lý đang tắt, nên các phím tắt của nó không có tác dụng."
     },

@@ -2646,6 +2646,7 @@
       "intro": "Každá zkratka funguje v jakékoli aplikaci. Kliknutím na zkratku nahrajete novou.",
       "dictation": "Diktování",
       "assistant": "Asistent",
+      "mouse": "Myš",
       "cleanupOff": "Pro tuto zkratku zapněte čištění pomocí AI.",
       "assistantOff": "Asistent je vypnutý, takže jeho zkratky nic nedělají."
     },
