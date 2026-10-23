@@ -4,6 +4,19 @@ What changed in each SpeakoFlow release. The release page on GitHub carries the
 highlights; this file has the full list. Versions before 2.0.0 are described on
 their [GitHub releases](https://github.com/AbhishekBarali/SpeakoFlow/releases).
 
+## Unreleased
+
+### Fixed
+
+- **Updating dropped the Processor choice for Parakeet and the other ONNX
+  models.** If you dictated with Parakeet V3 (or Canary, Moonshine,
+  SenseVoice, GigaAM or Cohere) and had set ONNX acceleration to CPU because it
+  failed on your graphics card, the update moved that model onto the graphics
+  card again. A graphics driver can get transcripts wrong there without
+  crashing. Updating from 2.1 now keeps Speech processing on Processor (CPU)
+  for you. If you already updated to 2.2.0, choose Processor (CPU) in Settings
+  → Advanced → Performance → Speech processing.
+
 ## 2.2.0
 
 A new speech engine under every local model, with all 69 models in Handy's

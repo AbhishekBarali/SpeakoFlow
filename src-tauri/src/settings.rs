@@ -5371,8 +5371,9 @@ const LEGACY_ACCELERATOR_KEYS: [&str; 3] = [
 /// survive: it counted whisper.cpp's own device list, which says nothing about
 /// which transcribe.cpp device is which, so it becomes automatic selection, and
 /// a `gpu` with no device is `auto` by definition. `ort_accelerator` belonged
-/// to an engine that no longer exists. Idempotent: once
-/// `transcribe_accelerator` is stored, only the consistency rule below applies.
+/// to an engine that no longer exists, with one exception (see
+/// [`legacy_speech_accelerator`]). Idempotent: once `transcribe_accelerator`
+/// is stored, only the consistency rule below applies.
 ///
 /// The consistency rule: `gpu` without a device key is the same as `auto`, and
 /// a key that is not a string (no version ever wrote one, but a hand edit can)
@@ -5382,11 +5383,7 @@ fn migrate_accelerator_settings(settings: &mut serde_json::Map<String, serde_jso
 
     let mut changed = false;
     if !settings.contains_key("transcribe_accelerator") {
-        if let Some(old) = settings
-            .get("whisper_accelerator")
-            .and_then(Value::as_str)
-            .filter(|value| matches!(*value, "auto" | "cpu" | "gpu"))
-        {
+        if let Some(old) = legacy_speech_accelerator(settings) {
             settings.insert(
                 "transcribe_accelerator".to_string(),
                 Value::String(old.to_string()),
@@ -5421,6 +5418,41 @@ fn migrate_accelerator_settings(settings: &mut serde_json::Map<String, serde_jso
         changed = true;
     }
     changed
+}
+
+/// The 2.x device choice that becomes `transcribe_accelerator`, if any.
+///
+/// Before 2.2 there were two choices, one per engine: `whisper_accelerator`
+/// for whisper.cpp and transcribe.cpp models, `ort_accelerator` for the ONNX
+/// ones (Parakeet, Canary, Moonshine, SenseVoice, GigaAM, Cohere). One setting
+/// covers every model now, and it starts from `whisper_accelerator`.
+///
+/// The exception is a processor choice for the model the user dictates with.
+/// Someone whose selected model was an ONNX one and who had set ONNX to the
+/// processor did so because that model failed on their graphics card: it was
+/// the workaround for issue #82 (Parakeet V3). That model's replacement runs
+/// on the graphics card too, so dropping the choice put them straight back on
+/// it, where a driver can produce wrong transcripts without crashing (Handy
+/// #2270: Parakeet V3 dropping words and changing language on Vulkan, fine on
+/// the processor). The choice is kept. An ONNX choice for a model they were
+/// not using, or one that asked for a graphics card, still goes, as before.
+fn legacy_speech_accelerator(
+    settings: &serde_json::Map<String, serde_json::Value>,
+) -> Option<&str> {
+    use serde_json::Value;
+
+    let onnx_on_cpu = settings.get("ort_accelerator").and_then(Value::as_str) == Some("cpu");
+    let dictates_with_onnx = settings
+        .get("selected_model")
+        .and_then(Value::as_str)
+        .is_some_and(crate::managers::legacy_models::is_retired);
+    if onnx_on_cpu && dictates_with_onnx {
+        return Some("cpu");
+    }
+    settings
+        .get("whisper_accelerator")
+        .and_then(Value::as_str)
+        .filter(|value| matches!(*value, "auto" | "cpu" | "gpu"))
 }
 
 fn migrate_screen_access(settings: &mut serde_json::Map<String, serde_json::Value>) -> bool {
@@ -8065,6 +8097,61 @@ mod tests {
                 assert!(saved.get(key).is_none(), "{key} is still saved");
             }
         }
+    }
+
+    #[test]
+    fn upgrading_keeps_the_processor_for_an_onnx_model_moved_there() {
+        use TranscribeAcceleratorSetting::{Auto, Cpu};
+        // (selected_model, ort_accelerator, whisper_accelerator) -> transcribe_accelerator.
+        // ONNX on the processor was the workaround for Parakeet V3 failing on
+        // the graphics card (#82). Its replacement runs on the graphics card
+        // too, so the choice stays for whoever dictates with an ONNX model; an
+        // ONNX choice for a model they were not using changes nothing.
+        for (model, ort, whisper, expected) in [
+            ("parakeet-tdt-0.6b-v3", "cpu", "auto", Cpu),
+            ("parakeet-tdt-0.6b-v3", "cpu", "gpu", Cpu),
+            ("parakeet-tdt-0.6b-v2", "cpu", "auto", Cpu),
+            ("canary-1b-v2", "cpu", "auto", Cpu),
+            ("sense-voice-int8", "cpu", "auto", Cpu),
+            ("parakeet-tdt-0.6b-v3", "directml", "auto", Auto),
+            ("parakeet-tdt-0.6b-v3", "auto", "auto", Auto),
+            ("parakeet-tdt-0.6b-v3", "auto", "cpu", Cpu),
+            ("small", "cpu", "auto", Auto),
+            ("parakeet-tdt-0.6b-v3-gguf", "cpu", "auto", Auto),
+            ("", "cpu", "auto", Auto),
+        ] {
+            let mut stored = used_2_0_1_store();
+            let map = stored.as_object_mut().unwrap();
+            map.insert("selected_model".into(), serde_json::json!(model));
+            map.insert("ort_accelerator".into(), serde_json::json!(ort));
+            map.insert("whisper_accelerator".into(), serde_json::json!(whisper));
+
+            let after = launch_with(stored);
+            assert_eq!(
+                after.transcribe_accelerator, expected,
+                "{model} / ort {ort} / whisper {whisper}"
+            );
+            let saved = serde_json::to_value(&after).unwrap();
+            for key in LEGACY_ACCELERATOR_KEYS {
+                assert!(saved.get(key).is_none(), "{key} is still saved");
+            }
+        }
+    }
+
+    #[test]
+    fn a_stored_speech_device_is_not_migrated_again() {
+        // Once the new key is stored, a later launch leaves it alone, whatever
+        // a stray legacy key says.
+        let mut stored = serde_json::to_value(get_default_settings()).unwrap();
+        stored["transcribe_accelerator"] = serde_json::json!("auto");
+        stored["selected_model"] = serde_json::json!("parakeet-tdt-0.6b-v3");
+        stored["ort_accelerator"] = serde_json::json!("cpu");
+        let (settings, changed) = deserialize_settings_value(stored);
+        assert!(changed, "the legacy key is dropped");
+        assert_eq!(
+            settings.transcribe_accelerator,
+            TranscribeAcceleratorSetting::Auto
+        );
     }
 
     #[test]
