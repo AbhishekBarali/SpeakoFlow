@@ -192,6 +192,7 @@ Some languages have complex plural rules. For now, use a general form that works
 | Japanese   | `ja` | Complete          |
 | Spanish    | `es` | Complete          |
 | Vietnamese | `vi` | Complete          |
+| Russian    | `ru` | Complete          |
 
 ## Requested Languages
 
