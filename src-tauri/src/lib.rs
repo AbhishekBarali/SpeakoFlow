@@ -27,6 +27,7 @@ mod native_tts;
 mod overlay;
 mod overlay_follow;
 mod overlay_lifecycle;
+mod panic_log;
 mod paste_tx;
 pub mod portable;
 mod reminders;
@@ -941,6 +942,10 @@ fn filter_webview2_context_menu<R: tauri::Runtime>(webview: &tauri::Webview<R>) 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(cli_args: CliArgs) {
+    // A panic reaches the log file instead of a stderr nobody can see. It only
+    // writes once the log plugin is up, which is long before anything can fail.
+    panic_log::install();
+
     // Detect portable mode before anything else
     portable::init();
 
@@ -1457,6 +1462,8 @@ pub fn run(cli_args: CliArgs) {
         ))
         .manage(cli_args.clone())
         .setup(move |app| {
+            log::info!("SpeakoFlow {} starting", env!("CARGO_PKG_VERSION"));
+
             // Record the GPU environment policy main() applied, so a crash
             // report can tell whether an overlay layer could have been involved.
             #[cfg(target_os = "windows")]
@@ -1742,6 +1749,9 @@ pub fn run(cli_args: CliArgs) {
             // The Windows Job Object in `local_llm.rs` is the backstop for the
             // crash / hard-kill paths where even this handler cannot run.
             if let tauri::RunEvent::Exit = &event {
+                // Marks an ordinary quit, so a log that ends without this line
+                // ended in a crash.
+                log::info!("SpeakoFlow is quitting");
                 release_before_exit(app);
             }
             let _ = (app, event); // suppress unused warnings on non-macOS
