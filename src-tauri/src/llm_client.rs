@@ -788,6 +788,7 @@ pub(crate) enum RejectedParam {
     MaxTokens,
     /// "'temperature' does not support 0 with this model. Only the default (1)
     /// value is supported." — the same models; any explicit value is refused.
+    /// Current Claude models refuse it as well, as "deprecated for this model".
     Temperature,
 }
 
@@ -864,9 +865,15 @@ fn adapt_would_change(body: &ChatCompletionRequest, rejected: RejectedParam) -> 
 ///
 /// Reads the structured `error.param` first (OpenAI and Azure both send it), and
 /// falls back to the quoted parameter name in the message for gateways that
-/// forward only the text. The fallback requires the *quoted* name next to an
-/// "unsupported" phrase, so a message that merely mentions temperature in
-/// passing cannot trigger a retry.
+/// forward only the text and for providers that leave `param` null. The fallback
+/// requires the *quoted* name next to a refusal phrase, so a message that merely
+/// mentions temperature in passing cannot trigger a retry.
+///
+/// Both halves have more than one spelling. OpenAI writes `'temperature'` and
+/// "unsupported"; Anthropic's OpenAI-compatible endpoint writes the name in
+/// backticks and calls the parameter "deprecated for this model", with a null
+/// `param`. That body used to match nothing here, so cleanup on a current Claude
+/// model sent the same `temperature` on every retry and never ran.
 pub(crate) fn rejected_request_parameter(detail: &str) -> Option<RejectedParam> {
     let from_param = serde_json::from_str::<Value>(detail).ok().and_then(|json| {
         json.get("error")
@@ -884,16 +891,22 @@ pub(crate) fn rejected_request_parameter(detail: &str) -> Option<RejectedParam> 
     }
 
     let text = detail.to_ascii_lowercase();
-    let unsupported = text.contains("unsupported")
+    let refused = text.contains("unsupported")
         || text.contains("not supported")
-        || text.contains("does not support");
-    if !unsupported {
+        || text.contains("does not support")
+        || text.contains("deprecated");
+    if !refused {
         return None;
     }
-    if text.contains("'max_tokens'") || text.contains("max_completion_tokens") {
+    let quotes = |name: &str| {
+        ['\'', '`']
+            .iter()
+            .any(|quote| text.contains(&format!("{quote}{name}{quote}")))
+    };
+    if quotes("max_tokens") || text.contains("max_completion_tokens") {
         return Some(RejectedParam::MaxTokens);
     }
-    if text.contains("'temperature'") {
+    if quotes("temperature") {
         return Some(RejectedParam::Temperature);
     }
     None
@@ -1842,6 +1855,36 @@ mod tests {
             None
         );
         assert_eq!(rejected_request_parameter("model not found"), None);
+    }
+
+    /// Verbatim what Anthropic's OpenAI-compatible endpoint answers when a
+    /// cleanup request for `claude-sonnet-5-5` carries `temperature: 0`. No
+    /// `param`, the name in backticks, and "deprecated" where OpenAI says
+    /// "unsupported".
+    const ANTHROPIC_TEMPERATURE_400: &str = r#"{"error":{"code":"invalid_request_error","message":"`temperature` is deprecated for this model.","type":"invalid_request_error","param":null}}"#;
+
+    /// Unrecognised, this refusal was never repaired: every retry carried the
+    /// same `temperature`, so cleanup failed on every dictation and the raw
+    /// transcript was pasted.
+    #[test]
+    fn a_deprecated_parameter_in_backticks_is_recognised() {
+        assert_eq!(
+            rejected_request_parameter(ANTHROPIC_TEMPERATURE_400),
+            Some(RejectedParam::Temperature)
+        );
+        assert_eq!(
+            rejected_request_parameter("`max_tokens` is deprecated for this model."),
+            Some(RejectedParam::MaxTokens)
+        );
+        // Still a refusal of that parameter, not a passing mention of it.
+        assert_eq!(
+            rejected_request_parameter("temperature is deprecated; see the migration guide"),
+            None
+        );
+        assert_eq!(
+            rejected_request_parameter("`temperature` must be between 0 and 1"),
+            None
+        );
     }
 
     #[test]
