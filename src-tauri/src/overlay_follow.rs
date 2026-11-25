@@ -73,28 +73,69 @@ impl MonitorBounds {
     }
 }
 
+/// The coordinate space a platform reports the cursor in.
+///
+/// Tauri reports every display in physical pixels. The cursor is in physical
+/// pixels too on Windows and X11 (`GetCursorPos` / `XQueryPointer` in a
+/// DPI-aware process), but in logical points on macOS (`NSEvent::mouseLocation`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CursorSpace {
+    Physical,
+    Logical,
+}
+
+impl CursorSpace {
+    /// The space `input::get_cursor_position` answers in on this platform.
+    pub(crate) const NATIVE: Self = if cfg!(target_os = "macos") {
+        Self::Logical
+    } else {
+        Self::Physical
+    };
+}
+
 /// The display a cursor position falls on, or `None` when it is on none of them.
 ///
-/// Tauri reports monitor bounds in physical pixels, but the cursor is physical on
-/// Windows and X11 (`GetCursorPos` / `XQueryPointer` in a DPI-aware process) and
-/// logical points on macOS (`NSEvent::mouseLocation`). So the hit test runs in
-/// each space, physical first, instead of guessing which one this platform is in.
+/// The hit test has to run in the space the cursor is in, and that space has to
+/// be *known*, not guessed. This used to try physical pixels first and logical
+/// points second on every platform, which was wrong on a Mac whose displays have
+/// different scales: a Retina display at the origin is twice as large in pixels
+/// as in points, so its pixel rectangle reaches across the points that belong to
+/// the display next to it. A cursor on that neighbour, in points, matched the
+/// Retina display in the physical pass, and the overlay opened on a screen the
+/// user was not looking at.
 ///
-/// Physical first because it is the only reading that is correct on a scaled
-/// multi-monitor Windows desktop: pre-scaling the displays down to logical while
-/// the cursor stays physical made every display look smaller than it is, so a
-/// cursor in the right half of a 150% display matched nothing. The logical pass
-/// is a no-op on an unscaled display, where the two spaces are identical.
-pub(crate) fn display_under(displays: &[MonitorBounds], cursor: Point) -> Option<MonitorBounds> {
-    displays
-        .iter()
-        .find(|display| display.contains_physical(cursor))
-        .or_else(|| {
-            displays
-                .iter()
-                .find(|display| display.contains_logical(cursor))
-        })
-        .copied()
+/// A logical cursor is therefore tested in logical space only. macOS lays its
+/// displays out in points, and tao derives each physical origin by multiplying
+/// the origin in points by that display's own scale, so dividing by it again
+/// gives back exactly the rectangles the cursor is measured against.
+///
+/// A physical cursor is tested in physical space, the only reading that is
+/// correct on a scaled multi-monitor Windows desktop: pre-scaling the displays
+/// down to logical while the cursor stays physical made every display look
+/// smaller than it is, so a cursor in the right half of a 150% display matched
+/// nothing. A physical cursor that is on no display in pixels is still retried
+/// in logical space, as it always was, for a Linux session that reports the
+/// pointer scaled.
+pub(crate) fn display_under(
+    displays: &[MonitorBounds],
+    cursor: Point,
+    space: CursorSpace,
+) -> Option<MonitorBounds> {
+    let physical = || {
+        displays
+            .iter()
+            .find(|display| display.contains_physical(cursor))
+    };
+    let logical = || {
+        displays
+            .iter()
+            .find(|display| display.contains_logical(cursor))
+    };
+    match space {
+        CursorSpace::Physical => physical().or_else(logical),
+        CursorSpace::Logical => logical(),
+    }
+    .copied()
 }
 
 /// Which screen edge the overlay sits against, with its offset in logical px.
@@ -356,11 +397,12 @@ mod tests {
     #[test]
     fn the_cursor_is_found_on_the_display_it_is_on() {
         let displays = [LEFT, MIDDLE, RIGHT];
-        assert_eq!(display_under(&displays, (-5.0, 500.0)), Some(LEFT));
-        assert_eq!(display_under(&displays, (0.0, 0.0)), Some(MIDDLE));
+        let under = |cursor| display_under(&displays, cursor, CursorSpace::Physical);
+        assert_eq!(under((-5.0, 500.0)), Some(LEFT));
+        assert_eq!(under((0.0, 0.0)), Some(MIDDLE));
         // The right half of a 150% display — the case pre-scaling used to miss.
-        assert_eq!(display_under(&displays, (6000.0, 2000.0)), Some(RIGHT));
-        assert_eq!(display_under(&displays, (0.0, 5000.0)), None);
+        assert_eq!(under((6000.0, 2000.0)), Some(RIGHT));
+        assert_eq!(under((0.0, 5000.0)), None);
     }
 
     #[test]
@@ -373,7 +415,64 @@ mod tests {
             height: 2000.0,
             scale: 2.0,
         };
-        assert_eq!(display_under(&[retina], (2100.0, 500.0)), Some(retina));
+        let cursor = (2100.0, 500.0);
+        assert_eq!(
+            display_under(&[retina], cursor, CursorSpace::Logical),
+            Some(retina)
+        );
+        // A cursor said to be physical that is on no display in pixels is still
+        // retried in points.
+        assert_eq!(
+            display_under(&[retina], cursor, CursorSpace::Physical),
+            Some(retina)
+        );
+    }
+
+    #[test]
+    fn the_cursor_space_is_the_one_this_platform_reports() {
+        let expected = if cfg!(target_os = "macos") {
+            CursorSpace::Logical
+        } else {
+            CursorSpace::Physical
+        };
+        assert_eq!(CursorSpace::NATIVE, expected);
+    }
+
+    /// A MacBook's built-in Retina display with an unscaled ultrawide to its
+    /// right and a little above, as tao reports them: each display's origin in
+    /// points multiplied by its own scale. The ultrawide starts at 1512 pt.
+    const MACBOOK: MonitorBounds = MonitorBounds {
+        x: 0.0,
+        y: 0.0,
+        width: 3024.0,
+        height: 1964.0,
+        scale: 2.0,
+    };
+    const ULTRAWIDE: MonitorBounds = MonitorBounds {
+        x: 1512.0,
+        y: -670.0,
+        width: 3440.0,
+        height: 1440.0,
+        scale: 1.0,
+    };
+
+    #[test]
+    fn a_cursor_in_points_is_not_read_as_pixels_on_a_retina_neighbour() {
+        let displays = [MACBOOK, ULTRAWIDE];
+        let under = |cursor| display_under(&displays, cursor, CursorSpace::Logical);
+        // On the ultrawide in points, but inside the MacBook's 3024x1964 *pixel*
+        // rectangle: the overlay used to open on the MacBook.
+        for cursor in [(2000.0, 300.0), (2900.0, 700.0), (1512.0, 0.0)] {
+            assert_eq!(under(cursor), Some(ULTRAWIDE));
+        }
+        // Everywhere else it was already right, and must stay so.
+        assert_eq!(under((4000.0, 300.0)), Some(ULTRAWIDE));
+        assert_eq!(under((2000.0, -300.0)), Some(ULTRAWIDE));
+        assert_eq!(under((700.0, 500.0)), Some(MACBOOK));
+        assert_eq!(under((1511.0, 981.0)), Some(MACBOOK));
+        // Below the MacBook's 982 pt of height there is no display at all, though
+        // its pixel rectangle runs on to 1964.
+        assert_eq!(under((700.0, 1500.0)), None);
     }
 
     #[test]
