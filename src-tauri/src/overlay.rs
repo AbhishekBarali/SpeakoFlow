@@ -1,8 +1,8 @@
 use crate::input;
 use crate::managers::transcription::TranscriptionManager;
 use crate::overlay_follow::{
-    display_under, hop_destination, placement_at, rect_contains, DisplayFollower, Edge,
-    MonitorBounds, Point, Side, FOLLOW_POLL, HOP_FADE_OUT,
+    display_under, hop_destination, placement_at, rect_contains, CursorSpace, DisplayFollower,
+    Edge, MonitorBounds, Point, Side, FOLLOW_POLL, HOP_FADE_OUT,
 };
 use crate::overlay_lifecycle::OverlayLifecycle;
 use crate::settings;
@@ -924,13 +924,14 @@ pub(crate) fn get_monitor_with_cursor(app_handle: &AppHandle) -> Option<tauri::M
 /// the difference: "the cursor can't be located" (Wayland, a locked session)
 /// must leave the overlay where it is, not send it to the primary display.
 ///
-/// The hit test itself (physical space first, logical second, and why) is
-/// `overlay_follow::display_under`, shared with the follower's cached list.
+/// The hit test itself (in the space this platform reports the cursor in, and
+/// why that must not be guessed) is `overlay_follow::display_under`, shared with
+/// the follower's cached list.
 fn monitor_under_cursor(app_handle: &AppHandle) -> Option<tauri::Monitor> {
     let (x, y) = input::get_cursor_position(app_handle)?;
     let monitors = app_handle.available_monitors().ok()?;
     let displays: Vec<MonitorBounds> = monitors.iter().map(monitor_bounds).collect();
-    let hit = display_under(&displays, (x as f64, y as f64))?;
+    let hit = display_under(&displays, (x as f64, y as f64), CursorSpace::NATIVE)?;
     monitors.into_iter().find(|m| monitor_bounds(m) == hit)
 }
 
@@ -1150,7 +1151,8 @@ fn start_overlay_follow(
             }
             stale_hover_since = None;
 
-            if let Some(target) = follower.step(current, display_under(&displays, cursor), now) {
+            let under_cursor = display_under(&displays, cursor, CursorSpace::NATIVE);
+            if let Some(target) = follower.step(current, under_cursor, now) {
                 // A hide or a new state may have landed while this tick ran.
                 if !alive() {
                     break;
@@ -1166,8 +1168,9 @@ fn start_overlay_follow(
                 if !alive() {
                     break;
                 }
-                let now_under = input::get_cursor_position(&app)
-                    .and_then(|(x, y)| display_under(&displays, (x as f64, y as f64)));
+                let now_under = input::get_cursor_position(&app).and_then(|(x, y)| {
+                    display_under(&displays, (x as f64, y as f64), CursorSpace::NATIVE)
+                });
                 if let Some(destination) = hop_destination(current, target, now_under) {
                     set_overlay_placement(
                         &window,
